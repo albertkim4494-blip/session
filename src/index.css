@@ -3,9 +3,8 @@
   line-height: 1.5;
   font-weight: 400;
 
+  /* Let the browser render form controls nicely in both modes */
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #0b0f14;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -17,19 +16,72 @@
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
+
+  /* ---------------- Theme variables (default = dark) ---------------- */
+  --bg: #0b0f14;
+  --surface: #0f1722;
+  --surface2: #0b111a;
+
+  --border: rgba(255, 255, 255, 0.10);
+  --borderStrong: rgba(255, 255, 255, 0.22);
+
+  --text: #e8eef7;
+  --textMuted: rgba(232, 238, 247, 0.75);
+
+  /* calm / neutral accents */
+  --accent: #152338; /* dark mode accent */
+  --successBg: rgba(46, 204, 113, 0.18);
+  --successBorder: rgba(46, 204, 113, 0.25);
+
+  --chipBg: rgba(255, 255, 255, 0.10);
+  --chipBorder: rgba(255, 255, 255, 0.14);
+
+  --chipBgMuted: rgba(255, 255, 255, 0.06);
+  --chipBorderMuted: rgba(255, 255, 255, 0.10);
+
+  --dangerBorder: rgba(255, 100, 100, 0.35);
+  --dangerBg: rgba(255, 80, 80, 0.12);
+  --dangerText: #ffd7d7;
 }
 
-html, body {
+/* Manual toggle target */
+:root[data-theme="light"] {
+  /* sage/sand vibe like your screenshot */
+  --bg: #f6f4ef;        /* warm off-white */
+  --surface: #ede6dc;   /* soft sand */
+  --surface2: #ffffff;  /* raised */
+
+  --border: rgba(58, 51, 48, 0.14);
+  --borderStrong: rgba(58, 51, 48, 0.22);
+
+  --text: #3a3330;
+  --textMuted: rgba(58, 51, 48, 0.70);
+
+  --accent: #d0e1db; /* soft teal/sage */
+  --successBg: rgba(46, 204, 113, 0.16);
+  --successBorder: rgba(46, 204, 113, 0.22);
+
+  --chipBg: rgba(58, 51, 48, 0.08);
+  --chipBorder: rgba(58, 51, 48, 0.12);
+
+  --chipBgMuted: rgba(58, 51, 48, 0.06);
+  --chipBorderMuted: rgba(58, 51, 48, 0.10);
+
+  --dangerBorder: rgba(180, 60, 60, 0.30);
+  --dangerBg: rgba(180, 60, 60, 0.10);
+  --dangerText: #7a2b2b;
+}
+
+html,
+body {
   height: 100%;
   width: 100%;
   margin: 0;
+  background: var(--bg);
+  color: var(--text);
 }
 
 body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  background: #0b0f14;
   overflow-x: hidden;
 }
 
@@ -37,9 +89,10 @@ body {
   height: 100%;
   width: 100%;
   min-height: 100dvh;
-  background: #0b0f14;
+  background: var(--bg);
 }
 
+/* Links (optional) */
 a {
   font-weight: 500;
   color: #646cff;
@@ -63,7 +116,8 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--surface);
+  color: var(--text);
   cursor: pointer;
   transition: border-color 0.25s;
 }
@@ -73,17 +127,4 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #0b0f14; /* keep consistent */
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
 }
