@@ -15,17 +15,8 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const LS_KEY = "workout_tracker_v2";
 const LS_BACKUP_KEY = "workout_tracker_v2_backup";
+
 const BASELINE_WORKOUT_ID = "baseline";
-
-const THEME_KEY = "workout_tracker_theme";
-
-function getInitialTheme() {
-  const saved = localStorage.getItem(THEME_KEY);
-  if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light";
-}
-
-/* ------------------------------ Helpers ------------------------------ */
 
 function yyyyMmDd(d = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -92,15 +83,6 @@ function formatMaxWeight(maxNum, hasBW) {
   return "-";
 }
 
-function defaultBaselineExercises() {
-  return [
-    { id: uid("ex"), name: "Push Ups" },
-    { id: uid("ex"), name: "Pull Ups" },
-    { id: uid("ex"), name: "Squats" },
-    { id: uid("ex"), name: "Face Pulls" },
-  ];
-}
-
 function ensureBaselineWorkout(program) {
   const hasBaseline = program.workouts.some((w) => w.id === BASELINE_WORKOUT_ID);
   if (hasBaseline) return program;
@@ -113,9 +95,22 @@ function ensureBaselineWorkout(program) {
   };
 }
 
+function defaultBaselineExercises() {
+  return [
+    { id: uid("ex"), name: "Push Ups" },
+    { id: uid("ex"), name: "Pull Ups" },
+    { id: uid("ex"), name: "Squats" },
+    { id: uid("ex"), name: "Face Pulls" },
+  ];
+}
+
 function defaultWorkouts() {
   return [
-    { id: BASELINE_WORKOUT_ID, name: "Baseline", exercises: defaultBaselineExercises() },
+    {
+      id: BASELINE_WORKOUT_ID,
+      name: "Baseline",
+      exercises: defaultBaselineExercises(),
+    },
     {
       id: uid("w"),
       name: "Workout A",
@@ -138,10 +133,15 @@ function defaultWorkouts() {
 function makeDefaultState() {
   return {
     version: 1,
-    program: { workouts: defaultWorkouts() },
+    program: {
+      workouts: defaultWorkouts(),
+    },
     // logsByDate[YYYY-MM-DD][exerciseId] = { sets: [{reps, weight}], notes }
     logsByDate: {},
-    meta: { createdAt: Date.now(), updatedAt: Date.now() },
+    meta: {
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    },
   };
 }
 
@@ -151,6 +151,7 @@ function loadState() {
   const st = safeParse(raw, null);
   if (!st || typeof st !== "object") return makeDefaultState();
 
+  // minimal migration/repair
   const next = {
     ...makeDefaultState(),
     ...st,
@@ -214,13 +215,6 @@ function Modal({ open, title, children, onClose }) {
 /* --------------------------------- App --------------------------------- */
 
 export default function App() {
-  const [theme, setTheme] = useState(getInitialTheme);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
-
   const [state, setState] = useState(() => loadState());
   const [tab, setTab] = useState("today"); // today | summary | manage
   const [summaryMode, setSummaryMode] = useState("wtd"); // wtd | mtd | ytd
@@ -286,13 +280,12 @@ export default function App() {
     const existing = state.logsByDate[dateKey]?.[exerciseId] ?? null;
     const prior = existing ?? findMostRecentLogBefore(exerciseId, dateKey);
 
-    const sets =
-      prior?.sets?.length
-        ? prior.sets.map((s) => ({
-            reps: Number(s.reps ?? 0) || 0,
-            weight: typeof s.weight === "string" ? s.weight : "",
-          }))
-        : [{ reps: 0, weight: "BW" }];
+    const sets = prior?.sets?.length
+      ? prior.sets.map((s) => ({
+          reps: Number(s.reps ?? 0) || 0,
+          weight: typeof s.weight === "string" ? s.weight : "",
+        }))
+      : [{ reps: 0, weight: "BW" }];
 
     const normalizedSets = sets.map((s) => {
       const isBW = String(s.weight).toUpperCase() === "BW";
@@ -312,10 +305,8 @@ export default function App() {
       .map((s) => {
         const reps = Number(s.reps ?? 0);
         const repsClean = Number.isFinite(reps) && reps > 0 ? Math.floor(reps) : 0;
-
         const w = String(s.weight ?? "").trim();
         const weight = w.toUpperCase() === "BW" ? "BW" : w.replace(/[^\d.]/g, "");
-
         return { reps: repsClean, weight: weight || "BW" };
       })
       .filter((s) => s.reps > 0);
@@ -411,12 +402,10 @@ export default function App() {
     const w = workoutById.get(workoutId);
     if (!w) return;
     if (!confirm(`Delete workout "${w.name}"? This will NOT delete past logs.`)) return;
-
     updateState((st) => {
       st.program.workouts = st.program.workouts.filter((x) => x.id !== workoutId);
       return st;
     });
-
     if (manageWorkoutId === workoutId) setManageWorkoutId(null);
   }
 
@@ -435,10 +424,8 @@ export default function App() {
     const w = workoutById.get(workoutId);
     const ex = w?.exercises?.find((e) => e.id === exerciseId);
     if (!ex) return;
-
     const name = prompt("Rename exercise:", ex.name);
     if (!name) return;
-
     updateState((st) => {
       const ww = st.program.workouts.find((x) => x.id === workoutId);
       const ee = ww?.exercises?.find((e) => e.id === exerciseId);
@@ -451,7 +438,6 @@ export default function App() {
     const w = workoutById.get(workoutId);
     const ex = w?.exercises?.find((e) => e.id === exerciseId);
     if (!ex) return;
-
     if (!confirm(`Delete exercise "${ex.name}"? This will NOT delete past logs.`)) return;
 
     updateState((st) => {
@@ -508,14 +494,10 @@ export default function App() {
   function ExerciseRow({ workoutId, exercise }) {
     const exLog = logsForDate[exercise.id] ?? null;
     const hasLog = !!exLog;
-
     const setsText = hasLog
       ? exLog.sets
           ?.filter((s) => Number(s.reps) > 0)
-          .map(
-            (s) =>
-              `${s.reps}x${String(s.weight).toUpperCase() === "BW" ? "BW" : s.weight}`
-          )
+          .map((s) => `${s.reps}x${String(s.weight).toUpperCase() === "BW" ? "BW" : s.weight}`)
           .join(", ")
       : "";
 
@@ -635,21 +617,10 @@ export default function App() {
 
   return (
     <div style={styles.app}>
+      {/* Centered column (fixes landscape) */}
       <div style={styles.content}>
         <div style={styles.topBar}>
-          <div style={styles.topTitleRow}>
-            <div style={styles.brand}>Workout Tracker</div>
-
-            <button
-              style={styles.iconBtn}
-              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-              aria-label="Toggle theme"
-              title="Toggle theme"
-            >
-              {theme === "dark" ? "☀️" : "🌙"}
-            </button>
-          </div>
-
+          <div style={styles.brand}>Workout Tracker</div>
           <div style={styles.dateRow}>
             <label style={styles.label}>Date</label>
             <input
@@ -665,6 +636,7 @@ export default function App() {
           {tab === "today" ? (
             <div style={styles.section}>
               {baselineWorkout ? <WorkoutCard workout={baselineWorkout} /> : null}
+
               {workouts
                 .filter((w) => w.id !== BASELINE_WORKOUT_ID)
                 .map((w) => (
@@ -684,12 +656,12 @@ export default function App() {
                   { value: "ytd", label: "YTD" },
                 ]}
               />
-
               <div style={styles.rangeText}>
                 Range: <b>{summaryRange.start}</b> → <b>{summaryRange.end}</b>
               </div>
 
               {baselineWorkout ? <SummaryBlock workout={baselineWorkout} /> : null}
+
               {workouts
                 .filter((w) => w.id !== BASELINE_WORKOUT_ID)
                 .map((w) => (
@@ -714,10 +686,7 @@ export default function App() {
                     return (
                       <button
                         key={w.id}
-                        style={{
-                          ...styles.manageItem,
-                          ...(active ? styles.manageItemActive : {}),
-                        }}
+                        style={{ ...styles.manageItem, ...(active ? styles.manageItemActive : {}) }}
                         onClick={() => setManageWorkoutId(w.id)}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -778,10 +747,7 @@ export default function App() {
                                   >
                                     Rename
                                   </button>
-                                  <button
-                                    style={styles.dangerBtn}
-                                    onClick={() => deleteExercise(w.id, ex.id)}
-                                  >
+                                  <button style={styles.dangerBtn} onClick={() => deleteExercise(w.id, ex.id)}>
                                     Delete
                                   </button>
                                 </div>
@@ -799,7 +765,6 @@ export default function App() {
                 <div style={styles.cardHeader}>
                   <div style={styles.cardTitle}>Backup</div>
                 </div>
-
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button style={styles.secondaryBtn} onClick={exportJson}>
                     Export JSON
@@ -831,7 +796,6 @@ export default function App() {
                     Reset All
                   </button>
                 </div>
-
                 <div style={styles.smallText}>
                   Import replaces current data. Structure changes never delete past logs.
                 </div>
@@ -841,6 +805,7 @@ export default function App() {
         </div>
       </div>
 
+      {/* Bottom nav stays fixed and safe-area aware */}
       <div style={styles.nav}>
         <button
           style={{ ...styles.navBtn, ...(tab === "today" ? styles.navBtnActive : {}) }}
@@ -952,81 +917,58 @@ export default function App() {
 }
 
 /* -------------------------------- Styles -------------------------------- */
-/**
- * NOTE: These now use CSS variables like var(--bg) / var(--surface) etc.
- * You MUST add the variables to src/index.css (snippet below).
- */
+
 const styles = {
+  /* Full screen + center column to fix landscape */
   app: {
     fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-    background: "var(--bg)",
-    color: "var(--text)",
+    background: "#0b0f14",
+    color: "#e8eef7",
     minHeight: "100dvh",
     width: "100%",
     display: "flex",
     justifyContent: "center",
   },
 
+  /* Centered content column */
   content: {
     width: "100%",
-    maxWidth: 760,
+    maxWidth: 760, // landscape fix: no huge empty right side
     display: "flex",
     flexDirection: "column",
     paddingLeft: "calc(14px + var(--safe-left, 0px))",
     paddingRight: "calc(14px + var(--safe-right, 0px))",
     paddingTop: "calc(10px + var(--safe-top, 0px))",
-    paddingBottom: "calc(92px + var(--safe-bottom, 0px))",
+    paddingBottom: "calc(92px + var(--safe-bottom, 0px))", // room for bottom nav
   },
 
   topBar: {
     position: "sticky",
     top: 0,
     zIndex: 10,
-    background: "var(--bg)",
+    background: "#0b0f14",
     padding: "14px 0 10px",
-    borderBottom: "1px solid var(--border)",
+    borderBottom: "1px solid rgba(255,255,255,0.08)",
   },
 
-  topTitleRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-
-  brand: {
-    fontWeight: 800,
-    fontSize: 18,
-    letterSpacing: 0.2,
-  },
-
-  dateRow: {
-    marginTop: 10,
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-  },
-
-  label: {
-    fontSize: 12,
-    opacity: 0.85,
-    color: "var(--textMuted)",
-  },
+  brand: { fontWeight: 800, fontSize: 18, letterSpacing: 0.2 },
+  dateRow: { marginTop: 10, display: "flex", alignItems: "center", gap: 10 },
+  label: { fontSize: 12, opacity: 0.85 },
 
   dateInput: {
     flex: 1,
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid var(--border)",
-    background: "var(--surface2)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "#0f1722",
+    color: "#e8eef7",
     fontSize: 14,
   },
 
   body: { flex: 1, paddingTop: 14 },
-
   section: { display: "flex", flexDirection: "column", gap: 12 },
 
+  /* Bottom nav safe-area aware */
   nav: {
     position: "fixed",
     left: 0,
@@ -1038,32 +980,31 @@ const styles = {
     paddingLeft: "calc(10px + var(--safe-left, 0px))",
     paddingRight: "calc(10px + var(--safe-right, 0px))",
     paddingBottom: "calc(10px + var(--safe-bottom, 0px))",
-    background: "var(--bg)",
-    borderTop: "1px solid var(--border)",
+    background: "#0b0f14",
+    borderTop: "1px solid rgba(255,255,255,0.08)",
   },
 
   navBtn: {
     flex: 1,
     padding: "12px 12px",
     borderRadius: 14,
-    border: "1px solid var(--border)",
-    background: "var(--surface)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "#0f1722",
+    color: "#e8eef7",
     fontWeight: 800,
   },
 
   navBtnActive: {
-    border: "1px solid var(--borderStrong)",
-    background: "var(--accent)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.25)",
+    background: "#152338",
   },
 
   card: {
-    background: "var(--surface)",
-    border: "1px solid var(--border)",
+    background: "#0f1722",
+    border: "1px solid rgba(255,255,255,0.10)",
     borderRadius: 16,
     padding: 12,
-    boxShadow: "0 8px 18px rgba(0,0,0,0.18)",
+    boxShadow: "0 8px 18px rgba(0,0,0,0.25)",
   },
 
   cardHeader: {
@@ -1080,21 +1021,20 @@ const styles = {
     fontSize: 12,
     padding: "4px 8px",
     borderRadius: 999,
-    background: "var(--chipBg)",
-    border: "1px solid var(--chipBorder)",
-    color: "var(--text)",
+    background: "rgba(255,255,255,0.12)",
+    border: "1px solid rgba(255,255,255,0.10)",
   },
 
   tagMuted: {
     fontSize: 12,
     padding: "4px 8px",
     borderRadius: 999,
-    background: "var(--chipBgMuted)",
-    border: "1px solid var(--chipBorderMuted)",
-    color: "var(--textMuted)",
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    opacity: 0.85,
   },
 
-  emptyText: { opacity: 0.8, fontSize: 13, padding: "6px 2px", color: "var(--textMuted)" },
+  emptyText: { opacity: 0.75, fontSize: 13, padding: "6px 2px" },
 
   exerciseRow: { display: "flex", alignItems: "stretch", gap: 10 },
 
@@ -1103,23 +1043,21 @@ const styles = {
     textAlign: "left",
     padding: 12,
     borderRadius: 14,
-    border: "1px solid var(--border)",
-    background: "var(--surface2)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "#0b111a",
+    color: "#e8eef7",
   },
 
   exerciseName: { fontWeight: 800, fontSize: 15 },
-
-  exerciseSub: { marginTop: 6, fontSize: 12, opacity: 0.85, color: "var(--textMuted)" },
+  exerciseSub: { marginTop: 6, fontSize: 12, opacity: 0.8 },
 
   badge: {
     fontSize: 11,
     fontWeight: 800,
     padding: "3px 8px",
     borderRadius: 999,
-    background: "var(--successBg)",
-    border: "1px solid var(--successBorder)",
-    color: "var(--text)",
+    background: "rgba(46, 204, 113, 0.18)",
+    border: "1px solid rgba(46, 204, 113, 0.25)",
   },
 
   badgeMuted: {
@@ -1127,35 +1065,35 @@ const styles = {
     fontWeight: 800,
     padding: "3px 8px",
     borderRadius: 999,
-    background: "var(--chipBgMuted)",
-    border: "1px solid var(--chipBorderMuted)",
-    color: "var(--textMuted)",
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    opacity: 0.75,
   },
 
   primaryBtn: {
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid var(--borderStrong)",
-    background: "var(--accent)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.18)",
+    background: "#152338",
+    color: "#e8eef7",
     fontWeight: 900,
   },
 
   secondaryBtn: {
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid var(--border)",
-    background: "var(--surface2)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "#0b111a",
+    color: "#e8eef7",
     fontWeight: 800,
   },
 
   dangerBtn: {
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid var(--dangerBorder)",
-    background: "var(--dangerBg)",
-    color: "var(--dangerText)",
+    border: "1px solid rgba(255,100,100,0.35)",
+    background: "rgba(255, 80, 80, 0.12)",
+    color: "#ffd7d7",
     fontWeight: 900,
   },
 
@@ -1163,19 +1101,19 @@ const styles = {
     width: 72,
     padding: "10px 10px",
     borderRadius: 12,
-    border: "1px solid var(--dangerBorder)",
-    background: "var(--dangerBg)",
-    color: "var(--dangerText)",
+    border: "1px solid rgba(255,100,100,0.35)",
+    background: "rgba(255, 80, 80, 0.12)",
+    color: "#ffd7d7",
     fontWeight: 900,
   },
 
   iconBtn: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    border: "1px solid var(--border)",
-    background: "var(--surface2)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "#0b111a",
+    color: "#e8eef7",
     fontWeight: 900,
   },
 
@@ -1185,23 +1123,14 @@ const styles = {
     flex: 1,
     padding: "10px 12px",
     borderRadius: 999,
-    border: "1px solid var(--border)",
+    border: "1px solid rgba(255,255,255,0.10)",
     fontWeight: 900,
   },
 
-  pillActive: {
-    background: "var(--accent)",
-    color: "var(--text)",
-    border: "1px solid var(--borderStrong)",
-  },
+  pillActive: { background: "#152338", color: "#e8eef7", border: "1px solid rgba(255,255,255,0.20)" },
+  pillInactive: { background: "#0f1722", color: "#e8eef7", opacity: 0.8 },
 
-  pillInactive: {
-    background: "var(--surface)",
-    color: "var(--textMuted)",
-    opacity: 0.95,
-  },
-
-  rangeText: { fontSize: 12, opacity: 0.85, marginBottom: 8, color: "var(--textMuted)" },
+  rangeText: { fontSize: 12, opacity: 0.8, marginBottom: 8 },
 
   summaryRow: {
     display: "flex",
@@ -1210,8 +1139,8 @@ const styles = {
     gap: 10,
     padding: "10px 12px",
     borderRadius: 14,
-    border: "1px solid var(--border)",
-    background: "var(--surface2)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "#0b111a",
   },
 
   summaryRight: { display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" },
@@ -1221,9 +1150,8 @@ const styles = {
     fontWeight: 900,
     padding: "6px 10px",
     borderRadius: 999,
-    background: "var(--chipBgMuted)",
-    border: "1px solid var(--chipBorderMuted)",
-    color: "var(--text)",
+    background: "rgba(255,255,255,0.08)",
+    border: "1px solid rgba(255,255,255,0.10)",
   },
 
   manageList: { display: "flex", flexDirection: "column", gap: 10 },
@@ -1232,14 +1160,14 @@ const styles = {
     textAlign: "left",
     padding: 12,
     borderRadius: 14,
-    border: "1px solid var(--border)",
-    background: "var(--surface2)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "#0b111a",
+    color: "#e8eef7",
   },
 
   manageItemActive: {
-    border: "1px solid var(--borderStrong)",
-    background: "var(--accent)",
+    border: "1px solid rgba(255,255,255,0.24)",
+    background: "#152338",
   },
 
   manageExerciseRow: {
@@ -1249,11 +1177,11 @@ const styles = {
     gap: 10,
     padding: "10px 12px",
     borderRadius: 14,
-    border: "1px solid var(--border)",
-    background: "var(--surface2)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "#0b111a",
   },
 
-  smallText: { fontSize: 12, opacity: 0.85, color: "var(--textMuted)" },
+  smallText: { fontSize: 12, opacity: 0.8 },
 
   modalOverlay: {
     position: "fixed",
@@ -1269,16 +1197,16 @@ const styles = {
   modalSheet: {
     width: "100%",
     maxWidth: 720,
-    background: "var(--surface)",
-    border: "1px solid var(--border)",
+    background: "#0f1722",
+    border: "1px solid rgba(255,255,255,0.10)",
     borderRadius: 18,
     overflow: "hidden",
-    boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
+    boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
   },
 
   modalHeader: {
     padding: 12,
-    borderBottom: "1px solid var(--border)",
+    borderBottom: "1px solid rgba(255,255,255,0.08)",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1286,9 +1214,7 @@ const styles = {
   },
 
   modalTitle: { fontWeight: 900, fontSize: 16 },
-
   modalBody: { padding: 12, maxHeight: "78vh", overflow: "auto" },
-
   modalFooter: { display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 },
 
   setRow: {
@@ -1298,8 +1224,8 @@ const styles = {
     alignItems: "end",
     padding: 10,
     borderRadius: 14,
-    border: "1px solid var(--border)",
-    background: "var(--surface2)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "#0b111a",
   },
 
   setIndex: {
@@ -1307,32 +1233,29 @@ const styles = {
     opacity: 0.85,
     textAlign: "center",
     paddingBottom: 10,
-    color: "var(--textMuted)",
   },
 
   fieldCol: { display: "flex", flexDirection: "column", gap: 6, minWidth: 0 },
-
   bwCol: { display: "flex", flexDirection: "column", gap: 8, alignItems: "center" },
 
   numInput: {
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid var(--border)",
-    background: "var(--surface)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "#0f1722",
+    color: "#e8eef7",
     fontSize: 14,
   },
 
   disabledInput: { opacity: 0.7 },
-
   checkbox: { width: 22, height: 22 },
 
   textarea: {
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid var(--border)",
-    background: "var(--surface)",
-    color: "var(--text)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "#0f1722",
+    color: "#e8eef7",
     fontSize: 14,
     resize: "vertical",
   },
