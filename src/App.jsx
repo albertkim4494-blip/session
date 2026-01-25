@@ -173,7 +173,7 @@ function persistState(state) {
 
 /* ------------------------------ UI helpers ------------------------------ */
 
-function PillTabs({ tabs, value, onChange }) {
+function PillTabs({ tabs, value, onChange, styles }) {
   return (
     <div style={styles.pillRow}>
       {tabs.map((t) => {
@@ -195,7 +195,7 @@ function PillTabs({ tabs, value, onChange }) {
   );
 }
 
-function Modal({ open, title, children, onClose }) {
+function Modal({ open, title, children, onClose, styles }) {
   if (!open) return null;
   return (
     <div style={styles.modalOverlay} onMouseDown={onClose}>
@@ -203,7 +203,7 @@ function Modal({ open, title, children, onClose }) {
         <div style={styles.modalHeader}>
           <div style={styles.modalTitle}>{title}</div>
           <button onClick={onClose} style={styles.iconBtn} aria-label="Close">
-            ✕
+            ×
           </button>
         </div>
         <div style={styles.modalBody}>{children}</div>
@@ -219,7 +219,45 @@ export default function App() {
   const [tab, setTab] = useState("today"); // today | summary | manage
   const [summaryMode, setSummaryMode] = useState("wtd"); // wtd | mtd | ytd
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
+  const [theme, setTheme] = useState("dark"); // add this
 
+  const colors =
+  theme === "dark"
+    ? {
+        appBg: "#0b0f14",
+        text: "#e8eef7",
+        border: "rgba(255,255,255,0.10)",
+
+        cardBg: "#0f1722",
+        cardAltBg: "#0b111a",
+        inputBg: "#0f1722",
+        navBg: "#0b0f14",
+        topBarBg: "#0b0f14",
+        shadow: "0 8px 18px rgba(0,0,0,0.25)",
+
+        // optional quick win:
+        primaryBg: "#152338",
+        primaryText: "#e8eef7",
+      }
+    : {
+        appBg: "#f5f9fc",
+        text: "#1f2933",
+        border: "#dde5ec",
+
+        cardBg: "#ffffff",
+        cardAltBg: "#eef6f3",
+        inputBg: "#ffffff",
+        navBg: "#f5f9fc",
+        topBarBg: "#f5f9fc",
+        shadow: "0 8px 18px rgba(31,41,51,0.08)",
+
+        // optional quick win:
+        primaryBg: "#2b5b7a",
+        primaryText: "#ffffff",
+      };
+
+  const styles = useMemo(() => getStyles(colors),[colors]);
+  
   // Logging modal
   const [logOpen, setLogOpen] = useState(false);
   const [logContext, setLogContext] = useState(null); // { workoutId, exerciseId, exerciseName }
@@ -285,7 +323,7 @@ export default function App() {
           reps: Number(s.reps ?? 0) || 0,
           weight: typeof s.weight === "string" ? s.weight : "",
         }))
-      : [{ reps: 0, weight: "BW" }];
+      : [{ reps: 0, weight: "" }];
 
     const normalizedSets = sets.map((s) => {
       const isBW = String(s.weight).toUpperCase() === "BW";
@@ -307,7 +345,7 @@ export default function App() {
         const repsClean = Number.isFinite(reps) && reps > 0 ? Math.floor(reps) : 0;
         const w = String(s.weight ?? "").trim();
         const weight = w.toUpperCase() === "BW" ? "BW" : w.replace(/[^\d.]/g, "");
-        return { reps: repsClean, weight: weight || "BW" };
+        return { reps: repsClean, weight: weight || "" };
       })
       .filter((s) => s.reps > 0);
 
@@ -606,7 +644,14 @@ export default function App() {
   }
 
   function addSet() {
-    setDraftSets((prev) => [...prev, { reps: 0, weight: "BW" }]);
+    setDraftSets((prev) => {
+      const last = prev[prev.length - 1];
+      const nextSet = last
+        ? {reps: last.reps ?? 0, weight: last.weight ?? ""}
+        : {reps:0,weight:""};
+      
+        return[...prev,nextSet];
+    });
   }
 
   function removeSet(i) {
@@ -648,6 +693,7 @@ export default function App() {
           {tab === "summary" ? (
             <div style={styles.section}>
               <PillTabs
+                styles={styles}
                 value={summaryMode}
                 onChange={setSummaryMode}
                 tabs={[
@@ -674,11 +720,22 @@ export default function App() {
             <div style={styles.section}>
               <div style={styles.card}>
                 <div style={styles.cardHeader}>
-                  <div style={styles.cardTitle}>Structure</div>
-                  <button style={styles.primaryBtn} onClick={addWorkout}>
-                    + Add Workout
+                 <div style={styles.cardTitle}>Structure</div>
+
+                 <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                   style={styles.secondaryBtn}
+                   onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+                  >
+                   {theme === "dark" ? "☀️ Light" : "🌙 Dark"}
                   </button>
+
+                  <button style={styles.primaryBtn} onClick={addWorkout}>
+                   + Add Workout
+                  </button>
+                 </div>
                 </div>
+
 
                 <div style={styles.manageList}>
                   {workouts.map((w) => {
@@ -827,7 +884,11 @@ export default function App() {
         </button>
       </div>
 
-      <Modal open={logOpen} title={logTitle} onClose={() => setLogOpen(false)}>
+      <Modal 
+        styles={styles}
+        open={logOpen} 
+        title={logTitle} 
+        onClose={() => setLogOpen(false)}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={styles.smallText}>
             Prefilled from your most recent log. Edit and hit <b>Save</b>.
@@ -918,12 +979,13 @@ export default function App() {
 
 /* -------------------------------- Styles -------------------------------- */
 
-const styles = {
+function getStyles(colors){
+  return{
   /* Full screen + center column to fix landscape */
   app: {
     fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-    background: "#0b0f14",
-    color: "#e8eef7",
+    background: colors.appBg,
+    color: colors.text,
     minHeight: "100dvh",
     width: "100%",
     display: "flex",
@@ -946,9 +1008,9 @@ const styles = {
     position: "sticky",
     top: 0,
     zIndex: 10,
-    background: "#0b0f14",
+    background: colors.topBarBg,
     padding: "14px 0 10px",
-    borderBottom: "1px solid rgba(255,255,255,0.08)",
+    borderBottom: `1px solid ${colors.border}`,
   },
 
   brand: { fontWeight: 800, fontSize: 18, letterSpacing: 0.2 },
@@ -959,9 +1021,9 @@ const styles = {
     flex: 1,
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "#0f1722",
-    color: "#e8eef7",
+    border: `1px solid ${colors.border}`,
+    background: colors.inputBg,
+    color: colors.text,
     fontSize: 14,
   },
 
@@ -980,17 +1042,17 @@ const styles = {
     paddingLeft: "calc(10px + var(--safe-left, 0px))",
     paddingRight: "calc(10px + var(--safe-right, 0px))",
     paddingBottom: "calc(10px + var(--safe-bottom, 0px))",
-    background: "#0b0f14",
-    borderTop: "1px solid rgba(255,255,255,0.08)",
+    background: colors.navBg,
+    borderTop: `1px solid ${colors.border}`,
   },
 
   navBtn: {
     flex: 1,
     padding: "12px 12px",
     borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "#0f1722",
-    color: "#e8eef7",
+    border: `1px solid ${colors.border}`,
+    background: colors.cardBg,
+    color: colors.text,
     fontWeight: 800,
   },
 
@@ -1001,10 +1063,10 @@ const styles = {
 
   card: {
     background: "#0f1722",
-    border: "1px solid rgba(255,255,255,0.10)",
+    border: `1px solid ${colors.border}`,
     borderRadius: 16,
     padding: 12,
-    boxShadow: "0 8px 18px rgba(0,0,0,0.25)",
+    boxShadow: colors.shadow,
   },
 
   cardHeader: {
@@ -1043,9 +1105,9 @@ const styles = {
     textAlign: "left",
     padding: 12,
     borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "#0b111a",
-    color: "#e8eef7",
+    border: `1px solid ${colors.border}`,
+    background: colors.cardAltBg,
+    color: colors.text,
   },
 
   exerciseName: { fontWeight: 800, fontSize: 15 },
@@ -1099,12 +1161,19 @@ const styles = {
 
   smallDangerBtn: {
     width: 72,
-    padding: "10px 10px",
+    height: 40,
+    padding: 0,
     borderRadius: 12,
     border: "1px solid rgba(255,100,100,0.35)",
     background: "rgba(255, 80, 80, 0.12)",
     color: "#ffd7d7",
     fontWeight: 900,
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    lineHeight: "40px",
+    alignSelf: "center",
   },
 
   iconBtn: {
@@ -1115,6 +1184,14 @@ const styles = {
     background: "#0b111a",
     color: "#e8eef7",
     fontWeight: 900,
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    lineHeight: "40px",
+    fontSize: 20,
+
   },
 
   pillRow: { display: "flex", gap: 8, marginBottom: 10 },
@@ -1139,8 +1216,8 @@ const styles = {
     gap: 10,
     padding: "10px 12px",
     borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "#0b111a",
+    border: `1px solid ${colors.border}`,
+    background: colors.cardAltBg,
   },
 
   summaryRight: { display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" },
@@ -1197,8 +1274,8 @@ const styles = {
   modalSheet: {
     width: "100%",
     maxWidth: 720,
-    background: "#0f1722",
-    border: "1px solid rgba(255,255,255,0.10)",
+    background: colors.cardBg,
+    border: `1px solid ${colors.border}`,
     borderRadius: 18,
     overflow: "hidden",
     boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
@@ -1221,7 +1298,7 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "36px 1fr 1fr 46px 88px",
     gap: 10,
-    alignItems: "end",
+    alignItems: "center",
     padding: 10,
     borderRadius: 14,
     border: "1px solid rgba(255,255,255,0.10)",
@@ -1241,9 +1318,9 @@ const styles = {
   numInput: {
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "#0f1722",
-    color: "#e8eef7",
+    border: `1px solid ${colors.border}`,
+    background: colors.inputBg,
+    color: colors.text,
     fontSize: 14,
   },
 
@@ -1253,10 +1330,11 @@ const styles = {
   textarea: {
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "#0f1722",
-    color: "#e8eef7",
+    border: `1px solid ${colors.border}`,
+    background: colors.inputBg,
+    color: colors.text,
     fontSize: 14,
     resize: "vertical",
   },
-};
+  };
+}
