@@ -338,6 +338,11 @@ export default function App() {
   // Manage UI state
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
 
+  // Add-workout modal state
+  const [addWorkoutOpen, setAddWorkoutOpen] = useState(false);
+  const [draftWorkoutName, setDraftWorkoutName] = useState("");
+  const [draftWorkoutCategory, setDraftWorkoutCategory] = useState("Workout");
+
   useEffect(() => {
     localStorage.setItem("wt_theme",theme);
   }, [theme]);
@@ -487,24 +492,9 @@ export default function App() {
   /* ------------------------------ Manage actions ------------------------------ */
 
   function addWorkout() {
-    const name = prompt("Workout name:");
-    if (!name) return;
-
-    const category = prompt(
-      "Workout category (e.g. Stretch / Push / Pull / Leg / Custom)",
-      "Workout"
-    );
-    if (category === null) return; // user hit cancel
-
-    updateState((st) => {
-      st.program.workouts.push({ 
-        id: uid("w"), 
-        name: name.trim(), 
-        category: (category || "Workout").trim() || "Workout", 
-        exercises: [] 
-      });
-      return st;
-    });
+    setDraftWorkoutName("");
+    setDraftWorkoutCategory("Workout");
+    setAddWorkoutOpen(true);
   }
 
   function renameWorkout(workoutId) {
@@ -515,6 +505,21 @@ export default function App() {
     updateState((st) => {
       const ww = st.program.workouts.find((x) => x.id === workoutId);
       if (ww) ww.name = name.trim();
+      return st;
+    });
+  }
+
+  function setWorkoutCategory(workoutId){
+    const w = workoutById.get(workoutId);
+    if (!w) return;
+
+    const current = (w.category || "").trim();
+    const next = prompt("Workout category:", current || "Workout");
+    if (next === null) return; // user hit cancel
+
+    updateState((st) => {
+      const ww = st.program.workouts.find((x) => x.id === workoutId);
+      if (ww) ww.category = (next || "").trim() || "Workout";
       return st;
     });
   }
@@ -862,6 +867,11 @@ export default function App() {
                             <button style={styles.secondaryBtn} onClick={() => renameWorkout(w.id)}>
                               Rename
                             </button>
+                            
+                            <button style={styles.secondaryBtn} onClick={() => setWorkoutCategory(w.id)}>
+                              Category
+                            </button>
+
                             <button
                               style={styles.dangerBtn}
                               onClick={() => deleteWorkout(w.id)}
@@ -1059,6 +1069,95 @@ export default function App() {
           </div>
         </div>
       </Modal>
+
+      <Modal
+        styles={styles}
+        open={addWorkoutOpen}
+        title="Add Workout"
+        onClose={() => setAddWorkoutOpen(false)}
+>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Workout name</label>
+            <input
+              value={draftWorkoutName}
+              onChange={(e) => setDraftWorkoutName(e.target.value)}
+              style={styles.textInput}
+              placeholder="e.g. Workout C"
+              autoFocus
+            />
+          </div>
+
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Workout category</label>
+
+            {/* free-text + suggestions */}
+            <input
+              value={draftWorkoutCategory}
+              onChange={(e) => setDraftWorkoutCategory(e.target.value)}
+              style={styles.textInput}
+              placeholder="e.g. Push / Pull / Legs / Stretch"
+              list="category-suggestions"
+            />
+            <datalist id="category-suggestions">
+              <option value="Workout" />
+              <option value="Baseline" />
+              <option value="Push" />
+              <option value="Pull" />
+              <option value="Legs" />
+              <option value="Upper" />
+              <option value="Lower" />
+              <option value="Cardio" />
+              <option value="Stretch" />
+              <option value="Abs" />
+              <option value="Custom" />
+            </datalist>
+          </div>
+
+          <div style={styles.modalFooter}>
+            <button style={styles.secondaryBtn} onClick={() => setAddWorkoutOpen(false)}>
+              Cancel
+            </button>
+
+            {/* Save wiring comes in step 2.3 */}
+            <button
+              style={styles.primaryBtn}
+              onClick={() => {
+                const name = (draftWorkoutName || "").trim();
+                if (!name) {
+                  alert("Please enter a workout name.");
+                  return;
+                }
+
+                const category = (draftWorkoutCategory || "Workout").trim() || "Workout";
+
+                const newId = uid("w");
+
+                updateState((st) => {
+                  st.program.workouts.push({
+                    id: newId,
+                    name,
+                    category,
+                    exercises: [],
+                  });
+                  return st;
+                });
+
+                setAddWorkoutOpen(false);
+                setManageWorkoutId(newId); // ✅ jump straight into editing it
+                setDraftWorkoutName("");
+                setDraftWorkoutCategory("Workout");
+                setTab("manage");
+
+              }}
+            >
+              Save
+            </button>
+
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 }
@@ -1103,6 +1202,18 @@ function getStyles(colors){
   dateRow: { marginTop: 10, display: "flex", alignItems: "center", gap: 10 },
   label: { fontSize: 12, opacity: 0.85 },
 
+  textInput: {
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: `1px solid ${colors.border}`,
+    background: colors.inputBg,
+    color: colors.text,
+    fontSize: 14,
+    width: "100%",
+    boxSizing: "border-box",
+  },
+
+ 
   dateInput: {
     flex: 1,
     padding: "10px 12px",
