@@ -89,7 +89,11 @@ function ensureBaselineWorkout(program) {
   return {
     ...program,
     workouts: [
-      { id: BASELINE_WORKOUT_ID, name: "Baseline", exercises: defaultBaselineExercises() },
+      { id: BASELINE_WORKOUT_ID, 
+        name: "Baseline", 
+        category: "Baseline",
+        exercises: defaultBaselineExercises() 
+      },
       ...program.workouts,
     ],
   };
@@ -109,11 +113,13 @@ function defaultWorkouts() {
     {
       id: BASELINE_WORKOUT_ID,
       name: "Baseline",
+      category: "Baseline",
       exercises: defaultBaselineExercises(),
     },
     {
       id: uid("w"),
       name: "Workout A",
+      category:"Workout",
       exercises: [
         { id: uid("ex"), name: "Incline Bench Press" },
         { id: uid("ex"), name: "Row" },
@@ -122,6 +128,7 @@ function defaultWorkouts() {
     {
       id: uid("w"),
       name: "Workout B",
+      category: "Workout",
       exercises: [
         { id: uid("ex"), name: "Overhead Press" },
         { id: uid("ex"), name: "Pull Down" },
@@ -159,7 +166,21 @@ function loadState() {
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
   };
+
+  // ✅ ensure every workout has a category (old saved data won't)
+  next.program.workouts = (next.program.workouts || []).map((w) => ({
+  ...w,
+  category:
+    typeof w.category === "string" && w.category.trim()
+      ? w.category.trim()
+      : w.id === BASELINE_WORKOUT_ID
+      ? "Baseline"
+      : "Workout",
+}));
+
+
   return next;
+
 }
 
 function persistState(state) {
@@ -212,6 +233,47 @@ function Modal({ open, title, children, onClose, styles }) {
   );
 }
 
+function ThemeSwitch({ theme, onToggle, styles }) {
+  const isDark = theme === "dark";
+
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        ...styles.themeSwitch,
+        ...(isDark ? styles.themeSwitchDark : styles.themeSwitchLight),
+      }}
+      aria-label="Toggle theme"
+      type="button"
+    >
+      <span
+        style={{
+          ...styles.themeSwitchTrack,
+          ...(isDark ? styles.themeSwitchTrackDark : styles.themeSwitchTrackLight),
+        }}
+      >
+        {/* icons (sit at ends of track) */}
+        <span style={{ ...styles.themeSwitchIcon, left: 6, opacity: isDark ? 0.35 : 0.9 }}>☀️</span>
+        <span style={{ ...styles.themeSwitchIcon, right: 6, opacity: isDark ? 0.9 : 0.35 }}>🌙</span>
+
+        {/* thumb */}
+        <span
+          style={{
+            ...styles.themeSwitchThumb,
+            ...(isDark ? styles.themeSwitchThumbDark : styles.themeSwitchThumbLight),
+            transform: isDark ? "translateX(22px)" : "translateX(0px)",
+          }}
+        />
+      </span>
+
+      <span style={styles.themeSwitchLabel}>{isDark ? "Dark" : "Light"}</span>
+    </button>
+  );
+}
+
+
+
+
 /* --------------------------------- App --------------------------------- */
 
 export default function App() {
@@ -219,42 +281,51 @@ export default function App() {
   const [tab, setTab] = useState("today"); // today | summary | manage
   const [summaryMode, setSummaryMode] = useState("wtd"); // wtd | mtd | ytd
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
-  const [theme, setTheme] = useState("dark"); // add this
+  const [theme, setTheme] = useState(() => localStorage.getItem("wt_theme")|| "dark");
 
   const colors =
-  theme === "dark"
-    ? {
-        appBg: "#0b0f14",
-        text: "#e8eef7",
-        border: "rgba(255,255,255,0.10)",
+    theme === "dark"
+      ? {
+          appBg: "#0b0f14",
+          text: "#e8eef7",
+          border: "rgba(255,255,255,0.10)",
 
-        cardBg: "#0f1722",
-        cardAltBg: "#0b111a",
-        inputBg: "#0f1722",
-        navBg: "#0b0f14",
-        topBarBg: "#0b0f14",
-        shadow: "0 8px 18px rgba(0,0,0,0.25)",
+          cardBg: "#0f1722",
+          cardAltBg: "#0b111a",
+          inputBg: "#0f1722",
+          navBg: "#0b0f14",
+          topBarBg: "#0b0f14",
+          shadow: "0 8px 18px rgba(0,0,0,0.25)",
 
-        // optional quick win:
-        primaryBg: "#152338",
-        primaryText: "#e8eef7",
-      }
-    : {
-        appBg: "#f5f9fc",
-        text: "#1f2933",
-        border: "#dde5ec",
+          primaryBg: "#152338",
+          primaryText: "#e8eef7",
 
-        cardBg: "#ffffff",
-        cardAltBg: "#eef6f3",
-        inputBg: "#ffffff",
-        navBg: "#f5f9fc",
-        topBarBg: "#f5f9fc",
-        shadow: "0 8px 18px rgba(31,41,51,0.08)",
+          // ✅ add these
+          dangerBg: "rgba(255, 80, 80, 0.14)",
+          dangerBorder: "rgba(255, 120, 120, 0.45)",
+          dangerText: "#ffd7d7",
+        }
+    :   {
+          appBg: "#f5f9fc",
+          text: "#1f2933",
+          border: "#dde5ec",
 
-        // optional quick win:
-        primaryBg: "#2b5b7a",
-        primaryText: "#ffffff",
-      };
+          cardBg: "#ffffff",
+          cardAltBg: "#eef6f3",
+          inputBg: "#ffffff",
+          navBg: "#f5f9fc",
+          topBarBg: "#f5f9fc",
+          shadow: "0 8px 18px rgba(31,41,51,0.08)",
+
+          primaryBg: "#2b5b7a",
+          primaryText: "#ffffff",
+
+          // ✅ add these
+          dangerBg: "rgba(220, 38, 38, 0.12)",
+          dangerBorder: "rgba(220, 38, 38, 0.35)",
+          dangerText: "#b91c1c",
+        };
+
 
   const styles = useMemo(() => getStyles(colors),[colors]);
   
@@ -267,6 +338,10 @@ export default function App() {
   // Manage UI state
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
 
+  useEffect(() => {
+    localStorage.setItem("wt_theme",theme);
+  }, [theme]);
+  
   useEffect(() => {
     // keep baseline present
     setState((prev) => {
@@ -414,8 +489,20 @@ export default function App() {
   function addWorkout() {
     const name = prompt("Workout name:");
     if (!name) return;
+
+    const category = prompt(
+      "Workout category (e.g. Stretch / Push / Pull / Leg / Custom)",
+      "Workout"
+    );
+    if (category === null) return; // user hit cancel
+
     updateState((st) => {
-      st.program.workouts.push({ id: uid("w"), name: name.trim(), exercises: [] });
+      st.program.workouts.push({ 
+        id: uid("w"), 
+        name: name.trim(), 
+        category: (category || "Workout").trim() || "Workout", 
+        exercises: [] 
+      });
       return st;
     });
   }
@@ -569,12 +656,12 @@ export default function App() {
   }
 
   function WorkoutCard({ workout }) {
-    const isBaseline = workout.id === BASELINE_WORKOUT_ID;
+    const cat = (workout.category || "Workout").trim();
     return (
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <div style={styles.cardTitle}>{workout.name}</div>
-          {isBaseline ? <span style={styles.tag}>Baseline</span> : <span style={styles.tagMuted}>Workout</span>}
+          <span style={styles.tagMuted}>{cat}</span>
         </div>
 
         {workout.exercises.length === 0 ? (
@@ -591,12 +678,12 @@ export default function App() {
   }
 
   function SummaryBlock({ workout }) {
-    const isBaseline = workout.id === BASELINE_WORKOUT_ID;
+    const cat = (workout.category || "Workout").trim();
     return (
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <div style={styles.cardTitle}>{workout.name}</div>
-          {isBaseline ? <span style={styles.tag}>Baseline</span> : <span style={styles.tagMuted}>Workout</span>}
+          <span style={styles.tagMuted}>{cat}</span>
         </div>
 
         {workout.exercises.length === 0 ? (
@@ -665,7 +752,16 @@ export default function App() {
       {/* Centered column (fixes landscape) */}
       <div style={styles.content}>
         <div style={styles.topBar}>
+         <div style={styles.topBarRow}>
           <div style={styles.brand}>Workout Tracker</div>
+
+          <ThemeSwitch
+            theme={theme}
+            styles={styles}
+            onToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          />
+        </div>
+
           <div style={styles.dateRow}>
             <label style={styles.label}>Date</label>
             <input
@@ -723,12 +819,6 @@ export default function App() {
                  <div style={styles.cardTitle}>Structure</div>
 
                  <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                   style={styles.secondaryBtn}
-                   onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-                  >
-                   {theme === "dark" ? "☀️ Light" : "🌙 Dark"}
-                  </button>
 
                   <button style={styles.primaryBtn} onClick={addWorkout}>
                    + Add Workout
@@ -748,11 +838,7 @@ export default function App() {
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <div style={{ fontWeight: 700 }}>{w.name}</div>
-                          {w.id === BASELINE_WORKOUT_ID ? (
-                            <span style={styles.tag}>Baseline</span>
-                          ) : (
-                            <span style={styles.tagMuted}>Workout</span>
-                          )}
+                          <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
                         </div>
                         <div style={styles.smallText}>{w.exercises.length} exercises</div>
                       </button>
@@ -1058,11 +1144,12 @@ function getStyles(colors){
 
   navBtnActive: {
     border: "1px solid rgba(255,255,255,0.25)",
-    background: "#152338",
+    background: colors.primaryBg,
+    color: colors.primaryText
   },
 
   card: {
-    background: "#0f1722",
+    background: colors.cardBg,
     border: `1px solid ${colors.border}`,
     borderRadius: 16,
     padding: 12,
@@ -1136,8 +1223,8 @@ function getStyles(colors){
     padding: "10px 12px",
     borderRadius: 12,
     border: "1px solid rgba(255,255,255,0.18)",
-    background: "#152338",
-    color: "#e8eef7",
+    background: colors.primaryBg,
+    color: colors.primaryText,
     fontWeight: 900,
   },
 
@@ -1145,17 +1232,17 @@ function getStyles(colors){
     padding: "10px 12px",
     borderRadius: 12,
     border: "1px solid rgba(255,255,255,0.12)",
-    background: "#0b111a",
-    color: "#e8eef7",
+    background: colors.cardAltBg,
+    color: colors.text,
     fontWeight: 800,
   },
 
   dangerBtn: {
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid rgba(255,100,100,0.35)",
-    background: "rgba(255, 80, 80, 0.12)",
-    color: "#ffd7d7",
+    border: `1px solid ${colors.dangerBorder}`,
+    background: colors.dangerBg,
+    color: colors.dangerText,
     fontWeight: 900,
   },
 
@@ -1164,9 +1251,9 @@ function getStyles(colors){
     height: 40,
     padding: 0,
     borderRadius: 12,
-    border: "1px solid rgba(255,100,100,0.35)",
-    background: "rgba(255, 80, 80, 0.12)",
-    color: "#ffd7d7",
+    border: `1px solid ${colors.dangerBorder}`,
+    background: colors.dangerBg,
+    color: colors.dangerText,
     fontWeight: 900,
 
     display: "flex",
@@ -1176,23 +1263,59 @@ function getStyles(colors){
     alignSelf: "center",
   },
 
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "#0b111a",
-    color: "#e8eef7",
-    fontWeight: 900,
+manageItem: {
+  textAlign: "left",
+  padding: 12,
+  borderRadius: 14,
+  border: `1px solid ${colors.border}`,
+  background: colors.cardAltBg,
+  color: colors.text,
+},
 
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 0,
-    lineHeight: "40px",
-    fontSize: 20,
+manageItemActive: {
+  border: `1px solid ${colors.border}`,
+  background: colors.primaryBg,
+  color: colors.primaryText,
+},
 
-  },
+manageExerciseRow: {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  padding: "10px 12px",
+  borderRadius: 14,
+  border: `1px solid ${colors.border}`,
+  background: colors.cardAltBg,
+},
+
+setRow: {
+  display: "grid",
+  gridTemplateColumns: "36px 1fr 1fr 46px 88px",
+  gap: 10,
+  alignItems: "center",
+  padding: 10,
+  borderRadius: 14,
+  border: `1px solid ${colors.border}`,
+  background: colors.cardAltBg,
+},
+
+iconBtn: {
+  width: 40,
+  height: 40,
+  borderRadius: 12,
+  border: `1px solid ${colors.border}`,
+  background: colors.cardAltBg,
+  color: colors.text,
+  fontWeight: 900,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+  lineHeight: "40px",
+  fontSize: 20,
+},
+
 
   pillRow: { display: "flex", gap: 8, marginBottom: 10 },
 
@@ -1204,8 +1327,17 @@ function getStyles(colors){
     fontWeight: 900,
   },
 
-  pillActive: { background: "#152338", color: "#e8eef7", border: "1px solid rgba(255,255,255,0.20)" },
-  pillInactive: { background: "#0f1722", color: "#e8eef7", opacity: 0.8 },
+  pillActive: {
+    background: colors.primaryBg,
+    color: colors.primaryText,
+    border: `1px solid ${colors.border}`,
+  },
+  pillInactive: {
+    background: colors.cardAltBg,
+    color: colors.text,
+    opacity: 0.85,
+    border: `1px solid ${colors.border}`,
+  },
 
   rangeText: { fontSize: 12, opacity: 0.8, marginBottom: 8 },
 
@@ -1232,31 +1364,6 @@ function getStyles(colors){
   },
 
   manageList: { display: "flex", flexDirection: "column", gap: 10 },
-
-  manageItem: {
-    textAlign: "left",
-    padding: 12,
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "#0b111a",
-    color: "#e8eef7",
-  },
-
-  manageItemActive: {
-    border: "1px solid rgba(255,255,255,0.24)",
-    background: "#152338",
-  },
-
-  manageExerciseRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    padding: "10px 12px",
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "#0b111a",
-  },
 
   smallText: { fontSize: 12, opacity: 0.8 },
 
@@ -1294,17 +1401,6 @@ function getStyles(colors){
   modalBody: { padding: 12, maxHeight: "78vh", overflow: "auto" },
   modalFooter: { display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 },
 
-  setRow: {
-    display: "grid",
-    gridTemplateColumns: "36px 1fr 1fr 46px 88px",
-    gap: 10,
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "#0b111a",
-  },
-
   setIndex: {
     fontWeight: 900,
     opacity: 0.85,
@@ -1324,6 +1420,99 @@ function getStyles(colors){
     fontSize: 14,
   },
 
+  themeDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 999,
+    background: colors.primaryBg,
+  },
+
+  topBarRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+},
+
+  themeSwitch: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 10px",
+    borderRadius: 999,
+    border: `1px solid ${colors.border}`,
+    background: colors.cardBg,
+    color: colors.text,
+    fontWeight: 800,
+    boxShadow: colors.shadow,
+    userSelect: "none",
+    WebkitTapHighlightColor: "transparent",
+  },
+
+  themeSwitchDark: {
+    // slightly punchier in dark
+  },
+
+  themeSwitchLight: {
+    // slightly softer in light
+  },
+
+  themeSwitchTrack: {
+    width: 44,
+    height: 24,
+    borderRadius: 999,
+    border: `1px solid ${colors.border}`,
+    display: "flex",
+    alignItems: "center",
+    padding: 2,
+    boxSizing: "border-box",
+    position: "relative",
+    overflow: "hidden",
+    transition: "background 160ms ease, border-color 160ms ease",
+  },
+
+  themeSwitchTrackDark: {
+    background: "rgba(255,255,255,0.08)",
+  },
+
+  themeSwitchTrackLight: {
+    background: "rgba(0,0,0,0.06)",
+  },
+
+  themeSwitchIcon: {
+    position: "absolute",
+    top: "50%",
+    transform: "translateY(-50%)",
+    fontSize: 12,
+    pointerEvents: "none",
+    transition: "opacity 160ms ease",
+  },
+
+  themeSwitchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    transition: "transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms ease",
+    boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
+    position: "relative",
+    zIndex: 1,
+  },
+
+  themeSwitchThumbDark: {
+    background: colors.primaryBg,
+    boxShadow: "0 10px 20px rgba(0,0,0,0.35)",
+  },
+
+  themeSwitchThumbLight: {
+    background: colors.primaryBg,
+    boxShadow: "0 8px 18px rgba(0,0,0,0.18)",
+  },
+
+  themeSwitchLabel: {
+    fontSize: 12,
+    opacity: 0.9,
+  },
+  
   disabledInput: { opacity: 0.7 },
   checkbox: { width: 22, height: 22 },
 
