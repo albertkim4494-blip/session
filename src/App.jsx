@@ -233,6 +233,27 @@ function Modal({ open, title, children, onClose, styles }) {
   );
 }
 
+function ConfirmModal({ open, title, message, confirmText = "Delete", onCancel, onConfirm, styles }) {
+  if (!open) return null;
+
+  return (
+    <Modal open={open} title={title} onClose={onCancel} styles={styles}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={styles.smallText}>{message}</div>
+
+        <div style={styles.modalFooter}>
+          <button style={styles.secondaryBtn} onClick={onCancel}>
+            Cancel
+          </button>
+          <button style={styles.dangerBtn} onClick={onConfirm}>
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function ThemeSwitch({ theme, onToggle, styles }) {
   const isDark = theme === "dark";
 
@@ -334,6 +355,19 @@ export default function App() {
   const [logContext, setLogContext] = useState(null); // { workoutId, exerciseId, exerciseName }
   const [draftSets, setDraftSets] = useState([]);
   const [draftNotes, setDraftNotes] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmText, setConfirmText] = useState("Delete");
+  const [confirmOnConfirm, setConfirmOnConfirm] = useState(() => () => {});
+  
+  function openConfirm({ title, message, confirmText = "Delete", onConfirm }) {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmText(confirmText);
+    setConfirmOnConfirm(() => onConfirm);
+    setConfirmOpen(true);
+  }
 
   // Manage UI state
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
@@ -531,12 +565,20 @@ export default function App() {
     }
     const w = workoutById.get(workoutId);
     if (!w) return;
-    if (!confirm(`Delete workout "${w.name}"? This will NOT delete past logs.`)) return;
-    updateState((st) => {
-      st.program.workouts = st.program.workouts.filter((x) => x.id !== workoutId);
-      return st;
+    
+    openConfirm({
+      title: "Delete workout?",
+      message: `Delete "${w.name}"? This will NOT delete past logs.`,
+      confirmText: "Delete",
+      onConfirm: () => {
+        updateState((st)=>{
+          st.program.workouts = st.program.workouts.filter((x)=>x.id !==workoutId);
+          return st;
+        });
+        if (manageWorkoutId === workoutId) setManageWorkoutId(null);
+        setConfirmOpen(false); 
+      },
     });
-    if (manageWorkoutId === workoutId) setManageWorkoutId(null);
   }
 
   function addExercise(workoutId) {
@@ -568,15 +610,23 @@ export default function App() {
     const w = workoutById.get(workoutId);
     const ex = w?.exercises?.find((e) => e.id === exerciseId);
     if (!ex) return;
-    if (!confirm(`Delete exercise "${ex.name}"? This will NOT delete past logs.`)) return;
 
-    updateState((st) => {
-      const ww = st.program.workouts.find((x) => x.id === workoutId);
-      if (!ww) return st;
-      ww.exercises = ww.exercises.filter((e) => e.id !== exerciseId);
-      return st;
+    openConfirm({
+      title: "Delete exercise?",
+      message: `Delete "${ex.name}"? This will NOT delete past logs.`,
+      confirmText: "Delete",
+      onConfirm: () => {
+        updateState((st) => {
+          const ww = st.program.workouts.find((x) => x.id === workoutId);
+          if (!ww) return st;
+          ww.exercises = ww.exercises.filter((e) => e.id !== exerciseId);
+          return st;
+        });
+        setConfirmOpen(false);
+      },
     });
   }
+
 
   function exportJson() {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -1070,6 +1120,17 @@ export default function App() {
         </div>
       </Modal>
 
+      <ConfirmModal
+        open={confirmOpen}
+        title={confirmTitle}
+        message={confirmMessage}
+        confirmText={confirmText}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={confirmOnConfirm}
+        styles={styles}
+      />
+
+
       <Modal
         styles={styles}
         open={addWorkoutOpen}
@@ -1289,8 +1350,8 @@ function getStyles(colors){
     fontSize: 12,
     padding: "4px 8px",
     borderRadius: 999,
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+    border: `1px solid ${colors.border}`,
     opacity: 0.85,
   },
 
