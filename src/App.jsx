@@ -586,7 +586,7 @@ export default function App() {
 
     setLogContext({ workoutId, exerciseId, exerciseName: exercise.name });
     setDraftSets(normalizedSets);
-    setDraftNotes(existing ?.notes??"");
+    setDraftNotes(existing?.notes ?? "");
     setLogOpen(true);
   }
 
