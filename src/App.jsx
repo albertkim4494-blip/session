@@ -71,6 +71,39 @@ function shiftMonth(monthKey, deltaMonths) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function formatMonthLabel(monthKey) {
+  const [yy, mm] = monthKey.split("-").map(Number);
+  const d = new Date(yy, mm - 1, 1);
+
+  return d.toLocaleString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatFriendlyDate(dateKey, todayKey) {
+  if (dateKey === todayKey) return "Today";
+
+  const d = new Date(dateKey + "T00:00:00");
+
+  const monthDay = d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+
+  const weekday = d.toLocaleDateString(undefined, {
+    weekday: "short",
+  });
+
+  const thisYear = new Date(todayKey + "T00:00:00").getFullYear();
+  const year = d.getFullYear();
+
+  return year !== thisYear
+    ? `${monthDay} (${weekday}) ${year}`
+    : `${monthDay} (${weekday})`;
+}
+
+
 function startOfWeekMonday(dateKey) {
   const d = new Date(dateKey + "T00:00:00");
   const day = d.getDay(); // 0=Sun..6=Sat
@@ -426,6 +459,8 @@ export default function App() {
           dangerBg: "rgba(255, 80, 80, 0.14)",
           dangerBorder: "rgba(255, 120, 120, 0.45)",
           dangerText: "#ffd7d7",
+
+          dot: "#7dd3fc", // bright (sky-ish)
         }
     :   {
           appBg: "#f5f9fc",
@@ -446,6 +481,8 @@ export default function App() {
           dangerBg: "rgba(220, 38, 38, 0.12)",
           dangerBorder: "rgba(220, 38, 38, 0.35)",
           dangerText: "#b91c1c",
+
+          dot: "#2563eb", // blue that still reads well
         };
 
 
@@ -1006,38 +1043,6 @@ export default function App() {
           />
         </div>
 
-          <div style={styles.dateRow}>
-            <label style={styles.label}>Date</label>
-
-            <div style={{ display: "flex", gap: 8, flex: 1 }}>
-              <button
-                style={styles.secondaryBtn}
-                onClick={() => setDateKey((k) => addDays(k, -1))}
-                aria-label="Previous day"
-                type="button"
-              >
-                ←
-              </button>
-
-              <button
-                style={{ ...styles.dateBtn, flex: 1 }}
-                onClick={() => setDatePickerOpen(true)}
-                aria-label="Pick date"
-                type="button"
-              >
-                {dateKey}
-              </button>
-
-              <button
-                style={styles.secondaryBtn}
-                onClick={() => setDateKey((k) => addDays(k, +1))}
-                aria-label="Next day"
-                type="button"
-              >
-                →
-              </button>
-            </div>
-          </div>
 
         </div>
 
@@ -1221,6 +1226,36 @@ export default function App() {
         </div>
       </div>
 
+      {/* Bottom date bar (thumb-friendly) */}
+      <div style={styles.bottomDateBar}>
+        <button
+          style={styles.bottomDateBtn}
+          onClick={() => setDatePickerOpen(true)}
+          type="button"
+        >
+          {formatFriendlyDate(dateKey, todayKey)}
+        </button>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            style={styles.secondaryBtn}
+            onClick={() => setDateKey((k) => addDays(k, -1))}
+            type="button"
+          >
+            ←
+          </button>
+
+          <button
+            style={styles.secondaryBtn}
+            onClick={() => setDateKey((k) => addDays(k, +1))}
+            type="button"
+          >
+            →
+          </button>
+        </div>
+      </div>
+
+      
       {/* Bottom nav stays fixed and safe-area aware */}
       <div style={styles.nav}>
         <button
@@ -1365,7 +1400,10 @@ export default function App() {
                   Prev
                 </button>
 
-                <div style={{ fontWeight: 900, alignSelf: "center" }}>{monthCursor}</div>
+                <div style={{ fontWeight: 900, alignSelf: "center" }}>
+                  {formatMonthLabel(monthCursor)}
+                </div>
+
 
                 <button
                   style={styles.secondaryBtn}
@@ -1407,7 +1445,7 @@ export default function App() {
                       >
                         <div style={styles.calendarCellNum}>{day}</div>
                         <div style={{ height: 10, display: "flex", justifyContent: "center" }}>
-                          {hasLog ? <span style={styles.calendarDot} /> : null}
+                          {hasLog && !selected ? <span style={styles.calendarDot} /> : null}
                         </div>
                       </button>
                     );
@@ -1667,8 +1705,9 @@ function getStyles(colors){
     width: 6,
     height: 6,
     borderRadius: 999,
-    background: colors.primaryBg, // looks good on selected AND unselected
-    opacity: 0.9,
+    background: colors.dot, // looks good on selected AND unselected
+    opacity: 1,
+    boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
   },
 
   calendarCellToday: {
@@ -1687,6 +1726,32 @@ function getStyles(colors){
 
   body: { flex: 1, paddingTop: 14 },
   section: { display: "flex", flexDirection: "column", gap: 12 },
+
+      bottomDateBar: {
+      position: "fixed",
+      left: 0,
+      right: 0,
+      bottom: "calc(66px + var(--safe-bottom, 0px))", // sits above nav
+      paddingLeft: "calc(10px + var(--safe-left, 0px))",
+      paddingRight: "calc(10px + var(--safe-right, 0px))",
+      display: "flex",
+      gap: 10,
+      justifyContent: "space-between",
+      alignItems: "center",
+      zIndex: 30,
+    },
+
+    bottomDateBtn: {
+      flex: 1,
+      padding: "12px 12px",
+      borderRadius: 14,
+      border: `1px solid ${colors.border}`,
+      background: colors.cardBg,
+      color: colors.text,
+      fontWeight: 900,
+      boxShadow: colors.shadow,
+    },
+
 
   /* Bottom nav safe-area aware */
   nav: {
