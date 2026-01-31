@@ -82,13 +82,6 @@ function safeParse(json, fallback) {
 }
 
 /**
- * Deep clone an object using JSON (simple but effective)
- */
-function deepClone(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
-
-/**
  * Generate a unique ID
  */
 function uid(prefix = "id") {
@@ -300,17 +293,21 @@ function loadState() {
   const st = safeParse(raw, null);
   if (!st || typeof st !== "object") return makeDefaultState();
 
+  const rawProgram = st.program && typeof st.program === "object" ? st.program : {};
+  const rawWorkouts = Array.isArray(rawProgram.workouts) ? rawProgram.workouts : [];
+
   const next = {
     ...makeDefaultState(),
     ...st,
-    program: ensureBaselineWorkout(st.program ?? makeDefaultState().program),
+    program: ensureBaselineWorkout({ ...rawProgram, workouts: rawWorkouts }),
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
   };
 
-  // Ensure every workout has a category
-  next.program.workouts = (next.program.workouts || []).map((w) => ({
+  // Ensure every workout has valid structure and a category
+  next.program.workouts = next.program.workouts.map((w) => ({
     ...w,
+    exercises: Array.isArray(w.exercises) ? w.exercises : [],
     category:
       typeof w.category === "string" && w.category.trim()
         ? w.category.trim()
@@ -341,14 +338,7 @@ function persistState(state) {
     }
 
     // Step 2: Save new data
-    const jsonString = JSON.stringify(state);
-    localStorage.setItem(LS_KEY, jsonString);
-
-    // Step 3: Verify it saved correctly
-    const saved = localStorage.getItem(LS_KEY);
-    if (saved !== jsonString) {
-      throw new Error("Data verification failed");
-    }
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
 
     return { success: true };
 
@@ -468,15 +458,18 @@ function analyzeWorkoutBalance(state, dateRange) {
     }
   }
   
-  for (const dateKey of Object.keys(state.logsByDate)) {
+  for (const dateKey of Object.keys(state.logsByDate || {})) {
+    if (!isValidDateKey(dateKey)) continue;
     if (!inRangeInclusive(dateKey, dateRange.start, dateRange.end)) continue;
-    
+
     const dayLogs = state.logsByDate[dateKey];
-    
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+
     for (const [exerciseId, log] of Object.entries(dayLogs)) {
       const exerciseName = exerciseIdToName.get(exerciseId);
       if (!exerciseName) continue;
-      
+      if (!log || !Array.isArray(log.sets)) continue;
+
       const groups = classifyExercise(exerciseName);
       const totalReps = log.sets.reduce((sum, set) => sum + (Number(set.reps) || 0), 0);
       
@@ -515,8 +508,8 @@ function getSuggestionsForMuscleGroup(group) {
 
 function detectImbalances(analysis) {
   const insights = [];
-  const { muscleGroupVolume } = analysis;
-  
+  const muscleGroupVolume = analysis?.muscleGroupVolume ?? {};
+
   const totalVolume = Object.values(muscleGroupVolume).reduce((a, b) => a + b, 0);
   
   if (totalVolume < 50) return [];
@@ -975,18 +968,13 @@ function InputModal({
   title,
   label,
   placeholder,
-  initialValue = "",
+  value = "",
   confirmText = "Save",
   onCancel,
   onConfirm,
+  onChange,
   styles,
 }) {
-  const [value, setValue] = useState(initialValue);
-
-  useEffect(() => {
-    if (open) setValue(initialValue || "");
-  }, [open, initialValue]);
-
   if (!open) return null;
 
   return (
@@ -996,7 +984,7 @@ function InputModal({
           <label style={styles.label}>{label}</label>
           <input
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => onChange(e.target.value)}
             style={styles.textInput}
             placeholder={placeholder}
             autoFocus
@@ -1212,6 +1200,8 @@ export default function App() {
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem("wt_theme") || "dark");
+  const [reorderMode, setReorderMode] = useState(false);
+  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
 
   // IMPROVEMENT: All modal state consolidated into one reducer
   const [modals, dispatchModal] = useReducer(modalReducer, {
@@ -1334,11 +1324,17 @@ export default function App() {
     localStorage.setItem("wt_theme", theme);
   }, [theme]);
 
+  // Close overflow menu when switching workouts
+  useEffect(() => {
+    setOverflowMenuOpen(false);
+  }, [manageWorkoutId]);
+
   // Ensure baseline workout exists
   useEffect(() => {
     setState((prev) => {
-      const fixed = { ...prev, program: ensureBaselineWorkout(prev.program) };
-      return fixed;
+      const hasBaseline = prev.program.workouts.some((w) => w.id === BASELINE_WORKOUT_ID);
+      if (hasBaseline) return prev;
+      return { ...prev, program: ensureBaselineWorkout(prev.program) };
     });
   }, []);
 
@@ -1365,7 +1361,7 @@ export default function App() {
    */
   function updateState(updater) {
     setState((prev) => {
-      const next = updater(deepClone(prev));
+      const next = updater(structuredClone(prev));
       next.meta = { ...(next.meta ?? {}), updatedAt: Date.now() };
       return next;
     });
@@ -1483,7 +1479,7 @@ export default function App() {
       }
       const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
 
-      const cleanedSets = modals.log.sets
+      const cleanedSets = (Array.isArray(modals.log.sets) ? modals.log.sets : [])
         .map((s) => {
           const reps = Number(s.reps ?? 0);
           const repsClean = Number.isFinite(reps) && reps > 0
@@ -1525,9 +1521,9 @@ export default function App() {
   /**
    * Add a new workout
    */
-  const addWorkout = useCallback(() => {
+  function addWorkout() {
     dispatchModal({ type: "OPEN_ADD_WORKOUT" });
-  }, []);
+  }
 
   /**
    * Rename a workout
@@ -1764,6 +1760,40 @@ export default function App() {
   }, [modals.editUnit]);
 
   /**
+   * Move a workout up or down in the list (skips baseline)
+   */
+  function moveWorkout(workoutId, direction) {
+    updateState((st) => {
+      const arr = st.program.workouts;
+      const idx = arr.findIndex((w) => w.id === workoutId);
+      if (idx < 0) return st;
+      const targetIdx = idx + direction;
+      if (targetIdx < 0 || targetIdx >= arr.length) return st;
+      // Don't swap with baseline
+      if (arr[targetIdx].id === BASELINE_WORKOUT_ID) return st;
+      [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]];
+      return st;
+    });
+  }
+
+  /**
+   * Move an exercise up or down within a workout
+   */
+  function moveExercise(workoutId, exerciseId, direction) {
+    updateState((st) => {
+      const w = st.program.workouts.find((x) => x.id === workoutId);
+      if (!w) return st;
+      const arr = w.exercises;
+      const idx = arr.findIndex((e) => e.id === exerciseId);
+      if (idx < 0) return st;
+      const targetIdx = idx + direction;
+      if (targetIdx < 0 || targetIdx >= arr.length) return st;
+      [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]];
+      return st;
+    });
+  }
+
+  /**
    * Export data as JSON
    */
   const exportJson = useCallback(() => {
@@ -1783,7 +1813,7 @@ export default function App() {
   /**
    * Import data from JSON file
    */
-  const importJsonFromFile = useCallback(async (file) => {
+  async function importJsonFromFile(file) {
     try {
       const text = await file.text();
       const incoming = safeParse(text, null);
@@ -1816,15 +1846,15 @@ export default function App() {
     } catch (error) {
       alert("❌ Failed to import: " + error.message);
     }
-  }, []);
+  }
 
   // NEW: Handle adding suggested exercise from AI Coach
-  const handleAddSuggestion = useCallback((exerciseName) => {
+  function handleAddSuggestion(exerciseName) {
     dispatchModal({
       type: "OPEN_ADD_SUGGESTION",
-      payload: { exerciseName }
+      payload: { exerciseName },
     });
-  }, []);
+  }
 
   const confirmAddSuggestion = useCallback((workoutId, exerciseName) => {
     const workout = workoutById.get(workoutId);
@@ -1879,11 +1909,11 @@ export default function App() {
    */
   function ExerciseRow({ workoutId, exercise }) {
     const exLog = logsForDate[exercise.id] ?? null;
-    const hasLog = !!exLog;
+    const hasLog = !!exLog && Array.isArray(exLog.sets);
     const exUnit = getUnit(exercise.unit, exercise);
     const setsText = hasLog
       ? exLog.sets
-          ?.filter((s) => Number(s.reps) > 0)
+          .filter((s) => Number(s.reps) > 0)
           .map((s) => {
             const isBW = String(s.weight).toUpperCase() === "BW";
             const w = isBW ? "BW" : s.weight;
@@ -2095,6 +2125,12 @@ export default function App() {
                 <div style={styles.cardHeader}>
                   <div style={styles.cardTitle}>Structure</div>
                   <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      style={reorderMode ? styles.primaryBtn : styles.secondaryBtn}
+                      onClick={() => setReorderMode((v) => !v)}
+                    >
+                      {reorderMode ? "Done" : "Reorder"}
+                    </button>
                     <button style={styles.primaryBtn} onClick={addWorkout}>
                       + Add Workout
                     </button>
@@ -2102,20 +2138,40 @@ export default function App() {
                 </div>
 
                 <div style={styles.manageList}>
-                  {workouts.map((w) => {
+                  {workouts.map((w, wi) => {
                     const active = manageWorkoutId === w.id;
+                    const isBase = w.id === BASELINE_WORKOUT_ID;
+                    const isFirst = wi === 0 || (wi === 1 && workouts[0]?.id === BASELINE_WORKOUT_ID);
+                    const isLast = wi === workouts.length - 1;
                     return (
-                      <button
-                        key={w.id}
-                        style={{ ...styles.manageItem, ...(active ? styles.manageItemActive : {}) }}
-                        onClick={() => setManageWorkoutId(w.id)}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ fontWeight: 700 }}>{w.name}</div>
-                          <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
-                        </div>
-                        <div style={styles.smallText}>{w.exercises.length} exercises</div>
-                      </button>
+                      <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button
+                          style={{ ...styles.manageItem, flex: 1, ...(active ? styles.manageItemActive : {}) }}
+                          onClick={() => setManageWorkoutId(w.id)}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ fontWeight: 700 }}>{w.name}</div>
+                            <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
+                          </div>
+                          <div style={styles.smallText}>{w.exercises.length} exercises</div>
+                        </button>
+                        {reorderMode && !isBase ? (
+                          <div style={styles.reorderBtnGroup}>
+                            <button
+                              style={styles.reorderBtn}
+                              disabled={isFirst}
+                              onClick={() => moveWorkout(w.id, -1)}
+                              title="Move up"
+                            >&#9650;</button>
+                            <button
+                              style={styles.reorderBtn}
+                              disabled={isLast}
+                              onClick={() => moveWorkout(w.id, 1)}
+                              title="Move down"
+                            >&#9660;</button>
+                          </div>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>
@@ -2131,52 +2187,91 @@ export default function App() {
 
                     return (
                       <>
+                        {/* Workout header: title+tag left, overflow menu right */}
                         <div style={styles.cardHeader}>
-                          <div style={styles.cardTitle}>{w.name}</div>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <button style={styles.secondaryBtn} onClick={() => renameWorkout(w.id)}>
-                              Rename
-                            </button>
-                            <button style={styles.secondaryBtn} onClick={() => setWorkoutCategory(w.id)}>
-                              Category
-                            </button>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+                            <div style={{ ...styles.cardTitle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.name}</div>
+                            <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
+                          </div>
+                          <div style={{ position: "relative" }}>
                             <button
-                              style={styles.dangerBtn}
-                              onClick={() => deleteWorkout(w.id)}
-                              disabled={isBaseline}
-                              title={isBaseline ? "Baseline cannot be deleted" : "Delete workout"}
-                            >
-                              Delete
-                            </button>
-                            <button style={styles.primaryBtn} onClick={() => addExercise(w.id)}>
-                              + Add Exercise
-                            </button>
+                              style={styles.overflowMenuBtn}
+                              onClick={() => setOverflowMenuOpen((v) => !v)}
+                              title="More options"
+                            >&#8942;</button>
+                            {overflowMenuOpen ? (
+                              <>
+                                <div style={styles.overflowBackdrop} onClick={() => setOverflowMenuOpen(false)} />
+                                <div style={styles.overflowMenu}>
+                                  <button
+                                    style={styles.overflowMenuItem}
+                                    onClick={() => { setOverflowMenuOpen(false); renameWorkout(w.id); }}
+                                  >Rename workout</button>
+                                  <button
+                                    style={styles.overflowMenuItem}
+                                    onClick={() => { setOverflowMenuOpen(false); setWorkoutCategory(w.id); }}
+                                  >Change category</button>
+                                  {!isBaseline ? (
+                                    <button
+                                      style={styles.overflowMenuItemDanger}
+                                      onClick={() => { setOverflowMenuOpen(false); deleteWorkout(w.id); }}
+                                    >Delete workout</button>
+                                  ) : null}
+                                </div>
+                              </>
+                            ) : null}
                           </div>
                         </div>
 
+                        {/* Full-width add exercise button */}
+                        <button style={styles.addExerciseFullBtn} onClick={() => addExercise(w.id)}>
+                          + Add Exercise
+                        </button>
+
                         {w.exercises.length === 0 ? (
-                          <div style={styles.emptyText}>No exercises yet. Add one.</div>
+                          <div style={styles.emptyText}>No exercises yet. Add one above.</div>
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                            {w.exercises.map((ex) => (
-                              <div key={ex.id} style={styles.manageExerciseRow}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <div style={{ fontWeight: 700 }}>{ex.name}</div>
-                                  <span style={styles.unitPill}>{getUnit(ex.unit, ex).abbr}</span>
+                            {w.exercises.map((ex, ei) => {
+                              const isFirstEx = ei === 0;
+                              const isLastEx = ei === w.exercises.length - 1;
+                              return (
+                                <div key={ex.id} style={styles.manageExerciseRow}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+                                    <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.name}</div>
+                                    <span style={styles.unitPill}>{getUnit(ex.unit, ex).abbr}</span>
+                                  </div>
+                                  {reorderMode ? (
+                                    <div style={styles.reorderBtnGroup}>
+                                      <button
+                                        style={styles.reorderBtn}
+                                        disabled={isFirstEx}
+                                        onClick={() => moveExercise(w.id, ex.id, -1)}
+                                        title="Move up"
+                                      >&#9650;</button>
+                                      <button
+                                        style={styles.reorderBtn}
+                                        disabled={isLastEx}
+                                        onClick={() => moveExercise(w.id, ex.id, 1)}
+                                        title="Move down"
+                                      >&#9660;</button>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: "flex", gap: 4 }}>
+                                      <button style={styles.compactSecondaryBtn} onClick={() => editUnitExercise(w.id, ex.id)}>
+                                        Unit
+                                      </button>
+                                      <button style={styles.compactSecondaryBtn} onClick={() => renameExercise(w.id, ex.id)}>
+                                        Rename
+                                      </button>
+                                      <button style={styles.compactDangerBtn} onClick={() => deleteExercise(w.id, ex.id)}>
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
-                                <div style={{ display: "flex", gap: 8 }}>
-                                  <button style={styles.secondaryBtn} onClick={() => editUnitExercise(w.id, ex.id)}>
-                                    Unit
-                                  </button>
-                                  <button style={styles.secondaryBtn} onClick={() => renameExercise(w.id, ex.id)}>
-                                    Rename
-                                  </button>
-                                  <button style={styles.dangerBtn} onClick={() => deleteExercise(w.id, ex.id)}>
-                                    Delete
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </>
@@ -2501,10 +2596,11 @@ export default function App() {
         title={modals.input.title}
         label={modals.input.label}
         placeholder={modals.input.placeholder}
-        initialValue={modals.input.value}
+        value={modals.input.value}
         confirmText={modals.input.confirmText}
         onCancel={() => dispatchModal({ type: "CLOSE_INPUT" })}
         onConfirm={modals.input.onConfirm}
+        onChange={(val) => dispatchModal({ type: "UPDATE_INPUT_VALUE", payload: val })}
         styles={styles}
       />
 
@@ -3420,6 +3516,130 @@ function getStyles(colors) {
       padding: '8px 10px',
       background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)",
       borderRadius: 8,
+    },
+
+    // Overflow menu (⋮ button + dropdown)
+    overflowMenuBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      border: `1px solid ${colors.border}`,
+      background: colors.cardAltBg,
+      color: colors.text,
+      fontWeight: 900,
+      fontSize: 20,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0,
+      cursor: "pointer",
+    },
+
+    overflowBackdrop: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 40,
+    },
+
+    overflowMenu: {
+      position: "absolute",
+      top: "100%",
+      right: 0,
+      marginTop: 4,
+      minWidth: 180,
+      background: colors.cardBg,
+      border: `1px solid ${colors.border}`,
+      borderRadius: 12,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+      zIndex: 41,
+      overflow: "hidden",
+    },
+
+    overflowMenuItem: {
+      display: "block",
+      width: "100%",
+      textAlign: "left",
+      padding: "12px 16px",
+      background: "transparent",
+      border: "none",
+      color: colors.text,
+      fontWeight: 700,
+      fontSize: 14,
+      cursor: "pointer",
+    },
+
+    overflowMenuItemDanger: {
+      display: "block",
+      width: "100%",
+      textAlign: "left",
+      padding: "12px 16px",
+      background: "transparent",
+      border: "none",
+      color: colors.dangerText,
+      fontWeight: 700,
+      fontSize: 14,
+      cursor: "pointer",
+    },
+
+    // Full-width add exercise button
+    addExerciseFullBtn: {
+      width: "100%",
+      padding: "12px 16px",
+      borderRadius: 12,
+      border: `1px solid rgba(255,255,255,0.18)`,
+      background: colors.primaryBg,
+      color: colors.primaryText,
+      fontWeight: 900,
+      fontSize: 14,
+      cursor: "pointer",
+      marginBottom: 10,
+    },
+
+    // Reorder arrow buttons
+    reorderBtnGroup: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 2,
+    },
+
+    reorderBtn: {
+      width: 30,
+      height: 26,
+      borderRadius: 8,
+      border: `1px solid ${colors.border}`,
+      background: colors.cardAltBg,
+      color: colors.text,
+      fontWeight: 900,
+      fontSize: 10,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0,
+      cursor: "pointer",
+      opacity: 1,
+    },
+
+    // Compact exercise action buttons
+    compactSecondaryBtn: {
+      padding: "6px 8px",
+      borderRadius: 8,
+      border: `1px solid rgba(255,255,255,0.12)`,
+      background: colors.cardAltBg,
+      color: colors.text,
+      fontWeight: 800,
+      fontSize: 12,
+      cursor: "pointer",
+    },
+
+    compactDangerBtn: {
+      padding: "6px 8px",
+      borderRadius: 8,
+      border: `1px solid ${colors.dangerBorder}`,
+      background: colors.dangerBg,
+      color: colors.dangerText,
+      fontWeight: 900,
+      fontSize: 12,
+      cursor: "pointer",
     },
   };
 }
