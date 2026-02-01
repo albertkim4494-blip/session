@@ -52,6 +52,8 @@ export default function AuthGate() {
   }, [session]);
 
   const handleLogout = async () => {
+    localStorage.removeItem("workout_tracker_v2");
+    localStorage.removeItem("workout_tracker_v2_backup");
     await supabase.auth.signOut();
   };
 

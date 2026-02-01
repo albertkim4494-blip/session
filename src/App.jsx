@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
+import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
 
 /**
  * ============================================================================
@@ -1284,6 +1285,8 @@ export default function App({ session, onLogout }) {
   // ---------------------------------------------------------------------------
 
   const [state, setState] = useState(() => loadState());
+  const [dataReady, setDataReady] = useState(false);
+  const cloudSaver = useRef(null);
   const [tab, setTab] = useState(() => sessionStorage.getItem("wt_tab") || "today");
   const [summaryMode, setSummaryMode] = useState("wtd");
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
@@ -1326,6 +1329,45 @@ export default function App({ session, onLogout }) {
       monthCursor: monthKeyFromDate(dateKey),
     },
   });
+
+  // ---------------------------------------------------------------------------
+  // CLOUD SYNC — Fetch from Supabase on mount, migrate if needed
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    cloudSaver.current = createDebouncedSaver(2000);
+
+    let cancelled = false;
+
+    async function init() {
+      try {
+        const cloudState = await fetchCloudState(session.user.id);
+
+        if (cancelled) return;
+
+        if (cloudState && typeof cloudState === "object" && Object.keys(cloudState).length > 0) {
+          // Cloud has data — use it as source of truth
+          setState(cloudState);
+          persistState(cloudState);
+        } else {
+          // Cloud is empty — migrate current localStorage state up
+          const localState = loadState();
+          await saveCloudState(session.user.id, localState);
+        }
+      } catch (err) {
+        // Network error — continue with localStorage data
+        console.error("Cloud sync init failed, using localStorage:", err);
+      }
+
+      if (!cancelled) setDataReady(true);
+    }
+
+    init();
+
+    return () => {
+      cancelled = true;
+      cloudSaver.current?.cancel();
+    };
+  }, [session.user.id]);
 
   const todayKey = yyyyMmDd(new Date());
 
@@ -1507,19 +1549,25 @@ export default function App({ session, onLogout }) {
   }, [manageWorkoutId]);
 
 
-  // Persist state changes
+  // Persist state changes (localStorage immediate, Supabase debounced)
   useEffect(() => {
-    const result = persistState({
+    const stateWithMeta = {
       ...state,
       meta: { ...(state.meta ?? {}), updatedAt: Date.now() },
-    });
+    };
+
+    const result = persistState(stateWithMeta);
 
     // IMPROVEMENT: Show error to user if save failed
     if (!result.success) {
       console.error(result.error);
-      // In production, you'd show a toast notification here
     }
-  }, [state]);
+
+    // Debounced cloud save (only after initial load is done)
+    if (dataReady) {
+      cloudSaver.current?.trigger(session.user.id, stateWithMeta);
+    }
+  }, [state, dataReady, session.user.id]);
 
   // ---------------------------------------------------------------------------
   // HELPER FUNCTIONS
@@ -2188,6 +2236,21 @@ export default function App({ session, onLogout }) {
   // ---------------------------------------------------------------------------
   // RENDER - The actual UI
   // ---------------------------------------------------------------------------
+
+  if (!dataReady) {
+    return (
+      <div style={{
+        minHeight: "100dvh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#0b0f14",
+        color: "#64748b",
+      }}>
+        Loading your workouts...
+      </div>
+    );
+  }
 
   return (
     <div style={styles.app}>
