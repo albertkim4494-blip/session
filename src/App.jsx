@@ -1278,7 +1278,7 @@ function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCancel, onC
 // 6. MAIN APP COMPONENT
 // ============================================================================
 
-export default function App() {
+export default function App({ session, onLogout }) {
   // ---------------------------------------------------------------------------
   // STATE - What the app remembers
   // ---------------------------------------------------------------------------
@@ -2197,7 +2197,24 @@ export default function App() {
         <div style={styles.topBar}>
           <div style={styles.topBarRow}>
             <div style={styles.brand}>Workout Tracker</div>
-            <ThemeSwitch theme={theme} styles={styles} onToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ThemeSwitch theme={theme} styles={styles} onToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
+              <button
+                onClick={onLogout}
+                style={{
+                  padding: "6px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: "1px solid #1e293b",
+                  background: "transparent",
+                  color: theme === "dark" ? "#94a3b8" : "#64748b",
+                  cursor: "pointer",
+                }}
+              >
+                Logout
+              </button>
+            </div>
           </div>
 
           <div style={styles.dateRow}>
