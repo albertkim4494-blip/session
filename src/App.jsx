@@ -907,6 +907,62 @@ function PillTabs({ tabs, value, onChange, styles }) {
 }
 
 /**
+ * Category autocomplete input
+ */
+function CategoryAutocomplete({ value, onChange, suggestions, placeholder, styles }) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  const query = (value || "").trim().toLowerCase();
+  const filtered = query
+    ? suggestions.filter((s) => s.toLowerCase().includes(query) && s.toLowerCase() !== query)
+    : suggestions;
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={wrapperRef} style={{ position: "relative" }}>
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        style={styles.textInput}
+        placeholder={placeholder}
+      />
+      {open && filtered.length > 0 && (
+        <div style={styles.autocompleteDropdown}>
+          {filtered.map((s) => (
+            <button
+              key={s}
+              type="button"
+              style={styles.autocompleteOption}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(s);
+                setOpen(false);
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Modal component - reusable sheet-style modal
  */
 function Modal({ open, title, children, onClose, styles }) {
@@ -1002,10 +1058,7 @@ function ThemeSwitch({ theme, onToggle, styles }) {
   return (
     <button
       onClick={onToggle}
-      style={{
-        ...styles.themeSwitch,
-        ...(isDark ? styles.themeSwitchDark : styles.themeSwitchLight),
-      }}
+      style={styles.themeSwitch}
       aria-label="Toggle theme"
       type="button"
     >
@@ -1015,13 +1068,11 @@ function ThemeSwitch({ theme, onToggle, styles }) {
           ...(isDark ? styles.themeSwitchTrackDark : styles.themeSwitchTrackLight),
         }}
       >
-        <span style={{ ...styles.themeSwitchIcon, left: 6, opacity: isDark ? 0.35 : 0.9 }}>☀️</span>
-        <span style={{ ...styles.themeSwitchIcon, right: 6, opacity: isDark ? 0.9 : 0.35 }}>🌙</span>
         <span
           style={{
             ...styles.themeSwitchThumb,
             ...(isDark ? styles.themeSwitchThumbDark : styles.themeSwitchThumbLight),
-            transform: isDark ? "translateX(22px)" : "translateX(0px)",
+            transform: isDark ? "translateX(20px)" : "translateX(0px)",
           }}
         />
       </span>
@@ -1033,36 +1084,41 @@ function ThemeSwitch({ theme, onToggle, styles }) {
 /**
  * NEW: AI Coach Insights Card
  */
-function CoachInsightsCard({ insights, onAddExercise, styles }) {
+function CoachInsightsCard({ insights, onAddExercise, styles, collapsed, onToggle }) {
   const [expandedIndex, setExpandedIndex] = useState(null);
-  
+
   if (insights.length === 0) return null;
-  
+
   return (
     <div style={styles.card}>
-      <div style={styles.cardHeader}>
+      <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
         <div style={styles.cardTitle}>🤖 AI Coach</div>
         <span style={styles.badge}>
           {insights.length} insight{insights.length !== 1 ? 's' : ''}
         </span>
+        <span style={styles.collapseToggle}>{collapsed ? "▶" : "▼"}</span>
       </div>
-      
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {insights.map((insight, idx) => (
-          <InsightItem
-            key={idx}
-            insight={insight}
-            isExpanded={expandedIndex === idx}
-            onToggle={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
-            onAddExercise={onAddExercise}
-            styles={styles}
-          />
-        ))}
-      </div>
-      
-      <div style={styles.coachFooter}>
-        💡 <b>Tip:</b> Click an insight to see exercise suggestions
-      </div>
+
+      {!collapsed && (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {insights.map((insight, idx) => (
+              <InsightItem
+                key={idx}
+                insight={insight}
+                isExpanded={expandedIndex === idx}
+                onToggle={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
+                onAddExercise={onAddExercise}
+                styles={styles}
+              />
+            ))}
+          </div>
+
+          <div style={styles.coachFooter}>
+            💡 <b>Tip:</b> Click an insight to see exercise suggestions
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1190,8 +1246,27 @@ export default function App() {
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem("wt_theme") || "dark");
-  const [reorderMode, setReorderMode] = useState(false);
+  const [reorderWorkouts, setReorderWorkouts] = useState(false);
+  const [reorderExercises, setReorderExercises] = useState(false);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
+  const [collapsedToday, setCollapsedToday] = useState(() => new Set());
+  const [collapsedSummary, setCollapsedSummary] = useState(() => new Set());
+
+  function toggleCollapse(setter, id) {
+    setter((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function collapseAll(setter, ids) {
+    setter(new Set(ids));
+  }
+
+  function expandAll(setter) {
+    setter(new Set());
+  }
 
   // IMPROVEMENT: All modal state consolidated into one reducer
   const [modals, dispatchModal] = useReducer(modalReducer, {
@@ -1252,6 +1327,21 @@ export default function App() {
 
   const workouts = state.program.workouts;
 
+  const categoryOptions = useMemo(() => {
+    const defaults = ["Workout", "Push", "Pull", "Legs", "Upper", "Lower", "Cardio", "Stretch", "Abs"];
+    const existing = workouts.map((w) => (w.category || "Workout").trim());
+    const seen = new Set();
+    const result = [];
+    for (const c of [...existing, ...defaults]) {
+      const key = c.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(c);
+      }
+    }
+    return result;
+  }, [workouts]);
+
   const workoutById = useMemo(() => {
     const m = new Map();
     for (const w of workouts) m.set(w.id, w);
@@ -1309,9 +1399,10 @@ export default function App() {
     localStorage.setItem("wt_theme", theme);
   }, [theme]);
 
-  // Close overflow menu when switching workouts
+  // Reset overflow menu and exercise reorder when switching workouts
   useEffect(() => {
     setOverflowMenuOpen(false);
+    setReorderExercises(false);
   }, [manageWorkoutId]);
 
 
@@ -1930,23 +2021,26 @@ export default function App() {
   /**
    * Workout card component
    */
-  function WorkoutCard({ workout }) {
+  function WorkoutCard({ workout, collapsed, onToggle }) {
     const cat = (workout.category || "Workout").trim();
     return (
       <div style={styles.card}>
-        <div style={styles.cardHeader}>
+        <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
+          <span style={styles.collapseToggle}>{collapsed ? "▶" : "▼"}</span>
         </div>
 
-        {workout.exercises.length === 0 ? (
-          <div style={styles.emptyText}>No exercises yet.</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {workout.exercises.map((ex) => (
-              <ExerciseRow key={ex.id} workoutId={workout.id} exercise={ex} />
-            ))}
-          </div>
+        {!collapsed && (
+          workout.exercises.length === 0 ? (
+            <div style={styles.emptyText}>No exercises yet.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {workout.exercises.map((ex) => (
+                <ExerciseRow key={ex.id} workoutId={workout.id} exercise={ex} />
+              ))}
+            </div>
+          )
         )}
       </div>
     );
@@ -1955,33 +2049,36 @@ export default function App() {
   /**
    * Summary block component
    */
-  function SummaryBlock({ workout }) {
+  function SummaryBlock({ workout, collapsed, onToggle }) {
     const cat = (workout.category || "Workout").trim();
     return (
       <div style={styles.card}>
-        <div style={styles.cardHeader}>
+        <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
+          <span style={styles.collapseToggle}>{collapsed ? "▶" : "▼"}</span>
         </div>
 
-        {workout.exercises.length === 0 ? (
-          <div style={styles.emptyText}>No exercises yet.</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {workout.exercises.map((ex) => {
-              const exUnit = getUnit(ex.unit, ex);
-              const s = computeExerciseSummary(ex.id, summaryRange.start, summaryRange.end, exUnit);
-              return (
-                <div key={ex.id} style={styles.summaryRow}>
-                  <div style={styles.exerciseName}>{ex.name}</div>
-                  <div style={styles.summaryRight}>
-                    <span style={styles.summaryChip}>{s.totalReps} {exUnit.abbr}</span>
-                    <span style={styles.summaryChip}>Max {s.maxWeight}</span>
+        {!collapsed && (
+          workout.exercises.length === 0 ? (
+            <div style={styles.emptyText}>No exercises yet.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {workout.exercises.map((ex) => {
+                const exUnit = getUnit(ex.unit, ex);
+                const s = computeExerciseSummary(ex.id, summaryRange.start, summaryRange.end, exUnit);
+                return (
+                  <div key={ex.id} style={styles.summaryRow}>
+                    <div style={styles.exerciseName}>{ex.name}</div>
+                    <div style={styles.summaryRight}>
+                      <span style={styles.summaryChip}>{s.totalReps} {exUnit.abbr}</span>
+                      <span style={styles.summaryChip}>Max {s.maxWeight}</span>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )
         )}
       </div>
     );
@@ -2046,8 +2143,25 @@ export default function App() {
           {/* TODAY TAB */}
           {tab === "today" ? (
             <div style={styles.section}>
+              <div style={styles.collapseAllRow}>
+                <button
+                  style={styles.collapseAllBtn}
+                  onClick={() => {
+                    const allCollapsed = workouts.every((w) => collapsedToday.has(w.id));
+                    allCollapsed ? expandAll(setCollapsedToday) : collapseAll(setCollapsedToday, workouts.map((w) => w.id));
+                  }}
+                  type="button"
+                >
+                  {workouts.every((w) => collapsedToday.has(w.id)) ? "Expand All" : "Collapse All"}
+                </button>
+              </div>
               {workouts.map((w) => (
-                <WorkoutCard key={w.id} workout={w} />
+                <WorkoutCard
+                  key={w.id}
+                  workout={w}
+                  collapsed={collapsedToday.has(w.id)}
+                  onToggle={() => toggleCollapse(setCollapsedToday, w.id)}
+                />
               ))}
             </div>
           ) : null}
@@ -2055,13 +2169,6 @@ export default function App() {
           {/* SUMMARY TAB */}
           {tab === "summary" ? (
             <div style={styles.section}>
-              {/* AI Coach Card */}
-              <CoachInsightsCard
-                insights={coachInsights}
-                onAddExercise={handleAddSuggestion}
-                styles={styles}
-              />
-
               <PillTabs
                 styles={styles}
                 value={summaryMode}
@@ -2072,12 +2179,39 @@ export default function App() {
                   { value: "ytd", label: "YTD" },
                 ]}
               />
-              <div style={styles.rangeText}>
-                Range: <b>{summaryRange.start}</b> → <b>{summaryRange.end}</b>
+              <div style={styles.rangeRow}>
+                <div style={styles.rangeText}>
+                  {formatDateLabel(summaryRange.start)} – {formatDateLabel(summaryRange.end)}
+                </div>
+                <button
+                  style={styles.collapseAllBtn}
+                  onClick={() => {
+                    const allIds = [...workouts.map((w) => w.id), "__coach__"];
+                    const allCollapsed = allIds.every((id) => collapsedSummary.has(id));
+                    allCollapsed ? expandAll(setCollapsedSummary) : collapseAll(setCollapsedSummary, allIds);
+                  }}
+                  type="button"
+                >
+                  {[...workouts.map((w) => w.id), "__coach__"].every((id) => collapsedSummary.has(id)) ? "Expand All" : "Collapse All"}
+                </button>
               </div>
 
+              {/* AI Coach Card */}
+              <CoachInsightsCard
+                insights={coachInsights}
+                onAddExercise={handleAddSuggestion}
+                styles={styles}
+                collapsed={collapsedSummary.has("__coach__")}
+                onToggle={() => toggleCollapse(setCollapsedSummary, "__coach__")}
+              />
+
               {workouts.map((w) => (
-                <SummaryBlock key={w.id} workout={w} />
+                <SummaryBlock
+                  key={w.id}
+                  workout={w}
+                  collapsed={collapsedSummary.has(w.id)}
+                  onToggle={() => toggleCollapse(setCollapsedSummary, w.id)}
+                />
               ))}
             </div>
           ) : null}
@@ -2091,10 +2225,10 @@ export default function App() {
                   <div style={styles.cardTitle}>Structure</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
-                      style={reorderMode ? styles.primaryBtn : styles.secondaryBtn}
-                      onClick={() => setReorderMode((v) => !v)}
+                      style={reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn}
+                      onClick={() => setReorderWorkouts((v) => !v)}
                     >
-                      {reorderMode ? "Done" : "Reorder"}
+                      {reorderWorkouts ? "Done" : "Reorder"}
                     </button>
                     <button style={styles.primaryBtn} onClick={addWorkout}>
                       + Add Workout
@@ -2119,7 +2253,7 @@ export default function App() {
                           </div>
                           <div style={styles.smallText}>{w.exercises.length} exercises</div>
                         </button>
-                        {reorderMode ? (
+                        {reorderWorkouts ? (
                           <div style={styles.reorderBtnGroup}>
                             <button
                               style={styles.reorderBtn}
@@ -2184,10 +2318,19 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Full-width add exercise button */}
-                        <button style={styles.addExerciseFullBtn} onClick={() => addExercise(w.id)}>
-                          + Add Exercise
-                        </button>
+                        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                          <button style={styles.addExerciseFullBtn} onClick={() => addExercise(w.id)}>
+                            + Add Exercise
+                          </button>
+                          {w.exercises.length > 1 && (
+                            <button
+                              style={reorderExercises ? styles.primaryBtn : styles.secondaryBtn}
+                              onClick={() => setReorderExercises((v) => !v)}
+                            >
+                              {reorderExercises ? "Done" : "Reorder"}
+                            </button>
+                          )}
+                        </div>
 
                         {w.exercises.length === 0 ? (
                           <div style={styles.emptyText}>No exercises yet. Add one above.</div>
@@ -2202,7 +2345,7 @@ export default function App() {
                                     <div style={styles.manageExerciseName}>{ex.name}</div>
                                     <span style={styles.unitPill}>{getUnit(ex.unit, ex).abbr}</span>
                                   </div>
-                                  {reorderMode ? (
+                                  {reorderExercises ? (
                                     <div style={styles.reorderBtnGroup}>
                                       <button
                                         style={styles.reorderBtn}
@@ -2591,30 +2734,18 @@ export default function App() {
 
           <div style={styles.fieldCol}>
             <label style={styles.label}>Workout category</label>
-            <input
+            <CategoryAutocomplete
               value={modals.addWorkout.category}
-              onChange={(e) =>
+              onChange={(val) =>
                 dispatchModal({
                   type: "UPDATE_ADD_WORKOUT",
-                  payload: { category: e.target.value },
+                  payload: { category: val },
                 })
               }
-              style={styles.textInput}
+              suggestions={categoryOptions}
               placeholder="e.g. Push / Pull / Legs / Stretch"
-              list="category-suggestions"
+              styles={styles}
             />
-            <datalist id="category-suggestions">
-              <option value="Workout" />
-              <option value="Push" />
-              <option value="Pull" />
-              <option value="Legs" />
-              <option value="Upper" />
-              <option value="Lower" />
-              <option value="Cardio" />
-              <option value="Stretch" />
-              <option value="Abs" />
-              <option value="Custom" />
-            </datalist>
           </div>
 
           <div style={styles.modalFooter}>
@@ -2982,6 +3113,60 @@ function getStyles(colors) {
       justifyContent: "space-between",
       gap: 10,
       marginBottom: 10,
+      cursor: "pointer",
+    },
+
+    collapseToggle: {
+      fontSize: 12,
+      opacity: 0.5,
+      marginLeft: "auto",
+    },
+
+    collapseAllRow: {
+      display: "flex",
+      justifyContent: "flex-end",
+    },
+
+    collapseAllBtn: {
+      padding: "6px 12px",
+      borderRadius: 10,
+      border: `1px solid ${colors.border}`,
+      background: colors.cardAltBg,
+      color: colors.text,
+      fontWeight: 700,
+      fontSize: 12,
+      opacity: 0.85,
+      cursor: "pointer",
+    },
+
+    autocompleteDropdown: {
+      position: "absolute",
+      top: "100%",
+      left: 0,
+      right: 0,
+      marginTop: 4,
+      background: colors.cardBg,
+      border: `1px solid ${colors.border}`,
+      borderRadius: 12,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+      zIndex: 10,
+      overflow: "hidden",
+      maxHeight: 200,
+      overflowY: "auto",
+    },
+
+    autocompleteOption: {
+      display: "block",
+      width: "100%",
+      textAlign: "left",
+      padding: "10px 14px",
+      background: "transparent",
+      border: "none",
+      borderBottom: `1px solid ${colors.border}`,
+      color: colors.text,
+      fontWeight: 600,
+      fontSize: 14,
+      cursor: "pointer",
     },
 
     cardTitle: { fontWeight: 900, fontSize: 16 },
@@ -3053,7 +3238,7 @@ function getStyles(colors) {
     secondaryBtn: {
       padding: "10px 12px",
       borderRadius: 12,
-      border: "1px solid rgba(255,255,255,0.12)",
+      border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
       fontWeight: 800,
@@ -3158,7 +3343,14 @@ function getStyles(colors) {
       border: `1px solid ${colors.border}`,
     },
 
-    rangeText: { fontSize: 12, opacity: 0.8, marginBottom: 8 },
+    rangeRow: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+
+    rangeText: { fontSize: 12, opacity: 0.8 },
 
     summaryRow: {
       display: "flex",
@@ -3336,70 +3528,53 @@ function getStyles(colors) {
     themeSwitch: {
       display: "inline-flex",
       alignItems: "center",
-      gap: 10,
-      padding: "8px 10px",
+      gap: 8,
+      padding: "6px 10px 6px 6px",
       borderRadius: 999,
       border: `1px solid ${colors.border}`,
       background: colors.cardBg,
       color: colors.text,
       fontWeight: 800,
-      boxShadow: colors.shadow,
       userSelect: "none",
       WebkitTapHighlightColor: "transparent",
+      cursor: "pointer",
     },
 
-    themeSwitchDark: {},
-    themeSwitchLight: {},
-
     themeSwitchTrack: {
-      width: 44,
-      height: 24,
+      width: 40,
+      height: 22,
       borderRadius: 999,
       border: `1px solid ${colors.border}`,
-      display: "flex",
-      alignItems: "center",
       padding: 2,
       boxSizing: "border-box",
       position: "relative",
-      overflow: "hidden",
-      transition: "background 160ms ease, border-color 160ms ease",
+      transition: "background 160ms ease",
     },
 
     themeSwitchTrackDark: {
-      background: "rgba(255,255,255,0.08)",
+      background: "rgba(255,255,255,0.12)",
     },
 
     themeSwitchTrackLight: {
-      background: "rgba(0,0,0,0.06)",
-    },
-
-    themeSwitchIcon: {
-      position: "absolute",
-      top: "50%",
-      transform: "translateY(-50%)",
-      fontSize: 12,
-      pointerEvents: "none",
-      transition: "opacity 160ms ease",
+      background: "rgba(0,0,0,0.08)",
     },
 
     themeSwitchThumb: {
-      width: 20,
-      height: 20,
+      width: 16,
+      height: 16,
       borderRadius: 999,
-      transition: "transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms ease",
-      boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
-      position: "relative",
-      zIndex: 1,
+      transition: "transform 200ms cubic-bezier(.2,.8,.2,1)",
+      position: "absolute",
+      top: 2,
+      left: 2,
     },
 
     themeSwitchThumbDark: {
-      background: colors.primaryBg,
-      boxShadow: "0 10px 20px rgba(0,0,0,0.35)",
+      background: "#e8eef7",
     },
 
     themeSwitchThumbLight: {
-      background: colors.primaryBg,
-      boxShadow: "0 8px 18px rgba(0,0,0,0.18)",
+      background: "#1f2933",
     },
 
     themeSwitchLabel: {
@@ -3568,7 +3743,7 @@ function getStyles(colors) {
 
     // Full-width add exercise button
     addExerciseFullBtn: {
-      width: "100%",
+      flex: 1,
       padding: "12px 16px",
       borderRadius: 12,
       border: `1px solid rgba(255,255,255,0.18)`,
@@ -3577,7 +3752,6 @@ function getStyles(colors) {
       fontWeight: 900,
       fontSize: 14,
       cursor: "pointer",
-      marginBottom: 10,
     },
 
     // Reorder arrow buttons
@@ -3609,7 +3783,7 @@ function getStyles(colors) {
     compactSecondaryBtn: {
       padding: "6px 8px",
       borderRadius: 8,
-      border: `1px solid rgba(255,255,255,0.12)`,
+      border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
       fontWeight: 800,
