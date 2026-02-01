@@ -877,6 +877,30 @@ function useSwipe({ onSwipeLeft, onSwipeRight, thresholdPx = 40 }) {
   return { onTouchStart, onTouchEnd };
 }
 
+/**
+ * Custom hook for mobile keyboard avoidance.
+ * Returns the current keyboard inset (in px) using window.visualViewport.
+ */
+function useKeyboardInset() {
+  const [inset, setInset] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    function onResize() {
+      const kb = window.innerHeight - vv.height;
+      setInset(kb > 0 ? kb : 0);
+    }
+
+    vv.addEventListener("resize", onResize);
+    onResize();
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
+
+  return inset;
+}
+
 // ============================================================================
 // 5. UI COMPONENTS - Reusable UI pieces
 // ============================================================================
@@ -963,21 +987,40 @@ function CategoryAutocomplete({ value, onChange, suggestions, placeholder, style
 }
 
 /**
- * Modal component - reusable sheet-style modal
+ * Modal component - reusable sheet-style modal with keyboard avoidance
  */
 function Modal({ open, title, children, onClose, styles }) {
+  const kbInset = useKeyboardInset();
+
   if (!open) return null;
 
+  const handleFocusCapture = (e) => {
+    const el = e.target;
+    if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") {
+      setTimeout(() => {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 120);
+    }
+  };
+
   return (
-    <div style={styles.modalOverlay} onMouseDown={onClose}>
-      <div style={styles.modalSheet} onMouseDown={(e) => e.stopPropagation()}>
+    <div style={{ ...styles.modalOverlay, paddingBottom: 10 + kbInset }} onMouseDown={onClose}>
+      <div
+        style={{ ...styles.modalSheet, maxHeight: `calc(100dvh - ${10 + kbInset}px)` }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div style={styles.modalHeader}>
           <div style={styles.modalTitle}>{title}</div>
           <button onClick={onClose} style={styles.iconBtn} aria-label="Close">
             ×
           </button>
         </div>
-        <div style={styles.modalBody}>{children}</div>
+        <div
+          style={{ ...styles.modalBody, maxHeight: `calc(78dvh - ${kbInset}px)` }}
+          onFocusCapture={handleFocusCapture}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
