@@ -1284,7 +1284,7 @@ export default function App() {
   // ---------------------------------------------------------------------------
 
   const [state, setState] = useState(() => loadState());
-  const [tab, setTab] = useState("today");
+  const [tab, setTab] = useState(() => sessionStorage.getItem("wt_tab") || "today");
   const [summaryMode, setSummaryMode] = useState("wtd");
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
@@ -1297,6 +1297,9 @@ export default function App() {
   });
   const [collapsedSummary, setCollapsedSummary] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_summary"))); } catch { return new Set(); }
+  });
+  const [autoCollapseEmpty, setAutoCollapseEmpty] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wt_auto_collapse_empty")) === true; } catch { return false; }
   });
 
   function toggleCollapse(setter, id) {
@@ -1407,6 +1410,21 @@ export default function App() {
     return { start: startOfYear(dateKey), end: dateKey, label: "YTD" };
   }, [dateKey, summaryMode]);
 
+  const summaryDaysLogged = useMemo(() => {
+    let logged = 0;
+    let total = 0;
+    let d = summaryRange.start;
+    while (d <= summaryRange.end) {
+      total++;
+      const dayLogs = state.logsByDate[d];
+      if (dayLogs && typeof dayLogs === "object" && Object.keys(dayLogs).length > 0) {
+        logged++;
+      }
+      d = addDays(d, 1);
+    }
+    return { logged, total };
+  }, [state.logsByDate, summaryRange]);
+
   const loggedDaysInMonth = useMemo(() => {
     const set = new Set();
     const prefix = modals.datePicker.monthCursor + "-";
@@ -1446,6 +1464,11 @@ export default function App() {
     localStorage.setItem("wt_theme", theme);
   }, [theme]);
 
+  // Persist active tab across refresh
+  useEffect(() => {
+    sessionStorage.setItem("wt_tab", tab);
+  }, [tab]);
+
   // Persist collapsed state
   useEffect(() => {
     localStorage.setItem("wt_collapsed_today", JSON.stringify([...collapsedToday]));
@@ -1454,6 +1477,28 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("wt_collapsed_summary", JSON.stringify([...collapsedSummary]));
   }, [collapsedSummary]);
+
+  useEffect(() => {
+    localStorage.setItem("wt_auto_collapse_empty", JSON.stringify(autoCollapseEmpty));
+  }, [autoCollapseEmpty]);
+
+  // Auto-collapse empty workout cards on date change
+  useEffect(() => {
+    if (!autoCollapseEmpty) return;
+    const dayLogs = state.logsByDate[dateKey] ?? {};
+    const emptyIds = workouts
+      .filter((w) => !w.exercises.some((ex) => dayLogs[ex.id]?.sets?.length > 0))
+      .map((w) => w.id);
+    const filledIds = workouts
+      .filter((w) => w.exercises.some((ex) => dayLogs[ex.id]?.sets?.length > 0))
+      .map((w) => w.id);
+    setCollapsedToday((prev) => {
+      const next = new Set(prev);
+      for (const id of emptyIds) next.add(id);
+      for (const id of filledIds) next.delete(id);
+      return next;
+    });
+  }, [dateKey, autoCollapseEmpty]);
 
   // Reset overflow menu and exercise reorder when switching workouts
   useEffect(() => {
@@ -2199,7 +2244,16 @@ export default function App() {
           {/* TODAY TAB */}
           {tab === "today" ? (
             <div style={styles.section}>
-              <div style={styles.collapseAllRow}>
+              <div style={{ ...styles.collapseAllRow, justifyContent: "space-between", alignItems: "center" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, opacity: 0.85, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={autoCollapseEmpty}
+                    onChange={(e) => setAutoCollapseEmpty(e.target.checked)}
+                    style={styles.checkbox}
+                  />
+                  Hide empty
+                </label>
                 <button
                   style={styles.collapseAllBtn}
                   onClick={() => {
@@ -2236,8 +2290,11 @@ export default function App() {
                 ]}
               />
               <div style={styles.rangeRow}>
-                <div style={styles.rangeText}>
-                  {formatDateLabel(summaryRange.start)} – {formatDateLabel(summaryRange.end)}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={styles.rangeText}>
+                    {formatDateLabel(summaryRange.start)} – {formatDateLabel(summaryRange.end)}
+                  </div>
+                  <span style={styles.tagMuted}>{summaryDaysLogged.logged} / {summaryDaysLogged.total} days</span>
                 </div>
                 <button
                   style={styles.collapseAllBtn}
