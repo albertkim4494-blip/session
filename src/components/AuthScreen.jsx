@@ -104,12 +104,15 @@ export default function AuthScreen() {
 
 const styles = {
   wrapper: {
-    minHeight: "100dvh",
+    height: "100dvh",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     background: "#0b0f14",
     padding: 16,
+    overflow: "hidden",
+    position: "fixed",
+    inset: 0,
   },
   card: {
     width: "100%",
