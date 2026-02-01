@@ -1249,8 +1249,12 @@ export default function App() {
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
-  const [collapsedToday, setCollapsedToday] = useState(() => new Set());
-  const [collapsedSummary, setCollapsedSummary] = useState(() => new Set());
+  const [collapsedToday, setCollapsedToday] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_today"))); } catch { return new Set(); }
+  });
+  const [collapsedSummary, setCollapsedSummary] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_summary"))); } catch { return new Set(); }
+  });
 
   function toggleCollapse(setter, id) {
     setter((prev) => {
@@ -1398,6 +1402,15 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("wt_theme", theme);
   }, [theme]);
+
+  // Persist collapsed state
+  useEffect(() => {
+    localStorage.setItem("wt_collapsed_today", JSON.stringify([...collapsedToday]));
+  }, [collapsedToday]);
+
+  useEffect(() => {
+    localStorage.setItem("wt_collapsed_summary", JSON.stringify([...collapsedSummary]));
+  }, [collapsedSummary]);
 
   // Reset overflow menu and exercise reorder when switching workouts
   useEffect(() => {
