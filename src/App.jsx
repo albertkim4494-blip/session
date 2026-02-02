@@ -3335,6 +3335,7 @@ function getStyles(colors) {
       width: "100%",
       display: "flex",
       justifyContent: "center",
+      overscrollBehavior: "none",
     },
 
     content: {
@@ -3417,6 +3418,7 @@ function getStyles(colors) {
       background: colors.cardBg,
       color: colors.text,
       fontWeight: 800,
+      transition: "background 0.25s, border-color 0.25s, color 0.25s",
     },
 
     navBtnActive: {
