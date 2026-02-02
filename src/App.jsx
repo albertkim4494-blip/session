@@ -3589,6 +3589,7 @@ function getStyles(colors) {
       paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
       background: colors.navBg,
       borderTop: `1px solid ${colors.border}`,
+      touchAction: "none",
     },
 
     navBtn: {
