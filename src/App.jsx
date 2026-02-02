@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
 import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
+import { supabase } from "./lib/supabase";
+import { fetchCoachInsights } from "./lib/coachApi";
 
 /**
  * ============================================================================
@@ -1128,38 +1130,67 @@ function ThemeSwitch({ theme, onToggle, styles }) {
 /**
  * NEW: AI Coach Insights Card
  */
-function CoachInsightsCard({ insights, onAddExercise, styles, collapsed, onToggle }) {
+function CoachInsightsCard({ insights, onAddExercise, styles, collapsed, onToggle, loading, error, onRefresh }) {
   const [expandedIndex, setExpandedIndex] = useState(null);
 
-  if (insights.length === 0) return null;
+  if (!loading && insights.length === 0 && !error) return null;
 
   return (
     <div style={styles.card}>
       <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
         <div style={styles.cardTitle}>🤖 AI Coach</div>
-        <span style={styles.badge}>
-          {insights.length} insight{insights.length !== 1 ? 's' : ''}
-        </span>
+        {loading ? (
+          <span style={styles.badge}>...</span>
+        ) : (
+          <span style={styles.badge}>
+            {insights.length} insight{insights.length !== 1 ? 's' : ''}
+          </span>
+        )}
         <span style={styles.collapseToggle}>{collapsed ? "▶" : "▼"}</span>
       </div>
 
       {!collapsed && (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {insights.map((insight, idx) => (
-              <InsightItem
-                key={idx}
-                insight={insight}
-                isExpanded={expandedIndex === idx}
-                onToggle={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
-                onAddExercise={onAddExercise}
-                styles={styles}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <div style={{ padding: '16px 0', textAlign: 'center', opacity: 0.6, fontSize: 14 }}>
+              Analyzing your workouts...
+            </div>
+          ) : (
+            <>
+              {error && (
+                <div style={{ padding: '8px 12px', marginBottom: 8, fontSize: 13, opacity: 0.7, background: 'rgba(245,158,11,0.1)', borderRadius: 8 }}>
+                  {error}
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {insights.map((insight, idx) => (
+                  <InsightItem
+                    key={idx}
+                    insight={insight}
+                    isExpanded={expandedIndex === idx}
+                    onToggle={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
+                    onAddExercise={onAddExercise}
+                    styles={styles}
+                  />
+                ))}
+              </div>
+            </>
+          )}
 
           <div style={styles.coachFooter}>
-            💡 <b>Tip:</b> Click an insight to see exercise suggestions
+            Powered by AI — personalized to your data
+            {onRefresh && !loading && (
+              <>
+                {' · '}
+                <a
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); onRefresh(); }}
+                  style={{ color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
+                >
+                  Refresh
+                </a>
+              </>
+            )}
           </div>
         </>
       )}
@@ -1305,6 +1336,36 @@ export default function App({ session, onLogout }) {
     try { return JSON.parse(localStorage.getItem("wt_auto_collapse_empty")) === true; } catch { return false; }
   });
 
+  // AI Coach state
+  const [profile, setProfile] = useState(null);
+  const [coachInsights, setCoachInsights] = useState([]);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachError, setCoachError] = useState(null);
+  const coachTimerRef = useRef(null);
+
+  // Swipe navigation between tabs
+  const touchRef = useRef({ startX: 0, startY: 0 });
+  const TAB_ORDER = ["today", "summary", "manage"];
+
+  const handleTouchStart = useCallback((e) => {
+    touchRef.current.startX = e.touches[0].clientX;
+    touchRef.current.startY = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchEnd = useCallback((e) => {
+    const dx = e.changedTouches[0].clientX - touchRef.current.startX;
+    const dy = e.changedTouches[0].clientY - touchRef.current.startY;
+    // Only trigger if horizontal swipe is dominant and long enough
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      setTab((prev) => {
+        const idx = TAB_ORDER.indexOf(prev);
+        if (dx < 0 && idx < TAB_ORDER.length - 1) return TAB_ORDER[idx + 1]; // swipe left → next
+        if (dx > 0 && idx > 0) return TAB_ORDER[idx - 1]; // swipe right → prev
+        return prev;
+      });
+    }
+  }, []);
+
   function toggleCollapse(setter, id) {
     setter((prev) => {
       const next = new Set(prev);
@@ -1367,6 +1428,27 @@ export default function App({ session, onLogout }) {
       cancelled = true;
       cloudSaver.current?.cancel();
     };
+  }, [session.user.id]);
+
+  // Fetch user profile from Supabase
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProfile() {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("age, weight_lbs, goal, about, sports")
+          .eq("id", session.user.id)
+          .single();
+        if (!cancelled && data && !error) {
+          setProfile(data);
+        }
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+      }
+    }
+    loadProfile();
+    return () => { cancelled = true; };
   }, [session.user.id]);
 
   const todayKey = yyyyMmDd(new Date());
@@ -1483,11 +1565,38 @@ export default function App({ session, onLogout }) {
     return set;
   }, [state.logsByDate, modals.datePicker.monthCursor]);
 
-  // NEW: AI Coach insights computation
-  const coachInsights = useMemo(() => {
-    const analysis = analyzeWorkoutBalance(state, summaryRange);
-    return detectImbalances(analysis);
-  }, [state, summaryRange]);
+  // NEW: AI Coach — async fetch with debounce and fallback
+  useEffect(() => {
+    if (!dataReady || !profile) return;
+
+    // Clear any pending debounce timer
+    if (coachTimerRef.current) clearTimeout(coachTimerRef.current);
+
+    coachTimerRef.current = setTimeout(async () => {
+      setCoachLoading(true);
+      setCoachError(null);
+      try {
+        const { insights } = await fetchCoachInsights({
+          profile,
+          state,
+          dateRange: summaryRange,
+        });
+        setCoachInsights(insights);
+      } catch (err) {
+        console.error("AI Coach error, falling back to static:", err);
+        // Fallback to static analysis
+        const analysis = analyzeWorkoutBalance(state, summaryRange);
+        setCoachInsights(detectImbalances(analysis));
+        setCoachError("AI coach unavailable — showing basic analysis");
+      } finally {
+        setCoachLoading(false);
+      }
+    }, 3000);
+
+    return () => {
+      if (coachTimerRef.current) clearTimeout(coachTimerRef.current);
+    };
+  }, [dataReady, profile, state, summaryRange]);
 
   // ---------------------------------------------------------------------------
   // EFFECTS - Side effects (saving, syncing)
@@ -2317,48 +2426,34 @@ export default function App({ session, onLogout }) {
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Main body */}
-        <div style={styles.body}>
-          {/* TODAY TAB */}
-          {tab === "today" ? (
-            <div style={styles.section}>
-              <div style={{ ...styles.collapseAllRow, justifyContent: "space-between", alignItems: "center" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, opacity: 0.85, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={autoCollapseEmpty}
-                    onChange={(e) => setAutoCollapseEmpty(e.target.checked)}
-                    style={styles.checkbox}
-                  />
-                  Hide empty
-                </label>
-                <button
-                  style={styles.collapseAllBtn}
-                  onClick={() => {
-                    const allCollapsed = workouts.every((w) => collapsedToday.has(w.id));
-                    allCollapsed ? expandAll(setCollapsedToday) : collapseAll(setCollapsedToday, workouts.map((w) => w.id));
-                  }}
-                  type="button"
-                >
-                  {workouts.every((w) => collapsedToday.has(w.id)) ? "Expand All" : "Collapse All"}
-                </button>
-              </div>
-              {workouts.map((w) => (
-                <WorkoutCard
-                  key={w.id}
-                  workout={w}
-                  collapsed={collapsedToday.has(w.id)}
-                  onToggle={() => toggleCollapse(setCollapsedToday, w.id)}
+          {/* Tab-specific sticky toolbar */}
+          {tab === "today" && (
+            <div style={{ ...styles.collapseAllRow, justifyContent: "space-between", alignItems: "center", paddingTop: 10 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, opacity: 0.85, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={autoCollapseEmpty}
+                  onChange={(e) => setAutoCollapseEmpty(e.target.checked)}
+                  style={styles.checkbox}
                 />
-              ))}
+                Hide empty
+              </label>
+              <button
+                style={styles.collapseAllBtn}
+                onClick={() => {
+                  const allCollapsed = workouts.every((w) => collapsedToday.has(w.id));
+                  allCollapsed ? expandAll(setCollapsedToday) : collapseAll(setCollapsedToday, workouts.map((w) => w.id));
+                }}
+                type="button"
+              >
+                {workouts.every((w) => collapsedToday.has(w.id)) ? "Expand All" : "Collapse All"}
+              </button>
             </div>
-          ) : null}
+          )}
 
-          {/* SUMMARY TAB */}
-          {tab === "summary" ? (
-            <div style={styles.section}>
+          {tab === "summary" && (
+            <div style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
               <PillTabs
                 styles={styles}
                 value={summaryMode}
@@ -2388,7 +2483,29 @@ export default function App({ session, onLogout }) {
                   {[...workouts.map((w) => w.id), "__coach__"].every((id) => collapsedSummary.has(id)) ? "Expand All" : "Collapse All"}
                 </button>
               </div>
+            </div>
+          )}
+        </div>
 
+        {/* Main body */}
+        <div style={styles.body} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+          {/* TODAY TAB */}
+          {tab === "today" ? (
+            <div style={styles.section}>
+              {workouts.map((w) => (
+                <WorkoutCard
+                  key={w.id}
+                  workout={w}
+                  collapsed={collapsedToday.has(w.id)}
+                  onToggle={() => toggleCollapse(setCollapsedToday, w.id)}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          {/* SUMMARY TAB */}
+          {tab === "summary" ? (
+            <div style={styles.section}>
               {/* AI Coach Card */}
               <CoachInsightsCard
                 insights={coachInsights}
@@ -2396,6 +2513,22 @@ export default function App({ session, onLogout }) {
                 styles={styles}
                 collapsed={collapsedSummary.has("__coach__")}
                 onToggle={() => toggleCollapse(setCollapsedSummary, "__coach__")}
+                loading={coachLoading}
+                error={coachError}
+                onRefresh={() => {
+                  if (coachTimerRef.current) clearTimeout(coachTimerRef.current);
+                  setCoachLoading(true);
+                  setCoachError(null);
+                  fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true } })
+                    .then(({ insights }) => setCoachInsights(insights))
+                    .catch((err) => {
+                      console.error("AI Coach refresh error:", err);
+                      const analysis = analyzeWorkoutBalance(state, summaryRange);
+                      setCoachInsights(detectImbalances(analysis));
+                      setCoachError("AI coach unavailable — showing basic analysis");
+                    })
+                    .finally(() => setCoachLoading(false));
+                }}
               />
 
               {workouts.map((w) => (
@@ -3207,7 +3340,7 @@ function getStyles(colors) {
     content: {
       width: "100%",
       maxWidth: 760,
-      overflowX: "hidden",
+      overflowX: "clip",
       display: "flex",
       flexDirection: "column",
       paddingLeft: "calc(14px + var(--safe-left, 0px))",
