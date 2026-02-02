@@ -1344,27 +1344,99 @@ export default function App({ session, onLogout }) {
   const coachTimerRef = useRef(null);
 
   // Swipe navigation between tabs
-  const touchRef = useRef({ startX: 0, startY: 0 });
+  const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
+  const bodyRef = useRef(null);
   const TAB_ORDER = ["today", "summary", "manage"];
 
   const handleTouchStart = useCallback((e) => {
     touchRef.current.startX = e.touches[0].clientX;
     touchRef.current.startY = e.touches[0].clientY;
-  }, []);
-
-  const handleTouchEnd = useCallback((e) => {
-    const dx = e.changedTouches[0].clientX - touchRef.current.startX;
-    const dy = e.changedTouches[0].clientY - touchRef.current.startY;
-    // Only trigger if horizontal swipe is dominant and long enough
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      setTab((prev) => {
-        const idx = TAB_ORDER.indexOf(prev);
-        if (dx < 0 && idx < TAB_ORDER.length - 1) return TAB_ORDER[idx + 1]; // swipe left → next
-        if (dx > 0 && idx > 0) return TAB_ORDER[idx - 1]; // swipe right → prev
-        return prev;
-      });
+    touchRef.current.swiping = false;
+    touchRef.current.locked = false;
+    if (bodyRef.current) {
+      bodyRef.current.style.transition = "none";
     }
   }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    const dx = e.touches[0].clientX - touchRef.current.startX;
+    const dy = e.touches[0].clientY - touchRef.current.startY;
+
+    // Once locked to vertical scrolling, don't interfere
+    if (touchRef.current.locked) return;
+
+    // Decide direction after 10px of movement
+    if (!touchRef.current.swiping && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        touchRef.current.swiping = true;
+      } else {
+        touchRef.current.locked = true;
+        return;
+      }
+    }
+
+    if (touchRef.current.swiping && bodyRef.current) {
+      // Add resistance at the edges
+      const idx = TAB_ORDER.indexOf(tab);
+      let clamped = dx;
+      if (dx > 0 && idx === 0) clamped = dx * 0.2;
+      if (dx < 0 && idx === TAB_ORDER.length - 1) clamped = dx * 0.2;
+
+      bodyRef.current.style.transform = `translateX(${clamped}px)`;
+      bodyRef.current.style.opacity = `${1 - Math.min(Math.abs(clamped) / 600, 0.3)}`;
+      e.preventDefault();
+    }
+  }, [tab]);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (!touchRef.current.swiping || !bodyRef.current) {
+      touchRef.current.swiping = false;
+      return;
+    }
+
+    const dx = e.changedTouches[0].clientX - touchRef.current.startX;
+    const idx = TAB_ORDER.indexOf(tab);
+    const threshold = 60;
+
+    if (Math.abs(dx) > threshold) {
+      // Determine direction
+      const goNext = dx < 0 && idx < TAB_ORDER.length - 1;
+      const goPrev = dx > 0 && idx > 0;
+
+      if (goNext || goPrev) {
+        const direction = goNext ? -1 : 1;
+        bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+        bodyRef.current.style.transform = `translateX(${direction * window.innerWidth}px)`;
+        bodyRef.current.style.opacity = "0.3";
+
+        setTimeout(() => {
+          setTab(goNext ? TAB_ORDER[idx + 1] : TAB_ORDER[idx - 1]);
+          if (bodyRef.current) {
+            bodyRef.current.style.transition = "none";
+            bodyRef.current.style.transform = `translateX(${-direction * window.innerWidth * 0.3}px)`;
+            bodyRef.current.style.opacity = "0.3";
+            // Force reflow then animate in
+            bodyRef.current.offsetHeight;
+            bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+            bodyRef.current.style.transform = "translateX(0)";
+            bodyRef.current.style.opacity = "1";
+          }
+        }, 200);
+      } else {
+        // At edge, snap back
+        bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+        bodyRef.current.style.transform = "translateX(0)";
+        bodyRef.current.style.opacity = "1";
+      }
+    } else {
+      // Below threshold, snap back
+      bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+      bodyRef.current.style.transform = "translateX(0)";
+      bodyRef.current.style.opacity = "1";
+    }
+
+    touchRef.current.swiping = false;
+  }, [tab]);
 
   function toggleCollapse(setter, id) {
     setter((prev) => {
@@ -2488,7 +2560,7 @@ export default function App({ session, onLogout }) {
         </div>
 
         {/* Main body */}
-        <div style={styles.body} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        <div ref={bodyRef} style={styles.body} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
           {/* TODAY TAB */}
           {tab === "today" ? (
             <div style={styles.section}>
@@ -3413,6 +3485,8 @@ function getStyles(colors) {
       color: colors.text,
       fontWeight: 800,
       transition: "background 0.25s, border-color 0.25s, color 0.25s",
+      WebkitTapHighlightColor: "transparent",
+      outline: "none",
     },
 
     navBtnActive: {
