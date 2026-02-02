@@ -899,25 +899,33 @@ function modalReducer(state, action) {
  * Usage: const swipe = useSwipe({ onSwipeLeft: fn, onSwipeRight: fn });
  *        <div {...swipe}>Content</div>
  */
-function useSwipe({ onSwipeLeft, onSwipeRight, thresholdPx = 40 }) {
-  const startXRef = useRef(null);
+function useSwipe({ onSwipeLeft, onSwipeRight, onSwipeUp, onSwipeDown, thresholdPx = 40 }) {
+  const startRef = useRef(null);
 
   function onTouchStart(e) {
-    const x = e.touches?.[0]?.clientX;
-    if (typeof x === "number") startXRef.current = x;
+    const t = e.touches?.[0];
+    if (t) startRef.current = { x: t.clientX, y: t.clientY };
   }
 
   function onTouchEnd(e) {
-    const startX = startXRef.current;
-    startXRef.current = null;
-    const endX = e.changedTouches?.[0]?.clientX;
-    if (typeof startX !== "number" || typeof endX !== "number") return;
+    const start = startRef.current;
+    startRef.current = null;
+    const end = e.changedTouches?.[0];
+    if (!start || !end) return;
 
-    const dx = endX - startX;
-    if (Math.abs(dx) < thresholdPx) return;
+    const dx = end.clientX - start.x;
+    const dy = end.clientY - start.y;
 
-    if (dx < 0) onSwipeLeft?.();
-    else onSwipeRight?.();
+    // Determine dominant axis
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (Math.abs(dx) < thresholdPx) return;
+      if (dx < 0) onSwipeLeft?.();
+      else onSwipeRight?.();
+    } else {
+      if (Math.abs(dy) < thresholdPx) return;
+      if (dy < 0) onSwipeUp?.();
+      else onSwipeDown?.();
+    }
   }
 
   return { onTouchStart, onTouchEnd };
@@ -2392,6 +2400,16 @@ export default function App({ session, onLogout }) {
         type: "UPDATE_MONTH_CURSOR",
         payload: shiftMonth(modals.datePicker.monthCursor, -1),
       }),
+    onSwipeUp: () =>
+      dispatchModal({
+        type: "UPDATE_MONTH_CURSOR",
+        payload: shiftMonth(modals.datePicker.monthCursor, +12),
+      }),
+    onSwipeDown: () =>
+      dispatchModal({
+        type: "UPDATE_MONTH_CURSOR",
+        payload: shiftMonth(modals.datePicker.monthCursor, -12),
+      }),
   });
 
   // ---------------------------------------------------------------------------
@@ -3190,7 +3208,7 @@ export default function App({ session, onLogout }) {
                 </button>
               </div>
 
-              <div style={styles.smallText}>Tip: swipe left/right to change months. Dots = days with logs.</div>
+              <div style={styles.smallText}>Tip: swipe left/right for months, up/down for years. Dots = days with logs.</div>
             </div>
           );
         })()}
