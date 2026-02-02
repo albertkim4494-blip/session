@@ -23,14 +23,18 @@ export default function AuthGate() {
         const newUserId = session?.user?.id || null;
         sessionRef.current = session;
 
-        if (event === "SIGNED_OUT" || event === "SIGNED_IN" || newUserId !== prevUserId) {
-          // Actual user change — reset and re-render
+        if (event === "TOKEN_REFRESHED" && newUserId === prevUserId) {
+          // Same user token refresh — no re-render needed
+          return;
+        }
+
+        // Any other event (INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, user change)
+        if (newUserId !== prevUserId) {
           profileCheckedForRef.current = null;
           setProfileReady(false);
           setNeedsOnboarding(false);
-          setSession(session);
         }
-        // Token refresh for same user — don't call setSession, no re-render needed
+        setSession(session);
       }
     );
 
