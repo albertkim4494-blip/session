@@ -12,11 +12,7 @@ export default function AuthGate() {
   const profileCheckedForRef = useRef(null); // user ID we already checked
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      sessionRef.current = session;
-      setSession(session);
-    });
-
+    // onAuthStateChange fires INITIAL_SESSION immediately — no need for getSession()
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         const prevUserId = sessionRef.current?.user?.id || null;
@@ -28,13 +24,13 @@ export default function AuthGate() {
           return;
         }
 
-        // Any other event (INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, user change)
+        // User changed — reset profile state
         if (newUserId !== prevUserId) {
           profileCheckedForRef.current = null;
           setProfileReady(false);
           setNeedsOnboarding(false);
         }
-        setSession(session);
+        setSession(session ?? null);
       }
     );
 
