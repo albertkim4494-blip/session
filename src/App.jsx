@@ -1382,6 +1382,7 @@ export default function App({ session, onLogout }) {
   const [autoCollapseEmpty, setAutoCollapseEmpty] = useState(() => {
     try { return JSON.parse(localStorage.getItem("wt_auto_collapse_empty")) === true; } catch { return false; }
   });
+  const manualExpandRef = useRef(new Set()); // tracks workouts user manually expanded
 
   // AI Coach state
   const [profile, setProfile] = useState(null);
@@ -1815,8 +1816,10 @@ export default function App({ session, onLogout }) {
     localStorage.setItem("wt_auto_collapse_empty", JSON.stringify(autoCollapseEmpty));
   }, [autoCollapseEmpty]);
 
-  // Auto-collapse empty workout cards on date change
+  // Auto-collapse empty workout cards on date change (respects manual overrides)
   useEffect(() => {
+    // Reset manual overrides when date changes
+    manualExpandRef.current.clear();
     if (!autoCollapseEmpty) return;
     const dayLogs = state.logsByDate[dateKey] ?? {};
     const emptyIds = workouts
@@ -1827,7 +1830,9 @@ export default function App({ session, onLogout }) {
       .map((w) => w.id);
     setCollapsedToday((prev) => {
       const next = new Set(prev);
-      for (const id of emptyIds) next.add(id);
+      for (const id of emptyIds) {
+        if (!manualExpandRef.current.has(id)) next.add(id);
+      }
       for (const id of filledIds) next.delete(id);
       return next;
     });
@@ -2689,7 +2694,15 @@ export default function App({ session, onLogout }) {
                   key={w.id}
                   workout={w}
                   collapsed={collapsedToday.has(w.id)}
-                  onToggle={() => toggleCollapse(setCollapsedToday, w.id)}
+                  onToggle={() => {
+                    // Track manual expand so auto-collapse doesn't override it
+                    if (collapsedToday.has(w.id)) {
+                      manualExpandRef.current.add(w.id);
+                    } else {
+                      manualExpandRef.current.delete(w.id);
+                    }
+                    toggleCollapse(setCollapsedToday, w.id);
+                  }}
                 />
               ))}
             </div>
