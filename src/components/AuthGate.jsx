@@ -8,11 +8,16 @@ export default function AuthGate() {
   const [session, setSession] = useState(undefined); // undefined=loading, null=logged out
   const [profileReady, setProfileReady] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const sessionRef = useRef(null); // latest session for API calls without triggering re-renders
-  const profileCheckedForRef = useRef(null); // user ID we already checked
+  const sessionRef = useRef(null);
+  const profileCheckedForRef = useRef(null);
 
   useEffect(() => {
-    // onAuthStateChange fires INITIAL_SESSION immediately — no need for getSession()
+    // getSession for initial load (INITIAL_SESSION may not exist in older supabase-js)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      sessionRef.current = session;
+      setSession(session ?? null);
+    });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         const prevUserId = sessionRef.current?.user?.id || null;
@@ -20,11 +25,9 @@ export default function AuthGate() {
         sessionRef.current = session;
 
         if (event === "TOKEN_REFRESHED" && newUserId === prevUserId) {
-          // Same user token refresh — no re-render needed
-          return;
+          return; // same user token refresh — no re-render
         }
 
-        // User changed — reset profile state
         if (newUserId !== prevUserId) {
           profileCheckedForRef.current = null;
           setProfileReady(false);
@@ -41,9 +44,8 @@ export default function AuthGate() {
     if (!session) return;
 
     const userId = session.user.id;
-    // Don't re-check if we already checked this exact user
+    // Already successfully checked this user — skip
     if (profileCheckedForRef.current === userId) return;
-    profileCheckedForRef.current = userId;
 
     let cancelled = false;
 
@@ -55,6 +57,9 @@ export default function AuthGate() {
         .single();
 
       if (cancelled) return;
+
+      // Only set the guard AFTER successful completion
+      profileCheckedForRef.current = userId;
 
       if (error || !data?.onboarding_completed_at) {
         setNeedsOnboarding(true);
@@ -76,6 +81,7 @@ export default function AuthGate() {
   const handleOnboardingComplete = () => {
     setNeedsOnboarding(false);
     setProfileReady(true);
+    profileCheckedForRef.current = session?.user?.id || null;
   };
 
   // 1. Auth loading
