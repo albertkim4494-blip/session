@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } 
 import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
 import { supabase } from "./lib/supabase";
 import { fetchCoachInsights } from "./lib/coachApi";
+import { classifyActivity, buildNormalizedAnalysis, detectImbalancesNormalized } from "./lib/coachNormalize";
 
 /**
  * ============================================================================
@@ -95,6 +96,43 @@ function uid(prefix = "id") {
  */
 function isValidDateKey(s) {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+/**
+ * Compute age from a YYYY-MM-DD birthdate string
+ */
+function computeAge(birthdateStr) {
+  const bd = new Date(birthdateStr + "T00:00:00");
+  const now = new Date();
+  let age = now.getFullYear() - bd.getFullYear();
+  const m = now.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < bd.getDate())) age--;
+  return age;
+}
+
+/**
+ * Validate a username string. Returns error message or null if valid.
+ */
+function validateUsername(s) {
+  if (!s || typeof s !== "string" || !s.trim()) return "Username is required";
+  const trimmed = s.trim();
+  if (trimmed.length < 3) return "Username must be at least 3 characters";
+  if (trimmed.length > 20) return "Username must be at most 20 characters";
+  if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) return "Only letters, numbers, and underscores";
+  return null;
+}
+
+/**
+ * Check if a birthdate string is valid (YYYY-MM-DD, age 13-120, not future)
+ */
+function isValidBirthdateString(s) {
+  if (!s || typeof s !== "string") return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + "T00:00:00");
+  if (isNaN(d.getTime())) return false;
+  if (d > new Date()) return false;
+  const age = computeAge(s);
+  return age >= 13 && age <= 120;
 }
 
 /**
@@ -441,39 +479,6 @@ function classifyExercise(exerciseName) {
   return matches.length > 0 ? matches : ['UNCLASSIFIED'];
 }
 
-function analyzeWorkoutBalance(state, dateRange) {
-  const muscleGroupVolume = {};
-  const exerciseIdToName = new Map();
-  
-  for (const workout of state.program.workouts) {
-    for (const ex of workout.exercises) {
-      exerciseIdToName.set(ex.id, ex.name);
-    }
-  }
-  
-  for (const dateKey of Object.keys(state.logsByDate || {})) {
-    if (!isValidDateKey(dateKey)) continue;
-    if (!inRangeInclusive(dateKey, dateRange.start, dateRange.end)) continue;
-
-    const dayLogs = state.logsByDate[dateKey];
-    if (!dayLogs || typeof dayLogs !== "object") continue;
-
-    for (const [exerciseId, log] of Object.entries(dayLogs)) {
-      const exerciseName = exerciseIdToName.get(exerciseId);
-      if (!exerciseName) continue;
-      if (!log || !Array.isArray(log.sets)) continue;
-
-      const groups = classifyExercise(exerciseName);
-      const totalReps = log.sets.reduce((sum, set) => sum + (Number(set.reps) || 0), 0);
-      
-      for (const group of groups) {
-        muscleGroupVolume[group] = (muscleGroupVolume[group] || 0) + totalReps;
-      }
-    }
-  }
-  
-  return { muscleGroupVolume };
-}
 
 function getSuggestionsForMuscleGroup(group) {
   const suggestions = {
@@ -499,86 +504,6 @@ function getSuggestionsForMuscleGroup(group) {
   return suggestions[group] || [];
 }
 
-function detectImbalances(analysis) {
-  const insights = [];
-  const muscleGroupVolume = analysis?.muscleGroupVolume ?? {};
-
-  const totalVolume = Object.values(muscleGroupVolume).reduce((a, b) => a + b, 0);
-  
-  if (totalVolume < 50) return [];
-  
-  // Check push/pull ratio
-  const pushVolume = 
-    (muscleGroupVolume.CHEST || 0) + 
-    (muscleGroupVolume.ANTERIOR_DELT || 0) + 
-    (muscleGroupVolume.TRICEPS || 0);
-    
-  const pullVolume = 
-    (muscleGroupVolume.BACK || 0) + 
-    (muscleGroupVolume.POSTERIOR_DELT || 0) + 
-    (muscleGroupVolume.BICEPS || 0);
-  
-  if (pushVolume > pullVolume * 1.5 && pullVolume > 0) {
-    const ratio = (pushVolume / pullVolume).toFixed(1);
-    insights.push({
-      type: 'IMBALANCE',
-      severity: 'HIGH',
-      title: '⚠️ Push/Pull Imbalance Detected',
-      message: `You're doing ${ratio}x more pushing than pulling. This can lead to shoulder issues and poor posture.`,
-      suggestions: [
-        { exercise: 'Barbell Rows', muscleGroup: 'BACK' },
-        { exercise: 'Pull Ups', muscleGroup: 'BACK' },
-        { exercise: 'Face Pulls', muscleGroup: 'POSTERIOR_DELT' },
-      ]
-    });
-  }
-  
-  // Check posterior delt neglect
-  const anteriorDelt = muscleGroupVolume.ANTERIOR_DELT || 0;
-  const posteriorDelt = muscleGroupVolume.POSTERIOR_DELT || 0;
-  
-  if (anteriorDelt > posteriorDelt * 2 && anteriorDelt > 30) {
-    insights.push({
-      type: 'IMBALANCE',
-      severity: 'MEDIUM',
-      title: '💡 Rear Delt Neglect',
-      message: 'Your front delts are getting way more work than rear delts. Add rear delt work for balanced shoulders.',
-      suggestions: getSuggestionsForMuscleGroup('POSTERIOR_DELT')
-    });
-  }
-  
-  // Check neglected groups
-  const importantGroups = ['BACK', 'HAMSTRINGS', 'POSTERIOR_DELT'];
-  
-  for (const group of importantGroups) {
-    const volume = muscleGroupVolume[group] || 0;
-    const percentage = (volume / totalVolume) * 100;
-    
-    if (percentage < 5 && totalVolume > 100 && insights.length < 2) {
-      const groupName = group.replace(/_/g, ' ').toLowerCase();
-      insights.push({
-        type: 'NEGLECTED',
-        severity: 'LOW',
-        title: `📊 ${groupName} volume is low`,
-        message: `You've barely trained ${groupName} recently. Consider adding some direct work.`,
-        suggestions: getSuggestionsForMuscleGroup(group)
-      });
-    }
-  }
-  
-  // Positive feedback
-  if (insights.length === 0 && totalVolume > 100) {
-    insights.push({
-      type: 'POSITIVE',
-      severity: 'INFO',
-      title: '✅ Training looks balanced!',
-      message: 'Your workout volume is well-distributed. Keep up the great work!',
-      suggestions: []
-    });
-  }
-  
-  return insights.slice(0, 3);
-}
 
 /**
  * Compute a stable signature for the AI Coach that only changes when
@@ -589,13 +514,16 @@ function computeCoachSignature(state, summaryRange) {
   const workouts = state?.program?.workouts || [];
   const logsByDate = state?.logsByDate || {};
   let totalSets = 0;
-  let totalReps = 0;
+  let totalReps = 0; // only strength reps for threshold comparison
   let loggedDays = 0;
   const exerciseNames = [];
 
+  // Build exercise ID → info map for activity classification
+  const exerciseIdToInfo = new Map();
   for (const w of workouts) {
     for (const ex of w.exercises || []) {
       exerciseNames.push(ex.name);
+      exerciseIdToInfo.set(ex.id, { name: ex.name, unit: ex.unit || "reps" });
     }
   }
 
@@ -605,16 +533,22 @@ function computeCoachSignature(state, summaryRange) {
     const dayLogs = logsByDate[dateKey];
     if (!dayLogs || typeof dayLogs !== "object") continue;
     let dayHasData = false;
-    for (const log of Object.values(dayLogs)) {
+    for (const [exId, log] of Object.entries(dayLogs)) {
       if (log && Array.isArray(log.sets)) {
         totalSets += log.sets.length;
-        totalReps += log.sets.reduce((s, set) => s + (Number(set.reps) || 0), 0);
+        const reps = log.sets.reduce((s, set) => s + (Number(set.reps) || 0), 0);
+        // Only count strength reps for the threshold value
+        const info = exerciseIdToInfo.get(exId);
+        if (info && classifyActivity(info.name, info.unit) === "strength") {
+          totalReps += reps;
+        }
         dayHasData = true;
       }
     }
     if (dayHasData) loggedDays++;
   }
 
+  // Still include totalSets in signature for change detection (covers all activity types)
   const signature = `${summaryRange.start}|${summaryRange.end}|${loggedDays}|${totalSets}|${totalReps}|${exerciseNames.length}`;
   return { signature, totalSets, totalReps, loggedDays };
 }
@@ -676,6 +610,19 @@ const initialModalState = {
   addSuggestion: {
     isOpen: false,
     exerciseName: "",
+  },
+  // Profile modal
+  profile: {
+    isOpen: false,
+    username: "",
+    birthdate: "",
+    gender: "",
+    weightLbs: "",
+    goal: "",
+    sports: "",
+    about: "",
+    saving: false,
+    error: "",
   },
   editUnit: {
     isOpen: false,
@@ -882,6 +829,36 @@ function modalReducer(state, action) {
       return {
         ...state,
         editUnit: initialModalState.editUnit,
+      };
+
+    // ===== PROFILE MODAL =====
+    case "OPEN_PROFILE_MODAL":
+      return {
+        ...state,
+        profile: {
+          isOpen: true,
+          username: action.payload.username || "",
+          birthdate: action.payload.birthdate || "",
+          gender: action.payload.gender || "",
+          weightLbs: String(action.payload.weightLbs || ""),
+          goal: action.payload.goal || "",
+          sports: action.payload.sports || "",
+          about: action.payload.about || "",
+          saving: false,
+          error: "",
+        },
+      };
+
+    case "UPDATE_PROFILE_MODAL":
+      return {
+        ...state,
+        profile: { ...state.profile, ...action.payload },
+      };
+
+    case "CLOSE_PROFILE_MODAL":
+      return {
+        ...state,
+        profile: initialModalState.profile,
       };
 
     default:
@@ -1175,6 +1152,172 @@ function ThemeSwitch({ theme, onToggle, styles }) {
       </span>
       <span style={styles.themeSwitchLabel}>{isDark ? "Dark" : "Light"}</span>
     </button>
+  );
+}
+
+/**
+ * Profile modal - edit user profile, theme toggle, logout
+ */
+function ProfileModal({ open, modalState, dispatch, theme, onToggleTheme, onLogout, onSave, styles }) {
+  if (!open) return null;
+
+  const { username, birthdate, gender, weightLbs, goal, sports, about, saving, error } = modalState;
+  const age = birthdate && isValidBirthdateString(birthdate) ? computeAge(birthdate) : null;
+
+  async function handleSave() {
+    const usernameErr = validateUsername(username);
+    if (usernameErr) {
+      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: usernameErr } });
+      return;
+    }
+    if (birthdate && !isValidBirthdateString(birthdate)) {
+      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: "Invalid birthdate (must be 13-120 years old)" } });
+      return;
+    }
+    const wNum = Number(weightLbs);
+    if (weightLbs && (wNum < 50 || wNum > 1000)) {
+      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: "Weight must be 50-1000 lbs" } });
+      return;
+    }
+
+    dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { saving: true, error: "" } });
+
+    const updates = {
+      username: username.trim(),
+      birthdate: birthdate || null,
+      gender: gender || null,
+      weight_lbs: weightLbs ? wNum : null,
+      goal: goal.trim() || null,
+      sports: sports.trim() || null,
+      about: about.trim() || null,
+      age: birthdate && isValidBirthdateString(birthdate) ? computeAge(birthdate) : null,
+    };
+
+    await onSave(updates);
+  }
+
+  const update = (field, value) => dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { [field]: value, error: "" } });
+
+  return (
+    <Modal open={open} title="Profile" onClose={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })} styles={styles}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={styles.fieldCol}>
+          <label style={styles.label}>Username *</label>
+          <input
+            value={username}
+            onChange={(e) => update("username", e.target.value)}
+            style={styles.textInput}
+            placeholder="e.g. john_doe"
+            maxLength={20}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ ...styles.fieldCol, flex: 1 }}>
+            <label style={styles.label}>Birthdate</label>
+            <input
+              type="date"
+              value={birthdate}
+              onChange={(e) => update("birthdate", e.target.value)}
+              style={styles.textInput}
+            />
+          </div>
+          {age !== null && (
+            <div style={{ ...styles.fieldCol, width: 60, flexShrink: 0 }}>
+              <label style={styles.label}>Age</label>
+              <div style={{ padding: "10px 0", fontWeight: 800, fontSize: 14 }}>
+                {age}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ ...styles.fieldCol, flex: 1 }}>
+            <label style={styles.label}>Gender</label>
+            <select
+              value={gender}
+              onChange={(e) => update("gender", e.target.value)}
+              style={styles.textInput}
+            >
+              <option value="">Prefer not to say</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div style={{ ...styles.fieldCol, flex: 1 }}>
+            <label style={styles.label}>Weight (lbs)</label>
+            <input
+              type="number"
+              value={weightLbs}
+              onChange={(e) => update("weightLbs", e.target.value)}
+              style={styles.textInput}
+              placeholder="e.g. 170"
+              min={50}
+              max={1000}
+            />
+          </div>
+        </div>
+
+        <div style={styles.fieldCol}>
+          <label style={styles.label}>Fitness Goal</label>
+          <input
+            value={goal}
+            onChange={(e) => update("goal", e.target.value)}
+            style={styles.textInput}
+            placeholder="e.g. Build muscle"
+          />
+        </div>
+
+        <div style={styles.fieldCol}>
+          <label style={styles.label}>Sports / Activities</label>
+          <input
+            value={sports}
+            onChange={(e) => update("sports", e.target.value)}
+            style={styles.textInput}
+            placeholder="e.g. Running, Basketball"
+          />
+        </div>
+
+        <div style={styles.fieldCol}>
+          <label style={styles.label}>About You</label>
+          <textarea
+            value={about}
+            onChange={(e) => update("about", e.target.value)}
+            style={styles.textarea}
+            placeholder="Anything you'd like to share..."
+            rows={3}
+          />
+        </div>
+
+        <div style={styles.profileDivider}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Theme</span>
+            <ThemeSwitch theme={theme} styles={styles} onToggle={onToggleTheme} />
+          </div>
+        </div>
+
+        {error && <div style={{ color: "#f87171", fontSize: 13 }}>{error}</div>}
+
+        <div style={styles.modalFooter}>
+          <button
+            style={styles.dangerBtn}
+            onClick={onLogout}
+            type="button"
+          >
+            Logout
+          </button>
+          <div style={{ flex: 1 }} />
+          <button style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })}>
+            Cancel
+          </button>
+          <button style={styles.primaryBtn} onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -1565,7 +1708,7 @@ export default function App({ session, onLogout }) {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("age, weight_lbs, goal, about, sports")
+          .select("username, birthdate, gender, age, weight_lbs, goal, about, sports")
           .eq("id", session.user.id)
           .single();
         if (!cancelled && data && !error) {
@@ -1767,8 +1910,8 @@ export default function App({ session, onLogout }) {
         console.error("AI Coach error:", err);
         // Only fall back to static if we have no cached insights at all
         if (coachInsights.length === 0) {
-          const analysis = analyzeWorkoutBalance(state, summaryRange);
-          setCoachInsights(detectImbalances(analysis));
+          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange);
+          setCoachInsights(detectImbalancesNormalized(analysis));
         }
         setCoachError("AI coach unavailable — showing basic analysis");
       })
@@ -2393,6 +2536,25 @@ export default function App({ session, onLogout }) {
     alert(`✅ Added "${exerciseName}" to ${workout.name}!`);
   }, [workoutById]);
 
+  // Save profile to Supabase
+  const saveProfile = useCallback(async (updates) => {
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .upsert({ id: session.user.id, ...updates });
+
+      if (error) {
+        dispatchModal({ type: "UPDATE_PROFILE_MODAL", payload: { saving: false, error: error.message } });
+        return;
+      }
+
+      setProfile((prev) => ({ ...prev, ...updates }));
+      dispatchModal({ type: "CLOSE_PROFILE_MODAL" });
+    } catch (err) {
+      dispatchModal({ type: "UPDATE_PROFILE_MODAL", payload: { saving: false, error: "Failed to save. Try again." } });
+    }
+  }, [session.user.id]);
+
   // Swipe hook for calendar
   const swipe = useSwipe({
     onSwipeLeft: () =>
@@ -2566,24 +2728,25 @@ export default function App({ session, onLogout }) {
         <div style={styles.topBar}>
           <div style={styles.topBarRow}>
             <div style={styles.brand}>Workout Tracker</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <ThemeSwitch theme={theme} styles={styles} onToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
-              <button
-                onClick={onLogout}
-                style={{
-                  padding: "6px 14px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  borderRadius: 8,
-                  border: "1px solid #1e293b",
-                  background: "transparent",
-                  color: theme === "dark" ? "#94a3b8" : "#64748b",
-                  cursor: "pointer",
-                }}
-              >
-                Logout
-              </button>
-            </div>
+            <button
+              onClick={() => dispatchModal({
+                type: "OPEN_PROFILE_MODAL",
+                payload: {
+                  username: profile?.username || "",
+                  birthdate: profile?.birthdate || "",
+                  gender: profile?.gender || "",
+                  weightLbs: profile?.weight_lbs || "",
+                  goal: profile?.goal || "",
+                  sports: profile?.sports || "",
+                  about: profile?.about || "",
+                },
+              })}
+              style={styles.avatarBtn}
+              aria-label="Profile"
+              type="button"
+            >
+              {(profile?.username || "")[0]?.toUpperCase() || "?"}
+            </button>
           </div>
 
           <div style={styles.dateRow}>
@@ -2738,8 +2901,8 @@ export default function App({ session, onLogout }) {
                       if (coachReqIdRef.current !== reqId) return;
                       console.error("AI Coach refresh error:", err);
                       if (coachInsights.length === 0) {
-                        const analysis = analyzeWorkoutBalance(state, summaryRange);
-                        setCoachInsights(detectImbalances(analysis));
+                        const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange);
+                        setCoachInsights(detectImbalancesNormalized(analysis));
                       }
                       setCoachError("AI coach unavailable — showing basic analysis");
                     })
@@ -3453,6 +3616,18 @@ export default function App({ session, onLogout }) {
         </div>
       </Modal>
 
+      {/* Profile Modal */}
+      <ProfileModal
+        open={modals.profile.isOpen}
+        modalState={modals.profile}
+        dispatch={dispatchModal}
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        onLogout={onLogout}
+        onSave={saveProfile}
+        styles={styles}
+      />
+
       {/* NEW: Add Suggested Exercise Modal */}
       <AddSuggestedExerciseModal
         open={modals.addSuggestion.isOpen}
@@ -3579,6 +3754,29 @@ function getStyles(colors) {
     brand: { fontWeight: 800, fontSize: 18, letterSpacing: 0.2 },
     dateRow: { marginTop: 10, display: "flex", alignItems: "center", gap: 10 },
     label: { fontSize: 12, opacity: 0.85 },
+
+    avatarBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 999,
+      border: `1px solid ${colors.border}`,
+      background: colors.primaryBg,
+      color: colors.primaryText,
+      fontWeight: 900,
+      fontSize: 15,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent",
+    },
+
+    profileDivider: {
+      borderTop: `1px solid ${colors.border}`,
+      paddingTop: 12,
+      marginTop: 2,
+    },
 
     topBarRow: {
       display: "flex",

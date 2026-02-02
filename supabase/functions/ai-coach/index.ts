@@ -24,13 +24,21 @@ Deno.serve(async (req) => {
   try {
     const { profile, workouts, recentLogs, dateRange } = await req.json();
 
-    // Build exercise ID → name map from workouts
-    const exerciseMap: Record<string, string> = {};
+    // Build exercise ID → info map from workouts
+    const exerciseMap: Record<string, { name: string; unit: string; unitAbbr: string }> = {};
     for (const w of workouts || []) {
       for (const ex of w.exercises || []) {
-        exerciseMap[ex.id] = ex.name;
+        exerciseMap[ex.id] = {
+          name: ex.name,
+          unit: ex.unit || "reps",
+          unitAbbr: ex.unitAbbr || "reps",
+        };
       }
     }
+
+    // Unit classification constants (inline — can't share modules with client)
+    const DURATION_FACTORS: Record<string, number> = { sec: 1 / 60, min: 1, hrs: 60 };
+    const DISTANCE_UNITS = new Set(["miles", "yards", "laps", "steps"]);
 
     // Build a text summary of the program structure
     const programLines: string[] = [];
@@ -42,24 +50,40 @@ Deno.serve(async (req) => {
       ? programLines.join("\n")
       : "No workouts configured.";
 
-    // Build a text summary of recent logs
+    // Build a text summary of recent logs (unit-aware)
     const logLines: string[] = [];
     for (const [dateKey, dayLogs] of Object.entries(recentLogs || {})) {
       if (!dayLogs || typeof dayLogs !== "object") continue;
       for (const [exId, log] of Object.entries(dayLogs as Record<string, unknown>)) {
-        const exName = exerciseMap[exId] || exId;
+        const exInfo = exerciseMap[exId];
+        const exName = exInfo?.name || exId;
+        const unit = exInfo?.unit || "reps";
+        const unitAbbr = exInfo?.unitAbbr || "reps";
         const logData = log as { sets?: Array<{ reps?: number; weight?: number }> };
         if (!logData?.sets || !Array.isArray(logData.sets)) continue;
-        const totalReps = logData.sets.reduce(
+
+        const totalValue = logData.sets.reduce(
           (sum: number, s: { reps?: number }) => sum + (Number(s.reps) || 0),
           0
         );
-        const maxWeight = Math.max(
-          ...logData.sets.map((s: { weight?: number }) => Number(s.weight) || 0),
-          0
-        );
-        const weightStr = maxWeight > 0 ? ` @ up to ${maxWeight} lbs` : "";
-        logLines.push(`  ${dateKey}: ${exName} — ${totalReps} total reps${weightStr} (${logData.sets.length} sets)`);
+        const setCount = logData.sets.length;
+
+        if (unit in DURATION_FACTORS) {
+          // Duration units: convert to minutes
+          const minutes = Math.round(totalValue * DURATION_FACTORS[unit]);
+          logLines.push(`  ${dateKey}: ${exName} — ${minutes} min total (${setCount} session${setCount !== 1 ? "s" : ""})`);
+        } else if (DISTANCE_UNITS.has(unit)) {
+          // Distance units: show with unit abbreviation
+          logLines.push(`  ${dateKey}: ${exName} — ${totalValue} ${unitAbbr} (${setCount} set${setCount !== 1 ? "s" : ""})`);
+        } else {
+          // Reps (strength): show reps + weight as before
+          const maxWeight = Math.max(
+            ...logData.sets.map((s: { weight?: number }) => Number(s.weight) || 0),
+            0
+          );
+          const weightStr = maxWeight > 0 ? ` @ up to ${maxWeight} lbs` : "";
+          logLines.push(`  ${dateKey}: ${exName} — ${totalValue} reps${weightStr} (${setCount} set${setCount !== 1 ? "s" : ""})`);
+        }
       }
     }
     const logSummary = logLines.length > 0
@@ -93,6 +117,10 @@ RULES:
 - suggestions: array of { "exercise": "<name>", "muscleGroup": "<GROUP>" } — only include if actionable. muscleGroup must be one of: ANTERIOR_DELT, LATERAL_DELT, POSTERIOR_DELT, CHEST, TRICEPS, BACK, BICEPS, QUADS, HAMSTRINGS, GLUTES, CALVES, ABS.
 - Consider the user's goal and sports when making suggestions. For example, a rower doesn't need extra pulling work; a runner benefits from hip/glute work.
 - Look at actual logged volume (total reps, weights, frequency), not just exercise names.
+- Duration/sport activities measured in minutes are NOT strength volume — do not count them as reps.
+- Repeated sport activities (e.g. Water Polo 3x/week) are normal and expected — do not flag as low variety.
+- Only compare strength exercises for muscle-group balance analysis.
+- For duration/sport insights, focus on consistency, frequency, and recovery rather than volume.
 - If the training looks well-balanced, say so (type: "POSITIVE").
 - If there's very little data, give a general tip instead of making assumptions.
 

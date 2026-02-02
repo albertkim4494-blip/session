@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { getUnitAbbr } from "./coachNormalize";
 
 const CACHE_KEY = "wt_coach_cache";
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
@@ -75,6 +76,8 @@ export async function fetchCoachInsights({ profile, state, dateRange, options })
         exercises: (w.exercises || []).map((ex) => ({
           id: ex.id,
           name: ex.name,
+          unit: ex.unit || "reps",
+          unitAbbr: getUnitAbbr(ex.unit, ex.customUnitAbbr),
         })),
       })),
       recentLogs,
