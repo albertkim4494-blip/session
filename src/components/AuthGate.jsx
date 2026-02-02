@@ -9,6 +9,7 @@ export default function AuthGate() {
   const [profileReady, setProfileReady] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const prevUserIdRef = useRef(null);
+  const profileCheckedRef = useRef(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -17,12 +18,18 @@ export default function AuthGate() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        // Only reset profile state on actual user changes, not token refreshes
         const newUserId = session?.user?.id || null;
-        if (event === "SIGNED_OUT" || newUserId !== prevUserIdRef.current) {
+        const userChanged = event === "SIGNED_OUT" || event === "SIGNED_IN" || newUserId !== prevUserIdRef.current;
+
+        if (userChanged) {
+          // Actual auth change — reset everything
+          setSession(session);
           setProfileReady(false);
           setNeedsOnboarding(false);
+          profileCheckedRef.current = false;
+        } else {
+          // Token refresh — update session silently, don't reset profile state
+          setSession(session);
         }
         prevUserIdRef.current = newUserId;
       }
@@ -33,6 +40,8 @@ export default function AuthGate() {
 
   useEffect(() => {
     if (!session) return;
+    // Don't re-check profile if we already checked for this user
+    if (profileCheckedRef.current) return;
 
     let cancelled = false;
 
@@ -44,6 +53,8 @@ export default function AuthGate() {
         .single();
 
       if (cancelled) return;
+
+      profileCheckedRef.current = true;
 
       if (error || !data?.onboarding_completed_at) {
         setNeedsOnboarding(true);
