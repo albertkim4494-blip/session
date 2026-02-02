@@ -2753,19 +2753,19 @@ export default function App({ session, onLogout }) {
             </div>
           ) : null}
         </div>
-      </div>
 
-      {/* Bottom navigation */}
-      <div style={styles.nav}>
-        <button style={{ ...styles.navBtn, ...(tab === "today" ? styles.navBtnActive : {}) }} onClick={() => setTab("today")}>
-          Today
-        </button>
-        <button style={{ ...styles.navBtn, ...(tab === "summary" ? styles.navBtnActive : {}) }} onClick={() => setTab("summary")}>
-          Summary
-        </button>
-        <button style={{ ...styles.navBtn, ...(tab === "manage" ? styles.navBtnActive : {}) }} onClick={() => setTab("manage")}>
-          Manage
-        </button>
+        {/* Bottom navigation */}
+        <div style={styles.nav}>
+          <button style={{ ...styles.navBtn, ...(tab === "today" ? styles.navBtnActive : {}) }} onClick={() => setTab("today")}>
+            Today
+          </button>
+          <button style={{ ...styles.navBtn, ...(tab === "summary" ? styles.navBtnActive : {}) }} onClick={() => setTab("summary")}>
+            Summary
+          </button>
+          <button style={{ ...styles.navBtn, ...(tab === "manage" ? styles.navBtnActive : {}) }} onClick={() => setTab("manage")}>
+            Manage
+          </button>
+        </div>
       </div>
 
       {/* MODALS */}
@@ -3331,11 +3331,11 @@ function getStyles(colors) {
       fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
       background: colors.appBg,
       color: colors.text,
-      minHeight: "100dvh",
+      height: "100dvh",
       width: "100%",
       display: "flex",
       justifyContent: "center",
-      overscrollBehavior: "none",
+      overflow: "hidden",
     },
 
     content: {
@@ -3344,15 +3344,14 @@ function getStyles(colors) {
       overflowX: "clip",
       display: "flex",
       flexDirection: "column",
+      height: "100%",
       paddingLeft: "calc(14px + var(--safe-left, 0px))",
       paddingRight: "calc(14px + var(--safe-right, 0px))",
       paddingTop: "calc(10px + var(--safe-top, 0px))",
-      paddingBottom: "calc(92px + var(--safe-bottom, 0px))",
     },
 
     topBar: {
-      position: "sticky",
-      top: 0,
+      flexShrink: 0,
       zIndex: 10,
       background: colors.topBarBg,
       padding: "14px 0 10px",
@@ -3392,19 +3391,14 @@ function getStyles(colors) {
       textAlign: "center",
     },
 
-    body: { flex: 1, paddingTop: 14 },
+    body: { flex: 1, paddingTop: 14, overflowY: "auto", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingBottom: 16 },
     section: { display: "flex", flexDirection: "column", gap: 12 },
 
     nav: {
-      position: "fixed",
-      left: 0,
-      right: 0,
-      bottom: 0,
+      flexShrink: 0,
       display: "flex",
       gap: 8,
       paddingTop: 10,
-      paddingLeft: "calc(10px + var(--safe-left, 0px))",
-      paddingRight: "calc(10px + var(--safe-right, 0px))",
       paddingBottom: "calc(10px + var(--safe-bottom, 0px))",
       background: colors.navBg,
       borderTop: `1px solid ${colors.border}`,
