@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import AuthScreen from "./AuthScreen";
 import OnboardingScreen from "./OnboardingScreen";
@@ -8,6 +8,7 @@ export default function AuthGate() {
   const [session, setSession] = useState(undefined); // undefined=loading, null=logged out
   const [profileReady, setProfileReady] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const prevUserIdRef = useRef(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -15,11 +16,15 @@ export default function AuthGate() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
-        // Reset profile state so it re-checks for the new user
-        setProfileReady(false);
-        setNeedsOnboarding(false);
+        // Only reset profile state on actual user changes, not token refreshes
+        const newUserId = session?.user?.id || null;
+        if (event === "SIGNED_OUT" || newUserId !== prevUserIdRef.current) {
+          setProfileReady(false);
+          setNeedsOnboarding(false);
+        }
+        prevUserIdRef.current = newUserId;
       }
     );
 

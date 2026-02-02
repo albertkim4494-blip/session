@@ -580,6 +580,49 @@ function detectImbalances(analysis) {
   return insights.slice(0, 3);
 }
 
+/**
+ * Compute a stable signature for the AI Coach that only changes when
+ * workout data actually changes meaningfully within the given date range.
+ * Returns { signature, totalSets, totalReps } for threshold comparison.
+ */
+function computeCoachSignature(state, summaryRange) {
+  const workouts = state?.program?.workouts || [];
+  const logsByDate = state?.logsByDate || {};
+  let totalSets = 0;
+  let totalReps = 0;
+  let loggedDays = 0;
+  const exerciseNames = [];
+
+  for (const w of workouts) {
+    for (const ex of w.exercises || []) {
+      exerciseNames.push(ex.name);
+    }
+  }
+
+  for (const dateKey of Object.keys(logsByDate)) {
+    if (!isValidDateKey(dateKey)) continue;
+    if (dateKey < summaryRange.start || dateKey > summaryRange.end) continue;
+    const dayLogs = logsByDate[dateKey];
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    let dayHasData = false;
+    for (const log of Object.values(dayLogs)) {
+      if (log && Array.isArray(log.sets)) {
+        totalSets += log.sets.length;
+        totalReps += log.sets.reduce((s, set) => s + (Number(set.reps) || 0), 0);
+        dayHasData = true;
+      }
+    }
+    if (dayHasData) loggedDays++;
+  }
+
+  const signature = `${summaryRange.start}|${summaryRange.end}|${loggedDays}|${totalSets}|${totalReps}|${exerciseNames.length}`;
+  return { signature, totalSets, totalReps, loggedDays };
+}
+
+const COACH_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes between auto-refreshes
+const COACH_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hour cache TTL
+const COACH_CHANGE_THRESHOLD = 0.15; // 15% change in reps to trigger refetch
+
 // ============================================================================
 // 4. STATE MANAGEMENT - Modal Reducer
 // ============================================================================
@@ -1133,52 +1176,48 @@ function ThemeSwitch({ theme, onToggle, styles }) {
 function CoachInsightsCard({ insights, onAddExercise, styles, collapsed, onToggle, loading, error, onRefresh }) {
   const [expandedIndex, setExpandedIndex] = useState(null);
 
-  if (!loading && insights.length === 0 && !error) return null;
+  const hasInsights = insights.length > 0;
+  if (!loading && !hasInsights && !error) return null;
 
   return (
     <div style={styles.card}>
       <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
         <div style={styles.cardTitle}>🤖 AI Coach</div>
-        {loading ? (
-          <span style={styles.badge}>...</span>
-        ) : (
-          <span style={styles.badge}>
-            {insights.length} insight{insights.length !== 1 ? 's' : ''}
-          </span>
-        )}
+        <span style={styles.badge}>
+          {loading && !hasInsights ? '...' : `${insights.length} insight${insights.length !== 1 ? 's' : ''}`}
+        </span>
         <span style={styles.collapseToggle}>{collapsed ? "▶" : "▼"}</span>
       </div>
 
       {!collapsed && (
         <>
-          {loading ? (
+          {error && (
+            <div style={{ padding: '8px 12px', marginBottom: 8, fontSize: 13, opacity: 0.7, background: 'rgba(245,158,11,0.1)', borderRadius: 8 }}>
+              {error}
+            </div>
+          )}
+
+          {hasInsights ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, opacity: loading ? 0.6 : 1, transition: 'opacity 0.3s' }}>
+              {insights.map((insight, idx) => (
+                <InsightItem
+                  key={idx}
+                  insight={insight}
+                  isExpanded={expandedIndex === idx}
+                  onToggle={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
+                  onAddExercise={onAddExercise}
+                  styles={styles}
+                />
+              ))}
+            </div>
+          ) : loading ? (
             <div style={{ padding: '16px 0', textAlign: 'center', opacity: 0.6, fontSize: 14 }}>
               Analyzing your workouts...
             </div>
-          ) : (
-            <>
-              {error && (
-                <div style={{ padding: '8px 12px', marginBottom: 8, fontSize: 13, opacity: 0.7, background: 'rgba(245,158,11,0.1)', borderRadius: 8 }}>
-                  {error}
-                </div>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {insights.map((insight, idx) => (
-                  <InsightItem
-                    key={idx}
-                    insight={insight}
-                    isExpanded={expandedIndex === idx}
-                    onToggle={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
-                    onAddExercise={onAddExercise}
-                    styles={styles}
-                  />
-                ))}
-              </div>
-            </>
-          )}
+          ) : null}
 
           <div style={styles.coachFooter}>
-            Powered by AI — personalized to your data
+            Powered by AI{loading ? ' — updating...' : ''}
             {onRefresh && !loading && (
               <>
                 {' · '}
@@ -1341,7 +1380,10 @@ export default function App({ session, onLogout }) {
   const [coachInsights, setCoachInsights] = useState([]);
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachError, setCoachError] = useState(null);
-  const coachTimerRef = useRef(null);
+  const coachReqIdRef = useRef(0);
+  const coachCacheRef = useRef(new Map());
+  const coachLastSignatureRef = useRef(null);
+  const coachLastFetchRef = useRef(0); // timestamp of last successful AI fetch
 
   // Swipe navigation between tabs
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
@@ -1353,8 +1395,11 @@ export default function App({ session, onLogout }) {
     touchRef.current.startY = e.touches[0].clientY;
     touchRef.current.swiping = false;
     touchRef.current.locked = false;
+    // Blur any focused button to prevent stuck highlight
+    try { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); } catch {}
     if (bodyRef.current) {
       bodyRef.current.style.transition = "none";
+      bodyRef.current.style.willChange = "transform, opacity";
     }
   }, []);
 
@@ -1436,6 +1481,8 @@ export default function App({ session, onLogout }) {
     }
 
     touchRef.current.swiping = false;
+    // Clear will-change after animation settles
+    setTimeout(() => { if (bodyRef.current) bodyRef.current.style.willChange = "auto"; }, 450);
   }, [tab]);
 
   function toggleCollapse(setter, id) {
@@ -1637,38 +1684,93 @@ export default function App({ session, onLogout }) {
     return set;
   }, [state.logsByDate, modals.datePicker.monthCursor]);
 
-  // NEW: AI Coach — async fetch with debounce and fallback
+  // AI Coach — stable signature that only changes when workout data meaningfully changes
+  const { signature: coachSignature, totalReps: coachTotalReps } = useMemo(
+    () => computeCoachSignature(state, summaryRange),
+    [state.logsByDate, state.program.workouts, summaryRange]
+  );
+
+  // AI Coach — load from localStorage cache on mount / signature change, fetch only when needed
   useEffect(() => {
     if (!dataReady || !profile) return;
 
-    // Clear any pending debounce timer
-    if (coachTimerRef.current) clearTimeout(coachTimerRef.current);
+    const userId = session.user.id;
+    const cacheKey = `wt_coach_v2:${userId}:${summaryMode}:${dateKey}`;
 
-    coachTimerRef.current = setTimeout(async () => {
-      setCoachLoading(true);
-      setCoachError(null);
+    // 1. Try localStorage persisted cache
+    if (coachInsights.length === 0) {
       try {
-        const { insights } = await fetchCoachInsights({
-          profile,
-          state,
-          dateRange: summaryRange,
-        });
-        setCoachInsights(insights);
-      } catch (err) {
-        console.error("AI Coach error, falling back to static:", err);
-        // Fallback to static analysis
-        const analysis = analyzeWorkoutBalance(state, summaryRange);
-        setCoachInsights(detectImbalances(analysis));
-        setCoachError("AI coach unavailable — showing basic analysis");
-      } finally {
-        setCoachLoading(false);
-      }
-    }, 3000);
+        const stored = JSON.parse(localStorage.getItem(cacheKey));
+        if (stored && stored.insights?.length > 0 && Date.now() - stored.createdAt < COACH_CACHE_TTL_MS) {
+          setCoachInsights(stored.insights);
+          coachLastSignatureRef.current = stored.signature;
+          coachLastFetchRef.current = stored.createdAt;
+          // If signature matches, no need to fetch
+          if (stored.signature === coachSignature) return;
+        }
+      } catch {}
+    }
 
-    return () => {
-      if (coachTimerRef.current) clearTimeout(coachTimerRef.current);
-    };
-  }, [dataReady, profile, state, summaryRange]);
+    // 2. Check in-memory cache
+    const memCached = coachCacheRef.current.get(coachSignature);
+    if (memCached && Date.now() - memCached.createdAt < COACH_CACHE_TTL_MS) {
+      setCoachInsights(memCached.insights);
+      setCoachError(null);
+      return;
+    }
+
+    // 3. Cooldown check — don't auto-fetch if we fetched recently
+    const timeSinceLastFetch = Date.now() - coachLastFetchRef.current;
+    if (timeSinceLastFetch < COACH_COOLDOWN_MS && coachInsights.length > 0) {
+      // Check minimum change threshold
+      const prevSig = coachLastSignatureRef.current;
+      if (prevSig) {
+        const prevReps = parseInt(prevSig.split("|")[4]) || 0;
+        const change = prevReps > 0 ? Math.abs(coachTotalReps - prevReps) / prevReps : 1;
+        if (change < COACH_CHANGE_THRESHOLD) return; // Not enough change, skip
+      }
+    }
+
+    // 4. Fetch from AI with race protection
+    let cancelled = false;
+    const reqId = ++coachReqIdRef.current;
+
+    setCoachLoading(true);
+    // Don't clear insights — keep showing previous while loading
+
+    fetchCoachInsights({ profile, state, dateRange: summaryRange })
+      .then(({ insights }) => {
+        if (cancelled || coachReqIdRef.current !== reqId) return;
+        setCoachInsights(insights);
+        setCoachError(null);
+        coachLastSignatureRef.current = coachSignature;
+        coachLastFetchRef.current = Date.now();
+        // Save to caches
+        coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({
+            insights, signature: coachSignature, createdAt: Date.now(),
+          }));
+        } catch {}
+      })
+      .catch((err) => {
+        if (cancelled || coachReqIdRef.current !== reqId) return;
+        console.error("AI Coach error:", err);
+        // Only fall back to static if we have no cached insights at all
+        if (coachInsights.length === 0) {
+          const analysis = analyzeWorkoutBalance(state, summaryRange);
+          setCoachInsights(detectImbalances(analysis));
+        }
+        setCoachError("AI coach unavailable — showing basic analysis");
+      })
+      .finally(() => {
+        if (!cancelled && coachReqIdRef.current === reqId) {
+          setCoachLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [dataReady, profile, coachSignature]);
 
   // ---------------------------------------------------------------------------
   // EFFECTS - Side effects (saving, syncing)
@@ -2588,18 +2690,31 @@ export default function App({ session, onLogout }) {
                 loading={coachLoading}
                 error={coachError}
                 onRefresh={() => {
-                  if (coachTimerRef.current) clearTimeout(coachTimerRef.current);
+                  const reqId = ++coachReqIdRef.current;
                   setCoachLoading(true);
                   setCoachError(null);
                   fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true } })
-                    .then(({ insights }) => setCoachInsights(insights))
+                    .then(({ insights }) => {
+                      if (coachReqIdRef.current !== reqId) return;
+                      setCoachInsights(insights);
+                      coachLastSignatureRef.current = coachSignature;
+                      coachLastFetchRef.current = Date.now();
+                      coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
+                      const cacheKey = `wt_coach_v2:${session.user.id}:${summaryMode}:${dateKey}`;
+                      try { localStorage.setItem(cacheKey, JSON.stringify({ insights, signature: coachSignature, createdAt: Date.now() })); } catch {}
+                    })
                     .catch((err) => {
+                      if (coachReqIdRef.current !== reqId) return;
                       console.error("AI Coach refresh error:", err);
-                      const analysis = analyzeWorkoutBalance(state, summaryRange);
-                      setCoachInsights(detectImbalances(analysis));
+                      if (coachInsights.length === 0) {
+                        const analysis = analyzeWorkoutBalance(state, summaryRange);
+                        setCoachInsights(detectImbalances(analysis));
+                      }
                       setCoachError("AI coach unavailable — showing basic analysis");
                     })
-                    .finally(() => setCoachLoading(false));
+                    .finally(() => {
+                      if (coachReqIdRef.current === reqId) setCoachLoading(false);
+                    });
                 }}
               />
 
@@ -3463,7 +3578,7 @@ function getStyles(colors) {
       textAlign: "center",
     },
 
-    body: { flex: 1, paddingTop: 14, overflowY: "auto", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingBottom: 16 },
+    body: { flex: 1, paddingTop: 14, overflowY: "auto", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingBottom: 24 },
     section: { display: "flex", flexDirection: "column", gap: 12 },
 
     nav: {
@@ -3471,7 +3586,7 @@ function getStyles(colors) {
       display: "flex",
       gap: 8,
       paddingTop: 10,
-      paddingBottom: "calc(10px + var(--safe-bottom, 0px))",
+      paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
       background: colors.navBg,
       borderTop: `1px solid ${colors.border}`,
     },
