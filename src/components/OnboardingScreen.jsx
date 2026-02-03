@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { validateUsernameStrict, sanitizeUsername, validateDisplayName } from "../lib/userIdentity";
 
 export default function OnboardingScreen({ session, onComplete }) {
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [age, setAge] = useState("");
   const [weightLbs, setWeightLbs] = useState("");
   const [goal, setGoal] = useState("");
@@ -13,6 +16,32 @@ export default function OnboardingScreen({ session, onComplete }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // Validate username
+    const trimmedUsername = username.trim().toLowerCase();
+    const usernameErr = validateUsernameStrict(trimmedUsername);
+    if (usernameErr) {
+      setError(usernameErr);
+      return;
+    }
+
+    // Check uniqueness
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", trimmedUsername)
+      .maybeSingle();
+    if (existing && existing.id !== session.user.id) {
+      setError("Username is already taken.");
+      return;
+    }
+
+    // Validate display name
+    const dnErr = validateDisplayName(displayName);
+    if (dnErr) {
+      setError(dnErr);
+      return;
+    }
 
     const ageNum = Number(age);
     const weightNum = Number(weightLbs);
@@ -31,6 +60,8 @@ export default function OnboardingScreen({ session, onComplete }) {
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
+          username: trimmedUsername,
+          display_name: displayName.trim() || null,
           age: ageNum,
           weight_lbs: weightNum,
           goal,
@@ -59,6 +90,29 @@ export default function OnboardingScreen({ session, onComplete }) {
         <p style={styles.subtitle}>Tell us a bit about yourself to get started.</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
+          <label style={styles.label}>Username *</label>
+          <input
+            type="text"
+            placeholder="e.g. john_doe"
+            value={username}
+            onChange={(e) => setUsername(sanitizeUsername(e.target.value))}
+            required
+            maxLength={16}
+            style={styles.input}
+          />
+          <span style={styles.helper}>3-16 chars: lowercase letters, numbers, underscores</span>
+
+          <label style={styles.label}>Display Name</label>
+          <input
+            type="text"
+            placeholder="e.g. John Doe"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            maxLength={30}
+            style={styles.input}
+          />
+          <span style={styles.helper}>Shown publicly. Falls back to username if empty.</span>
+
           <label style={styles.label}>Age *</label>
           <input
             type="number"
@@ -175,6 +229,11 @@ const styles = {
     background: "#1a2332",
     color: "#fff",
     outline: "none",
+  },
+  helper: {
+    color: "#64748b",
+    fontSize: 11,
+    marginTop: -6,
   },
   error: {
     color: "#f87171",

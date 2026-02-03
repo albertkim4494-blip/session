@@ -3,6 +3,7 @@ import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/sup
 import { supabase } from "./lib/supabase";
 import { fetchCoachInsights } from "./lib/coachApi";
 import { classifyActivity, buildNormalizedAnalysis, detectImbalancesNormalized } from "./lib/coachNormalize";
+import { validateUsernameStrict, validateDisplayName, canChangeUsername, usernameChangeCooldownMs, formatCooldown, avatarInitial, sanitizeUsername } from "./lib/userIdentity";
 
 /**
  * ============================================================================
@@ -110,17 +111,6 @@ function computeAge(birthdateStr) {
   return age;
 }
 
-/**
- * Validate a username string. Returns error message or null if valid.
- */
-function validateUsername(s) {
-  if (!s || typeof s !== "string" || !s.trim()) return "Username is required";
-  const trimmed = s.trim();
-  if (trimmed.length < 3) return "Username must be at least 3 characters";
-  if (trimmed.length > 20) return "Username must be at most 20 characters";
-  if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) return "Only letters, numbers, and underscores";
-  return null;
-}
 
 /**
  * Check if a birthdate string is valid (YYYY-MM-DD, age 13-120, not future)
@@ -615,6 +605,7 @@ const initialModalState = {
   profile: {
     isOpen: false,
     username: "",
+    displayName: "",
     birthdate: "",
     gender: "",
     weightLbs: "",
@@ -623,6 +614,13 @@ const initialModalState = {
     about: "",
     saving: false,
     error: "",
+  },
+  changeUsername: {
+    isOpen: false,
+    value: "",
+    checking: false,
+    error: "",
+    cooldownMs: 0,
   },
   editUnit: {
     isOpen: false,
@@ -838,6 +836,7 @@ function modalReducer(state, action) {
         profile: {
           isOpen: true,
           username: action.payload.username || "",
+          displayName: action.payload.displayName || "",
           birthdate: action.payload.birthdate || "",
           gender: action.payload.gender || "",
           weightLbs: String(action.payload.weightLbs || ""),
@@ -859,6 +858,31 @@ function modalReducer(state, action) {
       return {
         ...state,
         profile: initialModalState.profile,
+      };
+
+    // ===== CHANGE USERNAME MODAL =====
+    case "OPEN_CHANGE_USERNAME":
+      return {
+        ...state,
+        changeUsername: {
+          isOpen: true,
+          value: action.payload.value || "",
+          checking: false,
+          error: "",
+          cooldownMs: action.payload.cooldownMs || 0,
+        },
+      };
+
+    case "UPDATE_CHANGE_USERNAME":
+      return {
+        ...state,
+        changeUsername: { ...state.changeUsername, ...action.payload },
+      };
+
+    case "CLOSE_CHANGE_USERNAME":
+      return {
+        ...state,
+        changeUsername: initialModalState.changeUsername,
       };
 
     default:
@@ -1158,16 +1182,16 @@ function ThemeSwitch({ theme, onToggle, styles }) {
 /**
  * Profile modal - edit user profile, theme toggle, logout
  */
-function ProfileModal({ open, modalState, dispatch, theme, onToggleTheme, onLogout, onSave, styles }) {
+function ProfileModal({ open, modalState, dispatch, profile, theme, onToggleTheme, onLogout, onSave, styles }) {
   if (!open) return null;
 
-  const { username, birthdate, gender, weightLbs, goal, sports, about, saving, error } = modalState;
+  const { displayName, birthdate, gender, weightLbs, goal, sports, about, saving, error } = modalState;
   const age = birthdate && isValidBirthdateString(birthdate) ? computeAge(birthdate) : null;
 
   async function handleSave() {
-    const usernameErr = validateUsername(username);
-    if (usernameErr) {
-      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: usernameErr } });
+    const dnErr = validateDisplayName(displayName);
+    if (dnErr) {
+      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: dnErr } });
       return;
     }
     if (birthdate && !isValidBirthdateString(birthdate)) {
@@ -1183,7 +1207,7 @@ function ProfileModal({ open, modalState, dispatch, theme, onToggleTheme, onLogo
     dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { saving: true, error: "" } });
 
     const updates = {
-      username: username.trim(),
+      display_name: displayName.trim() || null,
       birthdate: birthdate || null,
       gender: gender || null,
       weight_lbs: weightLbs ? wNum : null,
@@ -1198,18 +1222,43 @@ function ProfileModal({ open, modalState, dispatch, theme, onToggleTheme, onLogo
 
   const update = (field, value) => dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { [field]: value, error: "" } });
 
+  function openChangeUsername() {
+    const cooldownMs = usernameChangeCooldownMs(profile?.username_last_changed_at);
+    dispatch({
+      type: "OPEN_CHANGE_USERNAME",
+      payload: { value: profile?.username || "", cooldownMs },
+    });
+  }
+
   return (
     <Modal open={open} title="Profile" onClose={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })} styles={styles}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={styles.fieldCol}>
-          <label style={styles.label}>Username *</label>
+          <label style={styles.label}>Username</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
+              @{profile?.username || "—"}
+            </span>
+            <button
+              type="button"
+              onClick={openChangeUsername}
+              style={{ ...styles.secondaryBtn, padding: "4px 10px", fontSize: 12 }}
+            >
+              Change
+            </button>
+          </div>
+        </div>
+
+        <div style={styles.fieldCol}>
+          <label style={styles.label}>Display Name</label>
           <input
-            value={username}
-            onChange={(e) => update("username", e.target.value)}
+            value={displayName}
+            onChange={(e) => update("displayName", e.target.value)}
             style={styles.textInput}
-            placeholder="e.g. john_doe"
-            maxLength={20}
+            placeholder="e.g. John Doe"
+            maxLength={30}
           />
+          <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>Shown publicly. Falls back to username if empty.</span>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
@@ -1322,6 +1371,116 @@ function ProfileModal({ open, modalState, dispatch, theme, onToggleTheme, onLogo
 }
 
 /**
+ * Change Username Modal - separate flow with cooldown enforcement
+ */
+function ChangeUsernameModal({ open, modalState, dispatch, profile, session, onProfileUpdate, styles }) {
+  if (!open) return null;
+
+  const { value, checking, error, cooldownMs } = modalState;
+  const onCooldown = cooldownMs > 0;
+
+  async function handleConfirm() {
+    const trimmed = value.trim().toLowerCase();
+
+    // Same as current → friendly no-op
+    if (trimmed === profile?.username) {
+      dispatch({ type: "CLOSE_CHANGE_USERNAME" });
+      return;
+    }
+
+    const err = validateUsernameStrict(trimmed);
+    if (err) {
+      dispatch({ type: "UPDATE_CHANGE_USERNAME", payload: { error: err } });
+      return;
+    }
+
+    dispatch({ type: "UPDATE_CHANGE_USERNAME", payload: { checking: true, error: "" } });
+
+    try {
+      // Check uniqueness
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", trimmed)
+        .maybeSingle();
+
+      if (existing && existing.id !== session.user.id) {
+        dispatch({ type: "UPDATE_CHANGE_USERNAME", payload: { checking: false, error: "Username is already taken." } });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const { error: saveErr } = await supabase
+        .from("profiles")
+        .update({
+          username: trimmed,
+          username_last_changed_at: now,
+          username_change_count: (profile?.username_change_count || 0) + 1,
+        })
+        .eq("id", session.user.id);
+
+      if (saveErr) {
+        dispatch({ type: "UPDATE_CHANGE_USERNAME", payload: { checking: false, error: saveErr.message } });
+        return;
+      }
+
+      onProfileUpdate({
+        username: trimmed,
+        username_last_changed_at: now,
+        username_change_count: (profile?.username_change_count || 0) + 1,
+      });
+      dispatch({ type: "CLOSE_CHANGE_USERNAME" });
+    } catch {
+      dispatch({ type: "UPDATE_CHANGE_USERNAME", payload: { checking: false, error: "Failed to save. Try again." } });
+    }
+  }
+
+  return (
+    <Modal open={open} title="Change Username" onClose={() => dispatch({ type: "CLOSE_CHANGE_USERNAME" })} styles={styles}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {onCooldown ? (
+          <div style={{ fontSize: 14, opacity: 0.8, textAlign: "center", padding: "12px 0" }}>
+            You can change your username again in <strong>{formatCooldown(cooldownMs)}</strong>.
+          </div>
+        ) : (
+          <>
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>New Username</label>
+              <input
+                value={value}
+                onChange={(e) => dispatch({
+                  type: "UPDATE_CHANGE_USERNAME",
+                  payload: { value: sanitizeUsername(e.target.value), error: "" },
+                })}
+                style={styles.textInput}
+                placeholder="e.g. new_name"
+                maxLength={16}
+                autoFocus
+              />
+              <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>
+                3-16 chars: lowercase letters, numbers, underscores. 30-day cooldown after change.
+              </span>
+            </div>
+            {error && <div style={{ color: "#f87171", fontSize: 13 }}>{error}</div>}
+          </>
+        )}
+
+        <div style={styles.modalFooter}>
+          <button style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_CHANGE_USERNAME" })}>
+            Cancel
+          </button>
+          {!onCooldown && (
+            <button style={styles.primaryBtn} onClick={handleConfirm} disabled={checking}>
+              {checking ? "Checking..." : "Confirm"}
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
  * NEW: AI Coach Insights Card
  */
 function CoachInsightsCard({ insights, onAddExercise, styles, collapsed, onToggle, loading, error, onRefresh }) {
@@ -1395,37 +1554,39 @@ function InsightItem({ insight, isExpanded, onToggle, onAddExercise, styles }) {
     LOW: '#3b82f6',
     INFO: '#10b981',
   };
-  
+
+  const suggestions = insight.suggestions || [];
+
   return (
     <div style={{
       ...styles.insightCard,
-      borderLeft: `4px solid ${severityColors[insight.severity]}`
+      borderLeft: `4px solid ${severityColors[insight.severity] || '#6b7280'}`
     }}>
-      <button 
+      <button
         onClick={onToggle}
         style={styles.insightHeader}
         type="button"
       >
         <div style={{ flex: 1 }}>
-          <div style={styles.insightTitle}>{insight.title}</div>
-          <div style={styles.insightMessage}>{insight.message}</div>
+          <div style={styles.insightTitle}>{insight.title || "Insight"}</div>
+          <div style={styles.insightMessage}>{insight.message || ""}</div>
         </div>
-        {insight.suggestions.length > 0 && (
+        {suggestions.length > 0 && (
           <span style={styles.insightChevron}>
             {isExpanded ? '▼' : '▶'}
           </span>
         )}
       </button>
-      
-      {isExpanded && insight.suggestions.length > 0 && (
+
+      {isExpanded && suggestions.length > 0 && (
         <div style={styles.insightSuggestions}>
           <div style={styles.suggestionsTitle}>💪 Suggested exercises:</div>
-          {insight.suggestions.map((suggestion, i) => (
+          {suggestions.map((suggestion, i) => (
             <div key={i} style={styles.suggestionRow}>
               <div style={{ flex: 1 }}>
                 <div style={styles.suggestionName}>{suggestion.exercise}</div>
                 <div style={styles.suggestionGroup}>
-                  {suggestion.muscleGroup.replace(/_/g, ' ').toLowerCase()}
+                  {(suggestion.muscleGroup || "").replace(/_/g, ' ').toLowerCase()}
                 </div>
               </div>
               <button
@@ -1708,7 +1869,7 @@ export default function App({ session, onLogout }) {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("username, birthdate, gender, age, weight_lbs, goal, about, sports")
+          .select("username, display_name, username_last_changed_at, username_change_count, birthdate, gender, age, weight_lbs, goal, about, sports")
           .eq("id", session.user.id)
           .single();
         if (!cancelled && data && !error) {
@@ -2733,6 +2894,7 @@ export default function App({ session, onLogout }) {
                 type: "OPEN_PROFILE_MODAL",
                 payload: {
                   username: profile?.username || "",
+                  displayName: profile?.display_name || "",
                   birthdate: profile?.birthdate || "",
                   gender: profile?.gender || "",
                   weightLbs: profile?.weight_lbs || "",
@@ -2745,7 +2907,7 @@ export default function App({ session, onLogout }) {
               aria-label="Profile"
               type="button"
             >
-              {(profile?.username || "")[0]?.toUpperCase() || "?"}
+              {avatarInitial(profile?.display_name, profile?.username)}
             </button>
           </div>
 
@@ -2849,6 +3011,33 @@ export default function App({ session, onLogout }) {
 
         {/* Main body */}
         <div ref={bodyRef} style={styles.body} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+          {/* Set Username banner for existing users without a username */}
+          {profile && !profile.username && (
+            <div style={{
+              ...styles.card,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "12px 16px",
+              marginBottom: 12,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                Set your username to complete your profile.
+              </div>
+              <button
+                type="button"
+                style={{ ...styles.primaryBtn, whiteSpace: "nowrap", padding: "6px 14px", fontSize: 12 }}
+                onClick={() => dispatchModal({
+                  type: "OPEN_CHANGE_USERNAME",
+                  payload: { value: "", cooldownMs: 0 },
+                })}
+              >
+                Set Username
+              </button>
+            </div>
+          )}
+
           {/* TODAY TAB */}
           {tab === "today" ? (
             <div style={styles.section}>
@@ -3621,10 +3810,22 @@ export default function App({ session, onLogout }) {
         open={modals.profile.isOpen}
         modalState={modals.profile}
         dispatch={dispatchModal}
+        profile={profile}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         onLogout={onLogout}
         onSave={saveProfile}
+        styles={styles}
+      />
+
+      {/* Change Username Modal */}
+      <ChangeUsernameModal
+        open={modals.changeUsername.isOpen}
+        modalState={modals.changeUsername}
+        dispatch={dispatchModal}
+        profile={profile}
+        session={session}
+        onProfileUpdate={(updates) => setProfile((prev) => ({ ...prev, ...updates }))}
         styles={styles}
       />
 

@@ -93,7 +93,15 @@ export async function fetchCoachInsights({ profile, state, dateRange, options })
     throw new Error(error.message || "Edge function call failed");
   }
 
-  const insights = data?.insights || [];
+  // Normalize each insight so UI never crashes on missing fields
+  const insights = (data?.insights || []).map((i) => ({
+    type: i.type || "INFO",
+    severity: i.severity || "LOW",
+    title: i.title || "Insight",
+    message: i.message || "",
+    suggestions: Array.isArray(i.suggestions) ? i.suggestions : [],
+    ...i,
+  }));
 
   // Save to cache
   try {

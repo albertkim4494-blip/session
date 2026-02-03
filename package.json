@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node src/lib/coachNormalize.test.js"
+    "test": "node src/lib/coachNormalize.test.js && node src/lib/userIdentity.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.93.3",
