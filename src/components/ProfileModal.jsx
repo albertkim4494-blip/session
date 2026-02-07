@@ -10,8 +10,9 @@ import {
   formatCooldown,
   sanitizeUsername,
 } from "../lib/userIdentity";
+import { EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
 
-export function ProfileModal({ open, modalState, dispatch, profile, theme, onToggleTheme, onLogout, onSave, styles }) {
+export function ProfileModal({ open, modalState, dispatch, profile, theme, onToggleTheme, equipment, onSetEquipment, onLogout, onSave, styles }) {
   if (!open) return null;
 
   const { displayName, birthdate, gender, weightLbs, goal, sports, about, saving, error } = modalState;
@@ -167,6 +168,20 @@ export function ProfileModal({ open, modalState, dispatch, profile, theme, onTog
             placeholder="Anything you'd like to share..."
             rows={3}
           />
+        </div>
+
+        <div style={styles.fieldCol}>
+          <label style={styles.label}>Equipment Access</label>
+          <select
+            value={equipment || "gym"}
+            onChange={(e) => onSetEquipment(e.target.value)}
+            style={styles.textInput}
+          >
+            {Object.entries(EQUIPMENT_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+          <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>AI Coach will tailor suggestions to your setup.</span>
         </div>
 
         <div style={styles.profileDivider}>

@@ -32,7 +32,7 @@ import { CoachInsightsCard, AddSuggestedExerciseModal } from "./components/Coach
 import { CatalogBrowseModal } from "./components/CatalogBrowseModal";
 
 // Exercise catalog
-import { EXERCISE_CATALOG } from "./lib/exerciseCatalog";
+import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
 import { buildCatalogMap } from "./lib/exerciseCatalogUtils";
 
 // Extracted styles
@@ -55,6 +55,7 @@ export default function App({ session, onLogout }) {
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem("wt_theme") || "dark");
+  const [equipment, setEquipment] = useState(() => localStorage.getItem("wt_equipment") || "gym");
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
@@ -380,9 +381,10 @@ export default function App({ session, onLogout }) {
     setCoachLoading(true);
 
     const userExNames = workouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
-    const coachOpts = { catalog: EXERCISE_CATALOG, userExerciseNames: userExNames };
+    const filteredCatalog = EXERCISE_CATALOG.filter((e) => exerciseFitsEquipment(e, equipment));
+    const coachOpts = { catalog: filteredCatalog, userExerciseNames: userExNames };
 
-    fetchCoachInsights({ profile, state, dateRange: summaryRange, catalog: EXERCISE_CATALOG })
+    fetchCoachInsights({ profile, state, dateRange: summaryRange, catalog: filteredCatalog, equipment })
       .then(({ insights }) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
@@ -428,6 +430,10 @@ export default function App({ session, onLogout }) {
   useEffect(() => {
     localStorage.setItem("wt_theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("wt_equipment", equipment);
+  }, [equipment]);
 
   useEffect(() => {
     sessionStorage.setItem("wt_tab", tab);
@@ -1255,7 +1261,8 @@ export default function App({ session, onLogout }) {
                   setCoachLoading(true);
                   setCoachError(null);
                   const refreshExNames = workouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
-                  fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true }, catalog: EXERCISE_CATALOG })
+                  const refreshCatalog = EXERCISE_CATALOG.filter((e) => exerciseFitsEquipment(e, equipment));
+                  fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true }, catalog: refreshCatalog, equipment })
                     .then(({ insights }) => {
                       if (coachReqIdRef.current !== reqId) return;
                       setCoachInsights(insights);
@@ -1270,7 +1277,7 @@ export default function App({ session, onLogout }) {
                       console.error("AI Coach refresh error:", err);
                       if (coachInsights.length === 0) {
                         const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange, catalogMap);
-                        setCoachInsights(detectImbalancesNormalized(analysis, { catalog: EXERCISE_CATALOG, userExerciseNames: refreshExNames }));
+                        setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, userExerciseNames: refreshExNames }));
                       }
                       setCoachError("AI coach unavailable \u2014 showing basic analysis");
                     })
@@ -2000,6 +2007,8 @@ export default function App({ session, onLogout }) {
         profile={profile}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        equipment={equipment}
+        onSetEquipment={setEquipment}
         onLogout={onLogout}
         onSave={saveProfile}
         styles={styles}

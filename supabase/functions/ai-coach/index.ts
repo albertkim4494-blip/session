@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { profile, workouts, recentLogs, dateRange, catalogSummary } = await req.json();
+    const { profile, workouts, recentLogs, dateRange, catalogSummary, equipment } = await req.json();
 
     // Build exercise ID → info map from workouts
     const exerciseMap: Record<string, { name: string; unit: string; unitAbbr: string }> = {};
@@ -97,6 +97,15 @@ Deno.serve(async (req) => {
     if (profile?.goal) profileParts.push(`Goal: ${profile.goal}`);
     if (profile?.sports) profileParts.push(`Sports/Activities: ${profile.sports}`);
     if (profile?.about) profileParts.push(`About: ${profile.about}`);
+    const equipmentLabels: Record<string, string> = {
+      home: "Home (bodyweight only, no equipment)",
+      basic: "Basic home setup (dumbbells, bench, pull-up bar, kettlebell)",
+      gym: "Full gym access (all equipment available)",
+    };
+    if (equipment && equipment !== "gym") {
+      profileParts.push(`Equipment: ${equipmentLabels[equipment] || equipment}`);
+    }
+
     const profileContext = profileParts.length > 0
       ? profileParts.join("\n")
       : "No profile info provided.";
@@ -139,6 +148,7 @@ RULES:
 - If the training looks well-balanced, say so (type: "POSITIVE").
 - If there's very little data, give a general tip instead of making assumptions.
 - When suggesting exercises, prefer ones from the AVAILABLE EXERCISES list (if provided) since those are real exercises in the app's catalog that the user can easily add. Use the exact exercise names from that list.
+- The available exercises are already filtered to the user's equipment setup. Only suggest exercises from this list — do not suggest exercises requiring equipment the user doesn't have.
 
 OUTPUT FORMAT:
 { "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...] } ] }`;

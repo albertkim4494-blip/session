@@ -11,6 +11,30 @@
  *   BACK, BICEPS, QUADS, HAMSTRINGS, GLUTES, CALVES, ABS
  */
 
+export const EQUIPMENT_TIERS = {
+  home: new Set(["bodyweight"]),
+  basic: new Set(["bodyweight", "dumbbell", "kettlebell", "pull-up bar", "dip bar", "bench", "ab wheel", "jump rope", "foam roller"]),
+  gym: null, // no filter — all equipment available
+};
+
+export const EQUIPMENT_LABELS = {
+  home: "Home (no equipment)",
+  basic: "Basic (dumbbells, bench, etc.)",
+  gym: "Full Gym",
+};
+
+/**
+ * Check if an exercise is available for a given equipment tier.
+ * An exercise matches if ANY of its equipment is in the tier's set,
+ * OR if the exercise has no equipment listed (e.g. cardio/sport).
+ */
+export function exerciseFitsEquipment(entry, tier) {
+  const allowed = EQUIPMENT_TIERS[tier];
+  if (!allowed) return true; // gym = no filter
+  if (!entry.equipment || entry.equipment.length === 0) return true;
+  return entry.equipment.some((e) => allowed.has(e));
+}
+
 export const EXERCISE_CATALOG = [
   // ===========================================================================
   // PUSH — Chest

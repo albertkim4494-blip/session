@@ -39,7 +39,7 @@ function filterLogsToRange(logsByDate, start, end) {
  * @param {Object} [params.options] - { forceRefresh: boolean }
  * @returns {Promise<{ insights: Array, fromCache: boolean }>}
  */
-export async function fetchCoachInsights({ profile, state, dateRange, options, catalog }) {
+export async function fetchCoachInsights({ profile, state, dateRange, options, catalog, equipment }) {
   const workouts = state?.program?.workouts || [];
   const recentLogs = filterLogsToRange(state?.logsByDate, dateRange.start, dateRange.end);
   const exerciseCount = workouts.reduce((sum, w) => sum + (w.exercises?.length || 0), 0);
@@ -110,6 +110,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
         label: dateRange.label,
       },
       catalogSummary,
+      equipment: equipment || "gym",
     },
   });
 
