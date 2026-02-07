@@ -153,7 +153,7 @@ export function getUnitAbbr(unitKey, customAbbr) {
  * @param {Object} dateRange - { start, end }
  * @returns {{ muscleGroupVolume, durationByActivity, sportFrequency, totalStrengthReps }}
  */
-export function buildNormalizedAnalysis(workouts, logsByDate, dateRange) {
+export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalogMap) {
   const muscleGroupVolume = {};
   const durationByActivity = {};
   const sportFrequency = {};
@@ -167,6 +167,7 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange) {
         name: ex.name,
         unit: ex.unit || "reps",
         customUnitAbbr: ex.customUnitAbbr,
+        catalogId: ex.catalogId,
       });
     }
   }
@@ -193,7 +194,17 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange) {
 
       if (activity === "strength") {
         // Strength: accumulate muscle group volume in reps
-        const groups = classifyExerciseMuscles(name);
+        // Prefer catalog muscle data when available, fall back to keyword matching
+        let groups;
+        if (info.catalogId && catalogMap) {
+          const catalogEntry = catalogMap.get(info.catalogId);
+          if (catalogEntry?.muscles?.primary?.length > 0) {
+            groups = catalogEntry.muscles.primary;
+          }
+        }
+        if (!groups) {
+          groups = classifyExerciseMuscles(name);
+        }
         for (const group of groups) {
           muscleGroupVolume[group] = (muscleGroupVolume[group] || 0) + totalValue;
         }

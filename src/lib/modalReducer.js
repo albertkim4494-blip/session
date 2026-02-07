@@ -70,6 +70,11 @@ export const initialModalState = {
     customUnitAbbr: "",
     customUnitAllowDecimal: false,
   },
+  catalogBrowse: {
+    isOpen: false,
+    workoutId: null,
+    query: "",
+  },
 };
 
 export function modalReducer(state, action) {
@@ -235,6 +240,29 @@ export function modalReducer(state, action) {
       return {
         ...state,
         addSuggestion: initialModalState.addSuggestion,
+      };
+
+    // ===== CATALOG BROWSE MODAL =====
+    case "OPEN_CATALOG_BROWSE":
+      return {
+        ...state,
+        catalogBrowse: {
+          isOpen: true,
+          workoutId: action.payload.workoutId,
+          query: "",
+        },
+      };
+
+    case "UPDATE_CATALOG_BROWSE":
+      return {
+        ...state,
+        catalogBrowse: { ...state.catalogBrowse, ...action.payload },
+      };
+
+    case "CLOSE_CATALOG_BROWSE":
+      return {
+        ...state,
+        catalogBrowse: initialModalState.catalogBrowse,
       };
 
     // ===== EDIT UNIT MODAL =====

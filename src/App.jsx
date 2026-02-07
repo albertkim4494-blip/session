@@ -29,6 +29,11 @@ import { PillTabs } from "./components/PillTabs";
 import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { ProfileModal, ChangeUsernameModal } from "./components/ProfileModal";
 import { CoachInsightsCard, AddSuggestedExerciseModal } from "./components/CoachInsights";
+import { CatalogBrowseModal } from "./components/CatalogBrowseModal";
+
+// Exercise catalog
+import { EXERCISE_CATALOG } from "./lib/exerciseCatalog";
+import { buildCatalogMap } from "./lib/exerciseCatalogUtils";
 
 // Extracted styles
 import { getColors, getStyles } from "./styles/theme";
@@ -278,6 +283,8 @@ export default function App({ session, onLogout }) {
     return m;
   }, [workouts]);
 
+  const catalogMap = useMemo(() => buildCatalogMap(EXERCISE_CATALOG), []);
+
   const logsForDate = state.logsByDate[dateKey] ?? {};
 
   const summaryRange = useMemo(() => {
@@ -390,7 +397,7 @@ export default function App({ session, onLogout }) {
         if (cancelled || coachReqIdRef.current !== reqId) return;
         console.error("AI Coach error:", err);
         if (coachInsights.length === 0) {
-          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange);
+          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange, catalogMap);
           setCoachInsights(detectImbalancesNormalized(analysis));
         }
         setCoachError("AI coach unavailable \u2014 showing basic analysis");
@@ -719,7 +726,7 @@ export default function App({ session, onLogout }) {
       if (!workout) return;
 
       dispatchModal({
-        type: "OPEN_ADD_EXERCISE",
+        type: "OPEN_CATALOG_BROWSE",
         payload: { workoutId },
       });
     },
@@ -1217,7 +1224,7 @@ export default function App({ session, onLogout }) {
                       if (coachReqIdRef.current !== reqId) return;
                       console.error("AI Coach refresh error:", err);
                       if (coachInsights.length === 0) {
-                        const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange);
+                        const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange, catalogMap);
                         setCoachInsights(detectImbalancesNormalized(analysis));
                       }
                       setCoachError("AI coach unavailable \u2014 showing basic analysis");
@@ -1767,7 +1774,58 @@ export default function App({ session, onLogout }) {
         </div>
       </Modal>
 
-      {/* Add Exercise Modal */}
+      {/* Catalog Browse Modal */}
+      <CatalogBrowseModal
+        open={modals.catalogBrowse.isOpen}
+        onClose={() => dispatchModal({ type: "CLOSE_CATALOG_BROWSE" })}
+        styles={styles}
+        colors={colors}
+        workouts={workouts}
+        logsByDate={state.logsByDate}
+        onSelectCatalogExercise={(entry) => {
+          const wId = modals.catalogBrowse.workoutId;
+          const workout = workoutById.get(wId);
+          if (!workout) return;
+          updateState((st) => {
+            const w = st.program.workouts.find((x) => x.id === wId);
+            if (!w) return st;
+            w.exercises.push({
+              id: uid("ex"),
+              name: entry.name,
+              unit: entry.defaultUnit,
+              catalogId: entry.id,
+            });
+            return st;
+          });
+          dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
+        }}
+        onSelectUserExercise={(ex) => {
+          const wId = modals.catalogBrowse.workoutId;
+          const workout = workoutById.get(wId);
+          if (!workout) return;
+          updateState((st) => {
+            const w = st.program.workouts.find((x) => x.id === wId);
+            if (!w) return st;
+            const newEx = { id: uid("ex"), name: ex.name, unit: ex.unit || "reps" };
+            if (ex.catalogId) newEx.catalogId = ex.catalogId;
+            if (ex.customUnitAbbr) newEx.customUnitAbbr = ex.customUnitAbbr;
+            if (ex.customUnitAllowDecimal) newEx.customUnitAllowDecimal = ex.customUnitAllowDecimal;
+            w.exercises.push(newEx);
+            return st;
+          });
+          dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
+        }}
+        onCustomExercise={() => {
+          const wId = modals.catalogBrowse.workoutId;
+          dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
+          dispatchModal({
+            type: "OPEN_ADD_EXERCISE",
+            payload: { workoutId: wId },
+          });
+        }}
+      />
+
+      {/* Add Exercise Modal (custom / free-text fallback) */}
       <Modal
         open={modals.addExercise.isOpen}
         title="Add Exercise"
