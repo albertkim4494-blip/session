@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabase";
+import { LS_KEY, LS_BACKUP_KEY } from "../lib/constants";
 import AuthScreen from "./AuthScreen";
 import OnboardingScreen from "./OnboardingScreen";
 import App from "../App";
@@ -73,8 +74,8 @@ export default function AuthGate() {
   }, [session]);
 
   const handleLogout = async () => {
-    localStorage.removeItem("workout_tracker_v2");
-    localStorage.removeItem("workout_tracker_v2_backup");
+    localStorage.removeItem(LS_KEY);
+    localStorage.removeItem(LS_BACKUP_KEY);
     await supabase.auth.signOut();
   };
 
