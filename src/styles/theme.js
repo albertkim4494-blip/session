@@ -164,6 +164,7 @@ export function getStyles(colors) {
       borderRadius: 16,
       padding: 12,
       boxShadow: colors.shadow,
+      overflow: "hidden",
     },
 
     cardHeader: {
@@ -363,6 +364,7 @@ export function getStyles(colors) {
       gap: 8,
       minWidth: 0,
       flex: 1,
+      overflow: "hidden",
     },
 
     manageExerciseName: {
