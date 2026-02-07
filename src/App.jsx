@@ -1046,7 +1046,7 @@ export default function App({ session, onLogout }) {
                 aria-label="Previous day"
                 type="button"
               >
-                \u2190
+                {"\u2190"}
               </button>
 
               <button
@@ -1069,7 +1069,7 @@ export default function App({ session, onLogout }) {
                 aria-label="Next day"
                 type="button"
               >
-                \u2192
+                {"\u2192"}
               </button>
             </div>
           </div>
