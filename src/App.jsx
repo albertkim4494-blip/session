@@ -1114,7 +1114,7 @@ export default function App({ session, onLogout }) {
               <div style={styles.rangeRow}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={styles.rangeText}>
-                    {formatDateLabel(summaryRange.start)} \u2013 {formatDateLabel(summaryRange.end)}
+                    {formatDateLabel(summaryRange.start)} {"\u2013"} {formatDateLabel(summaryRange.end)}
                   </div>
                   <span style={styles.tagMuted}>{summaryDaysLogged.logged} / {summaryDaysLogged.total} days</span>
                 </div>
@@ -1441,7 +1441,7 @@ export default function App({ session, onLogout }) {
           return (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={styles.smallText}>
-            Prefilled from your most recent log. Unit: <b>{logUnit.label}</b> \u2014 change in Manage tab.
+            Prefilled from your most recent log. Unit: <b>{logUnit.label}</b> {"\u2014"} change in Manage tab.
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
