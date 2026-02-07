@@ -62,27 +62,42 @@ function classifyExerciseMuscles(exerciseName) {
   return matches.length > 0 ? matches : ['UNCLASSIFIED'];
 }
 
-function getSuggestionsForMuscleGroup(group) {
-  const suggestions = {
-    POSTERIOR_DELT: [
-      { exercise: 'Face Pulls', muscleGroup: 'POSTERIOR_DELT' },
-      { exercise: 'Reverse Flyes', muscleGroup: 'POSTERIOR_DELT' },
-    ],
-    BACK: [
-      { exercise: 'Pull Ups', muscleGroup: 'BACK' },
-      { exercise: 'Barbell Rows', muscleGroup: 'BACK' },
-      { exercise: 'Lat Pulldowns', muscleGroup: 'BACK' },
-    ],
-    BICEPS: [
-      { exercise: 'Barbell Curls', muscleGroup: 'BICEPS' },
-      { exercise: 'Hammer Curls', muscleGroup: 'BICEPS' },
-    ],
-    HAMSTRINGS: [
-      { exercise: 'Romanian Deadlifts', muscleGroup: 'HAMSTRINGS' },
-      { exercise: 'Leg Curls', muscleGroup: 'HAMSTRINGS' },
-    ],
-  };
-  return suggestions[group] || [];
+const FALLBACK_SUGGESTIONS = {
+  POSTERIOR_DELT: [
+    { exercise: 'Face Pulls', muscleGroup: 'POSTERIOR_DELT' },
+    { exercise: 'Reverse Flyes', muscleGroup: 'POSTERIOR_DELT' },
+  ],
+  BACK: [
+    { exercise: 'Pull Ups', muscleGroup: 'BACK' },
+    { exercise: 'Barbell Rows', muscleGroup: 'BACK' },
+    { exercise: 'Lat Pulldowns', muscleGroup: 'BACK' },
+  ],
+  BICEPS: [
+    { exercise: 'Barbell Curls', muscleGroup: 'BICEPS' },
+    { exercise: 'Hammer Curls', muscleGroup: 'BICEPS' },
+  ],
+  HAMSTRINGS: [
+    { exercise: 'Romanian Deadlifts', muscleGroup: 'HAMSTRINGS' },
+    { exercise: 'Leg Curls', muscleGroup: 'HAMSTRINGS' },
+  ],
+};
+
+function getSuggestionsForMuscleGroup(group, catalog, userExerciseNames) {
+  if (!catalog) return FALLBACK_SUGGESTIONS[group] || [];
+
+  const userNamesLower = new Set(
+    (userExerciseNames || []).map((n) => n.toLowerCase())
+  );
+
+  const matches = catalog
+    .filter((entry) =>
+      entry.muscles?.primary?.includes(group) &&
+      !userNamesLower.has(entry.name.toLowerCase())
+    )
+    .slice(0, 3)
+    .map((entry) => ({ exercise: entry.name, muscleGroup: group }));
+
+  return matches.length > 0 ? matches : (FALLBACK_SUGGESTIONS[group] || []);
 }
 
 // --- Exports ---
@@ -232,8 +247,14 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
  * Detect imbalances using normalized analysis data.
  * Only uses strength reps for thresholds (not inflated by duration values).
  * Skips variety warnings for entries in sportFrequency.
+ * @param {Object} analysis
+ * @param {Object} [opts]
+ * @param {Array}  [opts.catalog] - EXERCISE_CATALOG array for smarter suggestions
+ * @param {Array}  [opts.userExerciseNames] - names of exercises already in user's program
  */
-export function detectImbalancesNormalized(analysis) {
+export function detectImbalancesNormalized(analysis, opts) {
+  const catalog = opts?.catalog;
+  const userExerciseNames = opts?.userExerciseNames;
   const insights = [];
   const muscleGroupVolume = analysis?.muscleGroupVolume ?? {};
   const sportFrequency = analysis?.sportFrequency ?? {};
@@ -261,9 +282,8 @@ export function detectImbalancesNormalized(analysis) {
       title: '⚠️ Push/Pull Imbalance Detected',
       message: `You're doing ${ratio}x more pushing than pulling. This can lead to shoulder issues and poor posture.`,
       suggestions: [
-        { exercise: 'Barbell Rows', muscleGroup: 'BACK' },
-        { exercise: 'Pull Ups', muscleGroup: 'BACK' },
-        { exercise: 'Face Pulls', muscleGroup: 'POSTERIOR_DELT' },
+        ...getSuggestionsForMuscleGroup('BACK', catalog, userExerciseNames).slice(0, 2),
+        ...getSuggestionsForMuscleGroup('POSTERIOR_DELT', catalog, userExerciseNames).slice(0, 1),
       ]
     });
   }
@@ -278,7 +298,7 @@ export function detectImbalancesNormalized(analysis) {
       severity: 'MEDIUM',
       title: '💡 Rear Delt Neglect',
       message: 'Your front delts are getting way more work than rear delts. Add rear delt work for balanced shoulders.',
-      suggestions: getSuggestionsForMuscleGroup('POSTERIOR_DELT')
+      suggestions: getSuggestionsForMuscleGroup('POSTERIOR_DELT', catalog, userExerciseNames)
     });
   }
 
@@ -299,7 +319,7 @@ export function detectImbalancesNormalized(analysis) {
         severity: 'LOW',
         title: `📊 ${groupName} volume is low`,
         message: `You've barely trained ${groupName} recently. Consider adding some direct work.`,
-        suggestions: getSuggestionsForMuscleGroup(group)
+        suggestions: getSuggestionsForMuscleGroup(group, catalog, userExerciseNames)
       });
     }
   }

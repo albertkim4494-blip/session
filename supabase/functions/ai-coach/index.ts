@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { profile, workouts, recentLogs, dateRange } = await req.json();
+    const { profile, workouts, recentLogs, dateRange, catalogSummary } = await req.json();
 
     // Build exercise ID → info map from workouts
     const exerciseMap: Record<string, { name: string; unit: string; unitAbbr: string }> = {};
@@ -101,6 +101,21 @@ Deno.serve(async (req) => {
       ? profileParts.join("\n")
       : "No profile info provided.";
 
+    // Build catalog reference (exercises not in user's program, grouped by muscle)
+    let catalogSection = "";
+    if (catalogSummary && typeof catalogSummary === "object") {
+      const lines: string[] = [];
+      for (const [muscle, exercises] of Object.entries(catalogSummary)) {
+        if (Array.isArray(exercises) && exercises.length > 0) {
+          const groupName = (muscle as string).replace(/_/g, " ").toLowerCase();
+          lines.push(`  ${groupName}: ${(exercises as string[]).join(", ")}`);
+        }
+      }
+      if (lines.length > 0) {
+        catalogSection = `\nAVAILABLE EXERCISES (not in user's program, by muscle group):\n${lines.join("\n")}\n`;
+      }
+    }
+
     const systemPrompt = `You are an expert fitness coach analyzing a user's workout data. You give concise, actionable insights.
 
 USER PROFILE:
@@ -123,6 +138,7 @@ RULES:
 - For duration/sport insights, focus on consistency, frequency, and recovery rather than volume.
 - If the training looks well-balanced, say so (type: "POSITIVE").
 - If there's very little data, give a general tip instead of making assumptions.
+- When suggesting exercises, prefer ones from the AVAILABLE EXERCISES list (if provided) since those are real exercises in the app's catalog that the user can easily add. Use the exact exercise names from that list.
 
 OUTPUT FORMAT:
 { "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...] } ] }`;
@@ -134,7 +150,7 @@ ${programSummary}
 
 RECENT TRAINING LOGS:
 ${logSummary}
-
+${catalogSection}
 Analyze this data and return JSON insights.`;
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {

@@ -379,7 +379,10 @@ export default function App({ session, onLogout }) {
 
     setCoachLoading(true);
 
-    fetchCoachInsights({ profile, state, dateRange: summaryRange })
+    const userExNames = workouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
+    const coachOpts = { catalog: EXERCISE_CATALOG, userExerciseNames: userExNames };
+
+    fetchCoachInsights({ profile, state, dateRange: summaryRange, catalog: EXERCISE_CATALOG })
       .then(({ insights }) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
@@ -398,7 +401,7 @@ export default function App({ session, onLogout }) {
         console.error("AI Coach error:", err);
         if (coachInsights.length === 0) {
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange, catalogMap);
-          setCoachInsights(detectImbalancesNormalized(analysis));
+          setCoachInsights(detectImbalancesNormalized(analysis, coachOpts));
         }
         setCoachError("AI coach unavailable \u2014 showing basic analysis");
       })
@@ -1251,7 +1254,8 @@ export default function App({ session, onLogout }) {
                   const reqId = ++coachReqIdRef.current;
                   setCoachLoading(true);
                   setCoachError(null);
-                  fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true } })
+                  const refreshExNames = workouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
+                  fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true }, catalog: EXERCISE_CATALOG })
                     .then(({ insights }) => {
                       if (coachReqIdRef.current !== reqId) return;
                       setCoachInsights(insights);
@@ -1266,7 +1270,7 @@ export default function App({ session, onLogout }) {
                       console.error("AI Coach refresh error:", err);
                       if (coachInsights.length === 0) {
                         const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange, catalogMap);
-                        setCoachInsights(detectImbalancesNormalized(analysis));
+                        setCoachInsights(detectImbalancesNormalized(analysis, { catalog: EXERCISE_CATALOG, userExerciseNames: refreshExNames }));
                       }
                       setCoachError("AI coach unavailable \u2014 showing basic analysis");
                     })

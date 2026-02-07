@@ -39,7 +39,7 @@ function filterLogsToRange(logsByDate, start, end) {
  * @param {Object} [params.options] - { forceRefresh: boolean }
  * @returns {Promise<{ insights: Array, fromCache: boolean }>}
  */
-export async function fetchCoachInsights({ profile, state, dateRange, options }) {
+export async function fetchCoachInsights({ profile, state, dateRange, options, catalog }) {
   const workouts = state?.program?.workouts || [];
   const recentLogs = filterLogsToRange(state?.logsByDate, dateRange.start, dateRange.end);
   const exerciseCount = workouts.reduce((sum, w) => sum + (w.exercises?.length || 0), 0);
@@ -59,6 +59,29 @@ export async function fetchCoachInsights({ profile, state, dateRange, options })
     } catch {
       // Ignore cache parse errors
     }
+  }
+
+  // Build catalog summary: exercises grouped by muscle, excluding user's current exercises
+  let catalogSummary = null;
+  if (catalog && catalog.length > 0) {
+    const userNames = new Set();
+    for (const w of workouts) {
+      for (const ex of w.exercises || []) {
+        userNames.add(ex.name.toLowerCase());
+      }
+    }
+    const byMuscle = {};
+    for (const entry of catalog) {
+      if (userNames.has(entry.name.toLowerCase())) continue;
+      if (!entry.muscles?.primary?.length) continue;
+      for (const muscle of entry.muscles.primary) {
+        if (!byMuscle[muscle]) byMuscle[muscle] = [];
+        if (!byMuscle[muscle].includes(entry.name)) {
+          byMuscle[muscle].push(entry.name);
+        }
+      }
+    }
+    catalogSummary = byMuscle;
   }
 
   // Call Edge Function
@@ -86,6 +109,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options })
         end: dateRange.end,
         label: dateRange.label,
       },
+      catalogSummary,
     },
   });
 
