@@ -126,7 +126,7 @@ export function getStyles(colors) {
     },
 
     body: { flex: 1, paddingTop: 14, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingBottom: 24 },
-    section: { display: "flex", flexDirection: "column", gap: 12 },
+    section: { display: "flex", flexDirection: "column", gap: 12, minWidth: 0, maxWidth: "100%" },
 
     nav: {
       flexShrink: 0,
@@ -375,6 +375,8 @@ export function getStyles(colors) {
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
       minWidth: 0,
+      flex: 1,
+      width: 0,
     },
 
     manageExerciseActions: {

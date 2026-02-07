@@ -1267,13 +1267,13 @@ export default function App({ session, onLogout }) {
                     const isFirst = wi === 0;
                     const isLast = wi === workouts.length - 1;
                     return (
-                      <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, maxWidth: "100%" }}>
                         <button
-                          style={{ ...styles.manageItem, flex: 1, ...(active ? styles.manageItemActive : {}) }}
+                          style={{ ...styles.manageItem, flex: 1, minWidth: 0, ...(active ? styles.manageItemActive : {}) }}
                           onClick={() => setManageWorkoutId(w.id)}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ fontWeight: 700 }}>{w.name}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{w.name}</div>
                             <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
                           </div>
                           <div style={styles.smallText}>{w.exercises.length} exercises</div>
@@ -1300,7 +1300,7 @@ export default function App({ session, onLogout }) {
                       <>
                         <div style={styles.cardHeader}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-                            <div style={{ ...styles.cardTitle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.name}</div>
+                            <div style={{ ...styles.cardTitle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 }}>{w.name}</div>
                             <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
                           </div>
                           <div style={{ position: "relative" }}>
