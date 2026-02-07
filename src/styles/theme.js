@@ -125,7 +125,7 @@ export function getStyles(colors) {
       textAlign: "center",
     },
 
-    body: { flex: 1, paddingTop: 14, overflowY: "auto", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingBottom: 24 },
+    body: { flex: 1, paddingTop: 14, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingBottom: 24 },
     section: { display: "flex", flexDirection: "column", gap: 12 },
 
     nav: {
@@ -356,6 +356,8 @@ export function getStyles(colors) {
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       overflow: "hidden",
+      minWidth: 0,
+      maxWidth: "100%",
     },
 
     manageExerciseLeft: {

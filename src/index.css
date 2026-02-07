@@ -40,6 +40,7 @@ body {
   width: 100%;
   min-height: 100dvh;
   background: #0b0f14;
+  overflow: hidden;
 }
 
 a {
