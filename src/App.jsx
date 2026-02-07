@@ -486,6 +486,47 @@ export default function App({ session, onLogout }) {
   }, [state, dataReady, session.user.id]);
 
   // ---------------------------------------------------------------------------
+  // BACK-BUTTON CLOSES MODALS (Android / PWA)
+  // ---------------------------------------------------------------------------
+
+  const anyModalOpen = modals.log.isOpen || modals.confirm.isOpen || modals.input.isOpen ||
+    modals.datePicker.isOpen || modals.addWorkout.isOpen || modals.addExercise.isOpen ||
+    modals.addSuggestion.isOpen || modals.profile.isOpen || modals.changeUsername.isOpen ||
+    modals.editUnit.isOpen || modals.catalogBrowse.isOpen;
+
+  const modalHistoryRef = useRef(false);
+  const closingViaCodeRef = useRef(false);
+
+  useEffect(() => {
+    if (anyModalOpen && !modalHistoryRef.current) {
+      // Modal just opened — push history entry so back button pops it
+      history.pushState({ modal: true }, "");
+      modalHistoryRef.current = true;
+    } else if (!anyModalOpen && modalHistoryRef.current) {
+      // Modal closed programmatically (X button / save) — pop the history entry
+      modalHistoryRef.current = false;
+      closingViaCodeRef.current = true;
+      history.back();
+    }
+  }, [anyModalOpen]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (closingViaCodeRef.current) {
+        // Ignore the popstate triggered by our own history.back()
+        closingViaCodeRef.current = false;
+        return;
+      }
+      if (modalHistoryRef.current) {
+        modalHistoryRef.current = false;
+        dispatchModal({ type: "CLOSE_ALL" });
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // HELPER FUNCTIONS
   // ---------------------------------------------------------------------------
 

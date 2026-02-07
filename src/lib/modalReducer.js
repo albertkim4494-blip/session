@@ -347,6 +347,10 @@ export function modalReducer(state, action) {
         changeUsername: initialModalState.changeUsername,
       };
 
+    // ===== CLOSE ALL (for back-button navigation) =====
+    case "CLOSE_ALL":
+      return initialModalState;
+
     default:
       return state;
   }
