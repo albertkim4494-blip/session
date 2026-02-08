@@ -337,3 +337,45 @@ export function detectImbalancesNormalized(analysis, opts) {
 
   return insights.slice(0, 3);
 }
+
+// ---------------------------------------------------------------------------
+// Insight normalization for UI
+// ---------------------------------------------------------------------------
+
+const SEVERITY_RANK = { HIGH: 3, MEDIUM: 2, LOW: 1, INFO: 0 };
+
+/**
+ * Normalize a raw insight into a UI-friendly shape.
+ * { title, message, severity, suggestions[] } → { headline, detail, severity, cta? }
+ */
+export function normalizeInsight(insight) {
+  if (!insight) return null;
+  const cta =
+    Array.isArray(insight.suggestions) && insight.suggestions.length > 0
+      ? insight.suggestions[0]
+      : null;
+  return {
+    headline: (insight.title || "Insight").replace(/^[\u2600-\u27BF\uFE00-\uFE0F\u{1F000}-\u{1FFFF}]\s*/u, ""),
+    detail: insight.message || "",
+    severity: insight.severity || "INFO",
+    cta,
+    _raw: insight,
+  };
+}
+
+/**
+ * Select the single most important insight from an array.
+ * Priority: showAsHero flag → salience score → severity rank → array order.
+ */
+export function selectTopInsight(insights) {
+  if (!Array.isArray(insights) || insights.length === 0) return null;
+  const hero = insights.find((i) => i.showAsHero);
+  if (hero) return hero;
+  const withSalience = insights.filter((i) => typeof i.salience === "number");
+  if (withSalience.length > 0) {
+    return withSalience.reduce((a, b) => (b.salience > a.salience ? b : a));
+  }
+  return [...insights].sort(
+    (a, b) => (SEVERITY_RANK[b.severity] || 0) - (SEVERITY_RANK[a.severity] || 0)
+  )[0];
+}

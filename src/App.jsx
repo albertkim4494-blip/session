@@ -28,7 +28,7 @@ import { Modal, ConfirmModal, InputModal } from "./components/Modal";
 import { PillTabs } from "./components/PillTabs";
 import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { ProfileModal, ChangeUsernameModal } from "./components/ProfileModal";
-import { CoachInsightsCard, AddSuggestedExerciseModal } from "./components/CoachInsights";
+import { CoachInsightsCard, CoachNudge, AddSuggestedExerciseModal } from "./components/CoachInsights";
 import { CatalogBrowseModal } from "./components/CatalogBrowseModal";
 import { GenerateWizardModal } from "./components/GenerateWizardModal";
 import { GenerateTodayModal } from "./components/GenerateTodayModal";
@@ -38,6 +38,7 @@ import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
 import { buildCatalogMap } from "./lib/exerciseCatalogUtils";
 import { generateProgram, generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
+import { selectGreeting, selectAcknowledgment } from "./lib/greetings";
 
 // Extracted styles
 import { getColors, getStyles } from "./styles/theme";
@@ -73,6 +74,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     try { return JSON.parse(localStorage.getItem("wt_auto_collapse_empty")) === true; } catch { return false; }
   });
   const manualExpandRef = useRef(new Set());
+
+  // Acknowledgment toast
+  const [toast, setToast] = useState(null); // { message, coachLine }
+  const toastTimerRef = useRef(null);
 
   // AI Coach state
   const [profile, setProfile] = useState(null);
@@ -689,6 +694,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return st;
     });
 
+    // Show acknowledgment toast
+    const ack = selectAcknowledgment(modals.log.mood, dateKey, state.logsByDate);
+    setToast(ack);
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2200);
+
     dispatchModal({ type: "CLOSE_LOG" });
   }, [modals.log, dateKey]);
 
@@ -1295,6 +1306,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* TODAY TAB */}
           {tab === "train" ? (
             <div style={styles.section}>
+              <CoachNudge insights={coachInsights} colors={colors} />
               {workouts.map((w) => (
                 <WorkoutCard
                   key={w.id}
@@ -1330,10 +1342,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 insights={coachInsights}
                 onAddExercise={handleAddSuggestion}
                 styles={styles}
-                collapsed={collapsedSummary.has("__coach__")}
-                onToggle={() => toggleCollapse(setCollapsedSummary, "__coach__")}
+                colors={colors}
                 loading={coachLoading}
                 error={coachError}
+                userExerciseNames={workouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
                 onRefresh={() => {
                   const reqId = ++coachReqIdRef.current;
                   setCoachLoading(true);
@@ -1569,6 +1581,22 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </button>
         </div>
       </div>
+
+      {/* Acknowledgment toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 70, left: "50%", transform: "translateX(-50%)",
+          background: colors.cardBg, color: colors.text, border: `1px solid ${colors.border}`,
+          borderRadius: 12, padding: "10px 18px", boxShadow: colors.shadow,
+          zIndex: 9999, textAlign: "center", animation: "coachFadeIn 0.3s ease-out",
+          maxWidth: "80vw",
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>{toast.message}</div>
+          {toast.coachLine && (
+            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>{toast.coachLine}</div>
+          )}
+        </div>
+      )}
 
       {/* MODALS */}
 
