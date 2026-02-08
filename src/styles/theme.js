@@ -325,6 +325,7 @@ export function getStyles(colors) {
       background: colors.primaryBg,
       color: colors.primaryText,
       fontWeight: 900,
+      fontSize: 14,
     },
 
     secondaryBtn: {
@@ -334,6 +335,7 @@ export function getStyles(colors) {
       background: colors.cardAltBg,
       color: colors.text,
       fontWeight: 800,
+      fontSize: 14,
     },
 
     dangerBtn: {
@@ -385,7 +387,6 @@ export function getStyles(colors) {
       borderRadius: 14,
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
-      overflow: "hidden",
       minWidth: 0,
       maxWidth: "100%",
     },
@@ -675,69 +676,6 @@ export function getStyles(colors) {
     themeSwitchLabel: {
       fontSize: 12,
       opacity: 0.9,
-    },
-
-    // Overflow menu
-    overflowMenuBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      border: `1px solid ${colors.border}`,
-      background: colors.cardAltBg,
-      color: colors.text,
-      fontWeight: 900,
-      fontSize: 20,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 0,
-      cursor: "pointer",
-    },
-
-    overflowBackdrop: {
-      position: "fixed",
-      inset: 0,
-      zIndex: 40,
-    },
-
-    overflowMenu: {
-      position: "absolute",
-      top: "100%",
-      right: 0,
-      marginTop: 4,
-      minWidth: 180,
-      background: colors.cardBg,
-      border: `1px solid ${colors.border}`,
-      borderRadius: 12,
-      boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
-      zIndex: 41,
-      overflow: "hidden",
-    },
-
-    overflowMenuItem: {
-      display: "block",
-      width: "100%",
-      textAlign: "left",
-      padding: "12px 16px",
-      background: "transparent",
-      border: "none",
-      color: colors.text,
-      fontWeight: 700,
-      fontSize: 14,
-      cursor: "pointer",
-    },
-
-    overflowMenuItemDanger: {
-      display: "block",
-      width: "100%",
-      textAlign: "left",
-      padding: "12px 16px",
-      background: "transparent",
-      border: "none",
-      color: colors.dangerText,
-      fontWeight: 700,
-      fontSize: 14,
-      cursor: "pointer",
     },
 
     addExerciseFullBtn: {
