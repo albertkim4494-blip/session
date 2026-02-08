@@ -1027,7 +1027,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   function handleAcceptGeneratedProgram(workouts, prefs) {
     updateState((st) => {
-      st.program.workouts = workouts;
+      // Append generated workouts — never delete existing ones
+      for (const w of workouts) st.program.workouts.push(w);
       st.program.generationPrefs = prefs;
       return st;
     });

@@ -60,7 +60,8 @@ export default function OnboardingScreen({ session, onComplete }) {
     try {
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({
+        .upsert({
+          id: session.user.id,
           username: trimmedUsername,
           display_name: displayName.trim() || null,
           birthdate,
@@ -70,12 +71,13 @@ export default function OnboardingScreen({ session, onComplete }) {
           about: about || null,
           sports: sports || null,
           onboarding_completed_at: new Date().toISOString(),
-        })
-        .eq("id", session.user.id);
+        });
 
       if (updateError) {
         setError(updateError.message);
       } else {
+        // Cache onboarding completion locally so AuthGate doesn't re-prompt
+        try { localStorage.setItem("onboarding_done", "1"); } catch {}
         onComplete();
       }
     } catch {

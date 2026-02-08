@@ -51,6 +51,15 @@ export default function AuthGate() {
     let cancelled = false;
 
     async function checkProfile() {
+      // Fast path: if we've cached onboarding completion locally, skip the query
+      try {
+        if (localStorage.getItem("onboarding_done") === "1") {
+          profileCheckedForRef.current = userId;
+          setProfileReady(true);
+          return;
+        }
+      } catch {}
+
       const { data, error } = await supabase
         .from("profiles")
         .select("onboarding_completed_at")
@@ -65,6 +74,8 @@ export default function AuthGate() {
       if (error || !data?.onboarding_completed_at) {
         setNeedsOnboarding(true);
       } else {
+        // Cache locally so future loads are instant
+        try { localStorage.setItem("onboarding_done", "1"); } catch {}
         setProfileReady(true);
       }
     }
@@ -76,6 +87,7 @@ export default function AuthGate() {
   const handleLogout = async () => {
     localStorage.removeItem(LS_KEY);
     localStorage.removeItem(LS_BACKUP_KEY);
+    localStorage.removeItem("onboarding_done");
     await supabase.auth.signOut();
   };
 
