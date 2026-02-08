@@ -69,8 +69,6 @@ export function getStyles(colors) {
       borderBottom: `1px solid ${colors.border}`,
     },
 
-    brand: { fontWeight: 800, fontSize: 18, letterSpacing: 0.2 },
-    dateRow: { marginTop: 10, display: "flex", alignItems: "center", gap: 10 },
     label: { fontSize: 12, opacity: 0.85 },
 
     avatarBtn: {
@@ -115,14 +113,40 @@ export function getStyles(colors) {
     },
 
     dateBtn: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: `1px solid ${colors.border}`,
-      background: colors.inputBg,
+      padding: "4px 0",
+      borderRadius: 8,
+      border: "none",
+      background: "transparent",
       color: colors.text,
-      fontSize: 14,
-      fontWeight: 900,
       textAlign: "center",
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent",
+    },
+
+    navArrow: {
+      padding: 6,
+      borderRadius: 8,
+      border: "none",
+      background: "transparent",
+      color: colors.text,
+      opacity: 0.5,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      WebkitTapHighlightColor: "transparent",
+    },
+
+    todayChip: {
+      padding: "4px 10px",
+      borderRadius: 999,
+      border: `1px solid ${colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.3)" : "rgba(43,91,122,0.25)"}`,
+      background: colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.1)" : "rgba(43,91,122,0.08)",
+      color: colors.appBg === "#0b0f14" ? "#7dd3fc" : "#2b5b7a",
+      fontSize: 12,
+      fontWeight: 700,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent",
     },
 
     body: { flex: 1, paddingTop: 14, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingBottom: 24 },
@@ -141,21 +165,27 @@ export function getStyles(colors) {
 
     navBtn: {
       flex: 1,
-      padding: "12px 12px",
-      borderRadius: 14,
-      border: `1px solid ${colors.border}`,
-      background: colors.cardBg,
+      padding: "6px 12px 4px",
+      borderRadius: 12,
+      border: "none",
+      background: "transparent",
       color: colors.text,
-      fontWeight: 800,
-      transition: "background 0.25s, border-color 0.25s, color 0.25s",
+      opacity: 0.45,
+      fontWeight: 700,
+      fontSize: 11,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 2,
+      transition: "opacity 0.2s, color 0.2s",
       WebkitTapHighlightColor: "transparent",
       outline: "none",
+      cursor: "pointer",
     },
 
     navBtnActive: {
-      border: "1px solid rgba(255,255,255,0.25)",
-      background: colors.primaryBg,
-      color: colors.primaryText,
+      opacity: 1,
+      color: colors.appBg === "#0b0f14" ? "#7dd3fc" : "#2b5b7a",
     },
 
     card: {
@@ -164,7 +194,6 @@ export function getStyles(colors) {
       borderRadius: 16,
       padding: 12,
       boxShadow: colors.shadow,
-      overflow: "hidden",
     },
 
     cardHeader: {
@@ -242,38 +271,41 @@ export function getStyles(colors) {
 
     emptyText: { opacity: 0.75, fontSize: 13, padding: "6px 2px" },
 
-    exerciseRow: { display: "flex", alignItems: "stretch", gap: 10 },
+    exerciseRow: { display: "flex", alignItems: "stretch", gap: 8 },
 
     exerciseBtn: {
       flex: 1,
       textAlign: "left",
-      padding: 12,
+      padding: "12px 14px",
       borderRadius: 14,
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
+      borderLeft: `3px solid transparent`,
     },
 
-    exerciseName: { fontWeight: 800, fontSize: 15 },
-    exerciseSub: { marginTop: 6, fontSize: 12, opacity: 0.8 },
+    exerciseBtnLogged: {
+      borderLeftColor: "#2ecc71",
+    },
+
+    exerciseName: { fontWeight: 800, fontSize: 14 },
+    exerciseSub: { marginTop: 4, fontSize: 12, opacity: 0.7 },
 
     badge: {
-      fontSize: 11,
-      fontWeight: 800,
-      padding: "3px 8px",
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 7px",
       borderRadius: 999,
       background: "rgba(46, 204, 113, 0.18)",
-      border: "1px solid rgba(46, 204, 113, 0.25)",
+      color: "#2ecc71",
     },
 
     badgeMuted: {
-      fontSize: 11,
-      fontWeight: 800,
-      padding: "3px 8px",
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 7px",
       borderRadius: 999,
-      background: "rgba(255,255,255,0.06)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      opacity: 0.75,
+      opacity: 0.4,
     },
 
     unitPill: {
@@ -313,19 +345,17 @@ export function getStyles(colors) {
       fontWeight: 900,
     },
 
-    smallDangerBtn: {
-      width: 72,
-      height: 40,
-      padding: 0,
-      borderRadius: 12,
-      border: `1px solid ${colors.dangerBorder}`,
-      background: colors.dangerBg,
+    deleteLogBtn: {
+      padding: 8,
+      borderRadius: 10,
+      border: "none",
+      background: "transparent",
       color: colors.dangerText,
-      fontWeight: 900,
+      opacity: 0.5,
+      cursor: "pointer",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      lineHeight: "40px",
       alignSelf: "center",
     },
 
@@ -494,7 +524,7 @@ export function getStyles(colors) {
 
     setRow: {
       display: "grid",
-      gridTemplateColumns: "36px 1fr 1fr 46px 88px",
+      gridTemplateColumns: "36px 1fr 1fr 46px 40px",
       gap: 10,
       alignItems: "center",
       padding: 10,
@@ -647,102 +677,6 @@ export function getStyles(colors) {
       opacity: 0.9,
     },
 
-    // AI Coach specific styles
-    insightCard: {
-      background: colors.cardAltBg,
-      border: `1px solid ${colors.border}`,
-      borderRadius: 12,
-      overflow: 'hidden',
-    },
-
-    insightHeader: {
-      width: '100%',
-      padding: 12,
-      textAlign: 'left',
-      background: 'transparent',
-      border: 'none',
-      color: colors.text,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 10,
-      cursor: 'pointer',
-    },
-
-    insightTitle: {
-      fontWeight: 800,
-      fontSize: 14,
-      marginBottom: 4,
-    },
-
-    insightMessage: {
-      fontSize: 13,
-      opacity: 0.85,
-      lineHeight: 1.4,
-    },
-
-    insightChevron: {
-      fontSize: 12,
-      opacity: 0.6,
-    },
-
-    insightSuggestions: {
-      padding: 12,
-      paddingTop: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 8,
-    },
-
-    suggestionsTitle: {
-      fontSize: 12,
-      fontWeight: 800,
-      opacity: 0.75,
-      marginBottom: 4,
-    },
-
-    suggestionRow: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 10,
-      padding: 10,
-      background: colors.cardBg,
-      border: `1px solid ${colors.border}`,
-      borderRadius: 10,
-    },
-
-    suggestionName: {
-      fontWeight: 700,
-      fontSize: 14,
-    },
-
-    suggestionGroup: {
-      fontSize: 11,
-      opacity: 0.7,
-      marginTop: 2,
-      textTransform: 'capitalize',
-    },
-
-    addSuggestionBtn: {
-      padding: '8px 12px',
-      borderRadius: 8,
-      border: `1px solid ${colors.border}`,
-      background: colors.primaryBg,
-      color: colors.primaryText,
-      fontWeight: 800,
-      fontSize: 13,
-    },
-
-    coachFooter: {
-      fontSize: 12,
-      opacity: 0.7,
-      marginTop: 8,
-      padding: '8px 10px',
-      background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)",
-      borderRadius: 8,
-    },
-
     // Overflow menu
     overflowMenuBtn: {
       width: 36,
@@ -853,15 +787,5 @@ export function getStyles(colors) {
       cursor: "pointer",
     },
 
-    compactDangerBtn: {
-      padding: "6px 8px",
-      borderRadius: 8,
-      border: `1px solid ${colors.dangerBorder}`,
-      background: colors.dangerBg,
-      color: colors.dangerText,
-      fontWeight: 900,
-      fontSize: 12,
-      cursor: "pointer",
-    },
   };
 }

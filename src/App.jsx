@@ -44,6 +44,21 @@ import { selectGreeting, selectAcknowledgment } from "./lib/greetings";
 import { getColors, getStyles } from "./styles/theme";
 
 // ============================================================================
+// CSS ANIMATIONS (injected once)
+// ============================================================================
+let _animInjected = false;
+function ensureAnimations() {
+  if (_animInjected) return;
+  _animInjected = true;
+  const s = document.createElement("style");
+  s.textContent = `
+@keyframes tabFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastSlideUp { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+`;
+  document.head.appendChild(s);
+}
+
+// ============================================================================
 // MAIN APP COMPONENT
 // ============================================================================
 
@@ -52,6 +67,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // STATE
   // ---------------------------------------------------------------------------
 
+  ensureAnimations();
   const [state, setState] = useState(() => loadState());
   const [dataReady, setDataReady] = useState(false);
   const cloudSaver = useRef(null);
@@ -1153,7 +1169,51 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         {/* Top bar */}
         <div style={styles.topBar}>
           <div style={styles.topBarRow}>
-            <div style={styles.brand}>Workout Tracker</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                style={styles.navArrow}
+                onClick={() => setDateKey((k) => addDays(k, -1))}
+                aria-label="Previous day"
+                type="button"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+              </button>
+              <button
+                style={styles.dateBtn}
+                onClick={() =>
+                  dispatchModal({
+                    type: "OPEN_DATE_PICKER",
+                    payload: { monthCursor: monthKeyFromDate(dateKey) },
+                  })
+                }
+                aria-label="Pick date"
+                type="button"
+              >
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.55, textTransform: "uppercase" }}>
+                  {new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" })}
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 900 }}>
+                  {formatDateLabel(dateKey)}
+                </div>
+              </button>
+              <button
+                style={styles.navArrow}
+                onClick={() => setDateKey((k) => addDays(k, +1))}
+                aria-label="Next day"
+                type="button"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+              </button>
+              {dateKey !== yyyyMmDd(new Date()) && (
+                <button
+                  style={styles.todayChip}
+                  onClick={() => setDateKey(yyyyMmDd(new Date()))}
+                  type="button"
+                >
+                  Today
+                </button>
+              )}
+            </div>
             <button
               onClick={() => dispatchModal({
                 type: "OPEN_PROFILE_MODAL",
@@ -1176,48 +1236,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             </button>
           </div>
 
-          <div style={styles.dateRow}>
-            <label style={styles.label}>Date</label>
-
-            <div style={{ display: "flex", gap: 8, flex: 1 }}>
-              <button
-                style={styles.secondaryBtn}
-                onClick={() => setDateKey((k) => addDays(k, -1))}
-                aria-label="Previous day"
-                type="button"
-              >
-                {"\u2190"}
-              </button>
-
-              <button
-                style={{ ...styles.dateBtn, flex: 1 }}
-                onClick={() =>
-                  dispatchModal({
-                    type: "OPEN_DATE_PICKER",
-                    payload: { monthCursor: monthKeyFromDate(dateKey) },
-                  })
-                }
-                aria-label="Pick date"
-                type="button"
-              >
-                {formatDateLabel(dateKey)}
-              </button>
-
-              <button
-                style={styles.secondaryBtn}
-                onClick={() => setDateKey((k) => addDays(k, +1))}
-                aria-label="Next day"
-                type="button"
-              >
-                {"\u2192"}
-              </button>
-            </div>
-          </div>
-
           {/* Tab-specific sticky toolbar */}
-          {tab === "train" && (
+          {tab === "train" && workouts.length > 0 && (
             <div style={{ ...styles.collapseAllRow, justifyContent: "space-between", alignItems: "center", paddingTop: 10 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, opacity: 0.85, cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, opacity: 0.6, cursor: "pointer" }}>
                 <input
                   type="checkbox"
                   checked={autoCollapseEmpty}
@@ -1305,39 +1327,78 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           {/* TODAY TAB */}
           {tab === "train" ? (
-            <div style={styles.section}>
+            <div key="train" style={{ ...styles.section, animation: "tabFadeIn 0.2s ease-out" }}>
               <CoachNudge insights={coachInsights} colors={colors} />
-              {workouts.map((w) => (
-                <WorkoutCard
-                  key={w.id}
-                  workout={w}
-                  collapsed={collapsedToday.has(w.id)}
-                  onToggle={() => {
-                    if (collapsedToday.has(w.id)) {
-                      manualExpandRef.current.add(w.id);
-                    } else {
-                      manualExpandRef.current.delete(w.id);
-                    }
-                    toggleCollapse(setCollapsedToday, w.id);
-                  }}
-                  logsForDate={logsForDate}
-                  openLog={openLog}
-                  deleteLogForExercise={deleteLogForExercise}
-                  styles={styles}
-                />
-              ))}
-              <button
-                style={{ ...styles.secondaryBtn, width: "100%", marginTop: 8 }}
-                onClick={handleGenerateToday}
-              >
-                Generate Workout for Today
-              </button>
+              {workouts.length === 0 ? (
+                <div style={{
+                  ...styles.card,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  padding: "32px 20px",
+                  gap: 12,
+                }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}>
+                    <path d="M4 12h16" /><rect x="2" y="8" width="4" height="8" rx="1" /><rect x="18" y="8" width="4" height="8" rx="1" /><rect x="6" y="6" width="3" height="12" rx="1" /><rect x="15" y="6" width="3" height="12" rx="1" />
+                  </svg>
+                  <div style={{ fontWeight: 800, fontSize: 16 }}>No workouts yet</div>
+                  <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
+                    Head to the <b>Plan</b> tab to create your program, or generate one with AI.
+                  </div>
+                  <button
+                    style={{ ...styles.primaryBtn, marginTop: 4, padding: "10px 20px" }}
+                    onClick={() => setTab("plan")}
+                  >
+                    Go to Plan
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {workouts.map((w) => (
+                    <WorkoutCard
+                      key={w.id}
+                      workout={w}
+                      collapsed={collapsedToday.has(w.id)}
+                      onToggle={() => {
+                        if (collapsedToday.has(w.id)) {
+                          manualExpandRef.current.add(w.id);
+                        } else {
+                          manualExpandRef.current.delete(w.id);
+                        }
+                        toggleCollapse(setCollapsedToday, w.id);
+                      }}
+                      logsForDate={logsForDate}
+                      openLog={openLog}
+                      deleteLogForExercise={deleteLogForExercise}
+                      styles={styles}
+                    />
+                  ))}
+                  <button
+                    style={{
+                      ...styles.secondaryBtn,
+                      width: "100%",
+                      marginTop: 4,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                    }}
+                    onClick={handleGenerateToday}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
+                    </svg>
+                    Generate Workout for Today
+                  </button>
+                </>
+              )}
             </div>
           ) : null}
 
           {/* SUMMARY TAB */}
           {tab === "progress" ? (
-            <div style={styles.section}>
+            <div key="progress" style={{ ...styles.section, animation: "tabFadeIn 0.2s ease-out" }}>
               <CoachInsightsCard
                 insights={coachInsights}
                 onAddExercise={handleAddSuggestion}
@@ -1377,23 +1438,43 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 }}
               />
 
-              {workouts.map((w) => (
-                <SummaryBlock
-                  key={w.id}
-                  workout={w}
-                  collapsed={collapsedSummary.has(w.id)}
-                  onToggle={() => toggleCollapse(setCollapsedSummary, w.id)}
-                  summaryRange={summaryRange}
-                  computeExerciseSummary={computeExerciseSummary}
-                  styles={styles}
-                />
-              ))}
+              {summaryDaysLogged.logged === 0 && !coachLoading && coachInsights.length === 0 ? (
+                <div style={{
+                  ...styles.card,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  padding: "32px 20px",
+                  gap: 12,
+                }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}>
+                    <path d="M3 20h18" /><path d="M7 20V10" /><path d="M12 20V4" /><path d="M17 20V14" />
+                  </svg>
+                  <div style={{ fontWeight: 800, fontSize: 16 }}>No data yet</div>
+                  <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
+                    Log a workout on the <b>Train</b> tab and your progress will show up here.
+                  </div>
+                </div>
+              ) : (
+                workouts.map((w) => (
+                  <SummaryBlock
+                    key={w.id}
+                    workout={w}
+                    collapsed={collapsedSummary.has(w.id)}
+                    onToggle={() => toggleCollapse(setCollapsedSummary, w.id)}
+                    summaryRange={summaryRange}
+                    computeExerciseSummary={computeExerciseSummary}
+                    styles={styles}
+                  />
+                ))
+              )}
             </div>
           ) : null}
 
           {/* MANAGE TAB */}
           {tab === "plan" ? (
-            <div style={styles.section}>
+            <div key="plan" style={{ ...styles.section, animation: "tabFadeIn 0.2s ease-out" }}>
               <div style={styles.card}>
                 <div style={styles.cardHeader}>
                   <div style={styles.cardTitle}>Structure</div>
@@ -1410,119 +1491,138 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </div>
                 </div>
 
-                <div style={styles.manageList}>
-                  {workouts.map((w, wi) => {
-                    const active = manageWorkoutId === w.id;
-                    const isFirst = wi === 0;
-                    const isLast = wi === workouts.length - 1;
-                    return (
-                      <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, maxWidth: "100%" }}>
-                        <button
-                          style={{ ...styles.manageItem, flex: 1, minWidth: 0, ...(active ? styles.manageItemActive : {}) }}
-                          onClick={() => setManageWorkoutId(w.id)}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{w.name}</div>
-                            <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
-                          </div>
-                          <div style={styles.smallText}>{w.exercises.length} exercises</div>
-                        </button>
-                        {reorderWorkouts ? (
-                          <div style={styles.reorderBtnGroup}>
-                            <button style={styles.reorderBtn} disabled={isFirst} onClick={() => moveWorkout(w.id, -1)} title="Move up">&#9650;</button>
-                            <button style={styles.reorderBtn} disabled={isLast} onClick={() => moveWorkout(w.id, 1)} title="Move down">&#9660;</button>
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <button
-                  style={{ ...styles.secondaryBtn, width: "100%", marginTop: 8, textAlign: "center" }}
-                  onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
-                >
-                  Generate Plan ✨
-                </button>
-              </div>
-
-              {manageWorkoutId ? (
-                <div style={styles.card}>
-                  {(() => {
-                    const w = workoutById.get(manageWorkoutId);
-                    if (!w) return <div style={styles.emptyText}>Select a workout.</div>;
-
-                    return (
-                      <>
-                        <div style={styles.cardHeader}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-                            <div style={{ ...styles.cardTitle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 }}>{w.name}</div>
-                            <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
-                          </div>
-                          <div style={{ position: "relative" }}>
-                            <button style={styles.overflowMenuBtn} onClick={() => setOverflowMenuOpen((v) => !v)} title="More options">&#8942;</button>
-                            {overflowMenuOpen ? (
-                              <>
-                                <div style={styles.overflowBackdrop} onClick={() => setOverflowMenuOpen(false)} />
-                                <div style={styles.overflowMenu}>
-                                  <button style={styles.overflowMenuItem} onClick={() => { setOverflowMenuOpen(false); renameWorkout(w.id); }}>Rename workout</button>
-                                  <button style={styles.overflowMenuItem} onClick={() => { setOverflowMenuOpen(false); setWorkoutCategory(w.id); }}>Change category</button>
-                                  <button style={styles.overflowMenuItemDanger} onClick={() => { setOverflowMenuOpen(false); deleteWorkout(w.id); }}>Delete workout</button>
-                                </div>
-                              </>
+                {workouts.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "16px 12px", opacity: 0.5, fontSize: 13, lineHeight: 1.5 }}>
+                    No workouts yet. Add one manually or generate a full program with AI.
+                  </div>
+                ) : (
+                  <div style={styles.manageList}>
+                    {workouts.map((w, wi) => {
+                      const active = manageWorkoutId === w.id;
+                      const isFirst = wi === 0;
+                      const isLast = wi === workouts.length - 1;
+                      return (
+                        <div key={w.id}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, maxWidth: "100%" }}>
+                            <button
+                              style={{ ...styles.manageItem, flex: 1, minWidth: 0, ...(active ? styles.manageItemActive : {}) }}
+                              onClick={() => setManageWorkoutId(active ? null : w.id)}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{w.name}</div>
+                                <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
+                                <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.5 }}>{active ? "\u25BC" : "\u25B6"}</span>
+                              </div>
+                              <div style={styles.smallText}>{w.exercises.length} exercises</div>
+                            </button>
+                            {reorderWorkouts ? (
+                              <div style={styles.reorderBtnGroup}>
+                                <button style={styles.reorderBtn} disabled={isFirst} onClick={() => moveWorkout(w.id, -1)} title="Move up">&#9650;</button>
+                                <button style={styles.reorderBtn} disabled={isLast} onClick={() => moveWorkout(w.id, 1)} title="Move down">&#9660;</button>
+                              </div>
                             ) : null}
                           </div>
-                        </div>
 
-                        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                          <button style={styles.addExerciseFullBtn} onClick={() => addExercise(w.id)}>
-                            + Add Exercise
-                          </button>
-                          {w.exercises.length > 1 && (
-                            <button
-                              style={reorderExercises ? styles.primaryBtn : styles.secondaryBtn}
-                              onClick={() => setReorderExercises((v) => !v)}
-                            >
-                              {reorderExercises ? "Done" : "Reorder"}
-                            </button>
+                          {/* Inline workout detail — accordion */}
+                          {active && !reorderWorkouts && (
+                            <div style={{
+                              marginTop: 6,
+                              marginLeft: 4,
+                              padding: "12px 12px 8px",
+                              borderLeft: `2px solid ${colors.border}`,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 10,
+                              animation: "tabFadeIn 0.15s ease-out",
+                            }}>
+                              {/* Action row: add exercise, reorder, overflow menu */}
+                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                <button style={{ ...styles.addExerciseFullBtn, flex: 1 }} onClick={() => addExercise(w.id)}>
+                                  + Add Exercise
+                                </button>
+                                {w.exercises.length > 1 && (
+                                  <button
+                                    style={reorderExercises ? styles.primaryBtn : styles.secondaryBtn}
+                                    onClick={() => setReorderExercises((v) => !v)}
+                                  >
+                                    {reorderExercises ? "Done" : "Reorder"}
+                                  </button>
+                                )}
+                                <div style={{ position: "relative" }}>
+                                  <button style={styles.overflowMenuBtn} onClick={() => setOverflowMenuOpen((v) => !v)} title="More options">&#8942;</button>
+                                  {overflowMenuOpen ? (
+                                    <>
+                                      <div style={styles.overflowBackdrop} onClick={() => setOverflowMenuOpen(false)} />
+                                      <div style={styles.overflowMenu}>
+                                        <button style={styles.overflowMenuItem} onClick={() => { setOverflowMenuOpen(false); renameWorkout(w.id); }}>Rename workout</button>
+                                        <button style={styles.overflowMenuItem} onClick={() => { setOverflowMenuOpen(false); setWorkoutCategory(w.id); }}>Change category</button>
+                                        <button style={styles.overflowMenuItemDanger} onClick={() => { setOverflowMenuOpen(false); deleteWorkout(w.id); }}>Delete workout</button>
+                                      </div>
+                                    </>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              {/* Exercise list */}
+                              {w.exercises.length === 0 ? (
+                                <div style={styles.emptyText}>No exercises yet.</div>
+                              ) : (
+                                w.exercises.map((ex, ei) => {
+                                  const isFirstEx = ei === 0;
+                                  const isLastEx = ei === w.exercises.length - 1;
+                                  return (
+                                    <div key={ex.id} style={styles.manageExerciseRow}>
+                                      <div style={styles.manageExerciseLeft}>
+                                        <div style={styles.manageExerciseName}>{ex.name}</div>
+                                        <span style={styles.unitPill}>{getUnit(ex.unit, ex).abbr}</span>
+                                      </div>
+                                      {reorderExercises ? (
+                                        <div style={styles.reorderBtnGroup}>
+                                          <button style={styles.reorderBtn} disabled={isFirstEx} onClick={() => moveExercise(w.id, ex.id, -1)} title="Move up">&#9650;</button>
+                                          <button style={styles.reorderBtn} disabled={isLastEx} onClick={() => moveExercise(w.id, ex.id, 1)} title="Move down">&#9660;</button>
+                                        </div>
+                                      ) : (
+                                        <div style={styles.manageExerciseActions}>
+                                          <button style={styles.compactSecondaryBtn} onClick={() => editUnitExercise(w.id, ex.id)}>Unit</button>
+                                          <button style={styles.compactSecondaryBtn} onClick={() => renameExercise(w.id, ex.id)}>Rename</button>
+                                          <button style={styles.deleteLogBtn} onClick={() => deleteExercise(w.id, ex.id)} aria-label={`Delete ${ex.name}`}>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                              <path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
                           )}
                         </div>
+                      );
+                    })}
+                  </div>
+                )}
 
-                        {w.exercises.length === 0 ? (
-                          <div style={styles.emptyText}>No exercises yet. Add one above.</div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                            {w.exercises.map((ex, ei) => {
-                              const isFirstEx = ei === 0;
-                              const isLastEx = ei === w.exercises.length - 1;
-                              return (
-                                <div key={ex.id} style={styles.manageExerciseRow}>
-                                  <div style={styles.manageExerciseLeft}>
-                                    <div style={styles.manageExerciseName}>{ex.name}</div>
-                                    <span style={styles.unitPill}>{getUnit(ex.unit, ex).abbr}</span>
-                                  </div>
-                                  {reorderExercises ? (
-                                    <div style={styles.reorderBtnGroup}>
-                                      <button style={styles.reorderBtn} disabled={isFirstEx} onClick={() => moveExercise(w.id, ex.id, -1)} title="Move up">&#9650;</button>
-                                      <button style={styles.reorderBtn} disabled={isLastEx} onClick={() => moveExercise(w.id, ex.id, 1)} title="Move down">&#9660;</button>
-                                    </div>
-                                  ) : (
-                                    <div style={styles.manageExerciseActions}>
-                                      <button style={styles.compactSecondaryBtn} onClick={() => editUnitExercise(w.id, ex.id)}>Unit</button>
-                                      <button style={styles.compactSecondaryBtn} onClick={() => renameExercise(w.id, ex.id)}>Rename</button>
-                                      <button style={styles.compactDangerBtn} onClick={() => deleteExercise(w.id, ex.id)}>Delete</button>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              ) : null}
+                <button
+                  style={{
+                    ...styles.secondaryBtn,
+                    width: "100%",
+                    marginTop: 8,
+                    textAlign: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                  }}
+                  onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
+                  </svg>
+                  Generate Plan
+                </button>
+              </div>
 
               {/* Backup section */}
               <div style={styles.card}>
@@ -1571,12 +1671,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         {/* Bottom navigation */}
         <div style={styles.nav}>
           <button style={{ ...styles.navBtn, ...(tab === "train" ? styles.navBtnActive : {}) }} onClick={() => setTab("train")}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 12h16" /><rect x="2" y="8" width="4" height="8" rx="1" /><rect x="18" y="8" width="4" height="8" rx="1" /><rect x="6" y="6" width="3" height="12" rx="1" /><rect x="15" y="6" width="3" height="12" rx="1" />
+            </svg>
             Train
           </button>
           <button style={{ ...styles.navBtn, ...(tab === "progress" ? styles.navBtnActive : {}) }} onClick={() => setTab("progress")}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 20h18" /><path d="M7 20V10" /><path d="M12 20V4" /><path d="M17 20V14" />
+            </svg>
             Progress
           </button>
           <button style={{ ...styles.navBtn, ...(tab === "plan" ? styles.navBtnActive : {}) }} onClick={() => setTab("plan")}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 7h8" /><path d="M8 12h8" /><path d="M8 17h4" />
+            </svg>
             Plan
           </button>
         </div>
@@ -1585,10 +1694,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* Acknowledgment toast */}
       {toast && (
         <div style={{
-          position: "fixed", bottom: 70, left: "50%", transform: "translateX(-50%)",
+          position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)",
           background: colors.cardBg, color: colors.text, border: `1px solid ${colors.border}`,
-          borderRadius: 12, padding: "10px 18px", boxShadow: colors.shadow,
-          zIndex: 9999, textAlign: "center", animation: "coachFadeIn 0.3s ease-out",
+          borderRadius: 14, padding: "10px 20px", boxShadow: "0 12px 28px rgba(0,0,0,0.3)",
+          zIndex: 9999, textAlign: "center", animation: "toastSlideUp 0.3s ease-out",
           maxWidth: "80vw",
         }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>{toast.message}</div>
@@ -1682,14 +1791,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </div>
 
                   <button
-                    style={styles.smallDangerBtn}
+                    style={{ ...styles.deleteLogBtn, opacity: modals.log.sets.length <= 1 ? 0.2 : 0.5 }}
                     onClick={() => {
                       const newSets = modals.log.sets.filter((_, idx) => idx !== i);
                       dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                     }}
                     disabled={modals.log.sets.length <= 1}
+                    aria-label="Remove set"
                   >
-                    Remove
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                    </svg>
                   </button>
                 </div>
               );
@@ -2366,28 +2478,30 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   return (
     <div style={styles.exerciseRow}>
       <button
-        style={styles.exerciseBtn}
+        style={{ ...styles.exerciseBtn, ...(hasLog ? styles.exerciseBtnLogged : {}) }}
         onClick={() => openLog(workoutId, exercise)}
         aria-label={`Log ${exercise.name}`}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <div style={styles.exerciseName}>{exercise.name}</div>
-          <span style={styles.unitPill}>{exUnit.abbr}</span>
-          {hasLog ? <span style={styles.badge}>Logged</span> : <span style={styles.badgeMuted}>-</span>}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, flex: 1 }}>
+            <div style={{ ...styles.exerciseName, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exercise.name}</div>
+            <span style={styles.unitPill}>{exUnit.abbr}</span>
+          </div>
+          {hasLog ? <span style={styles.badge}>Done</span> : <span style={styles.badgeMuted}>Tap to log</span>}
         </div>
         {hasLog && setsText ? <div style={styles.exerciseSub}>{setsText}</div> : null}
       </button>
 
-      {hasLog ? (
+      {hasLog && (
         <button
-          style={styles.smallDangerBtn}
+          style={styles.deleteLogBtn}
           onClick={() => deleteLogForExercise(exercise.id)}
           aria-label={`Delete log for ${exercise.name}`}
         >
-          Delete
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+          </svg>
         </button>
-      ) : (
-        <div style={{ width: 72 }} />
       )}
     </div>
   );

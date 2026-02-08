@@ -80,7 +80,6 @@ export function CatalogBrowseModal({
     if (open) {
       setQuery("");
       setMovementFilter(null);
-      setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [open]);
 
@@ -187,7 +186,6 @@ export function CatalogBrowseModal({
           onChange={(e) => setQuery(e.target.value)}
           style={styles.textInput}
           placeholder="Search exercises..."
-          autoFocus
         />
 
         <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, WebkitOverflowScrolling: "touch" }}>
