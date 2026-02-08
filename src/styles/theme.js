@@ -552,6 +552,9 @@ export function getStyles(colors) {
       background: colors.inputBg,
       color: colors.text,
       fontSize: 14,
+      width: "100%",
+      boxSizing: "border-box",
+      minWidth: 0,
     },
 
     disabledInput: { opacity: 0.7 },

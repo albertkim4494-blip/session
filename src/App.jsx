@@ -92,9 +92,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_summary"))); } catch { return new Set(); }
   });
 
-  // Acknowledgment toast
+  // Toast notification
   const [toast, setToast] = useState(null); // { message, coachLine }
   const toastTimerRef = useRef(null);
+  const showToast = useCallback((message, ms = 2500) => {
+    setToast({ message });
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), ms);
+  }, []);
 
   // AI Coach state
   const [profile, setProfile] = useState(null);
@@ -743,7 +748,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const ack = selectAcknowledgment(modals.log.mood, dateKey, state.logsByDate);
     setToast(ack);
     clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToast(null), 2200);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
 
     dispatchModal({ type: "CLOSE_LOG" });
   }, [modals.log, dateKey]);
@@ -753,6 +758,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       updateState((st) => {
         if (!st.logsByDate[dateKey]) return st;
         delete st.logsByDate[dateKey][exerciseId];
+        if (Object.keys(st.logsByDate[dateKey]).length === 0) {
+          delete st.logsByDate[dateKey];
+        }
         return st;
       });
     },
@@ -784,7 +792,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const { workoutId, name, category } = modals.editWorkout;
     const validation = validateWorkoutName(name, workouts.filter((x) => x.id !== workoutId));
     if (!validation.valid) {
-      alert("\u26a0\ufe0f " + validation.error);
+      showToast(validation.error);
       return;
     }
     updateState((st) => {
@@ -863,11 +871,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const otherExercises = w?.exercises?.filter((e) => e.id !== exerciseId) || [];
     const validation = validateExerciseName(name, otherExercises);
     if (!validation.valid) {
-      alert("\u26a0\ufe0f " + validation.error);
+      showToast(validation.error);
       return;
     }
     if (unit === "custom" && !customUnitAbbr?.trim()) {
-      alert("\u26a0\ufe0f Please enter a custom unit abbreviation");
+      showToast("Please enter a custom unit abbreviation");
       return;
     }
     updateState((st) => {
@@ -951,7 +959,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      alert("Failed to export data: " + error.message);
+      showToast("Failed to export data");
     }
   }, [state]);
 
@@ -961,7 +969,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const incoming = safeParse(text, null);
 
       if (!incoming || typeof incoming !== "object") {
-        alert("Invalid JSON file.");
+        showToast("Invalid JSON file");
         return;
       }
 
@@ -969,24 +977,32 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const logsByDate = incoming.logsByDate && typeof incoming.logsByDate === "object" ? incoming.logsByDate : null;
 
       if (!program || !Array.isArray(program.workouts) || !logsByDate) {
-        alert("Import file missing required fields (program.workouts, logsByDate).");
+        showToast("Import file missing required fields");
         return;
       }
 
-      if (!confirm("Import will REPLACE your current data. Continue?")) return;
-
-      const next = {
-        ...makeDefaultState(),
-        ...incoming,
-        program: incoming.program,
-        logsByDate,
-        meta: { ...(incoming.meta ?? {}), updatedAt: Date.now() },
-      };
-
-      setState(next);
-      alert("Import complete!");
+      dispatchModal({
+        type: "OPEN_CONFIRM",
+        payload: {
+          title: "Import Data",
+          message: "This will REPLACE all your current data. Continue?",
+          confirmText: "Import",
+          onConfirm: () => {
+            const next = {
+              ...makeDefaultState(),
+              ...incoming,
+              program: incoming.program,
+              logsByDate,
+              meta: { ...(incoming.meta ?? {}), updatedAt: Date.now() },
+            };
+            setState(next);
+            dispatchModal({ type: "CLOSE_CONFIRM" });
+          },
+        },
+      });
+      return;
     } catch (error) {
-      alert("Failed to import: " + error.message);
+      showToast("Failed to import file");
     }
   }
 
@@ -1000,7 +1016,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const confirmAddSuggestion = useCallback((workoutId, exerciseName) => {
     const workout = workoutById.get(workoutId);
     if (!workout) {
-      alert("Workout not found");
+      showToast("Workout not found");
       return;
     }
 
@@ -1009,7 +1025,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     );
 
     if (exists) {
-      alert(`"${exerciseName}" already exists in ${workout.name}`);
+      showToast(`"${exerciseName}" already exists in ${workout.name}`);
       dispatchModal({ type: "CLOSE_ADD_SUGGESTION" });
       return;
     }
@@ -1022,7 +1038,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
 
     dispatchModal({ type: "CLOSE_ADD_SUGGESTION" });
-    alert(`Added "${exerciseName}" to ${workout.name}!`);
+    showToast(`Added "${exerciseName}" to ${workout.name}`);
   }, [workoutById]);
 
   function handleAcceptGeneratedProgram(workouts, prefs) {
@@ -1794,11 +1810,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <button
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors.dangerBorder}`, background: colors.dangerBg, color: colors.dangerText, cursor: "pointer", textAlign: "left", width: "100%", marginTop: 4 }}
                     onClick={() => {
-                      if (!confirm("Reset ALL data? A backup will be exported first.")) return;
-                      exportJson();
-                      setState(makeDefaultState());
-                      setManageWorkoutId(null);
-                      alert("Reset complete. Your data was exported as a backup.");
+                      dispatchModal({
+                        type: "OPEN_CONFIRM",
+                        payload: {
+                          title: "Reset All Data",
+                          message: "This will delete all workouts and logs. A backup will be exported first.",
+                          confirmText: "Reset",
+                          onConfirm: () => {
+                            try {
+                              exportJson();
+                            } catch (e) {
+                              showToast("Backup export failed — reset aborted");
+                              return;
+                            }
+                            setState(makeDefaultState());
+                            setManageWorkoutId(null);
+                            dispatchModal({ type: "CLOSE_CONFIRM" });
+                          },
+                        },
+                      });
                     }}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -1887,7 +1917,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             : null;
 
           return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, overflowX: "hidden" }}>
           {logScheme && (
             <div style={{
               fontSize: 13, padding: "8px 12px", borderRadius: 10,
@@ -1942,8 +1972,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     value={String(s.reps ?? "")}
                     onChange={(e) => {
                       const newSets = [...modals.log.sets];
-                      const regex = logUnit.allowDecimal ? /[^\d.]/g : /[^\d]/g;
-                      newSets[i] = { ...newSets[i], reps: e.target.value.replace(regex, "") };
+                      let v = logUnit.allowDecimal ? e.target.value.replace(/[^\d.]/g, "") : e.target.value.replace(/[^\d]/g, "");
+                      if (logUnit.allowDecimal) { const parts = v.split("."); v = parts.shift() + (parts.length ? "." + parts.join("") : ""); }
+                      newSets[i] = { ...newSets[i], reps: v };
                       dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                     }}
                     inputMode={logUnit.allowDecimal ? "decimal" : "numeric"}
@@ -1957,7 +1988,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       value={isBW ? "BW" : String(s.weight ?? "")}
                       onChange={(e) => {
                         const newSets = [...modals.log.sets];
-                        newSets[i] = { ...newSets[i], weight: e.target.value };
+                        let w = e.target.value.replace(/[^\d.]/g, "");
+                        const parts = w.split("."); w = parts.shift() + (parts.length ? "." + parts.join("") : "");
+                        newSets[i] = { ...newSets[i], weight: w };
                         dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                       }}
                       inputMode="numeric"
@@ -2040,7 +2073,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4, position: "sticky", bottom: -12, background: colors.cardBg, paddingTop: 10, paddingBottom: 4, marginLeft: -12, marginRight: -12, paddingLeft: 12, paddingRight: 12 }}>
             <button style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
               Save
             </button>
@@ -2245,7 +2278,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               onClick={() => {
                 const validation = validateWorkoutName(modals.addWorkout.name, workouts);
                 if (!validation.valid) {
-                  alert("\u26a0\ufe0f " + validation.error);
+                  showToast(validation.error);
                   return;
                 }
 
@@ -2415,12 +2448,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
                 const validation = validateExerciseName(modals.addExercise.name, workout.exercises);
                 if (!validation.valid) {
-                  alert("\u26a0\ufe0f " + validation.error);
+                  showToast(validation.error);
                   return;
                 }
 
                 if (modals.addExercise.unit === "custom" && !modals.addExercise.customUnitAbbr?.trim()) {
-                  alert("\u26a0\ufe0f Please enter a custom unit abbreviation");
+                  showToast("Please enter a custom unit abbreviation");
                   return;
                 }
 
