@@ -1142,155 +1142,192 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       <div style={styles.content}>
         {/* Top bar */}
         <div style={styles.topBar}>
-          <div style={styles.topBarRow}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {trainSearchOpen ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, flexShrink: 0 }}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+              <input
+                value={trainSearch}
+                onChange={(e) => setTrainSearch(e.target.value)}
+                placeholder={tab === "train" ? "Search to log..." : tab === "progress" ? "Search exercises..." : "Search exercises..."}
+                autoFocus
+                style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1 }}
+              />
               <button
-                style={styles.navArrow}
-                onClick={() => setDateKey((k) => addDays(k, -1))}
-                aria-label="Previous day"
-                type="button"
+                style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "4px 2px", flexShrink: 0 }}
+                onClick={() => { setTrainSearchOpen(false); setTrainSearch(""); }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                Cancel
               </button>
-              <button
-                style={styles.dateBtn}
-                onClick={() =>
-                  dispatchModal({
-                    type: "OPEN_DATE_PICKER",
-                    payload: { monthCursor: monthKeyFromDate(dateKey) },
-                  })
-                }
-                aria-label="Pick date"
-                type="button"
-              >
-                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.55, textTransform: "uppercase" }}>
-                  {new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" })}
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 900 }}>
-                  {formatDateLabel(dateKey)}
-                </div>
-              </button>
-              <button
-                style={styles.navArrow}
-                onClick={() => setDateKey((k) => addDays(k, +1))}
-                aria-label="Next day"
-                type="button"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-              </button>
-              {dateKey !== yyyyMmDd(new Date()) && (
+            </div>
+          ) : (
+            <div style={styles.topBarRow}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button
-                  style={styles.todayChip}
-                  onClick={() => setDateKey(yyyyMmDd(new Date()))}
+                  style={styles.navArrow}
+                  onClick={() => setDateKey((k) => addDays(k, -1))}
+                  aria-label="Previous day"
                   type="button"
                 >
-                  Today
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                 </button>
-              )}
-            </div>
-            <button
-              onClick={() => dispatchModal({
-                type: "OPEN_PROFILE_MODAL",
-                payload: {
-                  username: profile?.username || "",
-                  displayName: profile?.display_name || "",
-                  birthdate: profile?.birthdate || "",
-                  gender: profile?.gender || "",
-                  weightLbs: profile?.weight_lbs || "",
-                  goal: profile?.goal || "",
-                  sports: profile?.sports || "",
-                  about: profile?.about || "",
-                },
-              })}
-              style={styles.avatarBtn}
-              aria-label="Profile"
-              type="button"
-            >
-              {avatarInitial(profile?.display_name, profile?.username)}
-            </button>
-          </div>
-
-          {/* Tab-specific sticky toolbar */}
-          {tab === "train" && workouts.length > 0 && (
-            <div style={{ paddingTop: 8, display: "flex", flexDirection: "column", gap: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                {trainSearchOpen ? (
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, position: "relative" }}>
-                    <input
-                      value={trainSearch}
-                      onChange={(e) => setTrainSearch(e.target.value)}
-                      placeholder="Search exercises..."
-                      autoFocus
-                      style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1 }}
-                    />
-                    <button
-                      style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "4px 6px" }}
-                      onClick={() => { setTrainSearchOpen(false); setTrainSearch(""); }}
-                    >
-                      Cancel
-                    </button>
+                <button
+                  style={styles.dateBtn}
+                  onClick={() =>
+                    dispatchModal({
+                      type: "OPEN_DATE_PICKER",
+                      payload: { monthCursor: monthKeyFromDate(dateKey) },
+                    })
+                  }
+                  aria-label="Pick date"
+                  type="button"
+                >
+                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.55, textTransform: "uppercase" }}>
+                    {new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" })}
                   </div>
-                ) : (
-                  <>
-                    <button
-                      style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, cursor: "pointer", padding: 4, display: "flex", alignItems: "center" }}
-                      onClick={() => setTrainSearchOpen(true)}
-                      title="Search exercises"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                    </button>
-                    <button
-                      style={styles.collapseAllBtn}
-                      onClick={() => {
-                        const allCollapsed = workouts.every((w) => collapsedToday.has(w.id));
-                        allCollapsed ? expandAll(setCollapsedToday) : collapseAll(setCollapsedToday, workouts.map((w) => w.id));
-                      }}
-                      type="button"
-                    >
-                      {workouts.every((w) => collapsedToday.has(w.id)) ? "Expand All" : "Collapse All"}
-                    </button>
-                  </>
+                  <div style={{ fontSize: 16, fontWeight: 900 }}>
+                    {formatDateLabel(dateKey)}
+                  </div>
+                </button>
+                <button
+                  style={styles.navArrow}
+                  onClick={() => setDateKey((k) => addDays(k, +1))}
+                  aria-label="Next day"
+                  type="button"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+                {dateKey !== yyyyMmDd(new Date()) && (
+                  <button
+                    style={styles.todayChip}
+                    onClick={() => setDateKey(yyyyMmDd(new Date()))}
+                    type="button"
+                  >
+                    Today
+                  </button>
                 )}
               </div>
-              {trainSearchOpen && trainSearch.trim() && (() => {
-                const q = trainSearch.trim().toLowerCase();
-                const results = [];
-                for (const w of workouts) {
-                  for (const ex of w.exercises) {
-                    if (ex.name.toLowerCase().includes(q)) {
-                      results.push({ workout: w, exercise: ex });
-                    }
-                  }
-                  if (results.length >= 8) break;
-                }
-                return results.length > 0 ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 6 }}>
-                    {results.map((r) => (
-                      <button
-                        key={r.exercise.id}
-                        style={{
-                          textAlign: "left", padding: "8px 10px", borderRadius: 10,
-                          border: `1px solid ${colors.border}`, background: colors.cardAltBg,
-                          color: colors.text, cursor: "pointer", display: "flex",
-                          alignItems: "center", justifyContent: "space-between",
-                        }}
-                        onClick={() => {
-                          openLog(r.workout.id, r.exercise);
-                          setTrainSearchOpen(false);
-                          setTrainSearch("");
-                        }}
-                      >
-                        <span style={{ fontWeight: 700, fontSize: 13 }}>{r.exercise.name}</span>
-                        <span style={{ fontSize: 11, opacity: 0.5 }}>{r.workout.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ padding: "8px 4px", opacity: 0.5, fontSize: 12 }}>No exercises found</div>
-                );
-              })()}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {tab === "train" && workouts.length > 0 && (
+                  <button
+                    style={{ ...styles.navArrow, opacity: 0.45 }}
+                    onClick={() => {
+                      const allCollapsed = workouts.every((w) => collapsedToday.has(w.id));
+                      allCollapsed ? expandAll(setCollapsedToday) : collapseAll(setCollapsedToday, workouts.map((w) => w.id));
+                    }}
+                    title={workouts.every((w) => collapsedToday.has(w.id)) ? "Expand all" : "Collapse all"}
+                    type="button"
+                  >
+                    {workouts.every((w) => collapsedToday.has(w.id)) ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10l5-5 5 5" /><path d="M7 14l5 5 5-5" /></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8l5 5 5-5" /><path d="M7 16l5-5 5 5" /></svg>
+                    )}
+                  </button>
+                )}
+                <button
+                  style={{ ...styles.navArrow, opacity: 0.45 }}
+                  onClick={() => { setTrainSearchOpen(true); }}
+                  title="Search exercises"
+                  type="button"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                </button>
+                <button
+                  onClick={() => dispatchModal({
+                    type: "OPEN_PROFILE_MODAL",
+                    payload: {
+                      username: profile?.username || "",
+                      displayName: profile?.display_name || "",
+                      birthdate: profile?.birthdate || "",
+                      gender: profile?.gender || "",
+                      weightLbs: profile?.weight_lbs || "",
+                      goal: profile?.goal || "",
+                      sports: profile?.sports || "",
+                      about: profile?.about || "",
+                    },
+                  })}
+                  style={styles.avatarBtn}
+                  aria-label="Profile"
+                  type="button"
+                >
+                  {avatarInitial(profile?.display_name, profile?.username)}
+                </button>
+              </div>
             </div>
           )}
+
+          {/* Search results (tab-aware) */}
+          {trainSearchOpen && trainSearch.trim() && (() => {
+            const q = trainSearch.trim().toLowerCase();
+            const results = [];
+            for (const w of workouts) {
+              for (const ex of w.exercises) {
+                if (ex.name.toLowerCase().includes(q)) {
+                  results.push({ workout: w, exercise: ex });
+                }
+              }
+              if (results.length >= 8) break;
+            }
+            if (results.length === 0) {
+              return <div style={{ padding: "8px 4px", opacity: 0.5, fontSize: 12 }}>No exercises found</div>;
+            }
+            const resultBtnStyle = {
+              textAlign: "left", padding: "8px 10px", borderRadius: 10,
+              border: `1px solid ${colors.border}`, background: colors.cardAltBg,
+              color: colors.text, cursor: "pointer",
+            };
+            if (tab === "train") {
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 6 }}>
+                  {results.map((r) => (
+                    <button key={r.exercise.id} style={{ ...resultBtnStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                      onClick={() => { openLog(r.workout.id, r.exercise); setTrainSearchOpen(false); setTrainSearch(""); }}>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{r.exercise.name}</span>
+                      <span style={{ fontSize: 11, opacity: 0.5 }}>{r.workout.name}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            }
+            if (tab === "progress") {
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 6 }}>
+                  {results.map((r) => {
+                    const exUnit = getUnit(r.exercise.unit, r.exercise);
+                    const summary = computeExerciseSummary(r.exercise.id, summaryRange.start, summaryRange.end, exUnit);
+                    return (
+                      <div key={r.exercise.id} style={{ ...resultBtnStyle, display: "flex", flexDirection: "column", gap: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <span style={{ fontWeight: 700, fontSize: 13 }}>{r.exercise.name}</span>
+                          <span style={{ fontSize: 11, opacity: 0.5 }}>{r.workout.name}</span>
+                        </div>
+                        {summary.sessions > 0 ? (
+                          <div style={{ fontSize: 11, opacity: 0.6 }}>
+                            {summary.sessions} sessions · {summary.totalSets} sets · {summary.totalReps} {exUnit.abbr}
+                            {summary.maxWeight ? ` · Best: ${summary.maxWeight}` : ""}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 11, opacity: 0.4 }}>No activity this period</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            }
+            // Plan tab
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 6 }}>
+                {results.map((r) => (
+                  <button key={r.exercise.id} style={{ ...resultBtnStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                    onClick={() => { setManageWorkoutId(r.workout.id); setTrainSearchOpen(false); setTrainSearch(""); setTab("plan"); }}>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{r.exercise.name}</span>
+                    <span style={{ fontSize: 11, opacity: 0.5 }}>{r.workout.name}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           {tab === "progress" && (() => {
             const pctLogged = summaryStats.total > 0 ? Math.round((summaryStats.logged / summaryStats.total) * 100) : 0;
