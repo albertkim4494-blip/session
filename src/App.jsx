@@ -82,6 +82,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [equipment, setEquipment] = useState(() => localStorage.getItem("wt_equipment") || "gym");
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
+  const [trainSearch, setTrainSearch] = useState("");
+  const [trainSearchOpen, setTrainSearchOpen] = useState(false);
 
   const [collapsedToday, setCollapsedToday] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_today"))); } catch { return new Set(); }
@@ -1210,17 +1212,83 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           {/* Tab-specific sticky toolbar */}
           {tab === "train" && workouts.length > 0 && (
-            <div style={{ ...styles.collapseAllRow, justifyContent: "flex-end", paddingTop: 10 }}>
-              <button
-                style={styles.collapseAllBtn}
-                onClick={() => {
-                  const allCollapsed = workouts.every((w) => collapsedToday.has(w.id));
-                  allCollapsed ? expandAll(setCollapsedToday) : collapseAll(setCollapsedToday, workouts.map((w) => w.id));
-                }}
-                type="button"
-              >
-                {workouts.every((w) => collapsedToday.has(w.id)) ? "Expand All" : "Collapse All"}
-              </button>
+            <div style={{ paddingTop: 8, display: "flex", flexDirection: "column", gap: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                {trainSearchOpen ? (
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, position: "relative" }}>
+                    <input
+                      value={trainSearch}
+                      onChange={(e) => setTrainSearch(e.target.value)}
+                      placeholder="Search exercises..."
+                      autoFocus
+                      style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1 }}
+                    />
+                    <button
+                      style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "4px 6px" }}
+                      onClick={() => { setTrainSearchOpen(false); setTrainSearch(""); }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, cursor: "pointer", padding: 4, display: "flex", alignItems: "center" }}
+                      onClick={() => setTrainSearchOpen(true)}
+                      title="Search exercises"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                    </button>
+                    <button
+                      style={styles.collapseAllBtn}
+                      onClick={() => {
+                        const allCollapsed = workouts.every((w) => collapsedToday.has(w.id));
+                        allCollapsed ? expandAll(setCollapsedToday) : collapseAll(setCollapsedToday, workouts.map((w) => w.id));
+                      }}
+                      type="button"
+                    >
+                      {workouts.every((w) => collapsedToday.has(w.id)) ? "Expand All" : "Collapse All"}
+                    </button>
+                  </>
+                )}
+              </div>
+              {trainSearchOpen && trainSearch.trim() && (() => {
+                const q = trainSearch.trim().toLowerCase();
+                const results = [];
+                for (const w of workouts) {
+                  for (const ex of w.exercises) {
+                    if (ex.name.toLowerCase().includes(q)) {
+                      results.push({ workout: w, exercise: ex });
+                    }
+                  }
+                  if (results.length >= 8) break;
+                }
+                return results.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 6 }}>
+                    {results.map((r) => (
+                      <button
+                        key={r.exercise.id}
+                        style={{
+                          textAlign: "left", padding: "8px 10px", borderRadius: 10,
+                          border: `1px solid ${colors.border}`, background: colors.cardAltBg,
+                          color: colors.text, cursor: "pointer", display: "flex",
+                          alignItems: "center", justifyContent: "space-between",
+                        }}
+                        onClick={() => {
+                          openLog(r.workout.id, r.exercise);
+                          setTrainSearchOpen(false);
+                          setTrainSearch("");
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, fontSize: 13 }}>{r.exercise.name}</span>
+                        <span style={{ fontSize: 11, opacity: 0.5 }}>{r.workout.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: "8px 4px", opacity: 0.5, fontSize: 12 }}>No exercises found</div>
+                );
+              })()}
             </div>
           )}
 
