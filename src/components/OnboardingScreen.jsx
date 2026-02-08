@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { validateUsernameStrict, sanitizeUsername, validateDisplayName } from "../lib/userIdentity";
+import { isValidBirthdateString, computeAge } from "../lib/validation";
 
 export default function OnboardingScreen({ session, onComplete }) {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [age, setAge] = useState("");
+  const [birthdate, setBirthdate] = useState("");
   const [weightLbs, setWeightLbs] = useState("");
   const [goal, setGoal] = useState("");
   const [about, setAbout] = useState("");
@@ -43,13 +44,13 @@ export default function OnboardingScreen({ session, onComplete }) {
       return;
     }
 
-    const ageNum = Number(age);
-    const weightNum = Number(weightLbs);
-
-    if (ageNum < 13 || ageNum > 120) {
-      setError("Age must be between 13 and 120.");
+    if (!birthdate || !isValidBirthdateString(birthdate)) {
+      setError("Please enter a valid birthdate (must be 13-120 years old).");
       return;
     }
+    const ageNum = computeAge(birthdate);
+    const weightNum = Number(weightLbs);
+
     if (weightNum < 50 || weightNum > 1000) {
       setError("Weight must be between 50 and 1000 lbs.");
       return;
@@ -62,6 +63,7 @@ export default function OnboardingScreen({ session, onComplete }) {
         .update({
           username: trimmedUsername,
           display_name: displayName.trim() || null,
+          birthdate,
           age: ageNum,
           weight_lbs: weightNum,
           goal,
@@ -113,15 +115,12 @@ export default function OnboardingScreen({ session, onComplete }) {
           />
           <span style={styles.helper}>Shown publicly. Falls back to username if empty.</span>
 
-          <label style={styles.label}>Age *</label>
+          <label style={styles.label}>Birthdate *</label>
           <input
-            type="number"
-            placeholder="e.g. 25"
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
+            type="date"
+            value={birthdate}
+            onChange={(e) => setBirthdate(e.target.value)}
             required
-            min={13}
-            max={120}
             style={styles.input}
           />
 
@@ -149,12 +148,13 @@ export default function OnboardingScreen({ session, onComplete }) {
 
           <label style={styles.label}>About You</label>
           <textarea
-            placeholder="Anything you'd like to share..."
+            placeholder={"e.g. 34M, desk job. Recovering from a shoulder impingement (cleared by PT in Dec). Can't do overhead pressing yet. Played water polo in college but haven't been consistent in 5+ years. Want to build back slowly."}
             value={about}
             onChange={(e) => setAbout(e.target.value)}
-            rows={3}
+            rows={4}
             style={{ ...styles.input, resize: "vertical" }}
           />
+          <span style={styles.helper}>Share details that help tailor your workouts — injuries, limitations, fitness history, etc.</span>
 
           <label style={styles.label}>Sports / Activities</label>
           <input
@@ -168,7 +168,7 @@ export default function OnboardingScreen({ session, onComplete }) {
           {error && <div style={styles.error}>{error}</div>}
 
           <button type="submit" disabled={loading} style={styles.submit}>
-            {loading ? "Saving..." : "Let's Go"}
+            {loading ? "Saving..." : "Generate Plan"}
           </button>
         </form>
       </div>

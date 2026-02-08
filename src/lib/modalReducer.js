@@ -75,6 +75,19 @@ export const initialModalState = {
     workoutId: null,
     query: "",
   },
+  generateWizard: {
+    isOpen: false,
+    step: 1,
+    goal: "",
+    daysPerWeek: 3,
+    equipment: "gym",
+    duration: 60,
+    preview: null,
+  },
+  generateToday: {
+    isOpen: false,
+    preview: null,
+  },
 };
 
 export function modalReducer(state, action) {
@@ -345,6 +358,51 @@ export function modalReducer(state, action) {
       return {
         ...state,
         changeUsername: initialModalState.changeUsername,
+      };
+
+    // ===== GENERATE WIZARD MODAL =====
+    case "OPEN_GENERATE_WIZARD":
+      return {
+        ...state,
+        generateWizard: {
+          ...initialModalState.generateWizard,
+          isOpen: true,
+          equipment: action.payload?.equipment || "gym",
+        },
+      };
+
+    case "UPDATE_GENERATE_WIZARD":
+      return {
+        ...state,
+        generateWizard: { ...state.generateWizard, ...action.payload },
+      };
+
+    case "CLOSE_GENERATE_WIZARD":
+      return {
+        ...state,
+        generateWizard: initialModalState.generateWizard,
+      };
+
+    // ===== GENERATE TODAY MODAL =====
+    case "OPEN_GENERATE_TODAY":
+      return {
+        ...state,
+        generateToday: {
+          isOpen: true,
+          preview: action.payload.preview,
+        },
+      };
+
+    case "UPDATE_GENERATE_TODAY":
+      return {
+        ...state,
+        generateToday: { ...state.generateToday, ...action.payload },
+      };
+
+    case "CLOSE_GENERATE_TODAY":
+      return {
+        ...state,
+        generateToday: initialModalState.generateToday,
       };
 
     // ===== CLOSE ALL (for back-button navigation) =====

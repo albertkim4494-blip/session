@@ -79,9 +79,12 @@ export default function AuthGate() {
     await supabase.auth.signOut();
   };
 
+  const [showGenerateWizard, setShowGenerateWizard] = useState(false);
+
   const handleOnboardingComplete = () => {
     setNeedsOnboarding(false);
     setProfileReady(true);
+    setShowGenerateWizard(true);
     profileCheckedForRef.current = session?.user?.id || null;
   };
 
@@ -110,7 +113,7 @@ export default function AuthGate() {
   }
 
   // 5. Ready
-  return <App session={session} onLogout={handleLogout} />;
+  return <App session={session} onLogout={handleLogout} showGenerateWizard={showGenerateWizard} onGenerateWizardShown={() => setShowGenerateWizard(false)} />;
 }
 
 const loadingStyle = {

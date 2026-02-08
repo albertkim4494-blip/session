@@ -30,10 +30,13 @@ import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { ProfileModal, ChangeUsernameModal } from "./components/ProfileModal";
 import { CoachInsightsCard, AddSuggestedExerciseModal } from "./components/CoachInsights";
 import { CatalogBrowseModal } from "./components/CatalogBrowseModal";
+import { GenerateWizardModal } from "./components/GenerateWizardModal";
+import { GenerateTodayModal } from "./components/GenerateTodayModal";
 
 // Exercise catalog
 import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
 import { buildCatalogMap } from "./lib/exerciseCatalogUtils";
+import { generateProgram, generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 
 // Extracted styles
 import { getColors, getStyles } from "./styles/theme";
@@ -42,7 +45,7 @@ import { getColors, getStyles } from "./styles/theme";
 // MAIN APP COMPONENT
 // ============================================================================
 
-export default function App({ session, onLogout }) {
+export default function App({ session, onLogout, showGenerateWizard, onGenerateWizardShown }) {
   // ---------------------------------------------------------------------------
   // STATE
   // ---------------------------------------------------------------------------
@@ -194,6 +197,15 @@ export default function App({ session, onLogout }) {
       monthCursor: monthKeyFromDate(dateKey),
     },
   });
+
+  // Auto-open generate wizard after onboarding
+  useEffect(() => {
+    if (showGenerateWizard) {
+      setTab("manage");
+      dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } });
+      onGenerateWizardShown?.();
+    }
+  }, [showGenerateWizard]);
 
   // ---------------------------------------------------------------------------
   // CLOUD SYNC
@@ -501,7 +513,8 @@ export default function App({ session, onLogout }) {
   const anyModalOpen = modals.log.isOpen || modals.confirm.isOpen || modals.input.isOpen ||
     modals.datePicker.isOpen || modals.addWorkout.isOpen || modals.addExercise.isOpen ||
     modals.addSuggestion.isOpen || modals.profile.isOpen || modals.changeUsername.isOpen ||
-    modals.editUnit.isOpen || modals.catalogBrowse.isOpen;
+    modals.editUnit.isOpen || modals.catalogBrowse.isOpen ||
+    modals.generateWizard.isOpen || modals.generateToday.isOpen;
 
   const modalHistoryRef = useRef(false);
   const closingViaCodeRef = useRef(false);
@@ -602,12 +615,22 @@ export default function App({ session, onLogout }) {
       const existing = state.logsByDate[dateKey]?.[exerciseId] ?? null;
       const prior = existing ?? findMostRecentLogBefore(exerciseId, dateKey);
 
-      const sets = prior?.sets?.length
-        ? prior.sets.map((s) => ({
-            reps: Number(s.reps ?? 0) || 0,
-            weight: typeof s.weight === "string" ? s.weight : "",
-          }))
-        : [{ reps: 0, weight: "" }];
+      let sets;
+      if (prior?.sets?.length) {
+        sets = prior.sets.map((s) => ({
+          reps: Number(s.reps ?? 0) || 0,
+          weight: typeof s.weight === "string" ? s.weight : "",
+        }));
+      } else {
+        // Check if workout has a generation scheme to prefill set count
+        const workout = workoutById.get(workoutId);
+        const parsed = workout?.scheme ? parseScheme(workout.scheme) : null;
+        if (parsed) {
+          sets = Array.from({ length: parsed.sets }, () => ({ reps: 0, weight: "" }));
+        } else {
+          sets = [{ reps: 0, weight: "" }];
+        }
+      }
 
       const normalizedSets = sets.map((s) => {
         const isBW = String(s.weight).toUpperCase() === "BW";
@@ -1002,6 +1025,35 @@ export default function App({ session, onLogout }) {
     alert(`Added "${exerciseName}" to ${workout.name}!`);
   }, [workoutById]);
 
+  function handleAcceptGeneratedProgram(workouts, prefs) {
+    updateState((st) => {
+      st.program.workouts = workouts;
+      st.program.generationPrefs = prefs;
+      return st;
+    });
+    setManageWorkoutId(null);
+    dispatchModal({ type: "CLOSE_GENERATE_WIZARD" });
+  }
+
+  function handleGenerateToday() {
+    const workout = generateTodayWorkout({
+      state,
+      equipment,
+      profile,
+      catalog: EXERCISE_CATALOG,
+      todayKey: dateKey,
+    });
+    dispatchModal({ type: "OPEN_GENERATE_TODAY", payload: { preview: workout } });
+  }
+
+  function handleAcceptTodayWorkout(workout) {
+    updateState((st) => {
+      st.program.workouts.push(workout);
+      return st;
+    });
+    dispatchModal({ type: "CLOSE_GENERATE_TODAY" });
+  }
+
   const saveProfile = useCallback(async (updates) => {
     try {
       const { error } = await supabase
@@ -1242,6 +1294,12 @@ export default function App({ session, onLogout }) {
                   styles={styles}
                 />
               ))}
+              <button
+                style={{ ...styles.secondaryBtn, width: "100%", marginTop: 8 }}
+                onClick={handleGenerateToday}
+              >
+                Generate Workout for Today
+              </button>
             </div>
           ) : null}
 
@@ -1308,6 +1366,12 @@ export default function App({ session, onLogout }) {
                 <div style={styles.cardHeader}>
                   <div style={styles.cardTitle}>Structure</div>
                   <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      style={styles.secondaryBtn}
+                      onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
+                    >
+                      Generate Plan
+                    </button>
                     <button
                       style={reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn}
                       onClick={() => setReorderWorkouts((v) => !v)}
@@ -2107,6 +2171,29 @@ export default function App({ session, onLogout }) {
           </div>
         </div>
       </Modal>
+
+      {/* Generate Wizard Modal */}
+      <GenerateWizardModal
+        open={modals.generateWizard.isOpen}
+        wizardState={modals.generateWizard}
+        dispatch={dispatchModal}
+        onAccept={handleAcceptGeneratedProgram}
+        onClose={() => dispatchModal({ type: "CLOSE_GENERATE_WIZARD" })}
+        catalog={EXERCISE_CATALOG}
+        styles={styles}
+        colors={colors}
+      />
+
+      {/* Generate Today Modal */}
+      <GenerateTodayModal
+        open={modals.generateToday.isOpen}
+        preview={modals.generateToday.preview}
+        onRegenerate={handleGenerateToday}
+        onAccept={handleAcceptTodayWorkout}
+        onClose={() => dispatchModal({ type: "CLOSE_GENERATE_TODAY" })}
+        styles={styles}
+        colors={colors}
+      />
     </div>
   );
 }
