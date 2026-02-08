@@ -77,6 +77,24 @@ export function startOfYear(dateKey) {
   return yyyyMmDd(d);
 }
 
+export function endOfWeekSunday(dateKey) {
+  const d = new Date(dateKey + "T00:00:00");
+  d.setDate(d.getDate() + (6 - d.getDay()));
+  return yyyyMmDd(d);
+}
+
+export function endOfMonth(dateKey) {
+  const d = new Date(dateKey + "T00:00:00");
+  d.setMonth(d.getMonth() + 1, 0);
+  return yyyyMmDd(d);
+}
+
+export function endOfYear(dateKey) {
+  const d = new Date(dateKey + "T00:00:00");
+  d.setFullYear(d.getFullYear(), 11, 31);
+  return yyyyMmDd(d);
+}
+
 // String comparison works for YYYY-MM-DD format (lexicographic === chronological)
 export function inRangeInclusive(dateKey, startKey, endKey) {
   return dateKey >= startKey && dateKey <= endKey;

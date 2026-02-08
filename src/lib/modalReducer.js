@@ -63,10 +63,17 @@ export const initialModalState = {
     error: "",
     cooldownMs: 0,
   },
-  editUnit: {
+  editWorkout: {
+    isOpen: false,
+    workoutId: null,
+    name: "",
+    category: "Workout",
+  },
+  editExercise: {
     isOpen: false,
     workoutId: null,
     exerciseId: null,
+    name: "",
     unit: "reps",
     customUnitAbbr: "",
     customUnitAllowDecimal: false,
@@ -290,30 +297,55 @@ export function modalReducer(state, action) {
         catalogBrowse: initialModalState.catalogBrowse,
       };
 
-    // ===== EDIT UNIT MODAL =====
-    case "OPEN_EDIT_UNIT":
+    // ===== EDIT WORKOUT MODAL =====
+    case "OPEN_EDIT_WORKOUT":
       return {
         ...state,
-        editUnit: {
+        editWorkout: {
+          isOpen: true,
+          workoutId: action.payload.workoutId,
+          name: action.payload.name,
+          category: action.payload.category || "Workout",
+        },
+      };
+
+    case "UPDATE_EDIT_WORKOUT":
+      return {
+        ...state,
+        editWorkout: { ...state.editWorkout, ...action.payload },
+      };
+
+    case "CLOSE_EDIT_WORKOUT":
+      return {
+        ...state,
+        editWorkout: initialModalState.editWorkout,
+      };
+
+    // ===== EDIT EXERCISE MODAL =====
+    case "OPEN_EDIT_EXERCISE":
+      return {
+        ...state,
+        editExercise: {
           isOpen: true,
           workoutId: action.payload.workoutId,
           exerciseId: action.payload.exerciseId,
+          name: action.payload.name,
           unit: action.payload.unit,
           customUnitAbbr: action.payload.customUnitAbbr || "",
           customUnitAllowDecimal: action.payload.customUnitAllowDecimal ?? false,
         },
       };
 
-    case "UPDATE_EDIT_UNIT":
+    case "UPDATE_EDIT_EXERCISE":
       return {
         ...state,
-        editUnit: { ...state.editUnit, ...action.payload },
+        editExercise: { ...state.editExercise, ...action.payload },
       };
 
-    case "CLOSE_EDIT_UNIT":
+    case "CLOSE_EDIT_EXERCISE":
       return {
         ...state,
-        editUnit: initialModalState.editUnit,
+        editExercise: initialModalState.editExercise,
       };
 
     // ===== PROFILE MODAL =====

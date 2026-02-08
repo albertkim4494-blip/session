@@ -10,7 +10,9 @@ import { REP_UNITS, getUnit } from "./lib/constants";
 import {
   yyyyMmDd, addDays, formatDateLabel, monthKeyFromDate, daysInMonth,
   weekdaySunday0, shiftMonth, formatMonthLabel,
-  startOfWeekSunday, startOfMonth, startOfYear, inRangeInclusive, isValidDateKey,
+  startOfWeekSunday, startOfMonth, startOfYear,
+  endOfWeekSunday, endOfMonth, endOfYear,
+  inRangeInclusive, isValidDateKey,
 } from "./lib/dateUtils";
 import { uid, loadState, persistState, makeDefaultState, safeParse } from "./lib/stateUtils";
 import {
@@ -72,15 +74,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [dataReady, setDataReady] = useState(false);
   const cloudSaver = useRef(null);
   const [tab, setTab] = useState(() => sessionStorage.getItem("wt_tab") || "train");
-  const [summaryMode, setSummaryMode] = useState("wtd");
+  const [summaryMode, setSummaryMode] = useState("week");
+  const [summaryOffset, setSummaryOffset] = useState(0);
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem("wt_theme") || "dark");
   const [equipment, setEquipment] = useState(() => localStorage.getItem("wt_equipment") || "gym");
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
-  const [workoutMenuId, setWorkoutMenuId] = useState(null);
-  const [exerciseMenuId, setExerciseMenuId] = useState(null);
 
   const [collapsedToday, setCollapsedToday] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_today"))); } catch { return new Set(); }
@@ -321,29 +322,77 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logsForDate = state.logsByDate[dateKey] ?? {};
 
   const summaryRange = useMemo(() => {
-    if (summaryMode === "wtd") {
-      return { start: startOfWeekSunday(dateKey), end: dateKey, label: "WTD" };
+    // Shift the anchor date by offset periods
+    let anchor = dateKey;
+    if (summaryOffset !== 0) {
+      const d = new Date(dateKey + "T00:00:00");
+      if (summaryMode === "week") {
+        d.setDate(d.getDate() + summaryOffset * 7);
+      } else if (summaryMode === "month") {
+        d.setMonth(d.getMonth() + summaryOffset);
+      } else if (summaryMode === "year") {
+        d.setFullYear(d.getFullYear() + summaryOffset);
+      }
+      anchor = yyyyMmDd(d);
     }
-    if (summaryMode === "mtd") {
-      return { start: startOfMonth(dateKey), end: dateKey, label: "MTD" };
-    }
-    return { start: startOfYear(dateKey), end: dateKey, label: "YTD" };
-  }, [dateKey, summaryMode]);
 
-  const summaryDaysLogged = useMemo(() => {
+    if (summaryMode === "week") {
+      const start = startOfWeekSunday(anchor);
+      const end = summaryOffset === 0 ? dateKey : endOfWeekSunday(anchor);
+      return { start, end, label: "Week" };
+    }
+    if (summaryMode === "month") {
+      const start = startOfMonth(anchor);
+      const end = summaryOffset === 0 ? dateKey : endOfMonth(anchor);
+      return { start, end, label: "Month" };
+    }
+    if (summaryMode === "year") {
+      const start = startOfYear(anchor);
+      const end = summaryOffset === 0 ? dateKey : endOfYear(anchor);
+      return { start, end, label: "Year" };
+    }
+    // "all" mode
+    const allDates = Object.keys(state.logsByDate).filter(isValidDateKey).sort();
+    const start = allDates.length > 0 ? allDates[0] : dateKey;
+    return { start, end: dateKey, label: "All Time" };
+  }, [dateKey, summaryMode, summaryOffset, state.logsByDate]);
+
+  const summaryStats = useMemo(() => {
     let logged = 0;
     let total = 0;
+    let totalSets = 0;
     let d = summaryRange.start;
     while (d <= summaryRange.end) {
       total++;
       const dayLogs = state.logsByDate[d];
-      if (dayLogs && typeof dayLogs === "object" && Object.keys(dayLogs).length > 0) {
-        logged++;
+      if (dayLogs && typeof dayLogs === "object") {
+        const keys = Object.keys(dayLogs);
+        if (keys.length > 0) {
+          logged++;
+          for (const exId of keys) {
+            const exLog = dayLogs[exId];
+            if (exLog?.sets && Array.isArray(exLog.sets)) totalSets += exLog.sets.length;
+          }
+        }
       }
       d = addDays(d, 1);
     }
-    return { logged, total };
-  }, [state.logsByDate, summaryRange]);
+
+    // Current streak: count consecutive days with logs going back from today
+    let streak = 0;
+    let sd = dateKey;
+    while (true) {
+      const dayLogs = state.logsByDate[sd];
+      if (dayLogs && typeof dayLogs === "object" && Object.keys(dayLogs).length > 0) {
+        streak++;
+        sd = addDays(sd, -1);
+      } else {
+        break;
+      }
+    }
+
+    return { logged, total, totalSets, streak };
+  }, [state.logsByDate, summaryRange, dateKey]);
 
   const loggedDaysInMonth = useMemo(() => {
     const set = new Set();
@@ -481,8 +530,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   useEffect(() => {
     setReorderExercises(false);
-    setWorkoutMenuId(null);
-    setExerciseMenuId(null);
   }, [manageWorkoutId]);
 
   // Persist state changes
@@ -510,7 +557,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const anyModalOpen = modals.log.isOpen || modals.confirm.isOpen || modals.input.isOpen ||
     modals.datePicker.isOpen || modals.addWorkout.isOpen || modals.addExercise.isOpen ||
     modals.addSuggestion.isOpen || modals.profile.isOpen || modals.changeUsername.isOpen ||
-    modals.editUnit.isOpen || modals.catalogBrowse.isOpen ||
+    modals.editWorkout?.isOpen || modals.editExercise?.isOpen || modals.catalogBrowse.isOpen ||
     modals.generateWizard.isOpen || modals.generateToday.isOpen;
 
   const modalHistoryRef = useRef(false);
@@ -573,6 +620,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let totalReps = 0;
     let maxNum = null;
     let hasBW = false;
+    let sessions = 0;
+    let totalSets = 0;
 
     for (const dk of Object.keys(state.logsByDate)) {
       if (!isValidDateKey(dk)) continue;
@@ -580,6 +629,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       const exLog = state.logsByDate[dk]?.[exerciseId];
       if (!exLog || !Array.isArray(exLog.sets)) continue;
+
+      sessions++;
+      totalSets += exLog.sets.length;
 
       for (const set of exLog.sets) {
         const reps = Number(set.reps ?? 0);
@@ -599,7 +651,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       ? parseFloat(totalReps.toFixed(2))
       : Math.floor(totalReps);
 
-    return { totalReps: displayTotal, maxWeight: formatMaxWeight(maxNum, hasBW) };
+    return { totalReps: displayTotal, maxWeight: formatMaxWeight(maxNum, hasBW), sessions, totalSets };
   }
 
   // ---------------------------------------------------------------------------
@@ -709,65 +761,40 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     dispatchModal({ type: "OPEN_ADD_WORKOUT" });
   }
 
-  const renameWorkout = useCallback(
+  const openEditWorkout = useCallback(
     (workoutId) => {
       const w = workoutById.get(workoutId);
       if (!w) return;
-
       dispatchModal({
-        type: "OPEN_INPUT",
+        type: "OPEN_EDIT_WORKOUT",
         payload: {
-          title: "Rename workout",
-          label: "Workout name",
-          placeholder: "e.g. Push Day",
-          initialValue: w.name,
-          onConfirm: (val) => {
-            const validation = validateWorkoutName(val, workouts.filter((x) => x.id !== workoutId));
-            if (!validation.valid) {
-              alert("\u26a0\ufe0f " + validation.error);
-              return;
-            }
-
-            const name = val.trim();
-            updateState((st) => {
-              const ww = st.program.workouts.find((x) => x.id === workoutId);
-              if (ww) ww.name = name;
-              return st;
-            });
-            dispatchModal({ type: "CLOSE_INPUT" });
-          },
-        },
-      });
-    },
-    [workoutById, workouts]
-  );
-
-  const setWorkoutCategory = useCallback(
-    (workoutId) => {
-      const w = workoutById.get(workoutId);
-      if (!w) return;
-
-      dispatchModal({
-        type: "OPEN_INPUT",
-        payload: {
-          title: "Set category",
-          label: "Workout category",
-          placeholder: "e.g. Push / Pull / Legs / Stretch",
-          initialValue: (w.category || "Workout").trim(),
-          onConfirm: (val) => {
-            const next = (val || "").trim() || "Workout";
-            updateState((st) => {
-              const ww = st.program.workouts.find((x) => x.id === workoutId);
-              if (ww) ww.category = next;
-              return st;
-            });
-            dispatchModal({ type: "CLOSE_INPUT" });
-          },
+          workoutId,
+          name: w.name,
+          category: (w.category || "Workout").trim(),
         },
       });
     },
     [workoutById]
   );
+
+  const saveEditWorkout = useCallback(() => {
+    if (!modals.editWorkout) return;
+    const { workoutId, name, category } = modals.editWorkout;
+    const validation = validateWorkoutName(name, workouts.filter((x) => x.id !== workoutId));
+    if (!validation.valid) {
+      alert("\u26a0\ufe0f " + validation.error);
+      return;
+    }
+    updateState((st) => {
+      const w = st.program.workouts.find((x) => x.id === workoutId);
+      if (w) {
+        w.name = name.trim();
+        w.category = (category || "Workout").trim() || "Workout";
+      }
+      return st;
+    });
+    dispatchModal({ type: "CLOSE_EDIT_WORKOUT" });
+  }, [modals.editWorkout, workouts]);
 
   const deleteWorkout = useCallback(
     (workoutId) => {
@@ -807,41 +834,57 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     [workoutById]
   );
 
-  const renameExercise = useCallback(
+  const openEditExercise = useCallback(
     (workoutId, exerciseId) => {
       const w = workoutById.get(workoutId);
       const ex = w?.exercises?.find((e) => e.id === exerciseId);
       if (!ex) return;
-
       dispatchModal({
-        type: "OPEN_INPUT",
+        type: "OPEN_EDIT_EXERCISE",
         payload: {
-          title: "Rename exercise",
-          label: "Exercise name",
-          placeholder: "e.g. Bench Press",
-          initialValue: ex.name,
-          onConfirm: (val) => {
-            const otherExercises = w.exercises.filter((e) => e.id !== exerciseId);
-            const validation = validateExerciseName(val, otherExercises);
-            if (!validation.valid) {
-              alert("\u26a0\ufe0f " + validation.error);
-              return;
-            }
-
-            const name = val.trim();
-            updateState((st) => {
-              const ww = st.program.workouts.find((x) => x.id === workoutId);
-              const ee = ww?.exercises?.find((e) => e.id === exerciseId);
-              if (ee) ee.name = name;
-              return st;
-            });
-            dispatchModal({ type: "CLOSE_INPUT" });
-          },
+          workoutId,
+          exerciseId,
+          name: ex.name,
+          unit: ex.unit || "reps",
+          customUnitAbbr: ex.customUnitAbbr || "",
+          customUnitAllowDecimal: ex.customUnitAllowDecimal ?? false,
         },
       });
     },
     [workoutById]
   );
+
+  const saveEditExercise = useCallback(() => {
+    if (!modals.editExercise) return;
+    const { workoutId, exerciseId, name, unit, customUnitAbbr, customUnitAllowDecimal } = modals.editExercise;
+    const w = workoutById.get(workoutId);
+    const otherExercises = w?.exercises?.filter((e) => e.id !== exerciseId) || [];
+    const validation = validateExerciseName(name, otherExercises);
+    if (!validation.valid) {
+      alert("\u26a0\ufe0f " + validation.error);
+      return;
+    }
+    if (unit === "custom" && !customUnitAbbr?.trim()) {
+      alert("\u26a0\ufe0f Please enter a custom unit abbreviation");
+      return;
+    }
+    updateState((st) => {
+      const ww = st.program.workouts.find((x) => x.id === workoutId);
+      const ex = ww?.exercises?.find((e) => e.id === exerciseId);
+      if (!ex) return st;
+      ex.name = name.trim();
+      ex.unit = unit;
+      if (unit === "custom") {
+        ex.customUnitAbbr = customUnitAbbr.trim();
+        ex.customUnitAllowDecimal = customUnitAllowDecimal ?? false;
+      } else {
+        delete ex.customUnitAbbr;
+        delete ex.customUnitAllowDecimal;
+      }
+      return st;
+    });
+    dispatchModal({ type: "CLOSE_EDIT_EXERCISE" });
+  }, [modals.editExercise, workoutById]);
 
   const deleteExercise = useCallback(
     (workoutId, exerciseId) => {
@@ -869,52 +912,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     },
     [workoutById]
   );
-
-  const editUnitExercise = useCallback(
-    (workoutId, exerciseId) => {
-      const w = workoutById.get(workoutId);
-      const ex = w?.exercises?.find((e) => e.id === exerciseId);
-      if (!ex) return;
-
-      dispatchModal({
-        type: "OPEN_EDIT_UNIT",
-        payload: {
-          workoutId,
-          exerciseId,
-          unit: ex.unit || "reps",
-          customUnitAbbr: ex.customUnitAbbr || "",
-          customUnitAllowDecimal: ex.customUnitAllowDecimal ?? false,
-        },
-      });
-    },
-    [workoutById]
-  );
-
-  const saveEditUnit = useCallback(() => {
-    const { workoutId, exerciseId, unit, customUnitAbbr, customUnitAllowDecimal } = modals.editUnit;
-
-    if (unit === "custom" && !customUnitAbbr?.trim()) {
-      alert("\u26a0\ufe0f Please enter a custom unit abbreviation");
-      return;
-    }
-
-    updateState((st) => {
-      const w = st.program.workouts.find((x) => x.id === workoutId);
-      const ex = w?.exercises?.find((e) => e.id === exerciseId);
-      if (!ex) return st;
-      ex.unit = unit;
-      if (unit === "custom") {
-        ex.customUnitAbbr = customUnitAbbr.trim();
-        ex.customUnitAllowDecimal = customUnitAllowDecimal ?? false;
-      } else {
-        delete ex.customUnitAbbr;
-        delete ex.customUnitAllowDecimal;
-      }
-      return st;
-    });
-
-    dispatchModal({ type: "CLOSE_EDIT_UNIT" });
-  }, [modals.editUnit]);
 
   function moveWorkout(workoutId, direction) {
     updateState((st) => {
@@ -1227,39 +1224,94 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             </div>
           )}
 
-          {tab === "progress" && (
-            <div style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          {tab === "progress" && (() => {
+            const pctLogged = summaryStats.total > 0 ? Math.round((summaryStats.logged / summaryStats.total) * 100) : 0;
+            const navBtnStyle = { background: "transparent", border: "none", color: colors.text, cursor: "pointer", padding: "4px 8px", fontSize: 18, fontWeight: 700, lineHeight: 1 };
+            return (
+            <div style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
               <PillTabs
                 styles={styles}
                 value={summaryMode}
-                onChange={setSummaryMode}
+                onChange={(v) => { setSummaryMode(v); setSummaryOffset(0); }}
                 tabs={[
-                  { value: "wtd", label: "WTD" },
-                  { value: "mtd", label: "MTD" },
-                  { value: "ytd", label: "YTD" },
+                  { value: "week", label: "Week" },
+                  { value: "month", label: "Month" },
+                  { value: "year", label: "Year" },
+                  { value: "all", label: "All" },
                 ]}
               />
-              <div style={styles.rangeRow}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={styles.rangeText}>
+
+              {/* Date navigation row */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                {summaryMode !== "all" && (
+                  <button style={{ ...navBtnStyle, opacity: 0.5 }} onClick={() => setSummaryOffset((o) => o - 1)} aria-label="Previous period">
+                    ‹
+                  </button>
+                )}
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>
                     {formatDateLabel(summaryRange.start)} {"\u2013"} {formatDateLabel(summaryRange.end)}
                   </div>
-                  <span style={styles.tagMuted}>{summaryDaysLogged.logged} / {summaryDaysLogged.total} days</span>
                 </div>
-                <button
-                  style={styles.collapseAllBtn}
-                  onClick={() => {
-                    const allIds = [...workouts.map((w) => w.id), "__coach__"];
-                    const allCollapsed = allIds.every((id) => collapsedSummary.has(id));
-                    allCollapsed ? expandAll(setCollapsedSummary) : collapseAll(setCollapsedSummary, allIds);
-                  }}
-                  type="button"
-                >
-                  {[...workouts.map((w) => w.id), "__coach__"].every((id) => collapsedSummary.has(id)) ? "Expand All" : "Collapse All"}
-                </button>
+                {summaryMode !== "all" && (
+                  <button style={{ ...navBtnStyle, opacity: summaryOffset >= 0 ? 0.15 : 0.5 }} onClick={() => { if (summaryOffset < 0) setSummaryOffset((o) => o + 1); }} disabled={summaryOffset >= 0} aria-label="Next period">
+                    ›
+                  </button>
+                )}
+                {summaryOffset !== 0 && summaryMode !== "all" && (
+                  <button
+                    style={{ background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, opacity: 0.6, cursor: "pointer", padding: "2px 8px", fontSize: 11, fontWeight: 700, marginLeft: 4 }}
+                    onClick={() => setSummaryOffset(0)}
+                  >
+                    Today
+                  </button>
+                )}
+              </div>
+
+              {/* Quick stats row */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 8,
+              }}>
+                <div style={{
+                  textAlign: "center", padding: "10px 6px", borderRadius: 12,
+                  background: colors.cardAltBg, border: `1px solid ${colors.border}`,
+                }}>
+                  <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.logged}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
+                </div>
+                <div style={{
+                  textAlign: "center", padding: "10px 6px", borderRadius: 12,
+                  background: colors.cardAltBg, border: `1px solid ${colors.border}`,
+                }}>
+                  <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.totalSets}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Total Sets</div>
+                </div>
+                <div style={{
+                  textAlign: "center", padding: "10px 6px", borderRadius: 12,
+                  background: colors.cardAltBg, border: `1px solid ${colors.border}`,
+                }}>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.streak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.streak}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Day Streak</div>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ flex: 1, height: 6, borderRadius: 3, background: colors.cardAltBg, overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%", borderRadius: 3,
+                    width: `${pctLogged}%`,
+                    background: pctLogged >= 80 ? "#2ecc71" : pctLogged >= 40 ? "#f59e0b" : colors.primaryBg,
+                    transition: "width 0.3s ease",
+                  }} />
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, whiteSpace: "nowrap" }}>{summaryStats.logged}/{summaryStats.total} days</span>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Main body */}
@@ -1397,7 +1449,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 }}
               />
 
-              {summaryDaysLogged.logged === 0 && !coachLoading && coachInsights.length === 0 ? (
+              {summaryStats.logged === 0 && !coachLoading && coachInsights.length === 0 ? (
                 <div style={{
                   ...styles.card,
                   display: "flex",
@@ -1425,6 +1477,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     summaryRange={summaryRange}
                     computeExerciseSummary={computeExerciseSummary}
                     styles={styles}
+                    colors={colors}
                   />
                 ))
               )}
@@ -1439,18 +1492,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <div style={styles.cardTitle}>Structure</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
-                      style={{ ...(reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn), display: "flex", alignItems: "center", gap: 4 }}
+                      style={{ ...(reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn), display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }}
                       onClick={() => setReorderWorkouts((v) => !v)}
+                      title={reorderWorkouts ? "Done reordering" : "Reorder workouts"}
                     >
-                      {reorderWorkouts ? "Done" : (
-                        <>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>
-                          Reorder
-                        </>
+                      {reorderWorkouts ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>
                       )}
                     </button>
-                    <button style={styles.primaryBtn} onClick={addWorkout}>
-                      + Add
+                    <button style={{ ...styles.primaryBtn, display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }} onClick={addWorkout} title="Add workout">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                     </button>
                   </div>
                 </div>
@@ -1466,110 +1519,73 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       const isFirst = wi === 0;
                       const isLast = wi === workouts.length - 1;
 
-                      const kebabDot = (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.5 }}>
-                          <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
-                        </svg>
+                      const iconBtn = (onClick, title, children, extraStyle) => (
+                        <button
+                          style={{ background: "transparent", border: "none", color: "inherit", padding: 4, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.45, ...extraStyle }}
+                          onClick={onClick} title={title}
+                        >
+                          {children}
+                        </button>
                       );
 
-                      const menuStyle = {
-                        position: "absolute", top: "100%", right: 0, marginTop: 4,
-                        minWidth: 160, background: colors.cardBg,
-                        border: `1px solid ${colors.border}`, borderRadius: 12,
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.35)", zIndex: 41,
-                        overflow: "hidden",
-                      };
-
-                      const menuItemStyle = {
-                        display: "block", width: "100%", textAlign: "left",
-                        padding: "11px 16px", background: "transparent", border: "none",
-                        color: colors.text, fontWeight: 600, fontSize: 14, cursor: "pointer",
-                      };
+                      const pencilIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>;
+                      const trashIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>;
+                      const plusIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>;
+                      const reorderIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>;
+                      const checkIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
 
                       return (
                         <div key={w.id}>
                           {/* Workout row */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, maxWidth: "100%" }}>
+                          <div
+                            style={{
+                              ...styles.manageItem,
+                              ...(active ? styles.manageItemActive : {}),
+                              display: "flex", alignItems: "center", gap: 6,
+                            }}
+                          >
                             <div
-                              style={{
-                                ...styles.manageItem, flex: 1, minWidth: 0,
-                                ...(active ? styles.manageItemActive : {}),
-                                display: "flex", alignItems: "center", gap: 8,
-                              }}
+                              style={{ flex: 1, minWidth: 0, cursor: reorderWorkouts ? "default" : "pointer", display: "flex", alignItems: "center", gap: 8 }}
+                              onClick={() => { if (!reorderWorkouts) setManageWorkoutId(active ? null : w.id); }}
                             >
-                              <button
-                                style={{ flex: 1, minWidth: 0, textAlign: "left", background: "transparent", border: "none", color: "inherit", padding: 0, cursor: "pointer" }}
-                                onClick={() => setManageWorkoutId(active ? null : w.id)}
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                  <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{w.name}</div>
-                                  <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
-                                </div>
-                                <div style={styles.smallText}>{w.exercises.length} exercises</div>
-                              </button>
-                              {!reorderWorkouts && (
-                                <div style={{ position: "relative", flexShrink: 0 }}>
-                                  <button
-                                    style={{ background: "transparent", border: "none", color: "inherit", padding: 6, cursor: "pointer", display: "flex" }}
-                                    onClick={(e) => { e.stopPropagation(); setWorkoutMenuId(workoutMenuId === w.id ? null : w.id); setExerciseMenuId(null); }}
-                                    aria-label="Workout options"
-                                  >
-                                    {kebabDot}
-                                  </button>
-                                  {workoutMenuId === w.id && (
-                                    <>
-                                      <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setWorkoutMenuId(null)} />
-                                      <div style={menuStyle}>
-                                        <button style={menuItemStyle} onClick={() => { setWorkoutMenuId(null); renameWorkout(w.id); }}>Rename</button>
-                                        <button style={menuItemStyle} onClick={() => { setWorkoutMenuId(null); setWorkoutCategory(w.id); }}>Change category</button>
-                                        <button style={{ ...menuItemStyle, color: colors.dangerText }} onClick={() => { setWorkoutMenuId(null); deleteWorkout(w.id); }}>Delete</button>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              )}
+                              <div style={{ ...styles.manageExerciseName, fontWeight: 700 }}>{w.name}</div>
+                              <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
                             </div>
-                            {reorderWorkouts && (
-                              <div style={styles.reorderBtnGroup}>
-                                <button style={styles.reorderBtn} disabled={isFirst} onClick={() => moveWorkout(w.id, -1)} title="Move up">&#9650;</button>
-                                <button style={styles.reorderBtn} disabled={isLast} onClick={() => moveWorkout(w.id, 1)} title="Move down">&#9660;</button>
+                            {reorderWorkouts ? (
+                              <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+                                <button style={{ ...styles.reorderBtn, opacity: isFirst ? 0.15 : 0.5, padding: "0 4px" }} disabled={isFirst} onClick={() => moveWorkout(w.id, -1)} title="Move up">
+                                  <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
+                                </button>
+                                <button style={{ ...styles.reorderBtn, opacity: isLast ? 0.15 : 0.5, padding: "0 4px" }} disabled={isLast} onClick={() => moveWorkout(w.id, 1)} title="Move down">
+                                  <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                                {iconBtn(() => openEditWorkout(w.id), "Edit workout", pencilIcon)}
+                                {iconBtn(() => deleteWorkout(w.id), "Delete workout", trashIcon, { opacity: 0.3 })}
+                                {active && w.exercises.length > 1 && (
+                                  reorderExercises
+                                    ? iconBtn(() => setReorderExercises(false), "Done reordering", checkIcon, { opacity: 0.7 })
+                                    : iconBtn(() => setReorderExercises(true), "Reorder exercises", reorderIcon)
+                                )}
+                                {active && iconBtn(() => addExercise(w.id), "Add exercise", plusIcon)}
                               </div>
                             )}
                           </div>
 
-                          {/* Inline workout detail — accordion */}
+                          {/* Inline workout detail — exercise list */}
                           {active && !reorderWorkouts && (
                             <div style={{
                               marginTop: 6,
                               marginLeft: 4,
-                              padding: "12px 12px 8px",
+                              padding: "8px 12px 8px",
                               borderLeft: `2px solid ${colors.border}`,
                               display: "flex",
                               flexDirection: "column",
-                              gap: 10,
+                              gap: 8,
                               animation: "tabFadeIn 0.15s ease-out",
                             }}>
-                              {/* Action row */}
-                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <button style={{ ...styles.addExerciseFullBtn, flex: 1 }} onClick={() => addExercise(w.id)}>
-                                  + Add Exercise
-                                </button>
-                                {w.exercises.length > 1 && (
-                                  <button
-                                    style={{ ...(reorderExercises ? styles.primaryBtn : styles.secondaryBtn), display: "flex", alignItems: "center", gap: 4 }}
-                                    onClick={() => setReorderExercises((v) => !v)}
-                                  >
-                                    {reorderExercises ? "Done" : (
-                                      <>
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>
-                                        Reorder
-                                      </>
-                                    )}
-                                  </button>
-                                )}
-                              </div>
-
-                              {/* Exercise list */}
                               {w.exercises.length === 0 ? (
                                 <div style={styles.emptyText}>No exercises yet.</div>
                               ) : (
@@ -1577,35 +1593,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                   const isFirstEx = ei === 0;
                                   const isLastEx = ei === w.exercises.length - 1;
                                   return (
-                                    <div key={ex.id} style={{ ...styles.manageExerciseRow, position: "relative" }}>
+                                    <div key={ex.id} style={styles.manageExerciseRow}>
                                       <div style={styles.manageExerciseLeft}>
                                         <div style={styles.manageExerciseName}>{ex.name}</div>
-                                        <span style={styles.unitPill}>{getUnit(ex.unit, ex).abbr}</span>
+                                        <span style={styles.tagMuted}>{getUnit(ex.unit, ex).abbr}</span>
                                       </div>
                                       {reorderExercises ? (
                                         <div style={styles.reorderBtnGroup}>
-                                          <button style={styles.reorderBtn} disabled={isFirstEx} onClick={() => moveExercise(w.id, ex.id, -1)} title="Move up">&#9650;</button>
-                                          <button style={styles.reorderBtn} disabled={isLastEx} onClick={() => moveExercise(w.id, ex.id, 1)} title="Move down">&#9660;</button>
+                                          <button style={{ ...styles.reorderBtn, opacity: isFirstEx ? 0.15 : 0.5, padding: "0 4px" }} disabled={isFirstEx} onClick={() => moveExercise(w.id, ex.id, -1)} title="Move up">
+                                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
+                                          </button>
+                                          <button style={{ ...styles.reorderBtn, opacity: isLastEx ? 0.15 : 0.5, padding: "0 4px" }} disabled={isLastEx} onClick={() => moveExercise(w.id, ex.id, 1)} title="Move down">
+                                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
+                                          </button>
                                         </div>
                                       ) : (
-                                        <div style={{ position: "relative", flexShrink: 0 }}>
-                                          <button
-                                            style={{ background: "transparent", border: "none", color: "inherit", padding: 6, cursor: "pointer", display: "flex" }}
-                                            onClick={() => { setExerciseMenuId(exerciseMenuId === ex.id ? null : ex.id); setWorkoutMenuId(null); }}
-                                            aria-label="Exercise options"
-                                          >
-                                            {kebabDot}
-                                          </button>
-                                          {exerciseMenuId === ex.id && (
-                                            <>
-                                              <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setExerciseMenuId(null)} />
-                                              <div style={menuStyle}>
-                                                <button style={menuItemStyle} onClick={() => { setExerciseMenuId(null); editUnitExercise(w.id, ex.id); }}>Change unit</button>
-                                                <button style={menuItemStyle} onClick={() => { setExerciseMenuId(null); renameExercise(w.id, ex.id); }}>Rename</button>
-                                                <button style={{ ...menuItemStyle, color: colors.dangerText }} onClick={() => { setExerciseMenuId(null); deleteExercise(w.id, ex.id); }}>Delete</button>
-                                              </div>
-                                            </>
-                                          )}
+                                        <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                                          {iconBtn(() => openEditExercise(w.id, ex.id), "Edit exercise", pencilIcon)}
+                                          {iconBtn(() => deleteExercise(w.id, ex.id), "Delete exercise", trashIcon, { opacity: 0.3 })}
                                         </div>
                                       )}
                                     </div>
@@ -1684,10 +1689,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <button
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors.dangerBorder}`, background: colors.dangerBg, color: colors.dangerText, cursor: "pointer", textAlign: "left", width: "100%", marginTop: 4 }}
                     onClick={() => {
-                      if (!confirm("Reset ALL data? This cannot be undone.")) return;
+                      if (!confirm("Reset ALL data? A backup will be exported first.")) return;
+                      exportJson();
                       setState(makeDefaultState());
                       setManageWorkoutId(null);
-                      alert("Reset complete.");
+                      alert("Reset complete. Your data was exported as a backup.");
                     }}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -2372,78 +2378,126 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         styles={styles}
       />
 
-      {/* Edit Unit Modal */}
-      <Modal
-        open={modals.editUnit.isOpen}
-        title="Change Unit"
-        onClose={() => dispatchModal({ type: "CLOSE_EDIT_UNIT" })}
-        styles={styles}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={styles.fieldCol}>
-            <label style={styles.label}>Unit</label>
-            <select
-              value={modals.editUnit.unit}
-              onChange={(e) =>
-                dispatchModal({
-                  type: "UPDATE_EDIT_UNIT",
-                  payload: { unit: e.target.value },
-                })
-              }
-              style={styles.textInput}
-            >
-              {REP_UNITS.map((u) => (
-                <option key={u.key} value={u.key}>
-                  {u.label} ({u.abbr})
-                </option>
-              ))}
-              <option value="custom">Custom...</option>
-            </select>
-          </div>
-
-          {modals.editUnit.unit === "custom" && (
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-              <div style={{ ...styles.fieldCol, flex: 1 }}>
-                <label style={styles.label}>Abbreviation</label>
-                <input
-                  value={modals.editUnit.customUnitAbbr || ""}
-                  onChange={(e) =>
-                    dispatchModal({
-                      type: "UPDATE_EDIT_UNIT",
-                      payload: { customUnitAbbr: e.target.value.slice(0, 10) },
-                    })
-                  }
-                  style={styles.textInput}
-                  placeholder="e.g. cal"
-                />
-              </div>
-              <div style={{ ...styles.fieldCol, alignItems: "center" }}>
-                <label style={styles.label}>Decimals</label>
-                <input
-                  type="checkbox"
-                  checked={modals.editUnit.customUnitAllowDecimal || false}
-                  onChange={(e) =>
-                    dispatchModal({
-                      type: "UPDATE_EDIT_UNIT",
-                      payload: { customUnitAllowDecimal: e.target.checked },
-                    })
-                  }
-                  style={styles.checkbox}
-                />
-              </div>
+      {/* Edit Workout Modal */}
+      {modals.editWorkout && (
+        <Modal
+          open={modals.editWorkout.isOpen}
+          title="Edit Workout"
+          onClose={() => dispatchModal({ type: "CLOSE_EDIT_WORKOUT" })}
+          styles={styles}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Workout name</label>
+              <input
+                value={modals.editWorkout.name}
+                onChange={(e) =>
+                  dispatchModal({ type: "UPDATE_EDIT_WORKOUT", payload: { name: e.target.value } })
+                }
+                style={styles.textInput}
+                placeholder="e.g. Push Day"
+                autoFocus
+              />
             </div>
-          )}
-
-          <div style={styles.modalFooter}>
-            <button style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_UNIT" })}>
-              Cancel
-            </button>
-            <button style={styles.primaryBtn} onClick={saveEditUnit}>
-              Save
-            </button>
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Category</label>
+              <CategoryAutocomplete
+                value={modals.editWorkout.category}
+                onChange={(val) =>
+                  dispatchModal({ type: "UPDATE_EDIT_WORKOUT", payload: { category: val } })
+                }
+                suggestions={categoryOptions}
+                placeholder="e.g. Push / Pull / Legs / Stretch"
+                styles={styles}
+              />
+            </div>
+            <div style={styles.modalFooter}>
+              <button style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_WORKOUT" })}>
+                Cancel
+              </button>
+              <button style={styles.primaryBtn} onClick={saveEditWorkout}>
+                Save
+              </button>
+            </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
+
+      {/* Edit Exercise Modal */}
+      {modals.editExercise && (
+        <Modal
+          open={modals.editExercise.isOpen}
+          title="Edit Exercise"
+          onClose={() => dispatchModal({ type: "CLOSE_EDIT_EXERCISE" })}
+          styles={styles}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Exercise name</label>
+              <input
+                value={modals.editExercise.name}
+                onChange={(e) =>
+                  dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload: { name: e.target.value } })
+                }
+                style={styles.textInput}
+                placeholder="e.g. Bench Press"
+                autoFocus
+              />
+            </div>
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Unit</label>
+              <select
+                value={modals.editExercise.unit}
+                onChange={(e) =>
+                  dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload: { unit: e.target.value } })
+                }
+                style={styles.textInput}
+              >
+                {REP_UNITS.map((u) => (
+                  <option key={u.key} value={u.key}>
+                    {u.label} ({u.abbr})
+                  </option>
+                ))}
+                <option value="custom">Custom...</option>
+              </select>
+            </div>
+            {modals.editExercise.unit === "custom" && (
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                <div style={{ ...styles.fieldCol, flex: 1 }}>
+                  <label style={styles.label}>Abbreviation</label>
+                  <input
+                    value={modals.editExercise.customUnitAbbr || ""}
+                    onChange={(e) =>
+                      dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload: { customUnitAbbr: e.target.value.slice(0, 10) } })
+                    }
+                    style={styles.textInput}
+                    placeholder="e.g. cal"
+                  />
+                </div>
+                <div style={{ ...styles.fieldCol, alignItems: "center" }}>
+                  <label style={styles.label}>Decimals</label>
+                  <input
+                    type="checkbox"
+                    checked={modals.editExercise.customUnitAllowDecimal || false}
+                    onChange={(e) =>
+                      dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload: { customUnitAllowDecimal: e.target.checked } })
+                    }
+                    style={styles.checkbox}
+                  />
+                </div>
+              </div>
+            )}
+            <div style={styles.modalFooter}>
+              <button style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_EXERCISE" })}>
+                Cancel
+              </button>
+              <button style={styles.primaryBtn} onClick={saveEditExercise}>
+                Save
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Generate Wizard Modal */}
       <GenerateWizardModal
@@ -2661,34 +2715,70 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
   );
 }
 
-function SummaryBlock({ workout, collapsed, onToggle, summaryRange, computeExerciseSummary, styles }) {
+function SummaryBlock({ workout, collapsed, onToggle, summaryRange, computeExerciseSummary, styles, colors }) {
   const cat = (workout.category || "Workout").trim();
+
+  // Pre-compute summaries to split active vs inactive
+  const exSummaries = workout.exercises.map((ex) => {
+    const exUnit = getUnit(ex.unit, ex);
+    const s = computeExerciseSummary(ex.id, summaryRange.start, summaryRange.end, exUnit);
+    return { ex, exUnit, s };
+  });
+  const active = exSummaries.filter((e) => e.s.sessions > 0);
+  const inactiveCount = exSummaries.length - active.length;
+
   return (
     <div style={styles.card}>
       <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
-        <div style={styles.cardTitle}>{workout.name}</div>
-        <span style={styles.tagMuted}>{cat}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+          <div style={styles.cardTitle}>{workout.name}</div>
+          <span style={styles.tagMuted}>{cat}</span>
+        </div>
+        {active.length > 0 && (
+          <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>
+            {active.length}/{exSummaries.length}
+          </span>
+        )}
         <span style={styles.collapseToggle}>{collapsed ? "\u25B6" : "\u25BC"}</span>
       </div>
 
       {!collapsed && (
         workout.exercises.length === 0 ? (
           <div style={styles.emptyText}>No exercises yet.</div>
+        ) : active.length === 0 ? (
+          <div style={{ fontSize: 13, opacity: 0.5, padding: "4px 0" }}>No activity this period</div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {workout.exercises.map((ex) => {
-              const exUnit = getUnit(ex.unit, ex);
-              const s = computeExerciseSummary(ex.id, summaryRange.start, summaryRange.end, exUnit);
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {active.map(({ ex, exUnit, s }) => {
+              const strength = exUnit.key === "reps";
               return (
-                <div key={ex.id} style={styles.summaryRow}>
-                  <div style={styles.exerciseName}>{ex.name}</div>
-                  <div style={styles.summaryRight}>
+                <div key={ex.id} style={{
+                  ...styles.summaryRow,
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                  gap: 6,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ ...styles.exerciseName, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 }}>{ex.name}</div>
+                    <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, whiteSpace: "nowrap", marginLeft: 8 }}>
+                      {s.sessions}x
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <span style={styles.summaryChip}>{s.totalReps} {exUnit.abbr}</span>
-                    <span style={styles.summaryChip}>Max {s.maxWeight}</span>
+                    <span style={{ ...styles.summaryChip, background: "transparent", border: `1px solid ${colors.border}`, color: colors.text }}>{s.totalSets} sets</span>
+                    {strength && s.maxWeight !== "\u2014" && (
+                      <span style={{ ...styles.summaryChip, background: "transparent", border: `1px solid ${colors.border}`, color: colors.text }}>Best: {s.maxWeight}</span>
+                    )}
                   </div>
                 </div>
               );
             })}
+            {inactiveCount > 0 && (
+              <div style={{ fontSize: 12, opacity: 0.4, padding: "4px 2px" }}>
+                {inactiveCount} exercise{inactiveCount !== 1 ? "s" : ""} with no activity
+              </div>
+            )}
           </div>
         )
       )}

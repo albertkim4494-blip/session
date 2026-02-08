@@ -261,12 +261,13 @@ export function getStyles(colors) {
     cardTitle: { fontWeight: 900, fontSize: 16 },
 
     tagMuted: {
-      fontSize: 12,
-      padding: "4px 8px",
+      fontSize: 11,
+      fontWeight: 600,
+      padding: "2px 7px",
       borderRadius: 999,
       background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
       border: `1px solid ${colors.border}`,
-      opacity: 0.85,
+      opacity: 0.65,
     },
 
     emptyText: { opacity: 0.75, fontSize: 13, padding: "6px 2px" },
@@ -310,12 +311,12 @@ export function getStyles(colors) {
 
     unitPill: {
       fontSize: 11,
-      fontWeight: 800,
+      fontWeight: 600,
       padding: "2px 7px",
       borderRadius: 999,
       background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
       border: `1px solid ${colors.border}`,
-      opacity: 0.85,
+      opacity: 0.65,
     },
 
     primaryBtn: {
@@ -692,26 +693,20 @@ export function getStyles(colors) {
 
     reorderBtnGroup: {
       display: "flex",
-      flexDirection: "column",
-      gap: 2,
+      flexDirection: "row",
       flexShrink: 0,
     },
 
     reorderBtn: {
-      width: 30,
-      height: 26,
-      borderRadius: 8,
-      border: `1px solid ${colors.border}`,
-      background: colors.cardAltBg,
+      background: "transparent",
+      border: "none",
       color: colors.text,
-      fontWeight: 900,
-      fontSize: 10,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: 0,
+      padding: "2px 2px",
       cursor: "pointer",
-      opacity: 1,
+      lineHeight: 1,
     },
 
     compactSecondaryBtn: {
