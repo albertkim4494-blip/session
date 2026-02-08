@@ -18,7 +18,7 @@ export function Modal({ open, title, children, footer, onClose, styles }) {
   return (
     <div style={{ ...styles.modalOverlay, paddingBottom: 10 + kbInset }} onMouseDown={onClose}>
       <div
-        style={{ ...styles.modalSheet, maxHeight: `calc(100dvh - ${10 + kbInset}px)`, display: "flex", flexDirection: "column" }}
+        style={{ ...styles.modalSheet, ...(footer ? { height: `calc(85dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column" }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div style={styles.modalHeader}>
