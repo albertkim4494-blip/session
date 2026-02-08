@@ -4,6 +4,7 @@ export const initialModalState = {
     context: null, // { workoutId, exerciseId, exerciseName }
     sets: [],
     notes: "",
+    mood: null, // -2 | -1 | 0 | 1 | 2
   },
   confirm: {
     isOpen: false,
@@ -78,15 +79,19 @@ export const initialModalState = {
   generateWizard: {
     isOpen: false,
     step: 1,
-    goal: "",
     daysPerWeek: 3,
     equipment: "gym",
     duration: 60,
     preview: null,
+    loading: false,
+    error: null,
+    sportDays: [],
   },
   generateToday: {
     isOpen: false,
     preview: null,
+    loading: false,
+    error: null,
   },
 };
 
@@ -101,6 +106,7 @@ export function modalReducer(state, action) {
           context: action.payload.context,
           sets: action.payload.sets,
           notes: action.payload.notes,
+          mood: action.payload.mood ?? null,
         },
       };
 
@@ -114,6 +120,12 @@ export function modalReducer(state, action) {
       return {
         ...state,
         log: { ...state.log, notes: action.payload },
+      };
+
+    case "UPDATE_LOG_MOOD":
+      return {
+        ...state,
+        log: { ...state.log, mood: action.payload },
       };
 
     case "CLOSE_LOG":

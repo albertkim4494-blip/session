@@ -37,6 +37,7 @@ import { GenerateTodayModal } from "./components/GenerateTodayModal";
 import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
 import { buildCatalogMap } from "./lib/exerciseCatalogUtils";
 import { generateProgram, generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
+import { generateTodayAI } from "./lib/workoutGeneratorApi";
 
 // Extracted styles
 import { getColors, getStyles } from "./styles/theme";
@@ -53,7 +54,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [state, setState] = useState(() => loadState());
   const [dataReady, setDataReady] = useState(false);
   const cloudSaver = useRef(null);
-  const [tab, setTab] = useState(() => sessionStorage.getItem("wt_tab") || "today");
+  const [tab, setTab] = useState(() => sessionStorage.getItem("wt_tab") || "train");
   const [summaryMode, setSummaryMode] = useState("wtd");
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
@@ -86,7 +87,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Swipe navigation between tabs
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
   const bodyRef = useRef(null);
-  const TAB_ORDER = ["today", "summary", "manage"];
+  const TAB_ORDER = ["train", "progress", "plan"];
 
   const handleTouchStart = useCallback((e) => {
     touchRef.current.startX = e.touches[0].clientX;
@@ -201,7 +202,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Auto-open generate wizard after onboarding
   useEffect(() => {
     if (showGenerateWizard) {
-      setTab("manage");
+      setTab("plan");
       dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } });
       onGenerateWizardShown?.();
     }
@@ -622,14 +623,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           weight: typeof s.weight === "string" ? s.weight : "",
         }));
       } else {
-        // Check if workout has a generation scheme to prefill set count
-        const workout = workoutById.get(workoutId);
-        const parsed = workout?.scheme ? parseScheme(workout.scheme) : null;
-        if (parsed) {
-          sets = Array.from({ length: parsed.sets }, () => ({ reps: 0, weight: "" }));
-        } else {
-          sets = [{ reps: 0, weight: "" }];
-        }
+        sets = [{ reps: 0, weight: "" }];
       }
 
       const normalizedSets = sets.map((s) => {
@@ -637,6 +631,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         return { reps: s.reps, weight: isBW ? "BW" : String(s.weight ?? "").trim() };
       });
 
+      const workout = workoutById.get(workoutId);
       dispatchModal({
         type: "OPEN_LOG",
         payload: {
@@ -647,9 +642,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             unit: exercise.unit || "reps",
             customUnitAbbr: exercise.customUnitAbbr || "",
             customUnitAllowDecimal: exercise.customUnitAllowDecimal ?? false,
+            scheme: workout?.scheme || null,
           },
           sets: normalizedSets,
           notes: prior?.notes ?? "",
+          mood: existing?.mood ?? null,
         },
       });
     },
@@ -682,10 +679,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         .filter((s) => s.reps > 0);
 
       st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
-      st.logsByDate[dateKey][logCtx.exerciseId] = {
+      const logEntry = {
         sets: cleanedSets.length ? cleanedSets : [{ reps: 0, weight: "BW" }],
         notes: modals.log.notes ?? "",
       };
+      if (modals.log.mood != null) logEntry.mood = modals.log.mood;
+      st.logsByDate[dateKey][logCtx.exerciseId] = logEntry;
 
       return st;
     });
@@ -1036,15 +1035,35 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     dispatchModal({ type: "CLOSE_GENERATE_WIZARD" });
   }
 
-  function handleGenerateToday() {
-    const workout = generateTodayWorkout({
-      state,
+  async function handleGenerateToday() {
+    // Open modal immediately with loading state
+    dispatchModal({ type: "OPEN_GENERATE_TODAY", payload: { preview: null } });
+    dispatchModal({ type: "UPDATE_GENERATE_TODAY", payload: { loading: true, error: null } });
+
+    const result = await generateTodayAI({
       equipment,
       profile,
+      state,
       catalog: EXERCISE_CATALOG,
       todayKey: dateKey,
     });
-    dispatchModal({ type: "OPEN_GENERATE_TODAY", payload: { preview: workout } });
+
+    if (result.success) {
+      dispatchModal({ type: "UPDATE_GENERATE_TODAY", payload: { preview: result.data, loading: false } });
+    } else {
+      // Fallback to deterministic
+      const fallback = generateTodayWorkout({
+        state,
+        equipment,
+        profile,
+        catalog: EXERCISE_CATALOG,
+        todayKey: dateKey,
+      });
+      dispatchModal({
+        type: "UPDATE_GENERATE_TODAY",
+        payload: { preview: fallback, loading: false, error: "AI unavailable — used smart defaults" },
+      });
+    }
   }
 
   function handleAcceptTodayWorkout(workout) {
@@ -1185,7 +1204,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </div>
 
           {/* Tab-specific sticky toolbar */}
-          {tab === "today" && (
+          {tab === "train" && (
             <div style={{ ...styles.collapseAllRow, justifyContent: "space-between", alignItems: "center", paddingTop: 10 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, opacity: 0.85, cursor: "pointer" }}>
                 <input
@@ -1209,7 +1228,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             </div>
           )}
 
-          {tab === "summary" && (
+          {tab === "progress" && (
             <div style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
               <PillTabs
                 styles={styles}
@@ -1274,7 +1293,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           )}
 
           {/* TODAY TAB */}
-          {tab === "today" ? (
+          {tab === "train" ? (
             <div style={styles.section}>
               {workouts.map((w) => (
                 <WorkoutCard
@@ -1305,7 +1324,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           ) : null}
 
           {/* SUMMARY TAB */}
-          {tab === "summary" ? (
+          {tab === "progress" ? (
             <div style={styles.section}>
               <CoachInsightsCard
                 insights={coachInsights}
@@ -1361,18 +1380,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           ) : null}
 
           {/* MANAGE TAB */}
-          {tab === "manage" ? (
+          {tab === "plan" ? (
             <div style={styles.section}>
               <div style={styles.card}>
                 <div style={styles.cardHeader}>
                   <div style={styles.cardTitle}>Structure</div>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      style={styles.secondaryBtn}
-                      onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
-                    >
-                      Generate Plan
-                    </button>
                     <button
                       style={reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn}
                       onClick={() => setReorderWorkouts((v) => !v)}
@@ -1380,7 +1393,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       {reorderWorkouts ? "Done" : "Reorder"}
                     </button>
                     <button style={styles.primaryBtn} onClick={addWorkout}>
-                      + Add Workout
+                      + Add
                     </button>
                   </div>
                 </div>
@@ -1412,6 +1425,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     );
                   })}
                 </div>
+
+                <button
+                  style={{ ...styles.secondaryBtn, width: "100%", marginTop: 8, textAlign: "center" }}
+                  onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
+                >
+                  Generate Plan ✨
+                </button>
               </div>
 
               {manageWorkoutId ? (
@@ -1538,14 +1558,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
         {/* Bottom navigation */}
         <div style={styles.nav}>
-          <button style={{ ...styles.navBtn, ...(tab === "today" ? styles.navBtnActive : {}) }} onClick={() => setTab("today")}>
-            Today
+          <button style={{ ...styles.navBtn, ...(tab === "train" ? styles.navBtnActive : {}) }} onClick={() => setTab("train")}>
+            Train
           </button>
-          <button style={{ ...styles.navBtn, ...(tab === "summary" ? styles.navBtnActive : {}) }} onClick={() => setTab("summary")}>
-            Summary
+          <button style={{ ...styles.navBtn, ...(tab === "progress" ? styles.navBtnActive : {}) }} onClick={() => setTab("progress")}>
+            Progress
           </button>
-          <button style={{ ...styles.navBtn, ...(tab === "manage" ? styles.navBtnActive : {}) }} onClick={() => setTab("manage")}>
-            Manage
+          <button style={{ ...styles.navBtn, ...(tab === "plan" ? styles.navBtnActive : {}) }} onClick={() => setTab("plan")}>
+            Plan
           </button>
         </div>
       </div>
@@ -1562,10 +1582,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             if (found) { logExercise = found; break; }
           }
           const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
+          const logScheme = logCtx?.scheme;
           return (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {logScheme && (
+            <div style={{
+              fontSize: 13, padding: "8px 12px", borderRadius: 10,
+              background: colors.primaryBg + "18", border: `1px solid ${colors.primaryBg}44`,
+              color: colors.text,
+            }}>
+              Suggested: <b>{logScheme}</b> (sets x reps)
+            </div>
+          )}
           <div style={styles.smallText}>
-            Prefilled from your most recent log. Unit: <b>{logUnit.label}</b> {"\u2014"} change in Manage tab.
+            Prefilled from your most recent log. Unit: <b>{logUnit.label}</b>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1649,13 +1679,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             + Add Set
           </button>
 
+          <MoodPicker
+            value={modals.log.mood}
+            onChange={(v) => dispatchModal({ type: "UPDATE_LOG_MOOD", payload: v })}
+            colors={colors}
+          />
+
           <div style={styles.fieldCol}>
             <label style={styles.label}>Notes (optional)</label>
             <textarea
               value={modals.log.notes}
               onChange={(e) => dispatchModal({ type: "UPDATE_LOG_NOTES", payload: e.target.value })}
               style={styles.textarea}
-              rows={3}
+              rows={2}
               placeholder="Quick notes..."
             />
           </div>
@@ -1882,7 +1918,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
                 dispatchModal({ type: "CLOSE_ADD_WORKOUT" });
                 setManageWorkoutId(newId);
-                setTab("manage");
+                setTab("plan");
               }}
             >
               Save
@@ -2181,6 +2217,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         onAccept={handleAcceptGeneratedProgram}
         onClose={() => dispatchModal({ type: "CLOSE_GENERATE_WIZARD" })}
         catalog={EXERCISE_CATALOG}
+        profile={profile}
+        state={state}
         styles={styles}
         colors={colors}
       />
@@ -2189,12 +2227,87 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       <GenerateTodayModal
         open={modals.generateToday.isOpen}
         preview={modals.generateToday.preview}
+        loading={modals.generateToday.loading}
+        error={modals.generateToday.error}
         onRegenerate={handleGenerateToday}
         onAccept={handleAcceptTodayWorkout}
         onClose={() => dispatchModal({ type: "CLOSE_GENERATE_TODAY" })}
         styles={styles}
         colors={colors}
       />
+    </div>
+  );
+}
+
+// ============================================================================
+// MOOD PICKER - SVG face icons for workout feel
+// ============================================================================
+
+const MOOD_FACES = [
+  { value: 2, label: "Great", mouth: "M12,18 Q16,22 20,18", eyes: "happy" },
+  { value: 1, label: "Good", mouth: "M13,19 Q16,21 19,19", eyes: "normal" },
+  { value: 0, label: "Okay", mouth: "M13,19 L19,19", eyes: "normal" },
+  { value: -1, label: "Tough", mouth: "M13,20 Q16,18 19,20", eyes: "normal" },
+  { value: -2, label: "Brutal", mouth: "M12,21 Q16,17 20,21", eyes: "squint" },
+];
+
+function FaceIcon({ face, selected, color, onSelect }) {
+  return (
+    <button
+      onClick={() => onSelect(face.value)}
+      aria-label={face.label}
+      style={{
+        width: 44, height: 44, padding: 0, border: "none",
+        background: "transparent", cursor: "pointer",
+        transform: selected ? "scale(1.15)" : "scale(1)",
+        transition: "transform 0.15s ease",
+        opacity: selected ? 1 : 0.55,
+      }}
+    >
+      <svg viewBox="0 0 32 32" width="44" height="44">
+        <circle
+          cx="16" cy="16" r="14"
+          fill={selected ? "#FFD93D" : "transparent"}
+          stroke={selected ? "#E6B800" : color}
+          strokeWidth="1.5"
+        />
+        {face.eyes === "happy" ? (
+          <>
+            <path d="M10,13 Q11,11 12,13" fill="none" stroke={selected ? "#5D4E00" : color} strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M20,13 Q21,11 22,13" fill="none" stroke={selected ? "#5D4E00" : color} strokeWidth="1.5" strokeLinecap="round" />
+          </>
+        ) : face.eyes === "squint" ? (
+          <>
+            <line x1="9.5" y1="13" x2="12.5" y2="13" stroke={selected ? "#5D4E00" : color} strokeWidth="1.5" strokeLinecap="round" />
+            <line x1="19.5" y1="13" x2="22.5" y2="13" stroke={selected ? "#5D4E00" : color} strokeWidth="1.5" strokeLinecap="round" />
+          </>
+        ) : (
+          <>
+            <circle cx="11" cy="12.5" r="1.5" fill={selected ? "#5D4E00" : color} />
+            <circle cx="21" cy="12.5" r="1.5" fill={selected ? "#5D4E00" : color} />
+          </>
+        )}
+        <path d={face.mouth} fill="none" stroke={selected ? "#5D4E00" : color} strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
+function MoodPicker({ value, onChange, colors }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.7 }}>How did this feel?</div>
+      <div style={{ display: "flex", justifyContent: "space-between", maxWidth: 260 }}>
+        {MOOD_FACES.map((face) => (
+          <FaceIcon
+            key={face.value}
+            face={face}
+            selected={value === face.value}
+            color={colors.textSecondary || colors.text}
+            onSelect={(v) => onChange(value === v ? null : v)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
