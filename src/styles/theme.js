@@ -286,7 +286,7 @@ export function getStyles(colors) {
     },
 
     exerciseBtnLogged: {
-      borderLeftColor: "#2ecc71",
+      borderLeft: "3px solid #2ecc71",
     },
 
     exerciseName: { fontWeight: 800, fontSize: 14 },

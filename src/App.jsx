@@ -1917,7 +1917,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             : null;
 
           return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, overflowX: "hidden" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {logScheme && (
             <div style={{
               fontSize: 13, padding: "8px 12px", borderRadius: 10,
