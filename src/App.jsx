@@ -88,10 +88,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [collapsedSummary, setCollapsedSummary] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_summary"))); } catch { return new Set(); }
   });
-  const [autoCollapseEmpty, setAutoCollapseEmpty] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("wt_auto_collapse_empty")) === true; } catch { return false; }
-  });
-  const manualExpandRef = useRef(new Set());
 
   // Acknowledgment toast
   const [toast, setToast] = useState(null); // { message, coachLine }
@@ -482,30 +478,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   useEffect(() => {
     localStorage.setItem("wt_collapsed_summary", JSON.stringify([...collapsedSummary]));
   }, [collapsedSummary]);
-
-  useEffect(() => {
-    localStorage.setItem("wt_auto_collapse_empty", JSON.stringify(autoCollapseEmpty));
-  }, [autoCollapseEmpty]);
-
-  useEffect(() => {
-    manualExpandRef.current.clear();
-    if (!autoCollapseEmpty) return;
-    const dayLogs = state.logsByDate[dateKey] ?? {};
-    const emptyIds = workouts
-      .filter((w) => !w.exercises.some((ex) => dayLogs[ex.id]?.sets?.length > 0))
-      .map((w) => w.id);
-    const filledIds = workouts
-      .filter((w) => w.exercises.some((ex) => dayLogs[ex.id]?.sets?.length > 0))
-      .map((w) => w.id);
-    setCollapsedToday((prev) => {
-      const next = new Set(prev);
-      for (const id of emptyIds) {
-        if (!manualExpandRef.current.has(id)) next.add(id);
-      }
-      for (const id of filledIds) next.delete(id);
-      return next;
-    });
-  }, [dateKey, autoCollapseEmpty]);
 
   useEffect(() => {
     setReorderExercises(false);
@@ -1241,16 +1213,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           {/* Tab-specific sticky toolbar */}
           {tab === "train" && workouts.length > 0 && (
-            <div style={{ ...styles.collapseAllRow, justifyContent: "space-between", alignItems: "center", paddingTop: 10 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, opacity: 0.6, cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={autoCollapseEmpty}
-                  onChange={(e) => setAutoCollapseEmpty(e.target.checked)}
-                  style={styles.checkbox}
-                />
-                Hide empty
-              </label>
+            <div style={{ ...styles.collapseAllRow, justifyContent: "flex-end", paddingTop: 10 }}>
               <button
                 style={styles.collapseAllBtn}
                 onClick={() => {
@@ -1363,14 +1326,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       key={w.id}
                       workout={w}
                       collapsed={collapsedToday.has(w.id)}
-                      onToggle={() => {
-                        if (collapsedToday.has(w.id)) {
-                          manualExpandRef.current.add(w.id);
-                        } else {
-                          manualExpandRef.current.delete(w.id);
-                        }
-                        toggleCollapse(setCollapsedToday, w.id);
-                      }}
+                      onToggle={() => toggleCollapse(setCollapsedToday, w.id)}
                       logsForDate={logsForDate}
                       openLog={openLog}
                       deleteLogForExercise={deleteLogForExercise}
@@ -1800,47 +1756,92 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           }
           const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
           const logScheme = logCtx?.scheme;
+          const showWeight = logUnit.key === "reps";
+
+          // Find last session data for context
+          const existingLog = state.logsByDate[dateKey]?.[logCtx?.exerciseId];
+          const priorLog = !existingLog ? findMostRecentLogBefore(logCtx?.exerciseId, dateKey) : null;
+          const lastSessionSets = priorLog?.sets;
+          const lastSessionText = lastSessionSets
+            ? lastSessionSets
+                .filter((s) => Number(s.reps) > 0)
+                .map((s) => {
+                  const isBW = String(s.weight).toUpperCase() === "BW";
+                  const w = isBW ? "BW" : s.weight;
+                  if (logUnit.key === "reps") return `${s.reps}x${w || 0}`;
+                  const hasW = w && w !== "BW" && w !== "" && w !== "0";
+                  return hasW ? `${s.reps}${logUnit.abbr} @ ${w}` : `${s.reps}${logUnit.abbr}`;
+                })
+                .join(", ")
+            : null;
+
           return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {logScheme && (
             <div style={{
               fontSize: 13, padding: "8px 12px", borderRadius: 10,
               background: colors.primaryBg + "18", border: `1px solid ${colors.primaryBg}44`,
               color: colors.text,
             }}>
-              Suggested: <b>{logScheme}</b> (sets x reps)
+              Target: <b>{logScheme}</b>
             </div>
           )}
-          <div style={styles.smallText}>
-            Prefilled from your most recent log. Unit: <b>{logUnit.label}</b>
+
+          {lastSessionText && (
+            <div style={{
+              fontSize: 12, padding: "8px 12px", borderRadius: 10,
+              background: colors.cardAltBg, border: `1px solid ${colors.border}`,
+              color: colors.text, opacity: 0.7,
+            }}>
+              Last session: <span style={{ fontWeight: 700 }}>{lastSessionText}</span>
+            </div>
+          )}
+
+          {/* Column headers */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: showWeight ? "28px 1fr 1fr 40px 32px" : "28px 1fr 32px",
+            gap: 8,
+            padding: "0 10px",
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>Set</div>
+            <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{logUnit.label}</div>
+            {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>Weight</div>}
+            {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>BW</div>}
+            <div />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {modals.log.sets.map((s, i) => {
               const isBW = String(s.weight).toUpperCase() === "BW";
               return (
-                <div key={i} style={styles.setRow}>
-                  <div style={styles.setIndex}>{i + 1}</div>
+                <div key={i} style={{
+                  display: "grid",
+                  gridTemplateColumns: showWeight ? "28px 1fr 1fr 40px 32px" : "28px 1fr 32px",
+                  gap: 8,
+                  alignItems: "center",
+                  padding: "8px 10px",
+                  borderRadius: 12,
+                  border: `1px solid ${colors.border}`,
+                  background: colors.cardAltBg,
+                }}>
+                  <div style={{ fontWeight: 900, opacity: 0.5, textAlign: "center", fontSize: 14 }}>{i + 1}</div>
 
-                  <div style={styles.fieldCol}>
-                    <label style={styles.label}>{logUnit.label}</label>
-                    <input
-                      value={String(s.reps ?? "")}
-                      onChange={(e) => {
-                        const newSets = [...modals.log.sets];
-                        const regex = logUnit.allowDecimal ? /[^\d.]/g : /[^\d]/g;
-                        newSets[i] = { ...newSets[i], reps: e.target.value.replace(regex, "") };
-                        dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                      }}
-                      inputMode={logUnit.allowDecimal ? "decimal" : "numeric"}
-                      pattern={logUnit.allowDecimal ? "[0-9.]*" : "[0-9]*"}
-                      style={styles.numInput}
-                      placeholder="0"
-                    />
-                  </div>
+                  <input
+                    value={String(s.reps ?? "")}
+                    onChange={(e) => {
+                      const newSets = [...modals.log.sets];
+                      const regex = logUnit.allowDecimal ? /[^\d.]/g : /[^\d]/g;
+                      newSets[i] = { ...newSets[i], reps: e.target.value.replace(regex, "") };
+                      dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                    }}
+                    inputMode={logUnit.allowDecimal ? "decimal" : "numeric"}
+                    pattern={logUnit.allowDecimal ? "[0-9.]*" : "[0-9]*"}
+                    style={styles.numInput}
+                    placeholder="0"
+                  />
 
-                  <div style={styles.fieldCol}>
-                    <label style={styles.label}>Weight</label>
+                  {showWeight && (
                     <input
                       value={isBW ? "BW" : String(s.weight ?? "")}
                       onChange={(e) => {
@@ -1851,27 +1852,39 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       inputMode="numeric"
                       pattern="[0-9]*"
                       style={{ ...styles.numInput, ...(isBW ? styles.disabledInput : {}) }}
-                      placeholder="e.g. 185"
+                      placeholder="lbs"
                       disabled={isBW}
                     />
-                  </div>
+                  )}
 
-                  <div style={styles.bwCol}>
-                    <label style={styles.label}>BW</label>
-                    <input
-                      type="checkbox"
-                      checked={isBW}
-                      onChange={(e) => {
+                  {showWeight && (
+                    <button
+                      style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        border: `2px solid ${isBW ? colors.primaryBg : colors.border}`,
+                        background: isBW ? colors.primaryBg : "transparent",
+                        cursor: "pointer",
+                        justifySelf: "center",
+                        padding: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}
+                      onClick={() => {
                         const newSets = [...modals.log.sets];
-                        newSets[i] = { ...newSets[i], weight: e.target.checked ? "BW" : "" };
+                        newSets[i] = { ...newSets[i], weight: isBW ? "" : "BW" };
                         dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                       }}
-                      style={styles.checkbox}
-                    />
-                  </div>
+                      aria-label="Bodyweight toggle"
+                    >
+                      {isBW && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.primaryText} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
 
                   <button
-                    style={{ ...styles.deleteLogBtn, opacity: modals.log.sets.length <= 1 ? 0.2 : 0.5 }}
+                    style={{ ...styles.deleteLogBtn, opacity: modals.log.sets.length <= 1 ? 0.15 : 0.4 }}
                     onClick={() => {
                       const newSets = modals.log.sets.filter((_, idx) => idx !== i);
                       dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
@@ -1889,7 +1902,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </div>
 
           <button
-            style={styles.secondaryBtn}
+            style={{ ...styles.secondaryBtn, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, width: "100%" }}
             onClick={() => {
               const last = modals.log.sets[modals.log.sets.length - 1];
               const nextSet = last ? { reps: last.reps ?? 0, weight: last.weight ?? "" } : { reps: 0, weight: "" };
@@ -1916,12 +1929,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             />
           </div>
 
-          <div style={styles.modalFooter}>
-            <button style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_LOG" })}>
-              Cancel
-            </button>
-            <button style={styles.primaryBtn} onClick={saveLog}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+            <button style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
               Save
+            </button>
+            <button
+              style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 0" }}
+              onClick={() => dispatchModal({ type: "CLOSE_LOG" })}
+            >
+              Cancel
             </button>
           </div>
         </div>
@@ -2556,33 +2572,33 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
     : "";
 
   return (
-    <div style={styles.exerciseRow}>
-      <button
-        style={{ ...styles.exerciseBtn, ...(hasLog ? styles.exerciseBtnLogged : {}) }}
-        onClick={() => openLog(workoutId, exercise)}
-        aria-label={`Log ${exercise.name}`}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, flex: 1 }}>
-            <div style={{ ...styles.exerciseName, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exercise.name}</div>
-            <span style={styles.unitPill}>{exUnit.abbr}</span>
-          </div>
-          {hasLog ? <span style={styles.badge}>Done</span> : <span style={styles.badgeMuted}>Tap to log</span>}
+    <div
+      style={{ ...styles.exerciseBtn, ...(hasLog ? styles.exerciseBtnLogged : {}), position: "relative", cursor: "pointer" }}
+      onClick={() => openLog(workoutId, exercise)}
+      role="button"
+      aria-label={`Log ${exercise.name}`}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, flex: 1 }}>
+          <div style={{ ...styles.exerciseName, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exercise.name}</div>
+          <span style={styles.unitPill}>{exUnit.abbr}</span>
         </div>
-        {hasLog && setsText ? <div style={styles.exerciseSub}>{setsText}</div> : null}
-      </button>
-
-      {hasLog && (
-        <button
-          style={styles.deleteLogBtn}
-          onClick={() => deleteLogForExercise(exercise.id)}
-          aria-label={`Delete log for ${exercise.name}`}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-          </svg>
-        </button>
-      )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {hasLog ? <span style={styles.badge}>Done</span> : <span style={styles.badgeMuted}>Tap to log</span>}
+          {hasLog && (
+            <button
+              style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "inherit", opacity: 0.35, display: "flex" }}
+              onClick={(e) => { e.stopPropagation(); deleteLogForExercise(exercise.id); }}
+              aria-label={`Delete log for ${exercise.name}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+      {hasLog && setsText ? <div style={styles.exerciseSub}>{setsText}</div> : null}
     </div>
   );
 }
