@@ -1,7 +1,7 @@
 import React from "react";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
-export function Modal({ open, title, children, onClose, styles }) {
+export function Modal({ open, title, children, footer, onClose, styles }) {
   const kbInset = useKeyboardInset();
 
   if (!open) return null;
@@ -18,7 +18,7 @@ export function Modal({ open, title, children, onClose, styles }) {
   return (
     <div style={{ ...styles.modalOverlay, paddingBottom: 10 + kbInset }} onMouseDown={onClose}>
       <div
-        style={{ ...styles.modalSheet, maxHeight: `calc(100dvh - ${10 + kbInset}px)` }}
+        style={{ ...styles.modalSheet, maxHeight: `calc(100dvh - ${10 + kbInset}px)`, display: "flex", flexDirection: "column" }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div style={styles.modalHeader}>
@@ -28,11 +28,16 @@ export function Modal({ open, title, children, onClose, styles }) {
           </button>
         </div>
         <div
-          style={{ ...styles.modalBody, maxHeight: `calc(78dvh - ${kbInset}px)` }}
+          style={{ ...styles.modalBody, maxHeight: footer ? undefined : `calc(78dvh - ${kbInset}px)`, flex: footer ? 1 : undefined, minHeight: footer ? 0 : undefined }}
           onFocusCapture={handleFocusCapture}
         >
           {children}
         </div>
+        {footer && (
+          <div style={{ padding: "8px 12px 12px", flexShrink: 0 }}>
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

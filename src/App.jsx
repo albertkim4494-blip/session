@@ -1887,7 +1887,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles}>
+      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} footer={modals.log.isOpen ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
+            Save
+          </button>
+          <button
+            style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 0" }}
+            onClick={() => dispatchModal({ type: "CLOSE_LOG" })}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : null}>
         {modals.log.isOpen && (() => {
           const logCtx = modals.log.context;
           let logExercise = null;
@@ -2073,17 +2085,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4, position: "sticky", bottom: -12, background: colors.cardBg, paddingTop: 10, paddingBottom: 4, marginLeft: -12, marginRight: -12, paddingLeft: 12, paddingRight: 12 }}>
-            <button style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
-              Save
-            </button>
-            <button
-              style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 0" }}
-              onClick={() => dispatchModal({ type: "CLOSE_LOG" })}
-            >
-              Cancel
-            </button>
-          </div>
         </div>
           );
         })()}
