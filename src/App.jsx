@@ -2715,6 +2715,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         dispatch={dispatchModal}
         onAccept={handleAcceptGeneratedProgram}
         onClose={() => dispatchModal({ type: "CLOSE_GENERATE_WIZARD" })}
+        onBackToChoice={() => {
+          dispatchModal({ type: "CLOSE_GENERATE_WIZARD" });
+          dispatchModal({ type: "OPEN_WELCOME_CHOICE" });
+        }}
         catalog={EXERCISE_CATALOG}
         profile={profile}
         state={state}

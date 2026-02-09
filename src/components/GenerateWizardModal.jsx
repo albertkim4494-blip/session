@@ -25,6 +25,7 @@ export function GenerateWizardModal({
   dispatch,
   onAccept,
   onClose,
+  onBackToChoice,
   catalog,
   profile,
   state,
@@ -119,6 +120,7 @@ export function GenerateWizardModal({
     dispatch({ type: "UPDATE_GENERATE_WIZARD", payload });
 
   const canNext =
+    currentContent === "welcome" ||
     currentContent === "sport" ||
     currentContent === "days" ||
     currentContent === "duration" ||
@@ -346,7 +348,12 @@ export function GenerateWizardModal({
 
         {/* Footer */}
         <div style={styles.modalFooter}>
-          {step > 1 && !loading && (
+          {currentContent === "welcome" && onBackToChoice && (
+            <button style={styles.secondaryBtn} onClick={onBackToChoice}>
+              Back
+            </button>
+          )}
+          {step > 1 && currentContent !== "welcome" && !loading && (
             <button style={styles.secondaryBtn} onClick={goBack}>
               Back
             </button>
@@ -361,7 +368,7 @@ export function GenerateWizardModal({
               disabled={!canNext}
               onClick={goNext}
             >
-              Next
+              {currentContent === "welcome" ? "Let's Go" : "Next"}
             </button>
           )}
           {currentContent === "preview" && !loading && (
