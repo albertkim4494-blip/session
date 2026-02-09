@@ -40,22 +40,22 @@ const GREETINGS_GAP = [
 // ---------------------------------------------------------------------------
 
 const ACK_NEUTRAL = [
-  "Logged.",
-  "Workout saved.",
-  "Done.",
-  "Noted.",
+  { message: "Crushed it!", emoji: "\uD83D\uDCAA" },
+  { message: "Set logged!", emoji: "\u2705" },
+  { message: "Nice work!", emoji: "\uD83D\uDD25" },
+  { message: "Keep it going!", emoji: "\uD83D\uDE80" },
 ];
 
 const ACK_POSITIVE = [
-  "Felt good — nice.",
-  "Strong session.",
-  "Solid work.",
+  { message: "Feeling strong!", emoji: "\uD83D\uDCAA\uD83D\uDD25" },
+  { message: "Beast mode!", emoji: "\uD83D\uDC05" },
+  { message: "On fire!", emoji: "\uD83D\uDD25\uD83D\uDD25" },
 ];
 
 const ACK_TOUGH = [
-  "Tough one. Still counts.",
-  "Hard days build strength.",
-  "Showing up is the win.",
+  { message: "Tough but you showed up!", emoji: "\uD83D\uDCAF" },
+  { message: "Hard days build champions.", emoji: "\uD83C\uDFC6" },
+  { message: "That takes grit. Respect.", emoji: "\uD83D\uDCAA" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -160,14 +160,14 @@ export function selectGreeting(logsByDate, dateKey) {
  */
 export function selectAcknowledgment(mood, dateKey, logsByDate) {
   const seed = dateSeed(dateKey) + Date.now();
-  let message;
+  let ack;
 
   if (mood != null && mood >= 1) {
-    message = pick(ACK_POSITIVE, seed);
+    ack = pick(ACK_POSITIVE, seed);
   } else if (mood != null && mood <= -1) {
-    message = pick(ACK_TOUGH, seed);
+    ack = pick(ACK_TOUGH, seed);
   } else {
-    message = pick(ACK_NEUTRAL, seed);
+    ack = pick(ACK_NEUTRAL, seed);
   }
 
   // Coach reinforcement: only on first log of the day (~1 in 3 chance otherwise)
@@ -179,5 +179,5 @@ export function selectAcknowledgment(mood, dateKey, logsByDate) {
     coachLine = pick(COACH_LINES, seed + 7);
   }
 
-  return { message, coachLine };
+  return { message: ack.message, emoji: ack.emoji, coachLine };
 }

@@ -53,6 +53,8 @@ export const initialModalState = {
     goal: "",
     sports: "",
     about: "",
+    avatarUrl: null,
+    avatarPreview: null,
     saving: false,
     error: "",
   },
@@ -62,6 +64,14 @@ export const initialModalState = {
     checking: false,
     error: "",
     cooldownMs: 0,
+  },
+  changePassword: {
+    isOpen: false,
+    newPassword: "",
+    confirmPassword: "",
+    saving: false,
+    error: "",
+    success: false,
   },
   editWorkout: {
     isOpen: false,
@@ -83,6 +93,9 @@ export const initialModalState = {
     workoutId: null,
     query: "",
   },
+  welcomeChoice: {
+    isOpen: false,
+  },
   generateWizard: {
     isOpen: false,
     step: 1,
@@ -93,9 +106,13 @@ export const initialModalState = {
     loading: false,
     error: null,
     sportDays: [],
+    welcome: false,
   },
   generateToday: {
     isOpen: false,
+    step: 1,
+    duration: 60,
+    equipment: "gym",
     preview: null,
     loading: false,
     error: null,
@@ -362,6 +379,8 @@ export function modalReducer(state, action) {
           goal: action.payload.goal || "",
           sports: action.payload.sports || "",
           about: action.payload.about || "",
+          avatarUrl: action.payload.avatarUrl || null,
+          avatarPreview: null,
           saving: false,
           error: "",
         },
@@ -404,6 +423,45 @@ export function modalReducer(state, action) {
         changeUsername: initialModalState.changeUsername,
       };
 
+    // ===== CHANGE PASSWORD MODAL =====
+    case "OPEN_CHANGE_PASSWORD":
+      return {
+        ...state,
+        changePassword: {
+          isOpen: true,
+          newPassword: "",
+          confirmPassword: "",
+          saving: false,
+          error: "",
+          success: false,
+        },
+      };
+
+    case "UPDATE_CHANGE_PASSWORD":
+      return {
+        ...state,
+        changePassword: { ...state.changePassword, ...action.payload },
+      };
+
+    case "CLOSE_CHANGE_PASSWORD":
+      return {
+        ...state,
+        changePassword: initialModalState.changePassword,
+      };
+
+    // ===== WELCOME CHOICE MODAL =====
+    case "OPEN_WELCOME_CHOICE":
+      return {
+        ...state,
+        welcomeChoice: { isOpen: true },
+      };
+
+    case "CLOSE_WELCOME_CHOICE":
+      return {
+        ...state,
+        welcomeChoice: initialModalState.welcomeChoice,
+      };
+
     // ===== GENERATE WIZARD MODAL =====
     case "OPEN_GENERATE_WIZARD":
       return {
@@ -412,6 +470,7 @@ export function modalReducer(state, action) {
           ...initialModalState.generateWizard,
           isOpen: true,
           equipment: action.payload?.equipment || "gym",
+          welcome: action.payload?.welcome || false,
         },
       };
 
@@ -432,8 +491,12 @@ export function modalReducer(state, action) {
       return {
         ...state,
         generateToday: {
+          ...initialModalState.generateToday,
           isOpen: true,
-          preview: action.payload.preview,
+          step: 1,
+          equipment: action.payload?.equipment || "gym",
+          duration: action.payload?.duration || 60,
+          preview: action.payload?.preview || null,
         },
       };
 

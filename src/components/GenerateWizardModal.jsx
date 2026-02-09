@@ -40,6 +40,7 @@ export function GenerateWizardModal({
     loading,
     error,
     sportDays,
+    welcome,
   } = wizardState;
 
   const goal = profile?.goal || "General Fitness";
@@ -48,16 +49,16 @@ export function GenerateWizardModal({
   const hasSport = !!(profile?.sports && profile.sports.trim());
   const sportName = hasSport ? profile.sports.trim() : "";
 
-  // Steps: sport? → days → duration → equipment → preview
-  // With sport: 1=Sport Days, 2=Workout Days, 3=Duration, 4=Equipment, 5=Preview
-  // Without:   1=Workout Days, 2=Duration, 3=Equipment, 4=Preview
-  const TOTAL_STEPS = hasSport ? 5 : 4;
+  // Steps: welcome? → sport? → days → duration → equipment → preview
+  const stepSequence = [];
+  if (welcome) stepSequence.push("welcome");
+  if (hasSport) stepSequence.push("sport");
+  stepSequence.push("days", "duration", "equipment", "preview");
+
+  const TOTAL_STEPS = stepSequence.length;
 
   function getStepContent(s) {
-    if (hasSport) {
-      return ["", "sport", "days", "duration", "equipment", "preview"][s];
-    }
-    return ["", "days", "duration", "equipment", "preview"][s];
+    return stepSequence[s - 1] || "";
   }
 
   const currentContent = getStepContent(step);
@@ -166,11 +167,16 @@ export function GenerateWizardModal({
     textAlign: "center",
   });
 
-  const stepTitles = hasSport
-    ? ["", `How many days do you play ${sportName}?`, "How many gym days?", "Session duration?", "Equipment?", "Your Program"]
-    : ["", "How many workout days?", "Session duration?", "Equipment?", "Your Program"];
+  const contentToTitle = {
+    welcome: `Welcome, ${profile?.display_name || profile?.username || ""}!`,
+    sport: `How many days do you play ${sportName}?`,
+    days: hasSport ? "How many gym days?" : "How many workout days?",
+    duration: "Session duration?",
+    equipment: "Equipment?",
+    preview: "Your Program",
+  };
 
-  const stepTitle = stepTitles[step] || "";
+  const stepTitle = contentToTitle[currentContent] || "";
 
   const toggleSportDay = (day) => {
     const current = sportDays || [];
@@ -184,6 +190,19 @@ export function GenerateWizardModal({
   return (
     <Modal open={open} title={stepTitle} onClose={onClose} styles={styles}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* Welcome step */}
+        {currentContent === "welcome" && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, paddingTop: 12, paddingBottom: 8, textAlign: "center" }}>
+            <div style={{ fontSize: 36 }}>{"\uD83C\uDFCB\uFE0F"}</div>
+            <div style={{ fontSize: 15, opacity: 0.85, lineHeight: 1.6 }}>
+              Let's build your personalized workout program. We'll ask a few quick questions about your schedule and preferences, then generate a plan tailored just for you.
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.5 }}>
+              Takes about 30 seconds.
+            </div>
+          </div>
+        )}
+
         {/* Sport days — Mon-Sun toggle chips */}
         {currentContent === "sport" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center", paddingTop: 12 }}>

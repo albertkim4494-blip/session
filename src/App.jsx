@@ -29,7 +29,7 @@ import { useSwipe } from "./hooks/useSwipe";
 import { Modal, ConfirmModal, InputModal } from "./components/Modal";
 import { PillTabs } from "./components/PillTabs";
 import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
-import { ProfileModal, ChangeUsernameModal } from "./components/ProfileModal";
+import { ProfileModal, ChangeUsernameModal, ChangePasswordModal } from "./components/ProfileModal";
 import { CoachInsightsCard, CoachNudge, AddSuggestedExerciseModal } from "./components/CoachInsights";
 import { CatalogBrowseModal } from "./components/CatalogBrowseModal";
 import { GenerateWizardModal } from "./components/GenerateWizardModal";
@@ -55,7 +55,7 @@ function ensureAnimations() {
   const s = document.createElement("style");
   s.textContent = `
 @keyframes tabFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toastSlideUp { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes toastPop { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 `;
   document.head.appendChild(s);
 }
@@ -226,11 +226,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     },
   });
 
-  // Auto-open generate wizard after onboarding
+  // After onboarding, show welcome choice modal
   useEffect(() => {
     if (showGenerateWizard) {
-      setTab("plan");
-      dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } });
+      dispatchModal({ type: "OPEN_WELCOME_CHOICE" });
       onGenerateWizardShown?.();
     }
   }, [showGenerateWizard]);
@@ -278,7 +277,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("username, display_name, username_last_changed_at, username_change_count, birthdate, gender, age, weight_lbs, goal, about, sports")
+          .select("username, display_name, username_last_changed_at, username_change_count, birthdate, gender, age, weight_lbs, goal, about, sports, avatar_url")
           .eq("id", session.user.id)
           .single();
         if (!cancelled && data && !error) {
@@ -564,8 +563,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const anyModalOpen = modals.log.isOpen || modals.confirm.isOpen || modals.input.isOpen ||
     modals.datePicker.isOpen || modals.addWorkout.isOpen || modals.addExercise.isOpen ||
     modals.addSuggestion.isOpen || modals.profile.isOpen || modals.changeUsername.isOpen ||
-    modals.editWorkout?.isOpen || modals.editExercise?.isOpen || modals.catalogBrowse.isOpen ||
-    modals.generateWizard.isOpen || modals.generateToday.isOpen;
+    modals.changePassword.isOpen || modals.welcomeChoice.isOpen || modals.editWorkout?.isOpen ||
+    modals.editExercise?.isOpen || modals.catalogBrowse.isOpen || modals.generateWizard.isOpen ||
+    modals.generateToday.isOpen;
 
   const modalHistoryRef = useRef(false);
   const closingViaCodeRef = useRef(false);
@@ -1052,13 +1052,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     dispatchModal({ type: "CLOSE_GENERATE_WIZARD" });
   }
 
-  async function handleGenerateToday() {
-    // Open modal immediately with loading state
-    dispatchModal({ type: "OPEN_GENERATE_TODAY", payload: { preview: null } });
-    dispatchModal({ type: "UPDATE_GENERATE_TODAY", payload: { loading: true, error: null } });
+  function openGenerateToday() {
+    dispatchModal({ type: "OPEN_GENERATE_TODAY", payload: { equipment: equipment || "gym" } });
+  }
+
+  async function handleGenerateToday(opts) {
+    const eq = opts?.equipment || modals.generateToday.equipment || equipment;
+    const dur = opts?.duration || modals.generateToday.duration || 60;
+
+    dispatchModal({ type: "UPDATE_GENERATE_TODAY", payload: { loading: true, error: null, preview: null } });
 
     const result = await generateTodayAI({
-      equipment,
+      equipment: eq,
+      duration: dur,
       profile,
       state,
       catalog: EXERCISE_CATALOG,
@@ -1071,7 +1077,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       // Fallback to deterministic
       const fallback = generateTodayWorkout({
         state,
-        equipment,
+        equipment: eq,
         profile,
         catalog: EXERCISE_CATALOG,
         todayKey: dateKey,
@@ -1223,21 +1229,29 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {tab === "train" && workouts.length > 0 && (
+                {(tab === "train" || tab === "progress") && workouts.length > 0 && (
                   <button
                     style={{ ...styles.navArrow, opacity: 0.45 }}
                     onClick={() => {
-                      const allCollapsed = workouts.every((w) => collapsedToday.has(w.id));
-                      allCollapsed ? expandAll(setCollapsedToday) : collapseAll(setCollapsedToday, workouts.map((w) => w.id));
+                      const setter = tab === "train" ? setCollapsedToday : setCollapsedSummary;
+                      const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
+                      const allCollapsed = workouts.every((w) => collapsed.has(w.id));
+                      allCollapsed ? expandAll(setter) : collapseAll(setter, workouts.map((w) => w.id));
                     }}
-                    title={workouts.every((w) => collapsedToday.has(w.id)) ? "Expand all" : "Collapse all"}
+                    title={(() => {
+                      const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
+                      return workouts.every((w) => collapsed.has(w.id)) ? "Expand all" : "Collapse all";
+                    })()}
                     type="button"
                   >
-                    {workouts.every((w) => collapsedToday.has(w.id)) ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10l5-5 5 5" /><path d="M7 14l5 5 5-5" /></svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8l5 5 5-5" /><path d="M7 16l5-5 5 5" /></svg>
-                    )}
+                    {(() => {
+                      const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
+                      return workouts.every((w) => collapsed.has(w.id)) ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10l5-5 5 5" /><path d="M7 14l5 5 5-5" /></svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8l5 5 5-5" /><path d="M7 16l5-5 5 5" /></svg>
+                      );
+                    })()}
                   </button>
                 )}
                 <button
@@ -1260,13 +1274,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       goal: profile?.goal || "",
                       sports: profile?.sports || "",
                       about: profile?.about || "",
+                      avatarUrl: profile?.avatar_url || null,
                     },
                   })}
                   style={styles.avatarBtn}
                   aria-label="Profile"
                   type="button"
                 >
-                  {avatarInitial(profile?.display_name, profile?.username)}
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    avatarInitial(profile?.display_name, profile?.username)
+                  )}
                 </button>
               </div>
             </div>
@@ -1516,7 +1535,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       justifyContent: "center",
                       gap: 6,
                     }}
-                    onClick={handleGenerateToday}
+                    onClick={openGenerateToday}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
@@ -1673,7 +1692,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
                             </div>
                             {reorderWorkouts ? (
-                              <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+                              <div style={styles.reorderBtnGroup}>
                                 <button style={{ ...styles.reorderBtn, opacity: isFirst ? 0.15 : 0.5, padding: "0 4px" }} disabled={isFirst} onClick={() => moveWorkout(w.id, -1)} title="Move up">
                                   <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
                                 </button>
@@ -1871,15 +1890,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* Acknowledgment toast */}
       {toast && (
         <div style={{
-          position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)",
+          position: "fixed", top: "45%", left: "50%", transform: "translate(-50%, -50%)",
           background: colors.cardBg, color: colors.text, border: `1px solid ${colors.border}`,
-          borderRadius: 14, padding: "10px 20px", boxShadow: "0 12px 28px rgba(0,0,0,0.3)",
-          zIndex: 9999, textAlign: "center", animation: "toastSlideUp 0.3s ease-out",
+          borderRadius: 18, padding: "16px 28px", boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
+          zIndex: 9999, textAlign: "center", animation: "toastPop 0.25s ease-out",
           maxWidth: "80vw",
         }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>{toast.message}</div>
+          <div style={{ fontSize: 22, marginBottom: 4 }}>{toast.emoji || ""}</div>
+          <div style={{ fontSize: 16, fontWeight: 800 }}>{toast.message}</div>
           {toast.coachLine && (
-            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>{toast.coachLine}</div>
+            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 4 }}>{toast.coachLine}</div>
           )}
         </div>
       )}
@@ -2487,6 +2507,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         modalState={modals.profile}
         dispatch={dispatchModal}
         profile={profile}
+        session={session}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         equipment={equipment}
@@ -2494,6 +2515,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         onLogout={onLogout}
         onSave={saveProfile}
         styles={styles}
+        summaryStats={summaryStats}
+        colors={colors}
       />
 
       {/* Change Username Modal */}
@@ -2505,6 +2528,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         session={session}
         onProfileUpdate={(updates) => setProfile((prev) => ({ ...prev, ...updates }))}
         styles={styles}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        open={modals.changePassword.isOpen}
+        modalState={modals.changePassword}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
       />
 
       {/* Add Suggested Exercise Modal */}
@@ -2638,6 +2670,44 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         </Modal>
       )}
 
+      {/* Welcome Choice Modal (post-onboarding) */}
+      <Modal
+        open={modals.welcomeChoice.isOpen}
+        title={`Welcome, ${profile?.display_name || profile?.username || ""}!`}
+        onClose={() => dispatchModal({ type: "CLOSE_WELCOME_CHOICE" })}
+        styles={styles}
+      >
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "8px 0" }}>
+          <div style={{ fontSize: 40 }}>{"\uD83C\uDFCB\uFE0F"}</div>
+          <div style={{ fontSize: 15, opacity: 0.85, lineHeight: 1.6, textAlign: "center" }}>
+            Your profile is all set. How would you like to get started?
+          </div>
+          <button
+            style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 15 }}
+            onClick={() => {
+              dispatchModal({ type: "CLOSE_WELCOME_CHOICE" });
+              setTab("plan");
+              dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment, welcome: true } });
+            }}
+          >
+            Generate My Program
+          </button>
+          <button
+            style={{ ...styles.secondaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 15 }}
+            onClick={() => {
+              dispatchModal({ type: "CLOSE_WELCOME_CHOICE" });
+              setTab("plan");
+              showToast("Tap the + button in Structure to add your first workout");
+            }}
+          >
+            I'll Build My Own
+          </button>
+          <div style={{ fontSize: 12, opacity: 0.4, textAlign: "center" }}>
+            You can always generate or add workouts later from the Plan tab.
+          </div>
+        </div>
+      </Modal>
+
       {/* Generate Wizard Modal */}
       <GenerateWizardModal
         open={modals.generateWizard.isOpen}
@@ -2655,10 +2725,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* Generate Today Modal */}
       <GenerateTodayModal
         open={modals.generateToday.isOpen}
-        preview={modals.generateToday.preview}
-        loading={modals.generateToday.loading}
-        error={modals.generateToday.error}
-        onRegenerate={handleGenerateToday}
+        todayState={modals.generateToday}
+        dispatch={dispatchModal}
+        onGenerate={handleGenerateToday}
         onAccept={handleAcceptTodayWorkout}
         onClose={() => dispatchModal({ type: "CLOSE_GENERATE_TODAY" })}
         styles={styles}

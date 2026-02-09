@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Modal } from "./Modal";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { supabase } from "../lib/supabase";
@@ -9,14 +9,105 @@ import {
   usernameChangeCooldownMs,
   formatCooldown,
   sanitizeUsername,
+  avatarInitial,
 } from "../lib/userIdentity";
 import { EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
 
-export function ProfileModal({ open, modalState, dispatch, profile, theme, onToggleTheme, equipment, onSetEquipment, onLogout, onSave, styles }) {
+const sectionHeader = {
+  fontSize: 13,
+  fontWeight: 800,
+  opacity: 0.7,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  marginBottom: 2,
+};
+
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      const size = 256;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+
+      // Center-crop: use the smaller dimension as the crop square
+      const min = Math.min(img.width, img.height);
+      const sx = (img.width - min) / 2;
+      const sy = (img.height - min) / 2;
+      ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Canvas toBlob failed"));
+        },
+        "image/jpeg",
+        0.85
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to load image"));
+    };
+    img.src = url;
+  });
+}
+
+export function ProfileModal({ open, modalState, dispatch, profile, session, theme, onToggleTheme, equipment, onSetEquipment, onLogout, onSave, styles, summaryStats, colors }) {
+  const fileInputRef = useRef(null);
   if (!open) return null;
 
-  const { displayName, birthdate, gender, weightLbs, goal, sports, about, saving, error } = modalState;
+  const { displayName, birthdate, gender, weightLbs, goal, sports, about, avatarUrl, avatarPreview, saving, error } = modalState;
   const age = birthdate && isValidBirthdateString(birthdate) ? computeAge(birthdate) : null;
+  const initial = avatarInitial(displayName, profile?.username);
+  const avatarSrc = avatarPreview || avatarUrl;
+
+  async function handleAvatarPick(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: "Only JPEG, PNG, or WebP images allowed" } });
+      return;
+    }
+
+    // Show preview immediately
+    const previewUrl = URL.createObjectURL(file);
+    dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { avatarPreview: previewUrl, error: "" } });
+
+    try {
+      const compressed = await compressImage(file);
+      const userId = session.user.id;
+      const path = `${userId}/avatar.jpg`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, compressed, { upsert: true, contentType: "image/jpeg" });
+
+      if (uploadErr) {
+        dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { avatarPreview: null, error: uploadErr.message } });
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      const publicUrl = urlData.publicUrl + "?t=" + Date.now();
+
+      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { avatarUrl: publicUrl, avatarPreview: null } });
+      URL.revokeObjectURL(previewUrl);
+    } catch (err) {
+      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { avatarPreview: null, error: "Upload failed. Try again." } });
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+  }
 
   async function handleSave() {
     const dnErr = validateDisplayName(displayName);
@@ -45,6 +136,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, theme, onTog
       sports: sports.trim() || null,
       about: about.trim() || null,
       age: birthdate && isValidBirthdateString(birthdate) ? computeAge(birthdate) : null,
+      avatar_url: avatarUrl || null,
     };
 
     await onSave(updates);
@@ -60,155 +152,323 @@ export function ProfileModal({ open, modalState, dispatch, profile, theme, onTog
     });
   }
 
+  const footerContent = (
+    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <button style={styles.dangerBtn} onClick={onLogout} type="button">
+        Logout
+      </button>
+      <div style={{ flex: 1 }} />
+      {error && (
+        <div style={{
+          fontSize: 12,
+          color: colors?.dangerText || "#f87171",
+          background: colors?.dangerBg || "rgba(248,113,113,0.1)",
+          border: `1px solid ${colors?.dangerBorder || "rgba(248,113,113,0.3)"}`,
+          borderRadius: 8,
+          padding: "6px 10px",
+          flex: 1,
+          minWidth: 0,
+        }}>
+          {error}
+        </div>
+      )}
+      <button style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })}>
+        Cancel
+      </button>
+      <button style={styles.primaryBtn} onClick={handleSave} disabled={saving}>
+        {saving ? "Saving..." : "Save"}
+      </button>
+    </div>
+  );
+
   return (
-    <Modal open={open} title="Profile" onClose={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })} styles={styles}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Username</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
-              @{profile?.username || "\u2014"}
-            </span>
+    <Modal open={open} title="Profile" onClose={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })} styles={styles} footer={footerContent}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+
+        {/* Hidden file input for avatar */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          style={{ display: "none" }}
+          onChange={handleAvatarPick}
+        />
+
+        {/* ── Hero Section ── */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, paddingTop: 4, paddingBottom: 4 }}>
+          <div style={{ position: "relative", width: 68, height: 68 }}>
             <button
               type="button"
-              onClick={openChangeUsername}
-              style={{ ...styles.secondaryBtn, padding: "4px 10px", fontSize: 12 }}
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                width: 68,
+                height: 68,
+                borderRadius: 999,
+                background: colors?.primaryBg || "#152338",
+                color: colors?.primaryText || "#e8eef7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 900,
+                fontSize: 28,
+                border: `2px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
+                cursor: "pointer",
+                padding: 0,
+                overflow: "hidden",
+              }}
+              aria-label="Change profile picture"
             >
-              Change
+              {avatarSrc ? (
+                <img src={avatarSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                initial
+              )}
             </button>
+            {/* Camera badge — outside button so it isn't clipped */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                position: "absolute",
+                bottom: 0,
+                right: 0,
+                width: 22,
+                height: 22,
+                borderRadius: 999,
+                background: colors?.primaryBg || "#152338",
+                border: `2px solid ${colors?.cardBg || "#0f1722"}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                pointerEvents: "auto",
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors?.primaryText || "#e8eef7"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+            </div>
           </div>
-        </div>
-
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Display Name</label>
-          <input
-            value={displayName}
-            onChange={(e) => update("displayName", e.target.value)}
-            style={styles.textInput}
-            placeholder="e.g. John Doe"
-            maxLength={30}
-          />
-          <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>Shown publicly. Falls back to username if empty.</span>
-        </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <div style={{ ...styles.fieldCol, flex: 1 }}>
-            <label style={styles.label}>Birthdate</label>
-            <input
-              type="date"
-              value={birthdate}
-              onChange={(e) => update("birthdate", e.target.value)}
-              style={styles.textInput}
-            />
+          <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>
+            {displayName?.trim() || profile?.username || "User"}
+          </div>
+          <div style={{ fontSize: 13, opacity: 0.5, fontWeight: 600 }}>
+            @{profile?.username || "\u2014"}
           </div>
           {age !== null && (
-            <div style={{ ...styles.fieldCol, width: 60, flexShrink: 0 }}>
-              <label style={styles.label}>Age</label>
-              <div style={{ padding: "10px 0", fontWeight: 800, fontSize: 14 }}>
-                {age}
-              </div>
+            <div style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: "3px 10px",
+              borderRadius: 999,
+              background: colors?.cardAltBg || "rgba(255,255,255,0.06)",
+              border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
+              marginTop: 2,
+            }}>
+              {age} yrs old
             </div>
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
-          <div style={{ ...styles.fieldCol, flex: 1 }}>
-            <label style={styles.label}>Gender</label>
-            <select
-              value={gender}
-              onChange={(e) => update("gender", e.target.value)}
-              style={styles.textInput}
-            >
-              <option value="">Prefer not to say</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
-            </select>
+        {/* ── Stats Row ── */}
+        {summaryStats && (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 8,
+          }}>
+            <div style={{
+              textAlign: "center", padding: "10px 6px", borderRadius: 12,
+              background: colors?.cardAltBg, border: `1px solid ${colors?.border}`,
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.logged}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
+            </div>
+            <div style={{
+              textAlign: "center", padding: "10px 6px", borderRadius: 12,
+              background: colors?.cardAltBg, border: `1px solid ${colors?.border}`,
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.totalSets}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Total Sets</div>
+            </div>
+            <div style={{
+              textAlign: "center", padding: "10px 6px", borderRadius: 12,
+              background: colors?.cardAltBg, border: `1px solid ${colors?.border}`,
+            }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.streak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.streak}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Day Streak</div>
+            </div>
           </div>
-          <div style={{ ...styles.fieldCol, flex: 1 }}>
-            <label style={styles.label}>Weight (lbs)</label>
+        )}
+
+        {/* ── Personal Info ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={sectionHeader}>Personal Info</div>
+
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Display Name</label>
             <input
-              type="number"
-              value={weightLbs}
-              onChange={(e) => update("weightLbs", e.target.value)}
+              value={displayName}
+              onChange={(e) => update("displayName", e.target.value)}
               style={styles.textInput}
-              placeholder="e.g. 170"
-              min={50}
-              max={1000}
+              placeholder="e.g. John Doe"
+              maxLength={30}
+            />
+            <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>Shown publicly. Falls back to username if empty.</span>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ ...styles.fieldCol, flex: 1 }}>
+              <label style={styles.label}>Birthdate</label>
+              <input
+                type="date"
+                value={birthdate}
+                onChange={(e) => update("birthdate", e.target.value)}
+                style={styles.textInput}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ ...styles.fieldCol, flex: 1 }}>
+              <label style={styles.label}>Gender</label>
+              <select
+                value={gender}
+                onChange={(e) => update("gender", e.target.value)}
+                style={styles.textInput}
+              >
+                <option value="">Prefer not to say</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div style={{ ...styles.fieldCol, flex: 1 }}>
+              <label style={styles.label}>Weight (lbs)</label>
+              <input
+                type="number"
+                value={weightLbs}
+                onChange={(e) => update("weightLbs", e.target.value)}
+                style={styles.textInput}
+                placeholder="e.g. 170"
+                min={50}
+                max={1000}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Goals ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={sectionHeader}>Goals</div>
+
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Fitness Goal</label>
+            <input
+              value={goal}
+              onChange={(e) => update("goal", e.target.value)}
+              style={styles.textInput}
+              placeholder="e.g. Build muscle"
+            />
+          </div>
+
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Sports / Activities</label>
+            <input
+              value={sports}
+              onChange={(e) => update("sports", e.target.value)}
+              style={styles.textInput}
+              placeholder="e.g. Running, Basketball"
+            />
+          </div>
+
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>About You</label>
+            <textarea
+              value={about}
+              onChange={(e) => update("about", e.target.value)}
+              style={styles.textarea}
+              placeholder="Anything you'd like to share..."
+              rows={3}
             />
           </div>
         </div>
 
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Fitness Goal</label>
-          <input
-            value={goal}
-            onChange={(e) => update("goal", e.target.value)}
-            style={styles.textInput}
-            placeholder="e.g. Build muscle"
-          />
-        </div>
+        {/* ── Account ── */}
+        <div style={{ borderTop: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`, paddingTop: 14 }}>
+          <div style={{ ...sectionHeader, marginBottom: 10 }}>Account</div>
 
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Sports / Activities</label>
-          <input
-            value={sports}
-            onChange={(e) => update("sports", e.target.value)}
-            style={styles.textInput}
-            placeholder="e.g. Running, Basketball"
-          />
-        </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Username</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
+                  @{profile?.username || "\u2014"}
+                </span>
+                <button
+                  type="button"
+                  onClick={openChangeUsername}
+                  style={{ ...styles.secondaryBtn, padding: "4px 10px", fontSize: 12 }}
+                >
+                  Change
+                </button>
+              </div>
+            </div>
 
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>About You</label>
-          <textarea
-            value={about}
-            onChange={(e) => update("about", e.target.value)}
-            style={styles.textarea}
-            placeholder="Anything you'd like to share..."
-            rows={3}
-          />
-        </div>
-
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Equipment Access</label>
-          <select
-            value={equipment || "gym"}
-            onChange={(e) => onSetEquipment(e.target.value)}
-            style={styles.textInput}
-          >
-            {Object.entries(EQUIPMENT_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-          <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>AI Coach will tailor suggestions to your setup.</span>
-        </div>
-
-        <div style={styles.profileDivider}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Theme</span>
-            <ThemeSwitch theme={theme} styles={styles} onToggle={onToggleTheme} />
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Password</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
+                  ••••••••
+                </span>
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: "OPEN_CHANGE_PASSWORD" })}
+                  style={{ ...styles.secondaryBtn, padding: "4px 10px", fontSize: 12 }}
+                >
+                  Change
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {error && <div style={{ color: "#f87171", fontSize: 13 }}>{error}</div>}
+        {/* ── Preferences ── */}
+        <div style={{ borderTop: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`, paddingTop: 14 }}>
+          <div style={{ ...sectionHeader, marginBottom: 10 }}>Preferences</div>
 
-        <div style={styles.modalFooter}>
-          <button
-            style={styles.dangerBtn}
-            onClick={onLogout}
-            type="button"
-          >
-            Logout
-          </button>
-          <div style={{ flex: 1 }} />
-          <button style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })}>
-            Cancel
-          </button>
-          <button style={styles.primaryBtn} onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save"}
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Equipment Access</label>
+              <select
+                value={equipment || "gym"}
+                onChange={(e) => onSetEquipment(e.target.value)}
+                style={styles.textInput}
+              >
+                {Object.entries(EQUIPMENT_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+              <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>AI Coach will tailor suggestions to your setup.</span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Theme</span>
+              <ThemeSwitch theme={theme} styles={styles} onToggle={onToggleTheme} />
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", opacity: 0.4 }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Notifications</span>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>Coming soon</span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", opacity: 0.4 }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Refer Friends</span>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>Coming soon</span>
+            </div>
+          </div>
         </div>
+
       </div>
     </Modal>
   );
@@ -314,6 +574,111 @@ export function ChangeUsernameModal({ open, modalState, dispatch, profile, sessi
             </button>
           )}
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+export function ChangePasswordModal({ open, modalState, dispatch, styles, colors }) {
+  if (!open) return null;
+
+  const { newPassword, confirmPassword, saving, error, success } = modalState;
+
+  async function handleConfirm() {
+    if (newPassword.length < 6) {
+      dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { error: "Password must be at least 6 characters" } });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { error: "Passwords do not match" } });
+      return;
+    }
+
+    dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { saving: true, error: "" } });
+
+    try {
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) {
+        dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { saving: false, error: updateErr.message } });
+        return;
+      }
+
+      dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { saving: false, success: true } });
+      setTimeout(() => dispatch({ type: "CLOSE_CHANGE_PASSWORD" }), 1500);
+    } catch {
+      dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { saving: false, error: "Failed to update. Try again." } });
+    }
+  }
+
+  return (
+    <Modal open={open} title="Change Password" onClose={() => dispatch({ type: "CLOSE_CHANGE_PASSWORD" })} styles={styles}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {success ? (
+          <div style={{
+            textAlign: "center",
+            padding: "18px 0",
+            fontSize: 15,
+            fontWeight: 700,
+            color: "#2ecc71",
+          }}>
+            Password updated!
+          </div>
+        ) : (
+          <>
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => dispatch({
+                  type: "UPDATE_CHANGE_PASSWORD",
+                  payload: { newPassword: e.target.value, error: "" },
+                })}
+                style={styles.textInput}
+                placeholder="Min 6 characters"
+                autoFocus
+              />
+            </div>
+
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => dispatch({
+                  type: "UPDATE_CHANGE_PASSWORD",
+                  payload: { confirmPassword: e.target.value, error: "" },
+                })}
+                style={styles.textInput}
+                placeholder="Re-enter password"
+              />
+            </div>
+
+            {error && (
+              <div style={{
+                fontSize: 13,
+                color: colors?.dangerText || "#f87171",
+                background: colors?.dangerBg || "rgba(248,113,113,0.1)",
+                border: `1px solid ${colors?.dangerBorder || "rgba(248,113,113,0.3)"}`,
+                borderRadius: 8,
+                padding: "6px 10px",
+              }}>
+                {error}
+              </div>
+            )}
+          </>
+        )}
+
+        {!success && (
+          <div style={styles.modalFooter}>
+            <button style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_CHANGE_PASSWORD" })}>
+              Cancel
+            </button>
+            <button style={styles.primaryBtn} onClick={handleConfirm} disabled={saving}>
+              {saving ? "Updating..." : "Update Password"}
+            </button>
+          </div>
+        )}
       </div>
     </Modal>
   );

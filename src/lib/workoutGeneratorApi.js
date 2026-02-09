@@ -195,6 +195,7 @@ export async function generateProgramAI({
  */
 export async function generateTodayAI({
   equipment,
+  duration,
   profile,
   state,
   catalog,
@@ -213,6 +214,7 @@ export async function generateTodayAI({
           mode: "today",
           profile: profile || {},
           equipment,
+          duration: duration || 60,
           catalog: catalogPayload,
           history,
           muscleRecency,

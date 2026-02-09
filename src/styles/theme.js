@@ -86,6 +86,7 @@ export function getStyles(colors) {
       padding: 0,
       cursor: "pointer",
       WebkitTapHighlightColor: "transparent",
+      overflow: "hidden",
     },
 
     profileDivider: {

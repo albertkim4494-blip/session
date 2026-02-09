@@ -3,14 +3,22 @@ import { supabase } from "../lib/supabase";
 import { validateUsernameStrict, sanitizeUsername, validateDisplayName } from "../lib/userIdentity";
 import { isValidBirthdateString, computeAge } from "../lib/validation";
 
+const EQUIPMENT_OPTIONS = [
+  { key: "home", label: "Home", desc: "Bodyweight only" },
+  { key: "basic", label: "Basic", desc: "Dumbbells, bench, pull-up bar" },
+  { key: "gym", label: "Full Gym", desc: "All equipment available" },
+];
+
 export default function OnboardingScreen({ session, onComplete }) {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [birthdate, setBirthdate] = useState("");
+  const [birthdateDisplay, setBirthdateDisplay] = useState("");
   const [weightLbs, setWeightLbs] = useState("");
   const [goal, setGoal] = useState("");
   const [about, setAbout] = useState("");
   const [sports, setSports] = useState("");
+  const [equipment, setEquipment] = useState("gym");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -56,6 +64,9 @@ export default function OnboardingScreen({ session, onComplete }) {
       return;
     }
 
+    // Save equipment to localStorage so App picks it up
+    try { localStorage.setItem("wt_equipment", equipment); } catch {}
+
     setLoading(true);
     try {
       const { error: updateError } = await supabase
@@ -90,8 +101,11 @@ export default function OnboardingScreen({ session, onComplete }) {
   return (
     <div style={styles.wrapper}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Complete Your Profile</h1>
-        <p style={styles.subtitle}>Tell us a bit about yourself to get started.</p>
+        {/* Sticky header */}
+        <div style={styles.stickyHeader}>
+          <h1 style={styles.title}>Complete Your Profile</h1>
+          <p style={styles.subtitle}>Tell us a bit about yourself to get started.</p>
+        </div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>Username *</label>
@@ -119,12 +133,28 @@ export default function OnboardingScreen({ session, onComplete }) {
 
           <label style={styles.label}>Birthdate *</label>
           <input
-            type="date"
-            value={birthdate}
-            onChange={(e) => setBirthdate(e.target.value)}
-            required
+            type="text"
+            inputMode="numeric"
+            placeholder="MM/DD/YYYY"
+            value={birthdateDisplay}
+            onChange={(e) => {
+              let v = e.target.value.replace(/[^\d]/g, "");
+              // Auto-insert slashes
+              if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
+              if (v.length > 5) v = v.slice(0, 5) + "/" + v.slice(5, 9);
+              setBirthdateDisplay(v);
+              // Convert complete MM/DD/YYYY to YYYY-MM-DD for storage
+              const match = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+              if (match) {
+                setBirthdate(`${match[3]}-${match[1]}-${match[2]}`);
+              } else {
+                setBirthdate("");
+              }
+            }}
+            maxLength={10}
             style={styles.input}
           />
+          <span style={styles.helper}>Enter as MM/DD/YYYY</span>
 
           <label style={styles.label}>Weight (lbs) *</label>
           <input
@@ -148,6 +178,36 @@ export default function OnboardingScreen({ session, onComplete }) {
             style={styles.input}
           />
 
+          <label style={styles.label}>Equipment Access *</label>
+          <div style={{ display: "flex", gap: 8, width: "100%", boxSizing: "border-box" }}>
+            {EQUIPMENT_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setEquipment(opt.key)}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "10px 8px",
+                  borderRadius: 10,
+                  border: `2px solid ${equipment === opt.key ? "#2dd4bf" : "#1e293b"}`,
+                  background: equipment === opt.key ? "rgba(45,212,191,0.12)" : "#1a2332",
+                  color: equipment === opt.key ? "#2dd4bf" : "#94a3b8",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
+                <span>{opt.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.7 }}>{opt.desc}</span>
+              </button>
+            ))}
+          </div>
+
           <label style={styles.label}>About You</label>
           <textarea
             placeholder={"e.g. 34M, desk job. Recovering from a shoulder impingement (cleared by PT in Dec). Can't do overhead pressing yet. Played water polo in college but haven't been consistent in 5+ years. Want to build back slowly."}
@@ -170,7 +230,7 @@ export default function OnboardingScreen({ session, onComplete }) {
           {error && <div style={styles.error}>{error}</div>}
 
           <button type="submit" disabled={loading} style={styles.submit}>
-            {loading ? "Saving..." : "Generate Plan"}
+            {loading ? "Saving..." : "Let's Go"}
           </button>
         </form>
       </div>
@@ -195,9 +255,21 @@ const styles = {
     maxWidth: 380,
     maxHeight: "90dvh",
     overflowY: "auto",
+    overflowX: "hidden",
     background: "#0f1722",
     borderRadius: 16,
-    padding: 32,
+    padding: "0 32px 32px",
+    display: "flex",
+    flexDirection: "column",
+    boxSizing: "border-box",
+  },
+  stickyHeader: {
+    position: "sticky",
+    top: 0,
+    background: "#0f1722",
+    paddingTop: 32,
+    paddingBottom: 8,
+    zIndex: 2,
   },
   title: {
     color: "#fff",
@@ -210,7 +282,7 @@ const styles = {
     color: "#64748b",
     fontSize: 14,
     textAlign: "center",
-    margin: "0 0 24px",
+    margin: "0 0 8px",
   },
   form: {
     display: "flex",
@@ -231,6 +303,8 @@ const styles = {
     background: "#1a2332",
     color: "#fff",
     outline: "none",
+    boxSizing: "border-box",
+    width: "100%",
   },
   helper: {
     color: "#64748b",

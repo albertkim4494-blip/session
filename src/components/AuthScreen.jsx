@@ -1,16 +1,42 @@
 import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
 
+const EyeIcon = ({ open }) => open ? (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+) : (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+  </svg>
+);
+
 export default function AuthScreen() {
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Auto-clear mismatch error when passwords match
+  const confirmMismatch = mode === "signup" && confirmPassword.length > 0 && password !== confirmPassword;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (mode === "signup" && password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -41,7 +67,7 @@ export default function AuthScreen() {
               ...styles.pill,
               ...(isLogin ? styles.pillActive : styles.pillInactive),
             }}
-            onClick={() => { setMode("login"); setError(""); }}
+            onClick={() => { setMode("login"); setError(""); setConfirmPassword(""); setShowConfirm(false); }}
           >
             Log In
           </button>
@@ -50,7 +76,7 @@ export default function AuthScreen() {
               ...styles.pill,
               ...(!isLogin ? styles.pillActive : styles.pillInactive),
             }}
-            onClick={() => { setMode("signup"); setError(""); }}
+            onClick={() => { setMode("signup"); setError(""); setConfirmPassword(""); setShowConfirm(false); }}
           >
             Sign Up
           </button>
@@ -66,16 +92,55 @@ export default function AuthScreen() {
             autoComplete="email"
             style={styles.input}
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            autoComplete={isLogin ? "current-password" : "new-password"}
-            style={styles.input}
-          />
+          <div style={styles.passwordWrapper}>
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setError(""); }}
+              required
+              minLength={6}
+              autoComplete={isLogin ? "current-password" : "new-password"}
+              style={{ ...styles.input, paddingRight: 42 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              style={styles.eyeBtn}
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              <EyeIcon open={showPassword} />
+            </button>
+          </div>
+          {!isLogin && (
+            <>
+              <div style={styles.passwordWrapper}>
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  style={{ ...styles.input, paddingRight: 42 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  style={styles.eyeBtn}
+                  tabIndex={-1}
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
+                >
+                  <EyeIcon open={showConfirm} />
+                </button>
+              </div>
+              {confirmMismatch && (
+                <div style={styles.mismatch}>Passwords do not match</div>
+              )}
+            </>
+          )}
 
           {error && <div style={styles.error}>{error}</div>}
 
@@ -166,6 +231,30 @@ const styles = {
     background: "#1a2332",
     color: "#fff",
     outline: "none",
+    width: "100%",
+    boxSizing: "border-box",
+  },
+  passwordWrapper: {
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+  },
+  eyeBtn: {
+    position: "absolute",
+    right: 10,
+    background: "none",
+    border: "none",
+    color: "#64748b",
+    cursor: "pointer",
+    padding: 4,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mismatch: {
+    color: "#fbbf24",
+    fontSize: 12,
+    marginTop: -6,
   },
   error: {
     color: "#f87171",

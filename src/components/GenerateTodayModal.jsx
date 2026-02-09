@@ -1,5 +1,17 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Modal } from "./Modal";
+import { EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
+
+const EQUIPMENT_KEYS = ["home", "basic", "gym"];
+
+const DURATION_OPTIONS = [
+  { value: 10, label: "10 min" },
+  { value: 15, label: "15 min" },
+  { value: 30, label: "30 min" },
+  { value: 45, label: "45 min" },
+  { value: 60, label: "60 min" },
+  { value: 90, label: "90+ min" },
+];
 
 const MUSCLE_LABELS = {
   CHEST: "Chest",
@@ -18,16 +30,72 @@ const MUSCLE_LABELS = {
 
 export function GenerateTodayModal({
   open,
-  preview,
-  loading,
-  error,
-  onRegenerate,
+  todayState,
+  dispatch,
+  onGenerate,
   onAccept,
   onClose,
   styles,
   colors,
 }) {
   if (!open) return null;
+
+  const { step, duration, equipment, preview, loading, error } = todayState;
+  const genRef = useRef(0);
+
+  const update = (payload) =>
+    dispatch({ type: "UPDATE_GENERATE_TODAY", payload });
+
+  // Auto-generate when entering step 3 (preview)
+  useEffect(() => {
+    if (step !== 3 || preview || loading) return;
+    const genId = ++genRef.current;
+    onGenerate({ equipment, duration });
+    // onGenerate handles setting loading/preview state
+  }, [step, preview, loading]);
+
+  const TOTAL_STEPS = 3; // 1=duration, 2=equipment, 3=preview
+
+  const stepTitles = ["", "How much time do you have?", "Equipment?", "Generated Workout"];
+  const stepTitle = stepTitles[step] || "";
+
+  const goNext = () => {
+    if (step < TOTAL_STEPS) update({ step: step + 1 });
+  };
+  const goBack = () => {
+    if (step === 3) update({ step: step - 1, preview: null, loading: false, error: null });
+    else if (step > 1) update({ step: step - 1 });
+  };
+
+  const handleRegenerate = () => {
+    update({ preview: null, loading: false, error: null });
+    // useEffect will re-trigger generation
+  };
+
+  const smallChipStyle = (active) => ({
+    padding: "8px 16px",
+    borderRadius: 999,
+    border: `2px solid ${active ? colors.primaryBg : colors.border}`,
+    background: active ? colors.primaryBg : colors.cardAltBg,
+    color: active ? colors.primaryText : colors.text,
+    fontWeight: 700,
+    fontSize: 14,
+    cursor: "pointer",
+    minWidth: 44,
+    textAlign: "center",
+  });
+
+  const chipStyle = (active) => ({
+    padding: "10px 16px",
+    borderRadius: 12,
+    border: `2px solid ${active ? colors.primaryBg : colors.border}`,
+    background: active ? colors.primaryBg : colors.cardAltBg,
+    color: active ? colors.primaryText : colors.text,
+    fontWeight: 700,
+    fontSize: 14,
+    cursor: "pointer",
+    textAlign: "left",
+  });
 
   const muscleChipStyle = {
     display: "inline-block",
@@ -41,10 +109,41 @@ export function GenerateTodayModal({
   };
 
   return (
-    <Modal open={open} title="Generated Workout" onClose={onClose} styles={styles}>
+    <Modal open={open} title={stepTitle} onClose={onClose} styles={styles}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {/* Loading state */}
-        {loading && !preview && (
+
+        {/* Step 1: Duration */}
+        {step === 1 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", paddingTop: 12 }}>
+            {DURATION_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                style={smallChipStyle(duration === opt.value)}
+                onClick={() => update({ duration: opt.value })}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Step 2: Equipment */}
+        {step === 2 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {EQUIPMENT_KEYS.map((key) => (
+              <button
+                key={key}
+                style={chipStyle(equipment === key)}
+                onClick={() => update({ equipment: key })}
+              >
+                {EQUIPMENT_LABELS[key]}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Step 3: Preview — loading */}
+        {step === 3 && loading && !preview && (
           <div style={{ textAlign: "center", padding: 32, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
             <div style={{
               width: 32, height: 32, border: `3px solid ${colors.border}`,
@@ -58,8 +157,8 @@ export function GenerateTodayModal({
           </div>
         )}
 
-        {/* Content */}
-        {preview && (
+        {/* Step 3: Preview — content */}
+        {step === 3 && preview && (
           <>
             {error && (
               <div style={{
@@ -72,7 +171,7 @@ export function GenerateTodayModal({
             )}
 
             <div style={{ fontSize: 12, opacity: 0.7 }}>
-              Based on your recent training — targets muscles you haven't worked recently.
+              Based on your recent training — targets muscles you haven't worked recently. {duration} min session.
             </div>
 
             <div
@@ -103,20 +202,37 @@ export function GenerateTodayModal({
                 </div>
               ))}
             </div>
+          </>
+        )}
 
-            <div style={styles.modalFooter}>
-              <button style={styles.secondaryBtn} onClick={onRegenerate}>
+        {/* Footer */}
+        <div style={styles.modalFooter}>
+          {step > 1 && !loading && (
+            <button style={styles.secondaryBtn} onClick={goBack}>
+              Back
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          {step < 3 && (
+            <button style={styles.primaryBtn} onClick={goNext}>
+              Next
+            </button>
+          )}
+          {step === 3 && !loading && (
+            <>
+              <button style={styles.secondaryBtn} onClick={handleRegenerate}>
                 Regenerate
               </button>
               <button
                 style={{ ...styles.primaryBtn, marginLeft: 8 }}
                 onClick={() => onAccept(preview)}
+                disabled={!preview}
               >
                 Add to Program
               </button>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </Modal>
   );
