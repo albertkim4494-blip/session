@@ -30,6 +30,7 @@ function buildCatalogPayload(catalog, equipment) {
       name: e.name,
       muscles: (e.muscles?.primary || []).join(", "),
       tags: (e.tags || []).join(", "),
+      unit: e.defaultUnit || "reps",
     }));
 }
 
@@ -120,6 +121,7 @@ function transformExercises(aiExercises, catalogMap) {
         name: entry.name, // use catalog name, not AI's
         unit: entry.defaultUnit,
         catalogId: e.catalogId,
+        scheme: e.scheme || null, // per-exercise scheme from AI
       };
     });
 }

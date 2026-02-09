@@ -22,7 +22,7 @@ function jsonResponse(data: unknown, status = 200) {
 function buildProgramPrompt(payload: {
   profile: Record<string, unknown>;
   equipment: string;
-  catalog: Array<{ id: string; name: string; muscles: string; tags: string }>;
+  catalog: Array<{ id: string; name: string; muscles: string; tags: string; unit?: string }>;
   history: string;
   daysPerWeek: number;
   duration: number;
@@ -57,8 +57,10 @@ function buildProgramPrompt(payload: {
   };
 
   const catalogText = catalog
-    .map((e) => `${e.id} | ${e.name} | ${e.muscles} | ${e.tags}`)
+    .map((e) => `${e.id} | ${e.name} | ${e.muscles} | ${e.tags} | ${e.unit || "reps"}`)
     .join("\n");
+
+  const exerciseCount = Math.max(3, Math.min(Math.round(duration / 7), 10));
 
   const sportDayCount = Array.isArray(sportDays) ? sportDays.length : 0;
   const sportDayList = Array.isArray(sportDays) ? sportDays.join(", ") : "";
@@ -88,22 +90,26 @@ TRAINING HISTORY (last 14 days):
 ${history || "No recent training data."}
 
 EXERCISE CATALOG (pick ONLY from these by catalogId):
-id | name | muscles | tags
+id | name | muscles | tags | unit
 ${catalogText}
 
 RULES:
 1. Pick exercises ONLY from the catalog above, using exact catalogId values.
 2. Consider injuries/limitations mentioned in the "About" field — avoid exercises that could aggravate them.
-3. Tailor exercise selection and rep schemes to the user's goal:
-   - Build Muscle: 4x8-12, emphasize hypertrophy with isolation + compound mix
-   - Get Stronger: 4x3-5, emphasize heavy compounds
-   - Lose Fat: 3x15-20, include supersets, keep rest short
-   - General Fitness: 3x10-12, balanced approach
-   - Sport Performance: 3x6-8, explosive + sport-specific movements
+3. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.
+   - For isometric/hold exercises (tagged "isometric", unit "sec") like planks: prescribe a SINGLE long hold, e.g. "1x60s", "1x45s", "1x90s". Do NOT prescribe multiple sets for holds.
+   - For other exercises with unit "sec" (non-isometric): prescribe time-based schemes like "3x30s".
+   - For exercises with unit "reps": prescribe rep-based schemes like "4x8-12", "3x10", "5x5".
+   - Tailor schemes to the user's goal:
+     * Build Muscle: 3-4 sets of 8-12 reps, emphasize hypertrophy
+     * Get Stronger: 4-5 sets of 3-5 reps, heavy compounds
+     * Lose Fat: 3 sets of 15-20 reps, keep rest short
+     * General Fitness: 3 sets of 10-12 reps, balanced
+     * Sport Performance: 3-4 sets of 6-8 reps, explosive movements
 4. No duplicate exercises within a single day.
-5. Vary exercises across days — don't repeat the same exercise on multiple days unless necessary (e.g. squat variants).
+5. Vary exercises across days — don't repeat the same exercise on multiple days unless necessary.
 6. Order: compounds first, then isolation, then accessories/core.
-7. Each lifting day should have ${Math.max(3, Math.min(Math.round(duration / 7), 10))} exercises.
+7. Each lifting day should have ~${exerciseCount} exercises to fill ~${duration} minutes.
 8. Give each day a descriptive name (e.g. "Push", "Upper Hypertrophy", "Legs & Glutes").
 
 Return ONLY valid JSON, no markdown fences, no explanation.
@@ -113,9 +119,9 @@ OUTPUT FORMAT:
   "workouts": [
     {
       "name": "Day Name",
-      "scheme": "4x8-12",
       "exercises": [
-        { "catalogId": "c-bench-flat-bb", "name": "Barbell Bench Press" }
+        { "catalogId": "c-bench-flat-bb", "name": "Barbell Bench Press", "scheme": "4x8-12" },
+        { "catalogId": "x-plank", "name": "Plank", "scheme": "1x60s" }
       ]
     }
   ]
@@ -127,11 +133,12 @@ OUTPUT FORMAT:
 function buildTodayPrompt(payload: {
   profile: Record<string, unknown>;
   equipment: string;
-  catalog: Array<{ id: string; name: string; muscles: string; tags: string }>;
+  duration: number;
+  catalog: Array<{ id: string; name: string; muscles: string; tags: string; unit?: string }>;
   history: string;
   muscleRecency: Record<string, number | null>;
 }) {
-  const { profile, equipment, catalog, history, muscleRecency } = payload;
+  const { profile, equipment, duration, catalog, history, muscleRecency } = payload;
 
   const profileLines: string[] = [];
   if (profile.age) profileLines.push(`Age: ${profile.age}`);
@@ -148,7 +155,7 @@ function buildTodayPrompt(payload: {
   };
 
   const catalogText = catalog
-    .map((e) => `${e.id} | ${e.name} | ${e.muscles} | ${e.tags}`)
+    .map((e) => `${e.id} | ${e.name} | ${e.muscles} | ${e.tags} | ${e.unit || "reps"}`)
     .join("\n");
 
   const recencyLines = Object.entries(muscleRecency)
@@ -158,6 +165,8 @@ function buildTodayPrompt(payload: {
     .join("\n");
 
   const goal = (profile.goal as string) || "General Fitness";
+  const dur = duration || 60;
+  const exerciseCount = Math.max(2, Math.min(Math.round(dur / 7), 10));
 
   const system = `You are an expert strength & conditioning coach designing a single workout for today.
 
@@ -166,6 +175,7 @@ ${profileLines.length > 0 ? profileLines.join("\n") : "No profile info."}
 
 Equipment: ${equipmentLabels[equipment] || "Full gym"}
 Goal: ${goal}
+Session duration: ~${dur} minutes
 
 MUSCLE RECENCY (days since last trained):
 ${recencyLines}
@@ -174,17 +184,26 @@ TRAINING HISTORY (last 14 days):
 ${history || "No recent training data."}
 
 EXERCISE CATALOG (pick ONLY from these by catalogId):
-id | name | muscles | tags
+id | name | muscles | tags | unit
 ${catalogText}
 
 RULES:
 1. Prioritize muscles that haven't been trained recently (high days-ago or "never trained").
 2. Pick exercises ONLY from the catalog, using exact catalogId values.
 3. Consider injuries/limitations from the "About" field.
-4. Tailor to the user's goal.
+4. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.
+   - For isometric/hold exercises (tagged "isometric", unit "sec") like planks: prescribe a SINGLE long hold, e.g. "1x60s", "1x45s", "1x90s". Do NOT prescribe multiple sets for holds.
+   - For other exercises with unit "sec" (non-isometric): prescribe time-based schemes like "3x30s".
+   - For exercises with unit "reps": prescribe rep-based schemes like "4x8-12", "3x10", "5x5".
+   - Tailor schemes to the user's goal:
+     * Build Muscle: 3-4 sets of 8-12 reps
+     * Get Stronger: 4-5 sets of 3-5 reps
+     * Lose Fat: 3 sets of 15-20 reps
+     * General Fitness: 3 sets of 10-12 reps
+     * Sport Performance: 3-4 sets of 6-8 reps
 5. No duplicate exercises.
 6. Order: compounds first, then isolation, then accessories.
-7. Pick 6-8 exercises for ~60 minutes.
+7. Pick ~${exerciseCount} exercises to fit within ~${dur} minutes (including warm-up and rest between sets).
 8. Give the workout a descriptive name (e.g. "Pull", "Upper Body", "Chest & Shoulders").
 9. List the primary target muscle groups (use keys like CHEST, BACK, QUADS, etc.).
 
@@ -193,10 +212,10 @@ Return ONLY valid JSON, no markdown fences, no explanation.
 OUTPUT FORMAT:
 {
   "name": "Workout Name",
-  "scheme": "3x10-12",
   "targetMuscles": ["BACK", "BICEPS"],
   "exercises": [
-    { "catalogId": "b-row-bb", "name": "Barbell Row" }
+    { "catalogId": "b-row-bb", "name": "Barbell Row", "scheme": "3x10-12" },
+    { "catalogId": "x-plank", "name": "Plank", "scheme": "1x60s" }
   ]
 }`;
 

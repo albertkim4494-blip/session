@@ -197,8 +197,13 @@ export function GenerateTodayModal({
               )}
 
               {preview.exercises.map((ex) => (
-                <div key={ex.id} style={{ fontSize: 13, padding: "2px 0", opacity: 0.85 }}>
-                  {ex.name}
+                <div key={ex.id} style={{ fontSize: 13, padding: "3px 0", opacity: 0.85, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>{ex.name}</span>
+                  {ex.scheme && (
+                    <span style={{ fontSize: 11, opacity: 0.6, fontWeight: 600, marginLeft: 8, whiteSpace: "nowrap" }}>
+                      {ex.scheme}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

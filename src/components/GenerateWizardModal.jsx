@@ -307,7 +307,7 @@ export function GenerateWizardModal({
               </div>
             )}
             <div style={{ fontSize: 12, opacity: 0.7 }}>
-              {daysPerWeek}-day {goal} program — {preview.scheme} per exercise — {duration} min sessions
+              {daysPerWeek}-day {goal} program — {duration} min sessions
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: "45vh", overflowY: "auto" }}>
               {preview.workouts.map((w) => (
@@ -329,8 +329,13 @@ export function GenerateWizardModal({
                     )}
                   </div>
                   {w.exercises.map((ex) => (
-                    <div key={ex.id} style={{ fontSize: 13, padding: "2px 0", opacity: 0.85 }}>
-                      {ex.name}
+                    <div key={ex.id} style={{ fontSize: 13, padding: "3px 0", opacity: 0.85, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>{ex.name}</span>
+                      {ex.scheme && (
+                        <span style={{ fontSize: 11, opacity: 0.6, fontWeight: 600, marginLeft: 8, whiteSpace: "nowrap" }}>
+                          {ex.scheme}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>

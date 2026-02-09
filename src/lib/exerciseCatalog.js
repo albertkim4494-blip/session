@@ -170,6 +170,37 @@ export const EXERCISE_CATALOG = [
   // MOBILITY / FLEXIBILITY
   // ===========================================================================
   { id: "m-yoga", name: "Yoga", defaultUnit: "min", muscles: { primary: [] }, equipment: [], aliases: ["yoga flow", "yoga session"], tags: ["mobility", "flexibility"], movement: "mobility" },
-  { id: "m-stretching", name: "Stretching", defaultUnit: "min", muscles: { primary: [] }, equipment: [], aliases: ["stretch", "static stretching", "dynamic stretching"], tags: ["mobility", "flexibility"], movement: "mobility" },
   { id: "m-foam-roll", name: "Foam Rolling", defaultUnit: "min", muscles: { primary: [] }, equipment: ["foam roller"], aliases: ["foam roll", "myofascial release"], tags: ["mobility", "recovery"], movement: "mobility" },
+
+  // ===========================================================================
+  // STRETCHES — General
+  // ===========================================================================
+  { id: "s-hamstring", name: "Hamstring Stretch", defaultUnit: "sec", muscles: { primary: ["HAMSTRINGS"] }, equipment: ["bodyweight"], aliases: ["standing hamstring stretch", "seated hamstring stretch", "toe touch"], tags: ["stretch", "isometric", "bodyweight", "posture"], movement: "stretch" },
+  { id: "s-quad", name: "Quad Stretch", defaultUnit: "sec", muscles: { primary: ["QUADS"] }, equipment: ["bodyweight"], aliases: ["standing quad stretch", "quad pull"], tags: ["stretch", "isometric", "bodyweight"], movement: "stretch" },
+  { id: "s-calf", name: "Calf Stretch", defaultUnit: "sec", muscles: { primary: ["CALVES"] }, equipment: ["bodyweight"], aliases: ["wall calf stretch", "standing calf stretch"], tags: ["stretch", "isometric", "bodyweight"], movement: "stretch" },
+  { id: "s-glute", name: "Glute Stretch", defaultUnit: "sec", muscles: { primary: ["GLUTES"] }, equipment: ["bodyweight"], aliases: ["pigeon stretch", "figure four stretch", "seated glute stretch"], tags: ["stretch", "isometric", "bodyweight"], movement: "stretch" },
+  { id: "s-lat", name: "Lat Stretch", defaultUnit: "sec", muscles: { primary: ["BACK"] }, equipment: ["bodyweight"], aliases: ["overhead lat stretch", "doorway lat stretch", "side lat stretch"], tags: ["stretch", "isometric", "bodyweight", "posture"], movement: "stretch" },
+  { id: "s-shoulder-cross", name: "Cross-Body Shoulder Stretch", defaultUnit: "sec", muscles: { primary: ["POSTERIOR_DELT"] }, equipment: ["bodyweight"], aliases: ["cross body stretch", "rear delt stretch", "shoulder stretch"], tags: ["stretch", "isometric", "bodyweight"], movement: "stretch" },
+  { id: "s-tricep-overhead", name: "Overhead Tricep Stretch", defaultUnit: "sec", muscles: { primary: ["TRICEPS"] }, equipment: ["bodyweight"], aliases: ["tricep stretch", "behind head stretch"], tags: ["stretch", "isometric", "bodyweight"], movement: "stretch" },
+
+  // ===========================================================================
+  // STRETCHES — Kyphosis / Rounded Upper Back
+  // ===========================================================================
+  { id: "s-chest-doorway", name: "Doorway Chest Stretch", defaultUnit: "sec", muscles: { primary: ["CHEST", "ANTERIOR_DELT"] }, equipment: ["bodyweight"], aliases: ["pec stretch", "doorway stretch", "chest opener"], tags: ["stretch", "isometric", "bodyweight", "posture", "kyphosis"], movement: "stretch" },
+  { id: "s-thoracic-ext", name: "Thoracic Extension", defaultUnit: "sec", muscles: { primary: ["BACK"] }, equipment: ["foam roller"], aliases: ["thoracic spine extension", "upper back extension", "foam roller thoracic"], tags: ["stretch", "isometric", "posture", "kyphosis", "mobility"], movement: "stretch" },
+  { id: "s-cat-cow", name: "Cat-Cow Stretch", defaultUnit: "reps", muscles: { primary: ["BACK", "ABS"] }, equipment: ["bodyweight"], aliases: ["cat cow", "cat camel", "spinal flexion extension"], tags: ["stretch", "mobility", "bodyweight", "posture", "kyphosis"], movement: "stretch" },
+  { id: "s-chin-tuck", name: "Chin Tucks", defaultUnit: "reps", muscles: { primary: [] }, equipment: ["bodyweight"], aliases: ["chin tuck", "neck retraction", "cervical retraction"], tags: ["stretch", "posture", "bodyweight", "kyphosis"], movement: "stretch" },
+  { id: "s-wall-angel", name: "Wall Angels", defaultUnit: "reps", muscles: { primary: ["POSTERIOR_DELT", "BACK"] }, equipment: ["bodyweight"], aliases: ["wall slide", "wall angel", "scapular wall slide"], tags: ["stretch", "mobility", "bodyweight", "posture", "kyphosis"], movement: "stretch" },
+  { id: "s-prone-y-raise", name: "Prone Y Raise", defaultUnit: "reps", muscles: { primary: ["BACK", "POSTERIOR_DELT"] }, equipment: ["bodyweight"], aliases: ["y raise", "floor y raise", "prone y"], tags: ["stretch", "mobility", "bodyweight", "posture", "kyphosis"], movement: "stretch" },
+
+  // ===========================================================================
+  // STRETCHES — Anterior Pelvic Tilt
+  // ===========================================================================
+  { id: "s-hip-flexor", name: "Hip Flexor Stretch", defaultUnit: "sec", muscles: { primary: ["QUADS"] }, equipment: ["bodyweight"], aliases: ["kneeling hip flexor stretch", "psoas stretch", "lunge stretch"], tags: ["stretch", "isometric", "bodyweight", "posture", "apt"], movement: "stretch" },
+  { id: "s-couch", name: "Couch Stretch", defaultUnit: "sec", muscles: { primary: ["QUADS"] }, equipment: ["bodyweight"], aliases: ["wall quad stretch", "elevated hip flexor stretch", "rear foot elevated stretch"], tags: ["stretch", "isometric", "bodyweight", "posture", "apt"], movement: "stretch" },
+  { id: "s-childs-pose", name: "Child's Pose", defaultUnit: "sec", muscles: { primary: ["BACK"] }, equipment: ["bodyweight"], aliases: ["child's pose", "resting pose", "balasana"], tags: ["stretch", "isometric", "bodyweight", "posture", "apt"], movement: "stretch" },
+  { id: "s-knee-to-chest", name: "Knee to Chest Stretch", defaultUnit: "sec", muscles: { primary: ["GLUTES", "BACK"] }, equipment: ["bodyweight"], aliases: ["single knee to chest", "double knee to chest", "low back stretch"], tags: ["stretch", "isometric", "bodyweight", "posture", "apt"], movement: "stretch" },
+  { id: "s-pelvic-tilt", name: "Posterior Pelvic Tilts", defaultUnit: "reps", muscles: { primary: ["ABS", "GLUTES"] }, equipment: ["bodyweight"], aliases: ["pelvic tilt", "supine pelvic tilt", "lying pelvic tilt"], tags: ["stretch", "mobility", "bodyweight", "posture", "apt"], movement: "stretch" },
+  { id: "s-glute-bridge", name: "Glute Bridge Hold", defaultUnit: "sec", muscles: { primary: ["GLUTES", "HAMSTRINGS"] }, equipment: ["bodyweight"], aliases: ["bridge hold", "hip bridge hold", "glute bridge"], tags: ["stretch", "isometric", "bodyweight", "posture", "apt"], movement: "stretch" },
+  { id: "s-dead-hang", name: "Dead Hang", defaultUnit: "sec", muscles: { primary: ["BACK"] }, equipment: ["pull-up bar"], aliases: ["bar hang", "passive hang", "spinal decompression"], tags: ["stretch", "isometric", "posture", "apt", "kyphosis"], movement: "stretch" },
 ];
