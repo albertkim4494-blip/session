@@ -54,7 +54,7 @@ function getRecentUserExercises(workouts, logsByDate, limit) {
 
   for (const date of dates) {
     const dayLogs = logsByDate[date];
-    if (!dayLogs || typeof dayLogs !== "object") continue;
+    if (!dayLogs || dayLogs === null || typeof dayLogs !== "object") continue;
     for (const exerciseId of Object.keys(dayLogs)) {
       const ex = idToEx.get(exerciseId);
       if (!ex) continue;

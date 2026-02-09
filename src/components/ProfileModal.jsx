@@ -139,7 +139,11 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
       avatar_url: avatarUrl || null,
     };
 
-    await onSave(updates);
+    try {
+      await onSave(updates);
+    } finally {
+      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { saving: false } });
+    }
   }
 
   const update = (field, value) => dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { [field]: value, error: "" } });

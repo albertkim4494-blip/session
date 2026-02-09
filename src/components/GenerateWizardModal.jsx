@@ -112,7 +112,8 @@ export function GenerateWizardModal({
     }
 
     generate();
-  }, [step, preview, loading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentContent, preview, loading]);
 
   if (!open) return null;
 

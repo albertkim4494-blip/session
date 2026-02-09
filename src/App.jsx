@@ -100,6 +100,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(null), ms);
   }, []);
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
   // AI Coach state
   const [profile, setProfile] = useState(null);

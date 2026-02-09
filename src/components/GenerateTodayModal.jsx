@@ -52,7 +52,8 @@ export function GenerateTodayModal({
     const genId = ++genRef.current;
     onGenerate({ equipment, duration });
     // onGenerate handles setting loading/preview state
-  }, [step, preview, loading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, preview, loading, equipment, duration]);
 
   const TOTAL_STEPS = 3; // 1=duration, 2=equipment, 3=preview
 

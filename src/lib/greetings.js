@@ -96,7 +96,7 @@ function dateSeed(dateKey) {
 function getStreak(logsByDate, dateKey) {
   let streak = 0;
   const d = new Date(dateKey + "T00:00:00");
-  while (true) {
+  while (streak < 365) {
     const key = d.toISOString().slice(0, 10);
     const dayLogs = logsByDate[key];
     if (!dayLogs || Object.keys(dayLogs).length === 0) break;
