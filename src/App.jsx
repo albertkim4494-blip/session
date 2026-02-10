@@ -368,6 +368,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let logged = 0;
     let total = 0;
     let totalSets = 0;
+    let longestStreak = 0;
+    let currentStreak = 0;
     let d = summaryRange.start;
     while (d <= summaryRange.end) {
       total++;
@@ -376,49 +378,46 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         const keys = Object.keys(dayLogs);
         if (keys.length > 0) {
           logged++;
+          currentStreak++;
+          if (currentStreak > longestStreak) longestStreak = currentStreak;
           for (const exId of keys) {
             const exLog = dayLogs[exId];
             if (exLog?.sets && Array.isArray(exLog.sets)) totalSets += exLog.sets.length;
           }
+        } else {
+          currentStreak = 0;
         }
+      } else {
+        currentStreak = 0;
       }
       d = addDays(d, 1);
     }
 
-    // Current streak: count consecutive days with logs going back from today
-    let streak = 0;
-    let sd = dateKey;
-    while (true) {
-      const dayLogs = state.logsByDate[sd];
-      if (dayLogs && typeof dayLogs === "object" && Object.keys(dayLogs).length > 0) {
-        streak++;
-        sd = addDays(sd, -1);
-      } else {
-        break;
-      }
-    }
-
-    return { logged, total, totalSets, streak };
-  }, [state.logsByDate, summaryRange, dateKey]);
+    return { logged, total, totalSets, longestStreak };
+  }, [state.logsByDate, summaryRange]);
 
   // All-time stats for profile modal (not tied to summary range)
   const profileStats = useMemo(() => {
-    let logged = 0;
-    let streak = 0;
-    for (const [k, v] of Object.entries(state.logsByDate)) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
-      if (v && typeof v === "object" && Object.keys(v).length > 0) logged++;
+    const activeDates = Object.keys(state.logsByDate)
+      .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k) && state.logsByDate[k] && typeof state.logsByDate[k] === "object" && Object.keys(state.logsByDate[k]).length > 0)
+      .sort();
+
+    const logged = activeDates.length;
+    if (logged === 0) return { logged: 0, longestStreak: 0 };
+
+    let longestStreak = 1;
+    let currentStreak = 1;
+    for (let i = 1; i < activeDates.length; i++) {
+      if (activeDates[i] === addDays(activeDates[i - 1], 1)) {
+        currentStreak++;
+        if (currentStreak > longestStreak) longestStreak = currentStreak;
+      } else {
+        currentStreak = 1;
+      }
     }
-    let sd = dateKey;
-    while (streak < 365) {
-      const dayLogs = state.logsByDate[sd];
-      if (dayLogs && typeof dayLogs === "object" && Object.keys(dayLogs).length > 0) {
-        streak++;
-        sd = addDays(sd, -1);
-      } else break;
-    }
-    return { logged, streak };
-  }, [state.logsByDate, dateKey]);
+
+    return { logged, longestStreak };
+  }, [state.logsByDate]);
 
   const loggedDaysInMonth = useMemo(() => {
     const set = new Set();
@@ -1441,13 +1440,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.logged}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
                 </div>
-                <div style={{
-                  textAlign: "center", padding: "10px 6px", borderRadius: 12,
-                  background: colors.cardAltBg, border: `1px solid ${colors.border}`,
-                }}>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.streak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.streak}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Day Streak</div>
-                </div>
+                {summaryMode === "week" ? (
+                  <div style={{
+                    textAlign: "center", padding: "10px 6px", borderRadius: 12,
+                    background: colors.cardAltBg, border: `1px solid ${colors.border}`,
+                  }}>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.logged > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.logged}/{summaryStats.total}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Days Active</div>
+                  </div>
+                ) : (
+                  <div style={{
+                    textAlign: "center", padding: "10px 6px", borderRadius: 12,
+                    background: colors.cardAltBg, border: `1px solid ${colors.border}`,
+                  }}>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.longestStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.longestStreak}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Longest Streak</div>
+                  </div>
+                )}
               </div>
 
               {/* Progress bar */}
