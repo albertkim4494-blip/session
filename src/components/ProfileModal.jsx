@@ -278,7 +278,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
         {summaryStats && (
           <div style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
+            gridTemplateColumns: "1fr 1fr",
             gap: 8,
           }}>
             <div style={{
@@ -287,13 +287,6 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
             }}>
               <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.logged}</div>
               <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
-            </div>
-            <div style={{
-              textAlign: "center", padding: "10px 6px", borderRadius: 12,
-              background: colors?.cardAltBg, border: `1px solid ${colors?.border}`,
-            }}>
-              <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.totalSets}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Total Sets</div>
             </div>
             <div style={{
               textAlign: "center", padding: "10px 6px", borderRadius: 12,

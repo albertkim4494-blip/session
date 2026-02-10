@@ -401,6 +401,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return { logged, total, totalSets, streak };
   }, [state.logsByDate, summaryRange, dateKey]);
 
+  // All-time stats for profile modal (not tied to summary range)
+  const profileStats = useMemo(() => {
+    let logged = 0;
+    let streak = 0;
+    for (const [k, v] of Object.entries(state.logsByDate)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+      if (v && typeof v === "object" && Object.keys(v).length > 0) logged++;
+    }
+    let sd = dateKey;
+    while (streak < 365) {
+      const dayLogs = state.logsByDate[sd];
+      if (dayLogs && typeof dayLogs === "object" && Object.keys(dayLogs).length > 0) {
+        streak++;
+        sd = addDays(sd, -1);
+      } else break;
+    }
+    return { logged, streak };
+  }, [state.logsByDate, dateKey]);
+
   const loggedDaysInMonth = useMemo(() => {
     const set = new Set();
     const prefix = modals.datePicker.monthCursor + "-";
@@ -1412,7 +1431,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               {/* Quick stats row */}
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
+                gridTemplateColumns: "1fr 1fr",
                 gap: 8,
               }}>
                 <div style={{
@@ -1421,13 +1440,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 }}>
                   <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.logged}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
-                </div>
-                <div style={{
-                  textAlign: "center", padding: "10px 6px", borderRadius: 12,
-                  background: colors.cardAltBg, border: `1px solid ${colors.border}`,
-                }}>
-                  <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.totalSets}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Total Sets</div>
                 </div>
                 <div style={{
                   textAlign: "center", padding: "10px 6px", borderRadius: 12,
@@ -2516,7 +2528,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         onLogout={onLogout}
         onSave={saveProfile}
         styles={styles}
-        summaryStats={summaryStats}
+        summaryStats={profileStats}
         colors={colors}
       />
 
