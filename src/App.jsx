@@ -302,6 +302,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const styles = useMemo(() => getStyles(colors), [colors]);
 
   const workouts = state.program.workouts;
+  const dailyWorkoutsToday = state.dailyWorkouts?.[dateKey] || [];
 
   const categoryOptions = useMemo(() => {
     const defaults = ["Workout", "Push", "Pull", "Legs", "Upper", "Lower", "Cardio", "Stretch", "Abs"];
@@ -364,13 +365,22 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return { start, end: dateKey, label: "All Time" };
   }, [dateKey, summaryMode, summaryOffset, state.logsByDate]);
 
+  const progressWorkouts = useMemo(() => {
+    const daily = [];
+    for (const [date, ws] of Object.entries(state.dailyWorkouts || {})) {
+      if (inRangeInclusive(date, summaryRange.start, summaryRange.end)) {
+        for (const w of ws) daily.push(w);
+      }
+    }
+    return [...workouts, ...daily];
+  }, [workouts, state.dailyWorkouts, summaryRange]);
+
   const summaryStats = useMemo(() => {
     let logged = 0;
     let total = 0;
     let totalSets = 0;
-    let longestStreak = 0;
-    let currentStreak = 0;
     let d = summaryRange.start;
+    const weekMap = {};
     while (d <= summaryRange.end) {
       total++;
       const dayLogs = state.logsByDate[d];
@@ -378,22 +388,30 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         const keys = Object.keys(dayLogs);
         if (keys.length > 0) {
           logged++;
-          currentStreak++;
-          if (currentStreak > longestStreak) longestStreak = currentStreak;
+          const weekStart = startOfWeekSunday(d);
+          weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
           for (const exId of keys) {
             const exLog = dayLogs[exId];
             if (exLog?.sets && Array.isArray(exLog.sets)) totalSets += exLog.sets.length;
           }
-        } else {
-          currentStreak = 0;
         }
-      } else {
-        currentStreak = 0;
       }
       d = addDays(d, 1);
     }
 
-    return { logged, total, totalSets, longestStreak };
+    // Consecutive weeks with 2+ sessions
+    const weekKeys = Object.keys(weekMap).sort();
+    let weekStreak = 0, curWeekStreak = 0;
+    for (const wk of weekKeys) {
+      if (weekMap[wk] >= 2) {
+        curWeekStreak++;
+        if (curWeekStreak > weekStreak) weekStreak = curWeekStreak;
+      } else {
+        curWeekStreak = 0;
+      }
+    }
+
+    return { logged, total, totalSets, weekStreak };
   }, [state.logsByDate, summaryRange]);
 
   // All-time stats for profile modal (not tied to summary range)
@@ -403,20 +421,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       .sort();
 
     const logged = activeDates.length;
-    if (logged === 0) return { logged: 0, longestStreak: 0 };
+    if (logged === 0) return { logged: 0, weekStreak: 0 };
 
-    let longestStreak = 1;
-    let currentStreak = 1;
-    for (let i = 1; i < activeDates.length; i++) {
-      if (activeDates[i] === addDays(activeDates[i - 1], 1)) {
-        currentStreak++;
-        if (currentStreak > longestStreak) longestStreak = currentStreak;
+    // Compute week streak: consecutive weeks with 2+ sessions
+    const weekMap = {};
+    for (const d of activeDates) {
+      const weekStart = startOfWeekSunday(d);
+      weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
+    }
+    const weekKeys = Object.keys(weekMap).sort();
+    let weekStreak = 0, curWeekStreak = 0;
+    for (const wk of weekKeys) {
+      if (weekMap[wk] >= 2) {
+        curWeekStreak++;
+        if (curWeekStreak > weekStreak) weekStreak = curWeekStreak;
       } else {
-        currentStreak = 1;
+        curWeekStreak = 0;
       }
     }
 
-    return { logged, longestStreak };
+    return { logged, weekStreak };
   }, [state.logsByDate]);
 
   const loggedDaysInMonth = useMemo(() => {
@@ -738,6 +762,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         const found = wk.exercises.find((e) => e.id === logCtx.exerciseId);
         if (found) { logExercise = found; break; }
       }
+      if (!logExercise) {
+        const dailyWs = Object.values(st.dailyWorkouts || {}).flat();
+        for (const wk of dailyWs) {
+          const found = (wk.exercises || []).find((e) => e.id === logCtx.exerciseId);
+          if (found) { logExercise = found; break; }
+        }
+      }
       const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
 
       const cleanedSets = (Array.isArray(modals.log.sets) ? modals.log.sets : [])
@@ -1033,6 +1064,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }
 
   const confirmAddSuggestion = useCallback((workoutId, exerciseName) => {
+    if (workoutId === "__today__") {
+      // Add to daily workout for today
+      updateState((st) => {
+        if (!st.dailyWorkouts) st.dailyWorkouts = {};
+        if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
+        let coachWorkout = st.dailyWorkouts[dateKey].find(w => w.source === "coach");
+        if (!coachWorkout) {
+          coachWorkout = { id: uid("w"), name: "Coach Suggestions", category: "Coach", source: "coach", exercises: [] };
+          st.dailyWorkouts[dateKey].push(coachWorkout);
+        }
+        coachWorkout.exercises.push({ id: uid("ex"), name: exerciseName, unit: "reps" });
+        return st;
+      });
+      dispatchModal({ type: "CLOSE_ADD_SUGGESTION" });
+      showToast(`Added "${exerciseName}" for today`);
+      return;
+    }
+
     const workout = workoutById.get(workoutId);
     if (!workout) {
       showToast("Workout not found");
@@ -1058,7 +1107,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     dispatchModal({ type: "CLOSE_ADD_SUGGESTION" });
     showToast(`Added "${exerciseName}" to ${workout.name}`);
-  }, [workoutById]);
+  }, [workoutById, dateKey]);
 
   function handleAcceptGeneratedProgram(workouts, prefs) {
     updateState((st) => {
@@ -1110,7 +1159,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   function handleAcceptTodayWorkout(workout) {
     updateState((st) => {
-      st.program.workouts.push(workout);
+      if (!st.dailyWorkouts) st.dailyWorkouts = {};
+      if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
+      st.dailyWorkouts[dateKey].push({ ...workout, source: "generate_today" });
       return st;
     });
     dispatchModal({ type: "CLOSE_GENERATE_TODAY" });
@@ -1314,7 +1365,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {trainSearchOpen && trainSearch.trim() && (() => {
             const q = trainSearch.trim().toLowerCase();
             const results = [];
-            for (const w of workouts) {
+            for (const w of [...workouts, ...dailyWorkoutsToday]) {
               for (const ex of w.exercises) {
                 if (ex.name.toLowerCase().includes(q)) {
                   results.push({ workout: w, exercise: ex });
@@ -1453,8 +1504,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     textAlign: "center", padding: "10px 6px", borderRadius: 12,
                     background: colors.cardAltBg, border: `1px solid ${colors.border}`,
                   }}>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.longestStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.longestStreak}</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Longest Streak</div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Week Streak</div>
                   </div>
                 )}
               </div>
@@ -1509,7 +1560,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {tab === "train" ? (
             <div key="train" style={{ ...styles.section, animation: "tabFadeIn 0.2s ease-out" }}>
               <CoachNudge insights={coachInsights} colors={colors} />
-              {workouts.length === 0 ? (
+              {workouts.length === 0 && dailyWorkoutsToday.length === 0 ? (
                 <div style={{
                   ...styles.card,
                   display: "flex",
@@ -1547,6 +1598,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       styles={styles}
                     />
                   ))}
+                  {dailyWorkoutsToday.map((w) => (
+                    <WorkoutCard
+                      key={w.id}
+                      workout={w}
+                      collapsed={collapsedToday.has(w.id)}
+                      onToggle={() => toggleCollapse(setCollapsedToday, w.id)}
+                      logsForDate={logsForDate}
+                      openLog={openLog}
+                      deleteLogForExercise={deleteLogForExercise}
+                      styles={styles}
+                      daily
+                    />
+                  ))}
                   <button
                     style={{
                       ...styles.secondaryBtn,
@@ -1579,12 +1643,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 colors={colors}
                 loading={coachLoading}
                 error={coachError}
-                userExerciseNames={workouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
                 onRefresh={() => {
                   const reqId = ++coachReqIdRef.current;
                   setCoachLoading(true);
                   setCoachError(null);
-                  const refreshExNames = workouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
+                  const refreshExNames = progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
                   const refreshCatalog = EXERCISE_CATALOG.filter((e) => exerciseFitsEquipment(e, equipment));
                   fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true }, catalog: refreshCatalog, equipment })
                     .then(({ insights }) => {
@@ -1630,7 +1694,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </div>
                 </div>
               ) : (
-                workouts.map((w) => (
+                progressWorkouts.map((w) => (
                   <SummaryBlock
                     key={w.id}
                     workout={w}
@@ -2569,6 +2633,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         onCancel={() => dispatchModal({ type: "CLOSE_ADD_SUGGESTION" })}
         onConfirm={confirmAddSuggestion}
         styles={styles}
+        colors={colors}
       />
 
       {/* Edit Workout Modal */}
@@ -2891,7 +2956,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily }) {
   const cat = (workout.category || "Workout").trim();
   const totalEx = workout.exercises.length;
   const loggedEx = totalEx > 0
@@ -2908,6 +2973,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
+          {daily && <span style={{ ...styles.tagMuted, opacity: 0.5, fontStyle: "italic" }}>Today only</span>}
         </div>
         {totalEx > 0 && (
           <span style={{

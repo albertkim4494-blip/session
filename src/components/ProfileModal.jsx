@@ -292,8 +292,8 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
               textAlign: "center", padding: "10px 6px", borderRadius: 12,
               background: colors?.cardAltBg, border: `1px solid ${colors?.border}`,
             }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.longestStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.longestStreak}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Longest Streak</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Week Streak</div>
             </div>
           </div>
         )}

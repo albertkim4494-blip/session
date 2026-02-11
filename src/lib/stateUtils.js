@@ -53,6 +53,7 @@ export function makeDefaultState() {
     program: {
       workouts: defaultWorkouts(),
     },
+    dailyWorkouts: {},
     logsByDate: {},
     meta: {
       createdAt: Date.now(),
@@ -75,6 +76,7 @@ export function loadState() {
     ...makeDefaultState(),
     ...st,
     program: { ...rawProgram, workouts: rawWorkouts },
+    dailyWorkouts: st.dailyWorkouts && typeof st.dailyWorkouts === "object" ? st.dailyWorkouts : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
   };

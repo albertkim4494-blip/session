@@ -234,7 +234,7 @@ export function GenerateTodayModal({
                 onClick={() => onAccept(preview)}
                 disabled={!preview}
               >
-                Add to Program
+                Use Today
               </button>
             </>
           )}

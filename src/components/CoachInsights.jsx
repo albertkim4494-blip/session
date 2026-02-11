@@ -255,39 +255,66 @@ export function CoachNudge({ insights, colors }) {
 }
 
 // ---------------------------------------------------------------------------
-// AddSuggestedExerciseModal (unchanged)
+// AddSuggestedExerciseModal
 // ---------------------------------------------------------------------------
-export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCancel, onConfirm, styles }) {
+export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCancel, onConfirm, styles, colors }) {
+  const [mode, setMode] = useState("today");
   const [selectedWorkoutId, setSelectedWorkoutId] = useState(workouts[0]?.id || null);
 
   useEffect(() => {
-    if (open && workouts.length > 0) {
-      setSelectedWorkoutId(workouts[0].id);
+    if (open) {
+      setMode("today");
+      if (workouts.length > 0) setSelectedWorkoutId(workouts[0].id);
     }
   }, [open, workouts]);
 
   if (!open) return null;
 
+  const toggleBase = {
+    flex: 1, padding: "7px 0", border: "none", borderRadius: 8,
+    fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "background 0.15s",
+  };
+  const toggleActive = { ...toggleBase, background: colors?.primaryBg || "#152338", color: colors?.primaryText || "#e8eef7" };
+  const toggleInactive = { ...toggleBase, background: "transparent", color: colors?.text || "#e8eef7", opacity: 0.5 };
+
   return (
     <Modal open={open} title={`Add "${exerciseName}"`} onClose={onCancel} styles={styles}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Add to which workout?</label>
-          <select
-            value={selectedWorkoutId || ""}
-            onChange={(e) => setSelectedWorkoutId(e.target.value)}
-            style={{ ...styles.textInput, paddingRight: 32, appearance: "auto" }}
-          >
-            {workouts.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} ({w.category})
-              </option>
-            ))}
-          </select>
+        <div style={{
+          display: "flex", gap: 4, padding: 3, borderRadius: 10,
+          background: colors?.cardAltBg || "#0b111a",
+          border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
+        }}>
+          <button style={mode === "today" ? toggleActive : toggleInactive} onClick={() => setMode("today")}>
+            Just for Today
+          </button>
+          <button style={mode === "program" ? toggleActive : toggleInactive} onClick={() => setMode("program")}>
+            Add to Program
+          </button>
         </div>
 
+        {mode === "program" && (
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Add to which workout?</label>
+            <select
+              value={selectedWorkoutId || ""}
+              onChange={(e) => setSelectedWorkoutId(e.target.value)}
+              style={{ ...styles.textInput, paddingRight: 32, appearance: "auto" }}
+            >
+              {workouts.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} ({w.category})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div style={styles.smallText}>
-          This will add <b>&quot;{exerciseName}&quot;</b> to your selected workout. You can rename or remove it later.
+          {mode === "today"
+            ? <>This will add <b>&quot;{exerciseName}&quot;</b> to today&apos;s workout. It won&apos;t appear on other days.</>
+            : <>This will add <b>&quot;{exerciseName}&quot;</b> to your selected workout permanently.</>
+          }
         </div>
 
         <div style={styles.modalFooter}>
@@ -296,10 +323,10 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
           </button>
           <button
             style={styles.primaryBtn}
-            onClick={() => onConfirm(selectedWorkoutId, exerciseName)}
-            disabled={!selectedWorkoutId}
+            onClick={() => onConfirm(mode === "today" ? "__today__" : selectedWorkoutId, exerciseName)}
+            disabled={mode === "program" && !selectedWorkoutId}
           >
-            Add Exercise
+            {mode === "today" ? "Add for Today" : "Add Exercise"}
           </button>
         </div>
       </div>
