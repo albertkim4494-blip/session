@@ -106,7 +106,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   });
 
   // Rest timer state
-  const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90 });
+  const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
 
   // Toast notification
   const [toast, setToast] = useState(null); // { message, coachLine }
@@ -779,7 +779,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             customUnitAbbr: exercise.customUnitAbbr || "",
             customUnitAllowDecimal: exercise.customUnitAllowDecimal ?? false,
             scheme: schemeStr,
-            workoutExercises: workout?.exercises || [],
           },
           sets: normalizedSets,
           notes: prior?.notes ?? "",
@@ -852,15 +851,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       toastTimerRef.current = setTimeout(() => setToast(null), 2500);
     }
 
-    // Start rest timer after saving if any sets have data
-    const hasSetsWithData = modals.log.sets?.some((s) => Number(s.reps ?? 0) > 0);
-    if (state.preferences?.restTimerEnabled !== false && hasSetsWithData) {
-      const exName = logCtx.exerciseName || "";
-      const learnedKey = exName.toLowerCase().trim();
-      const learnedRest = state.preferences?.exerciseRestTimes?.[learnedKey];
-      const restSec = learnedRest || state.preferences?.defaultRestSec || 90;
-      setRestTimer({ active: true, exerciseId: logCtx.exerciseId, exerciseName: exName, restSec });
-    }
+    // Dismiss rest timer when closing modal
+    setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
 
     dispatchModal({ type: "CLOSE_LOG" });
   }, [modals.log, dateKey, state.logsByDate, state.preferences]);
@@ -930,14 +922,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setToast(null), isWorkoutComplete ? 3500 : 2000);
 
-      // Start rest timer if enabled and workout isn't complete
-      if (state.preferences?.restTimerEnabled !== false && !isWorkoutComplete) {
+      // Start rest timer if enabled, workout isn't complete, and there are more uncompleted sets
+      const hasMoreSets = updatedSets.some((s, idx) => idx !== setIndex && !isSetCompleted(s));
+      if (state.preferences?.restTimerEnabled !== false && !isWorkoutComplete && hasMoreSets) {
         const exerciseObj = exercises.find((e) => e.id === exerciseId);
         const exName = exerciseObj?.name || "";
         const learnedKey = exName.toLowerCase().trim();
         const learnedRest = state.preferences?.exerciseRestTimes?.[learnedKey];
         const restSec = learnedRest || state.preferences?.defaultRestSec || 90;
-        setRestTimer({ active: true, exerciseId, exerciseName: exName, restSec });
+        setRestTimer({ active: true, exerciseId, exerciseName: exName, restSec, completedSetIndex: setIndex });
       } else {
         setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
       }
@@ -2232,39 +2225,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} footer={modals.log.isOpen ? (() => {
-        const fCtx = modals.log.context;
-        const fExList = fCtx?.workoutExercises || [];
-        const fExIdx = fExList.findIndex((e) => e.id === fCtx?.exerciseId);
-        const fPrevEx = fExIdx > 0 ? fExList[fExIdx - 1] : null;
-        const fNextEx = fExIdx < fExList.length - 1 ? fExList[fExIdx + 1] : null;
-        const navExercise = (ex) => {
-          if (!ex) return;
-          saveLog();
-          setTimeout(() => openLog(fCtx.workoutId, ex), 50);
-        };
-        return (
+      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} footer={modals.log.isOpen ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {fExList.length > 1 && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-              <button
-                type="button"
-                disabled={!fPrevEx}
-                onClick={() => navExercise(fPrevEx)}
-                style={{ ...styles.compactSecondaryBtn, opacity: fPrevEx ? 1 : 0.3, flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-              >
-                {fPrevEx ? `\u2190 ${fPrevEx.name}` : "\u2190"}
-              </button>
-              <button
-                type="button"
-                disabled={!fNextEx}
-                onClick={() => navExercise(fNextEx)}
-                style={{ ...styles.compactSecondaryBtn, opacity: fNextEx ? 1 : 0.3, flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-              >
-                {fNextEx ? `${fNextEx.name} \u2192` : "\u2192"}
-              </button>
-            </div>
-          )}
           <button style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
             Save
           </button>
@@ -2275,8 +2237,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             Cancel
           </button>
         </div>
-        );
-      })() : null}>
+      ) : null}>
         {modals.log.isOpen && (() => {
           const logCtx = modals.log.context;
           let logExercise = null;
@@ -2312,39 +2273,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 .join(", ")
             : null;
 
-          // Swipe navigation between exercises
-          const exList = logCtx?.workoutExercises || [];
-          const exIdx = exList.findIndex((e) => e.id === logCtx?.exerciseId);
-          const prevEx = exIdx > 0 ? exList[exIdx - 1] : null;
-          const nextEx = exIdx < exList.length - 1 ? exList[exIdx + 1] : null;
-          const navToExercise = (ex) => {
-            if (!ex) return;
-            // Dismiss rest timer for old exercise
-            setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
-            saveLog();
-            setTimeout(() => openLog(logCtx.workoutId, ex), 50);
-          };
-
           return (
-        <div
-          style={{ display: "flex", flexDirection: "column", gap: 14 }}
-          onTouchStart={(e) => {
-            const t = e.touches?.[0];
-            if (t) e.currentTarget._swipeStart = { x: t.clientX, y: t.clientY };
-          }}
-          onTouchEnd={(e) => {
-            const start = e.currentTarget._swipeStart;
-            e.currentTarget._swipeStart = null;
-            const end = e.changedTouches?.[0];
-            if (!start || !end) return;
-            const dx = end.clientX - start.x;
-            const dy = end.clientY - start.y;
-            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-              if (dx < 0 && nextEx) navToExercise(nextEx);
-              else if (dx > 0 && prevEx) navToExercise(prevEx);
-            }
-          }}
-        >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {logScheme && (
             <div style={{
               fontSize: 13, padding: "8px 12px", borderRadius: 10,
@@ -2363,38 +2293,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             }}>
               Last session: <span style={{ fontWeight: 700 }}>{lastSessionText}</span>
             </div>
-          )}
-
-          {/* Rest Timer (inline in modal) */}
-          {restTimer.active && restTimer.exerciseId === logCtx?.exerciseId && (
-            <RestTimerBar
-              restSec={restTimer.restSec}
-              exerciseName={restTimer.exerciseName}
-              isVisible={restTimer.active}
-              onDismiss={() => setRestTimer((prev) => ({ ...prev, active: false }))}
-              onComplete={() => {}}
-              onRestTimeObserved={handleRestTimeObserved}
-              styles={styles}
-              colors={colors}
-              timerSound={state.preferences?.timerSound !== false}
-            />
-          )}
-
-          {/* Exercise Timer for sec-unit exercises */}
-          {isTimerEligible(logUnit.key) && (
-            <ExerciseTimer
-              sets={modals.log.sets}
-              savedSets={state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets || []}
-              onTimerComplete={(setIndex, seconds) => {
-                const newSets = [...modals.log.sets];
-                newSets[setIndex] = { ...newSets[setIndex], reps: seconds };
-                dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                completeSet(logCtx.exerciseId, setIndex, { reps: seconds, weight: "" }, logCtx.workoutId);
-              }}
-              colors={colors}
-              styles={styles}
-              timerSound={state.preferences?.timerSound !== false}
-            />
           )}
 
           {/* Column headers */}
@@ -2416,8 +2314,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               const isBW = String(s.weight).toUpperCase() === "BW";
               const savedSets = state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets;
               const isSetSaved = savedSets && i < savedSets.length && isSetCompleted(savedSets[i]);
+              const showRestAfter = restTimer.active && restTimer.exerciseId === logCtx?.exerciseId && restTimer.completedSetIndex === i;
               return (
-                <div key={i} style={{
+                <React.Fragment key={i}>
+                <div style={{
                   display: "grid",
                   gridTemplateColumns: showWeight ? "28px 1fr 1fr 40px 32px" : "28px 1fr 32px",
                   gap: 8,
@@ -2537,6 +2437,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     </svg>
                   </button>
                 </div>
+                {showRestAfter && (
+                  <RestTimerBar
+                    restSec={restTimer.restSec}
+                    exerciseName={restTimer.exerciseName}
+                    isVisible={restTimer.active}
+                    onDismiss={() => setRestTimer((prev) => ({ ...prev, active: false }))}
+                    onComplete={() => {}}
+                    onRestTimeObserved={handleRestTimeObserved}
+                    styles={styles}
+                    colors={colors}
+                    timerSound={state.preferences?.timerSound !== false}
+                  />
+                )}
+                </React.Fragment>
               );
             })}
           </div>
@@ -2551,6 +2465,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           >
             + Add Set
           </button>
+
+          {/* Exercise Timer for sec-unit exercises — below sets for top-to-bottom flow */}
+          {isTimerEligible(logUnit.key) && (
+            <ExerciseTimer
+              sets={modals.log.sets}
+              savedSets={state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets || []}
+              onTimerComplete={(setIndex, seconds) => {
+                const newSets = [...modals.log.sets];
+                newSets[setIndex] = { ...newSets[setIndex], reps: seconds };
+                dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                completeSet(logCtx.exerciseId, setIndex, { reps: seconds, weight: "" }, logCtx.workoutId);
+              }}
+              colors={colors}
+              styles={styles}
+              timerSound={state.preferences?.timerSound !== false}
+            />
+          )}
 
           <MoodPicker
             value={modals.log.mood}
