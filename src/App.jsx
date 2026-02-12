@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } 
 import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
 import { supabase } from "./lib/supabase";
 import { fetchCoachInsights } from "./lib/coachApi";
-import { classifyActivity, buildNormalizedAnalysis, detectImbalancesNormalized } from "./lib/coachNormalize";
+import { buildNormalizedAnalysis, detectImbalancesNormalized } from "./lib/coachNormalize";
 import { avatarInitial } from "./lib/userIdentity";
 
 // Extracted lib modules
@@ -38,9 +38,10 @@ import { GenerateTodayModal } from "./components/GenerateTodayModal";
 // Exercise catalog
 import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
 import { buildCatalogMap } from "./lib/exerciseCatalogUtils";
-import { generateProgram, generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
+import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
-import { selectGreeting, selectAcknowledgment, selectSetCompletionToast } from "./lib/greetings";
+import { selectAcknowledgment, selectSetCompletionToast } from "./lib/greetings";
+import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
 
 // Extracted styles
 import { getColors, getStyles } from "./styles/theme";
@@ -63,22 +64,6 @@ function ensureAnimations() {
   document.head.appendChild(s);
 }
 
-/** Check if a set is completed. After migration, all sets have explicit `completed` flag. */
-function isSetCompleted(set) {
-  if (set.completed !== undefined) return set.completed;
-  // Fallback for any edge case where migration hasn't run yet
-  return Number(set.reps) > 0;
-}
-
-/** Check if a day's logs contain at least one completed set. */
-function dayHasCompletedSets(dayLogs) {
-  if (!dayLogs || typeof dayLogs !== "object") return false;
-  for (const exId of Object.keys(dayLogs)) {
-    const exLog = dayLogs[exId];
-    if (exLog?.sets && Array.isArray(exLog.sets) && exLog.sets.some(isSetCompleted)) return true;
-  }
-  return false;
-}
 
 // ============================================================================
 // MAIN APP COMPONENT
@@ -434,19 +419,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       d = addDays(d, 1);
     }
 
-    // Consecutive weeks with 2+ sessions
-    const weekKeys = Object.keys(weekMap).sort();
-    let weekStreak = 0, curWeekStreak = 0;
-    for (const wk of weekKeys) {
-      if (weekMap[wk] >= 2) {
-        curWeekStreak++;
-        if (curWeekStreak > weekStreak) weekStreak = curWeekStreak;
-      } else {
-        curWeekStreak = 0;
-      }
-    }
-
-    return { logged, total, totalSets, weekStreak };
+    return { logged, total, totalSets, weekStreak: calculateWeekStreak(weekMap) };
   }, [state.logsByDate, summaryRange]);
 
   // All-time stats for profile modal (not tied to summary range)
@@ -464,18 +437,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const weekStart = startOfWeekSunday(d);
       weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
     }
-    const weekKeys = Object.keys(weekMap).sort();
-    let weekStreak = 0, curWeekStreak = 0;
-    for (const wk of weekKeys) {
-      if (weekMap[wk] >= 2) {
-        curWeekStreak++;
-        if (curWeekStreak > weekStreak) weekStreak = curWeekStreak;
-      } else {
-        curWeekStreak = 0;
-      }
-    }
-
-    return { logged, weekStreak };
+    return { logged, weekStreak: calculateWeekStreak(weekMap) };
   }, [state.logsByDate]);
 
   const loggedDaysInMonth = useMemo(() => {

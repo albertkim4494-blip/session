@@ -3,6 +3,8 @@
  * Pure functions, easy to tune — just edit the arrays.
  */
 
+import { isSetCompleted, dayHasCompletedSets } from "./setHelpers";
+
 // ---------------------------------------------------------------------------
 // Greeting copy pools
 // ---------------------------------------------------------------------------
@@ -73,22 +75,6 @@ const COACH_LINES = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Check if a set is completed (backward compat: old data without flag uses reps > 0). */
-function isSetCompleted(set) {
-  if (set.completed !== undefined) return set.completed;
-  return Number(set.reps) > 0;
-}
-
-/** Check if a day's logs contain at least one completed set. */
-function dayHasCompletedSets(dayLogs) {
-  if (!dayLogs || typeof dayLogs !== "object") return false;
-  for (const exId of Object.keys(dayLogs)) {
-    const exLog = dayLogs[exId];
-    if (exLog?.sets && Array.isArray(exLog.sets) && exLog.sets.some(isSetCompleted)) return true;
-  }
-  return false;
-}
 
 /** Pick a stable-ish item from an array based on a seed (avoids re-rolling every render). */
 function pick(arr, seed) {
