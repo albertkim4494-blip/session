@@ -236,6 +236,7 @@ export async function generateTodayAI({
       targetMuscles: Array.isArray(data.targetMuscles)
         ? data.targetMuscles
         : [],
+      note: data.note || null,
       exercises: transformExercises(data.exercises, catalogMap),
     };
 

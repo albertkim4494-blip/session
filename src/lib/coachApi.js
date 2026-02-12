@@ -289,6 +289,9 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   const adherence = computeAdherenceStats(state?.logsByDate);
   const previousInsights = loadPreviousInsights();
 
+  // Ensure we have a fresh session token before calling the edge function
+  await supabase.auth.getSession();
+
   // Call Edge Function
   const { data, error } = await supabase.functions.invoke("ai-coach", {
     body: {
@@ -316,7 +319,23 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   });
 
   if (error) {
-    throw new Error(error.message || "Edge function call failed");
+    // Extract useful details from FunctionsHttpError
+    let detail = error.message || "Edge function call failed";
+    if (error.context && typeof error.context.status === "number") {
+      detail += ` (HTTP ${error.context.status})`;
+    }
+    // Try to read error body for debugging
+    if (error.context && typeof error.context.json === "function") {
+      try {
+        const body = await error.context.json();
+        if (body?.error) detail += `: ${body.error}`;
+        if (body?.detail) detail += ` — ${body.detail}`;
+      } catch {
+        // body already consumed or not JSON
+      }
+    }
+    console.error("Coach API error detail:", detail);
+    throw new Error(detail);
   }
 
   // Normalize each insight so UI never crashes on missing fields

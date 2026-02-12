@@ -40,7 +40,7 @@ import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
 import { buildCatalogMap } from "./lib/exerciseCatalogUtils";
 import { generateProgram, generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
-import { selectGreeting, selectAcknowledgment } from "./lib/greetings";
+import { selectGreeting, selectAcknowledgment, selectSetCompletionToast } from "./lib/greetings";
 
 // Extracted styles
 import { getColors, getStyles } from "./styles/theme";
@@ -56,6 +56,7 @@ function ensureAnimations() {
   s.textContent = `
 @keyframes tabFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toastPop { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes chipPop { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
 `;
   document.head.appendChild(s);
 }
@@ -322,8 +323,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const workoutById = useMemo(() => {
     const m = new Map();
     for (const w of workouts) m.set(w.id, w);
+    for (const w of dailyWorkoutsToday) m.set(w.id, w);
     return m;
-  }, [workouts]);
+  }, [workouts, dailyWorkoutsToday]);
 
   const catalogMap = useMemo(() => buildCatalogMap(EXERCISE_CATALOG), []);
 
@@ -726,8 +728,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     (workoutId, exercise) => {
       const exerciseId = exercise.id;
       const existing = state.logsByDate[dateKey]?.[exerciseId] ?? null;
-      const prior = existing ?? findMostRecentLogBefore(exerciseId, dateKey);
+      const template = findMostRecentLogBefore(exerciseId, dateKey);
+      const prior = existing ?? template;
 
+      const workout = workoutById.get(workoutId);
+      const schemeStr = exercise.scheme || workout?.scheme || null;
       let sets;
       if (prior?.sets?.length) {
         sets = prior.sets.map((s) => ({
@@ -735,7 +740,32 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           weight: typeof s.weight === "string" ? s.weight : "",
         }));
       } else {
-        sets = [{ reps: 0, weight: "" }];
+        // Pre-fill from scheme (e.g. "3x8-12" → 3 sets of 8 reps)
+        const scheme = schemeStr ? parseScheme(schemeStr) : null;
+        if (scheme) {
+          sets = Array.from({ length: scheme.sets }, () => ({ reps: scheme.reps, weight: "" }));
+        } else {
+          sets = [{ reps: 0, weight: "" }];
+        }
+      }
+
+      // Pad partial logs with remaining template sets
+      if (existing && template?.sets?.length && sets.length < template.sets.length) {
+        for (let i = sets.length; i < template.sets.length; i++) {
+          const ts = template.sets[i];
+          sets.push({
+            reps: Number(ts.reps ?? 0) || 0,
+            weight: typeof ts.weight === "string" ? ts.weight : "",
+          });
+        }
+      }
+
+      // Pad from scheme if still fewer sets than scheme specifies
+      const parsedScheme = schemeStr ? parseScheme(schemeStr) : null;
+      if (existing && parsedScheme && sets.length < parsedScheme.sets) {
+        for (let i = sets.length; i < parsedScheme.sets; i++) {
+          sets.push({ reps: parsedScheme.reps, weight: "" });
+        }
       }
 
       const normalizedSets = sets.map((s) => {
@@ -743,7 +773,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         return { reps: s.reps, weight: isBW ? "BW" : String(s.weight ?? "").trim() };
       });
 
-      const workout = workoutById.get(workoutId);
       dispatchModal({
         type: "OPEN_LOG",
         payload: {
@@ -754,7 +783,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             unit: exercise.unit || "reps",
             customUnitAbbr: exercise.customUnitAbbr || "",
             customUnitAllowDecimal: exercise.customUnitAllowDecimal ?? false,
-            scheme: workout?.scheme || null,
+            scheme: schemeStr,
           },
           sets: normalizedSets,
           notes: prior?.notes ?? "",
@@ -769,6 +798,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (!modals.log.context) return;
 
     const logCtx = modals.log.context;
+    const existing = state.logsByDate[dateKey]?.[logCtx.exerciseId];
 
     updateState((st) => {
       let logExercise = null;
@@ -785,21 +815,39 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       }
       const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
 
-      const cleanedSets = (Array.isArray(modals.log.sets) ? modals.log.sets : [])
-        .map((s) => {
-          const reps = Number(s.reps ?? 0);
-          const repsClean = Number.isFinite(reps) && reps > 0
-            ? (logUnit.allowDecimal ? parseFloat(reps.toFixed(2)) : Math.floor(reps))
-            : 0;
-          const w = String(s.weight ?? "").trim();
-          const weight = w.toUpperCase() === "BW" ? "BW" : w.replace(/[^\d.]/g, "");
-          return { reps: repsClean, weight: weight || "" };
-        })
-        .filter((s) => s.reps > 0);
+      const cleanSet = (s) => {
+        const reps = Number(s.reps ?? 0);
+        const repsClean = Number.isFinite(reps) && reps > 0
+          ? (logUnit.allowDecimal ? parseFloat(reps.toFixed(2)) : Math.floor(reps))
+          : 0;
+        const w = String(s.weight ?? "").trim();
+        const weight = w.toUpperCase() === "BW" ? "BW" : w.replace(/[^\d.]/g, "");
+        return { reps: repsClean, weight: weight || "" };
+      };
+
+      // Check if user has partially completed sets via checkmarks
+      const savedSets = st.logsByDate[dateKey]?.[logCtx.exerciseId]?.sets;
+      const hasCheckedSets = savedSets && savedSets.some((s) => Number(s.reps) > 0);
+
+      let finalSets;
+      if (hasCheckedSets) {
+        // Checkmark flow: only update already-checked sets with modal edits
+        finalSets = savedSets.map((saved, i) => {
+          if (Number(saved.reps) > 0 && modals.log.sets[i]) {
+            return cleanSet(modals.log.sets[i]);
+          }
+          return saved;
+        }).filter((s) => s.reps > 0);
+      } else {
+        // Manual flow: save all modal sets with reps > 0 (original behavior)
+        finalSets = (Array.isArray(modals.log.sets) ? modals.log.sets : [])
+          .map(cleanSet)
+          .filter((s) => s.reps > 0);
+      }
 
       st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
       const logEntry = {
-        sets: cleanedSets.length ? cleanedSets : [{ reps: 0, weight: "BW" }],
+        sets: finalSets.length ? finalSets : [{ reps: 0, weight: "BW" }],
         notes: modals.log.notes ?? "",
       };
       if (modals.log.mood != null) logEntry.mood = modals.log.mood;
@@ -808,14 +856,113 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return st;
     });
 
-    // Show acknowledgment toast
-    const ack = selectAcknowledgment(modals.log.mood, dateKey, state.logsByDate);
-    setToast(ack);
-    clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
+    // Only show toast if something changed vs what was already saved
+    const savedSets = existing?.sets;
+    const hasCheckedSets = savedSets && savedSets.some((s) => Number(s.reps) > 0);
+    const compareSets = hasCheckedSets
+      ? savedSets.filter((s) => Number(s.reps) > 0)
+      : (Array.isArray(modals.log.sets) ? modals.log.sets : []).filter((s) => Number(s.reps) > 0);
+    const setsChanged = !existing || JSON.stringify(existing.sets) !== JSON.stringify(compareSets);
+    const notesChanged = (modals.log.notes ?? "") !== (existing?.notes ?? "");
+    const moodChanged = modals.log.mood !== (existing?.mood ?? null);
+
+    if (setsChanged || notesChanged || moodChanged) {
+      const ack = selectAcknowledgment(modals.log.mood, dateKey, state.logsByDate);
+      setToast(ack);
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToast(null), 2500);
+    }
 
     dispatchModal({ type: "CLOSE_LOG" });
-  }, [modals.log, dateKey]);
+  }, [modals.log, dateKey, state.logsByDate]);
+
+  const completeSet = useCallback(
+    (exerciseId, setIndex, setData, workoutId) => {
+      updateState((st) => {
+        st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
+        const entry = st.logsByDate[dateKey][exerciseId] ?? { sets: [] };
+        if (!Array.isArray(entry.sets)) entry.sets = [];
+        while (entry.sets.length <= setIndex) entry.sets.push({ reps: 0, weight: "" });
+        entry.sets[setIndex] = { reps: setData.reps, weight: setData.weight };
+        st.logsByDate[dateKey][exerciseId] = entry;
+        return st;
+      });
+
+      // Smart toast — compute context after state update
+      const workout = workoutById.get(workoutId);
+      const exercises = workout?.exercises || [];
+
+      // Figure out totalSets for this exercise from prior template or scheme
+      const prior = findMostRecentLogBefore(exerciseId, dateKey);
+      const schemeStr = exercises.find((e) => e.id === exerciseId)?.scheme || workout?.scheme || null;
+      const schemeParsed = schemeStr ? parseScheme(schemeStr) : null;
+      const totalSets = prior?.sets?.length || schemeParsed?.sets || 0;
+
+      // Check if the whole workout is complete after this set
+      const updatedDayLogs = { ...state.logsByDate[dateKey] };
+      // Include the set we just saved
+      const updatedEntry = { ...(updatedDayLogs[exerciseId] || { sets: [] }) };
+      const updatedSets = [...(updatedEntry.sets || [])];
+      while (updatedSets.length <= setIndex) updatedSets.push({ reps: 0, weight: "" });
+      updatedSets[setIndex] = { reps: setData.reps, weight: setData.weight };
+      updatedDayLogs[exerciseId] = { ...updatedEntry, sets: updatedSets };
+
+      const isWorkoutComplete = exercises.length > 0 && exercises.every((ex) => {
+        const exLog = updatedDayLogs[ex.id];
+        if (!exLog?.sets?.length) return false;
+        const completedCount = exLog.sets.filter((s) => Number(s.reps) > 0).length;
+        const exPrior = findMostRecentLogBefore(ex.id, dateKey);
+        const exScheme = ex.scheme || workout?.scheme || null;
+        const exSchemeParsed = exScheme ? parseScheme(exScheme) : null;
+        const exTotal = exPrior?.sets?.length || exSchemeParsed?.sets || 0;
+        return exTotal > 0 ? completedCount >= exTotal : completedCount > 0;
+      });
+
+      // Count exercises logged today
+      const exercisesDoneToday = Object.keys(updatedDayLogs).filter(
+        (eid) => updatedDayLogs[eid]?.sets?.some((s) => Number(s.reps) > 0)
+      ).length;
+
+      const toast = selectSetCompletionToast({
+        exerciseId,
+        setData,
+        setIndex,
+        totalSets,
+        logsByDate: state.logsByDate,
+        dateKey,
+        isWorkoutComplete,
+        exercisesDoneToday,
+      });
+
+      setToast(toast);
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToast(null), isWorkoutComplete ? 3500 : 2000);
+    },
+    [dateKey, state.logsByDate, workoutById]
+  );
+
+  const uncompleteSet = useCallback(
+    (exerciseId, setIndex) => {
+      updateState((st) => {
+        const dayLogs = st.logsByDate[dateKey];
+        if (!dayLogs?.[exerciseId]) return st;
+        const entry = dayLogs[exerciseId];
+        if (!Array.isArray(entry.sets)) return st;
+        entry.sets.splice(setIndex, 1);
+        if (entry.sets.filter((s) => Number(s.reps) > 0).length === 0) {
+          delete dayLogs[exerciseId];
+          if (Object.keys(dayLogs).length === 0) delete st.logsByDate[dateKey];
+        }
+        return st;
+      });
+    },
+    [dateKey]
+  );
+
+  const findPriorForExercise = useCallback(
+    (exerciseId) => findMostRecentLogBefore(exerciseId, dateKey),
+    [state.logsByDate, dateKey]
+  );
 
   const deleteLogForExercise = useCallback(
     (exerciseId) => {
@@ -1182,13 +1329,57 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }
 
   const deleteDailyWorkout = useCallback((workoutId) => {
-    updateState((st) => {
-      if (!st.dailyWorkouts?.[dateKey]) return st;
-      st.dailyWorkouts[dateKey] = st.dailyWorkouts[dateKey].filter(w => w.id !== workoutId);
-      if (st.dailyWorkouts[dateKey].length === 0) delete st.dailyWorkouts[dateKey];
-      return st;
+    const w = workoutById.get(workoutId);
+    dispatchModal({
+      type: "OPEN_CONFIRM",
+      payload: {
+        title: "Remove workout?",
+        message: `Remove "${w?.name || "this workout"}"?`,
+        confirmText: "Remove",
+        onConfirm: () => {
+          updateState((st) => {
+            if (!st.dailyWorkouts?.[dateKey]) return st;
+            st.dailyWorkouts[dateKey] = st.dailyWorkouts[dateKey].filter(dw => dw.id !== workoutId);
+            if (st.dailyWorkouts[dateKey].length === 0) delete st.dailyWorkouts[dateKey];
+            return st;
+          });
+          dispatchModal({ type: "CLOSE_CONFIRM" });
+        },
+      },
     });
-  }, [dateKey]);
+  }, [dateKey, workoutById]);
+
+  const deleteDailyExercise = useCallback((workoutId, exerciseId) => {
+    const w = workoutById.get(workoutId);
+    const ex = w?.exercises?.find(e => e.id === exerciseId);
+    const isLast = w?.exercises?.length <= 1;
+    dispatchModal({
+      type: "OPEN_CONFIRM",
+      payload: {
+        title: isLast ? "Remove workout?" : "Remove exercise?",
+        message: isLast
+          ? `"${ex?.name || "This exercise"}" is the last exercise. This will remove the entire workout.`
+          : `Remove "${ex?.name || "this exercise"}" from ${w?.name || "this workout"}?`,
+        confirmText: "Remove",
+        onConfirm: () => {
+          updateState((st) => {
+            const dayWs = st.dailyWorkouts?.[dateKey];
+            if (!dayWs) return st;
+            const wk = dayWs.find(dw => dw.id === workoutId);
+            if (!wk) return st;
+            if (wk.exercises.length <= 1) {
+              st.dailyWorkouts[dateKey] = dayWs.filter(dw => dw.id !== workoutId);
+              if (st.dailyWorkouts[dateKey].length === 0) delete st.dailyWorkouts[dateKey];
+            } else {
+              wk.exercises = wk.exercises.filter(e => e.id !== exerciseId);
+            }
+            return st;
+          });
+          dispatchModal({ type: "CLOSE_CONFIRM" });
+        },
+      },
+    });
+  }, [dateKey, workoutById]);
 
   const saveProfile = useCallback(async (updates) => {
     try {
@@ -1619,6 +1810,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       openLog={openLog}
                       deleteLogForExercise={deleteLogForExercise}
                       styles={styles}
+                      findPrior={findPriorForExercise}
                     />
                   ))}
                   {dailyWorkoutsToday.map((w) => (
@@ -1633,6 +1825,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       styles={styles}
                       daily
                       onDelete={() => deleteDailyWorkout(w.id)}
+                      onDeleteExercise={(exId) => deleteDailyExercise(w.id, exId)}
+                      findPrior={findPriorForExercise}
+                      colors={colors}
                     />
                   ))}
                   <button
@@ -1779,7 +1974,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       );
 
                       const pencilIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>;
-                      const trashIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>;
+                      const trashIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>;
                       const plusIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>;
                       const reorderIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>;
                       const checkIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
@@ -2097,6 +2292,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {modals.log.sets.map((s, i) => {
               const isBW = String(s.weight).toUpperCase() === "BW";
+              const savedSets = state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets;
+              const isSetSaved = savedSets && i < savedSets.length && Number(savedSets[i].reps) > 0;
               return (
                 <div key={i} style={{
                   display: "grid",
@@ -2105,10 +2302,44 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   alignItems: "center",
                   padding: "8px 10px",
                   borderRadius: 12,
-                  border: `1px solid ${colors.border}`,
-                  background: colors.cardAltBg,
+                  border: isSetSaved ? "1px solid rgba(46,204,113,0.4)" : `1px solid ${colors.border}`,
+                  background: isSetSaved ? "rgba(46,204,113,0.08)" : colors.cardAltBg,
+                  transition: "border 0.2s, background 0.2s",
                 }}>
-                  <div style={{ fontWeight: 900, opacity: 0.5, textAlign: "center", fontSize: 14 }}>{i + 1}</div>
+                  <button
+                    style={{
+                      width: 26, height: 26, borderRadius: 999, padding: 0,
+                      border: isSetSaved ? "2px solid #2ecc71" : `2px solid ${colors.border}`,
+                      background: isSetSaved ? "#2ecc71" : "transparent",
+                      cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: isSetSaved ? "#fff" : colors.text,
+                      fontWeight: 900, fontSize: 12,
+                      transition: "all 0.2s",
+                      ...(isSetSaved ? { animation: "chipPop 0.2s ease-out" } : {}),
+                      WebkitTapHighlightColor: "transparent",
+                    }}
+                    onClick={() => {
+                      if (isSetSaved) {
+                        uncompleteSet(logCtx.exerciseId, i);
+                      } else {
+                        const reps = Number(s.reps ?? 0);
+                        const weight = String(s.weight ?? "").trim();
+                        if (reps > 0) {
+                          completeSet(logCtx.exerciseId, i, { reps, weight: weight || "" }, logCtx.workoutId);
+                        }
+                      }
+                    }}
+                    aria-label={isSetSaved ? `Uncomplete set ${i + 1}` : `Complete set ${i + 1}`}
+                  >
+                    {isSetSaved ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      i + 1
+                    )}
+                  </button>
 
                   <input
                     value={String(s.reps ?? "")}
@@ -2929,10 +3160,19 @@ function MoodPicker({ value, onChange, colors }) {
 // SUB-COMPONENTS - Extracted from render to avoid re-creation per render
 // ============================================================================
 
-function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles }) {
+function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme }) {
   const exLog = logsForDate[exercise.id] ?? null;
   const hasLog = !!exLog && Array.isArray(exLog.sets);
   const exUnit = getUnit(exercise.unit, exercise);
+
+  const completedSets = hasLog ? exLog.sets.filter((s) => Number(s.reps) > 0) : [];
+  const templateSets = findPrior ? (findPrior(exercise.id)?.sets || []) : [];
+  const schemeStr = exercise.scheme || workoutScheme || null;
+  const schemeSets = schemeStr ? (parseScheme(schemeStr)?.sets || 0) : 0;
+  const totalSets = Math.max(templateSets.length, completedSets.length, schemeSets);
+  const completedCount = completedSets.length;
+  const allDone = totalSets > 0 && completedCount >= totalSets;
+
   const setsText = hasLog
     ? exLog.sets
         .filter((s) => Number(s.reps) > 0)
@@ -2950,7 +3190,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
 
   return (
     <div
-      style={{ ...styles.exerciseBtn, ...(hasLog ? styles.exerciseBtnLogged : {}), position: "relative", cursor: "pointer" }}
+      style={{ ...styles.exerciseBtn, ...(allDone ? styles.exerciseBtnLogged : {}), position: "relative", cursor: "pointer" }}
       onClick={() => openLog(workoutId, exercise)}
       role="button"
       aria-label={`Log ${exercise.name}`}
@@ -2961,7 +3201,15 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
           <span style={styles.unitPill}>{exUnit.abbr}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {hasLog ? <span style={styles.badge}>Done</span> : <span style={styles.badgeMuted}>Tap to log</span>}
+          {totalSets > 0 ? (
+            allDone
+              ? <span style={styles.badge}>Done</span>
+              : completedCount > 0
+                ? <span style={{ ...styles.badge, background: "rgba(46,204,113,0.10)", opacity: 0.7 }}>{completedCount}/{totalSets}</span>
+                : <span style={styles.badgeMuted}>Tap to log</span>
+          ) : (
+            hasLog ? <span style={styles.badge}>Done</span> : <span style={styles.badgeMuted}>Tap to log</span>
+          )}
           {hasLog && (
             <button
               style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "inherit", opacity: 0.35, display: "flex" }}
@@ -2973,6 +3221,17 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
               </svg>
             </button>
           )}
+          {onDeleteExercise && (
+            <button
+              style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "inherit", opacity: 0.35, display: "flex" }}
+              onClick={(e) => { e.stopPropagation(); onDeleteExercise(exercise.id); }}
+              aria-label={`Remove ${exercise.name}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
       {hasLog && setsText ? <div style={styles.exerciseSub}>{setsText}</div> : null}
@@ -2980,7 +3239,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors }) {
   const cat = (workout.category || "Workout").trim();
   const totalEx = workout.exercises.length;
   const loggedEx = totalEx > 0
@@ -2997,7 +3256,6 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
-          {daily && <span style={{ ...styles.tagMuted, opacity: 0.5, fontStyle: "italic" }}>Today only</span>}
         </div>
         {totalEx > 0 && (
           <span style={{
@@ -3037,6 +3295,17 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
         <span style={styles.collapseToggle}>{collapsed ? "\u25B6" : "\u25BC"}</span>
       </div>
 
+      {!collapsed && workout.note && (
+        <div style={{
+          fontSize: 12, padding: "8px 12px", borderRadius: 10, marginBottom: 10,
+          background: colors ? (colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.06)" : "rgba(43,91,122,0.06)") : "transparent",
+          border: colors ? `1px solid ${colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.15)" : "rgba(43,91,122,0.12)"}` : "none",
+          opacity: 0.85, lineHeight: 1.4,
+        }}>
+          {workout.note}
+        </div>
+      )}
+
       {!collapsed && (
         workout.exercises.length === 0 ? (
           <div style={styles.emptyText}>No exercises yet.</div>
@@ -3051,6 +3320,9 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
                 openLog={openLog}
                 deleteLogForExercise={deleteLogForExercise}
                 styles={styles}
+                findPrior={findPrior}
+                onDeleteExercise={onDeleteExercise ? (exId) => onDeleteExercise(exId) : undefined}
+                workoutScheme={workout.scheme}
               />
             ))}
           </div>

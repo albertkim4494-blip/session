@@ -172,7 +172,7 @@ export function GenerateTodayModal({
             )}
 
             <div style={{ fontSize: 12, opacity: 0.7 }}>
-              Based on your recent training — targets muscles you haven't worked recently. {duration} min session.
+              {preview.note || `Based on your recent training — targets muscles you haven't worked recently. ${duration} min session.`}
             </div>
 
             <div
@@ -183,8 +183,15 @@ export function GenerateTodayModal({
                 background: colors.cardAltBg,
               }}
             >
-              <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>
-                {preview.name}
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: 15 }}>
+                  {preview.name}
+                </div>
+                {preview.scheme && (
+                  <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600 }}>
+                    {preview.scheme}
+                  </span>
+                )}
               </div>
 
               {preview.targetMuscles && preview.targetMuscles.length > 0 && (

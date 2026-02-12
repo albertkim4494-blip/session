@@ -329,12 +329,23 @@ export function generateTodayWorkout({ state, equipment, profile, catalog, today
     60 // default 60 min for today workouts
   );
 
+  // Build a coach note based on why these muscles were chosen
+  const muscleLabels = {
+    CHEST: "chest", BACK: "back", QUADS: "quads", HAMSTRINGS: "hamstrings",
+    GLUTES: "glutes", CALVES: "calves", ANTERIOR_DELT: "shoulders",
+    LATERAL_DELT: "shoulders", POSTERIOR_DELT: "rear delts",
+    TRICEPS: "triceps", BICEPS: "biceps", ABS: "abs",
+  };
+  const muscleNames = [...new Set(targetMuscles.map((m) => muscleLabels[m] || m.toLowerCase()))];
+  const note = `Targeting ${muscleNames.join(", ")} — these haven't been worked recently.`;
+
   return {
     id: generateId("w"),
     name,
     category: "Workout",
     scheme: getSetRepScheme(goal),
     targetMuscles,
+    note,
     exercises: exercises.map((e) => ({
       id: generateId("ex"),
       name: e.name,
