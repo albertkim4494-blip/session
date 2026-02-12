@@ -29,12 +29,14 @@ export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles
   const [mode, setMode] = useState("countdown");
   const completedRef = useRef(false);
 
-  // Find first uncompleted set
+  // Find first uncompleted set — check modal sets against saved state
   const activeSetIndex = useMemo(() => {
-    if (!savedSets?.length) return 0;
-    const idx = savedSets.findIndex((s) => !isSetCompleted(s));
-    return idx >= 0 ? idx : -1;
-  }, [savedSets]);
+    if (!sets?.length) return -1;
+    for (let i = 0; i < sets.length; i++) {
+      if (!savedSets?.[i] || !isSetCompleted(savedSets[i])) return i;
+    }
+    return -1;
+  }, [sets, savedSets]);
 
   // Timer target from the active set's reps input
   const targetSec = activeSetIndex >= 0 ? (Number(sets[activeSetIndex]?.reps) || 0) : 0;
