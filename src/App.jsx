@@ -825,48 +825,43 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         return { reps: repsClean, weight: weight || "" };
       };
 
-      // Check if user has partially completed sets via checkmarks
-      const savedSets = st.logsByDate[dateKey]?.[logCtx.exerciseId]?.sets;
-      const hasCheckedSets = savedSets && savedSets.some((s) => Number(s.reps) > 0);
+      const existingEntry = st.logsByDate[dateKey]?.[logCtx.exerciseId];
 
-      let finalSets;
-      if (hasCheckedSets) {
-        // Checkmark flow: only update already-checked sets with modal edits
-        finalSets = savedSets.map((saved, i) => {
+      if (existingEntry) {
+        // Sets already exist (from checkmarks) — sync modal edits to checked sets, save notes/mood
+        const updatedSets = (existingEntry.sets || []).map((saved, i) => {
           if (Number(saved.reps) > 0 && modals.log.sets[i]) {
             return cleanSet(modals.log.sets[i]);
           }
           return saved;
         }).filter((s) => s.reps > 0);
+        existingEntry.sets = updatedSets.length ? updatedSets : existingEntry.sets;
+        existingEntry.notes = modals.log.notes ?? "";
+        if (modals.log.mood != null) existingEntry.mood = modals.log.mood;
       } else {
-        // Manual flow: save all modal sets with reps > 0 (original behavior)
-        finalSets = (Array.isArray(modals.log.sets) ? modals.log.sets : [])
+        // No existing log — bulk save all modal sets (manual/legacy flow)
+        const cleanedSets = (Array.isArray(modals.log.sets) ? modals.log.sets : [])
           .map(cleanSet)
           .filter((s) => s.reps > 0);
-      }
 
-      st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
-      const logEntry = {
-        sets: finalSets.length ? finalSets : [{ reps: 0, weight: "BW" }],
-        notes: modals.log.notes ?? "",
-      };
-      if (modals.log.mood != null) logEntry.mood = modals.log.mood;
-      st.logsByDate[dateKey][logCtx.exerciseId] = logEntry;
+        st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
+        const logEntry = {
+          sets: cleanedSets.length ? cleanedSets : [{ reps: 0, weight: "BW" }],
+          notes: modals.log.notes ?? "",
+        };
+        if (modals.log.mood != null) logEntry.mood = modals.log.mood;
+        st.logsByDate[dateKey][logCtx.exerciseId] = logEntry;
+      }
 
       return st;
     });
 
-    // Only show toast if something changed vs what was already saved
-    const savedSets = existing?.sets;
-    const hasCheckedSets = savedSets && savedSets.some((s) => Number(s.reps) > 0);
-    const compareSets = hasCheckedSets
-      ? savedSets.filter((s) => Number(s.reps) > 0)
-      : (Array.isArray(modals.log.sets) ? modals.log.sets : []).filter((s) => Number(s.reps) > 0);
-    const setsChanged = !existing || JSON.stringify(existing.sets) !== JSON.stringify(compareSets);
+    // Toast for notes/mood changes or first save
     const notesChanged = (modals.log.notes ?? "") !== (existing?.notes ?? "");
     const moodChanged = modals.log.mood !== (existing?.mood ?? null);
+    const isNewSave = !existing;
 
-    if (setsChanged || notesChanged || moodChanged) {
+    if (isNewSave || notesChanged || moodChanged) {
       const ack = selectAcknowledgment(modals.log.mood, dateKey, state.logsByDate);
       setToast(ack);
       clearTimeout(toastTimerRef.current);
