@@ -366,13 +366,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [dateKey, summaryMode, summaryOffset, state.logsByDate]);
 
   const progressWorkouts = useMemo(() => {
-    const daily = [];
+    const dailyExercises = [];
+    const coachExercises = [];
     for (const [date, ws] of Object.entries(state.dailyWorkouts || {})) {
       if (inRangeInclusive(date, summaryRange.start, summaryRange.end)) {
-        for (const w of ws) daily.push(w);
+        for (const w of ws) {
+          if (w.source === "coach") {
+            coachExercises.push(...(w.exercises || []));
+          } else {
+            dailyExercises.push(...(w.exercises || []));
+          }
+        }
       }
     }
-    return [...workouts, ...daily];
+    const result = [...workouts];
+    if (dailyExercises.length > 0) {
+      result.push({ id: "__daily__", name: "Daily Workouts", category: "Daily", exercises: dailyExercises });
+    }
+    if (coachExercises.length > 0) {
+      result.push({ id: "__coach__", name: "Coach Suggestions", category: "Coach", exercises: coachExercises });
+    }
+    return result;
   }, [workouts, state.dailyWorkouts, summaryRange]);
 
   const summaryStats = useMemo(() => {
@@ -1167,6 +1181,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     dispatchModal({ type: "CLOSE_GENERATE_TODAY" });
   }
 
+  const deleteDailyWorkout = useCallback((workoutId) => {
+    updateState((st) => {
+      if (!st.dailyWorkouts?.[dateKey]) return st;
+      st.dailyWorkouts[dateKey] = st.dailyWorkouts[dateKey].filter(w => w.id !== workoutId);
+      if (st.dailyWorkouts[dateKey].length === 0) delete st.dailyWorkouts[dateKey];
+      return st;
+    });
+  }, [dateKey]);
+
   const saveProfile = useCallback(async (updates) => {
     try {
       const { error } = await supabase
@@ -1609,6 +1632,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       deleteLogForExercise={deleteLogForExercise}
                       styles={styles}
                       daily
+                      onDelete={() => deleteDailyWorkout(w.id)}
                     />
                   ))}
                   <button
@@ -2956,7 +2980,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete }) {
   const cat = (workout.category || "Workout").trim();
   const totalEx = workout.exercises.length;
   const loggedEx = totalEx > 0
@@ -2988,6 +3012,27 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
           }}>
             {allDone ? "Complete" : `${loggedEx}/${totalEx}`}
           </span>
+        )}
+        {daily && onDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 4,
+              color: "inherit",
+              opacity: 0.45,
+              display: "flex",
+              alignItems: "center",
+            }}
+            aria-label="Remove daily workout"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         )}
         <span style={styles.collapseToggle}>{collapsed ? "\u25B6" : "\u25BC"}</span>
       </div>
