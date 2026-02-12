@@ -63,9 +63,10 @@ function ensureAnimations() {
   document.head.appendChild(s);
 }
 
-/** Check if a set is completed (backward compat: old data without flag uses reps > 0) */
+/** Check if a set is completed. After migration, all sets have explicit `completed` flag. */
 function isSetCompleted(set) {
   if (set.completed !== undefined) return set.completed;
+  // Fallback for any edge case where migration hasn't run yet
   return Number(set.reps) > 0;
 }
 

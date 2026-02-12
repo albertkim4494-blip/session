@@ -81,6 +81,24 @@ export function loadState() {
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
   };
 
+  // Migrate old log sets: stamp `completed` flag where missing
+  // Old data had only { reps, weight } — if reps > 0 and no flag, mark completed
+  if (next.logsByDate && typeof next.logsByDate === "object") {
+    for (const dk of Object.keys(next.logsByDate)) {
+      const dayLogs = next.logsByDate[dk];
+      if (!dayLogs || typeof dayLogs !== "object") continue;
+      for (const exId of Object.keys(dayLogs)) {
+        const exLog = dayLogs[exId];
+        if (!exLog?.sets || !Array.isArray(exLog.sets)) continue;
+        for (const s of exLog.sets) {
+          if (s.completed === undefined) {
+            s.completed = Number(s.reps) > 0;
+          }
+        }
+      }
+    }
+  }
+
   // Ensure every workout has valid structure and a category
   next.program.workouts = next.program.workouts.map((w) => ({
     ...w,
