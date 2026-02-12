@@ -14,7 +14,7 @@ import {
   endOfWeekSunday, endOfMonth, endOfYear,
   inRangeInclusive, isValidDateKey,
 } from "./lib/dateUtils";
-import { uid, loadState, persistState, makeDefaultState, safeParse } from "./lib/stateUtils";
+import { uid, loadState, persistState, makeDefaultState, safeParse, migrateCompletedFlag } from "./lib/stateUtils";
 import {
   validateExerciseName, validateWorkoutName,
   toNumberOrNull, formatMaxWeight,
@@ -270,6 +270,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (cancelled) return;
 
         if (cloudState && typeof cloudState === "object" && Object.keys(cloudState).length > 0) {
+          // Apply completed-flag migration to cloud data (cloud may lack the flag)
+          migrateCompletedFlag(cloudState);
           setState(cloudState);
           persistState(cloudState);
         } else {

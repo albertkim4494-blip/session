@@ -1,5 +1,29 @@
 import { LS_KEY, LS_BACKUP_KEY } from "./constants";
 
+/**
+ * Stamp `completed` flag on all log sets that are missing it.
+ * Past data with reps > 0 → completed; today's data → not completed.
+ * Mutates the state object in place.
+ */
+export function migrateCompletedFlag(st) {
+  if (!st?.logsByDate || typeof st.logsByDate !== "object") return;
+  const todayKey = new Date().toISOString().slice(0, 10);
+
+  for (const dk of Object.keys(st.logsByDate)) {
+    const dayLogs = st.logsByDate[dk];
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    for (const exId of Object.keys(dayLogs)) {
+      const exLog = dayLogs[exId];
+      if (!exLog?.sets || !Array.isArray(exLog.sets)) continue;
+      for (const s of exLog.sets) {
+        if (s.completed === undefined) {
+          s.completed = dk !== todayKey && Number(s.reps) > 0;
+        }
+      }
+    }
+  }
+}
+
 export function safeParse(json, fallback) {
   try {
     const v = JSON.parse(json);
@@ -81,31 +105,7 @@ export function loadState() {
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
   };
 
-  // Migrate log sets: stamp `completed` flag where missing
-  // v2: also fix today's data that was incorrectly migrated as completed in v1
-  if (next.logsByDate && typeof next.logsByDate === "object") {
-    const todayKey = new Date().toISOString().slice(0, 10);
-    const needsV2 = next._completedMigration !== 2;
-
-    for (const dk of Object.keys(next.logsByDate)) {
-      const dayLogs = next.logsByDate[dk];
-      if (!dayLogs || typeof dayLogs !== "object") continue;
-      for (const exId of Object.keys(dayLogs)) {
-        const exLog = dayLogs[exId];
-        if (!exLog?.sets || !Array.isArray(exLog.sets)) continue;
-        for (const s of exLog.sets) {
-          if (s.completed === undefined) {
-            // New migration: past data with reps > 0 → completed, today → not
-            s.completed = dk !== todayKey && Number(s.reps) > 0;
-          } else if (needsV2 && dk === todayKey) {
-            // Fix v1 migration that wrongly stamped today's templates as completed
-            s.completed = false;
-          }
-        }
-      }
-    }
-    next._completedMigration = 2;
-  }
+  migrateCompletedFlag(next);
 
   // Ensure every workout has valid structure and a category
   next.program.workouts = next.program.workouts.map((w) => ({
