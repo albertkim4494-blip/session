@@ -56,9 +56,17 @@ function ensureAnimations() {
   s.textContent = `
 @keyframes tabFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toastPop { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-@keyframes chipPop { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+@keyframes chipPop { 0%{transform:scale(1)} 50%{transform:scale(1.3)} 60%{transform:scale(0.95)} 100%{transform:scale(1)} }
+@keyframes checkDraw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+@keyframes rowPulse { 0% { box-shadow: inset 0 0 20px rgba(46,204,113,0.35); } 100% { box-shadow: none; } }
 `;
   document.head.appendChild(s);
+}
+
+/** Check if a set is completed (backward compat: old data without flag uses reps > 0) */
+function isSetCompleted(set) {
+  if (set.completed !== undefined) return set.completed;
+  return Number(set.reps) > 0;
 }
 
 // ============================================================================
@@ -696,10 +704,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const exLog = state.logsByDate[dk]?.[exerciseId];
       if (!exLog || !Array.isArray(exLog.sets)) continue;
 
-      sessions++;
-      totalSets += exLog.sets.length;
+      const completedInDay = exLog.sets.filter((s) => isSetCompleted(s));
+      if (completedInDay.length === 0) continue;
 
-      for (const set of exLog.sets) {
+      sessions++;
+      totalSets += completedInDay.length;
+
+      for (const set of completedInDay) {
         const reps = Number(set.reps ?? 0);
         if (Number.isFinite(reps)) totalReps += reps;
 
@@ -827,31 +838,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       const existingEntry = st.logsByDate[dateKey]?.[logCtx.exerciseId];
 
-      if (existingEntry) {
-        // Sets already exist (from checkmarks) — sync modal edits to checked sets, save notes/mood
-        const updatedSets = (existingEntry.sets || []).map((saved, i) => {
-          if (Number(saved.reps) > 0 && modals.log.sets[i]) {
-            return cleanSet(modals.log.sets[i]);
-          }
-          return saved;
-        }).filter((s) => s.reps > 0);
-        existingEntry.sets = updatedSets.length ? updatedSets : existingEntry.sets;
-        existingEntry.notes = modals.log.notes ?? "";
-        if (modals.log.mood != null) existingEntry.mood = modals.log.mood;
-      } else {
-        // No existing log — bulk save all modal sets (manual/legacy flow)
-        const cleanedSets = (Array.isArray(modals.log.sets) ? modals.log.sets : [])
-          .map(cleanSet)
-          .filter((s) => s.reps > 0);
+      // Save all modal sets, preserving completion flags from checkmarks
+      const allSets = (Array.isArray(modals.log.sets) ? modals.log.sets : []).map((modalSet, i) => {
+        const cleaned = cleanSet(modalSet);
+        const wasCompleted = existingEntry?.sets?.[i] && isSetCompleted(existingEntry.sets[i]);
+        return { ...cleaned, completed: !!wasCompleted };
+      });
 
-        st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
-        const logEntry = {
-          sets: cleanedSets.length ? cleanedSets : [{ reps: 0, weight: "BW" }],
-          notes: modals.log.notes ?? "",
-        };
-        if (modals.log.mood != null) logEntry.mood = modals.log.mood;
-        st.logsByDate[dateKey][logCtx.exerciseId] = logEntry;
-      }
+      st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
+      const logEntry = {
+        sets: allSets,
+        notes: modals.log.notes ?? "",
+      };
+      if (modals.log.mood != null) logEntry.mood = modals.log.mood;
+      st.logsByDate[dateKey][logCtx.exerciseId] = logEntry;
 
       return st;
     });
@@ -873,12 +873,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId) => {
+      // Haptic feedback
+      navigator.vibrate?.(10);
+
       updateState((st) => {
         st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
         const entry = st.logsByDate[dateKey][exerciseId] ?? { sets: [] };
         if (!Array.isArray(entry.sets)) entry.sets = [];
-        while (entry.sets.length <= setIndex) entry.sets.push({ reps: 0, weight: "" });
-        entry.sets[setIndex] = { reps: setData.reps, weight: setData.weight };
+        while (entry.sets.length <= setIndex) entry.sets.push({ reps: 0, weight: "", completed: false });
+        entry.sets[setIndex] = { reps: setData.reps, weight: setData.weight, completed: true };
         st.logsByDate[dateKey][exerciseId] = entry;
         return st;
       });
@@ -898,14 +901,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       // Include the set we just saved
       const updatedEntry = { ...(updatedDayLogs[exerciseId] || { sets: [] }) };
       const updatedSets = [...(updatedEntry.sets || [])];
-      while (updatedSets.length <= setIndex) updatedSets.push({ reps: 0, weight: "" });
-      updatedSets[setIndex] = { reps: setData.reps, weight: setData.weight };
+      while (updatedSets.length <= setIndex) updatedSets.push({ reps: 0, weight: "", completed: false });
+      updatedSets[setIndex] = { reps: setData.reps, weight: setData.weight, completed: true };
       updatedDayLogs[exerciseId] = { ...updatedEntry, sets: updatedSets };
 
       const isWorkoutComplete = exercises.length > 0 && exercises.every((ex) => {
         const exLog = updatedDayLogs[ex.id];
         if (!exLog?.sets?.length) return false;
-        const completedCount = exLog.sets.filter((s) => Number(s.reps) > 0).length;
+        const completedCount = exLog.sets.filter((s) => isSetCompleted(s)).length;
         const exPrior = findMostRecentLogBefore(ex.id, dateKey);
         const exScheme = ex.scheme || workout?.scheme || null;
         const exSchemeParsed = exScheme ? parseScheme(exScheme) : null;
@@ -915,7 +918,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       // Count exercises logged today
       const exercisesDoneToday = Object.keys(updatedDayLogs).filter(
-        (eid) => updatedDayLogs[eid]?.sets?.some((s) => Number(s.reps) > 0)
+        (eid) => updatedDayLogs[eid]?.sets?.some((s) => isSetCompleted(s))
       ).length;
 
       const toast = selectSetCompletionToast({
@@ -942,12 +945,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         const dayLogs = st.logsByDate[dateKey];
         if (!dayLogs?.[exerciseId]) return st;
         const entry = dayLogs[exerciseId];
-        if (!Array.isArray(entry.sets)) return st;
-        entry.sets.splice(setIndex, 1);
-        if (entry.sets.filter((s) => Number(s.reps) > 0).length === 0) {
-          delete dayLogs[exerciseId];
-          if (Object.keys(dayLogs).length === 0) delete st.logsByDate[dateKey];
-        }
+        if (!Array.isArray(entry.sets) || setIndex >= entry.sets.length) return st;
+        entry.sets[setIndex] = { ...entry.sets[setIndex], completed: false };
         return st;
       });
     },
@@ -2288,7 +2287,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             {modals.log.sets.map((s, i) => {
               const isBW = String(s.weight).toUpperCase() === "BW";
               const savedSets = state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets;
-              const isSetSaved = savedSets && i < savedSets.length && Number(savedSets[i].reps) > 0;
+              const isSetSaved = savedSets && i < savedSets.length && isSetCompleted(savedSets[i]);
               return (
                 <div key={i} style={{
                   display: "grid",
@@ -2300,6 +2299,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   border: isSetSaved ? "1px solid rgba(46,204,113,0.4)" : `1px solid ${colors.border}`,
                   background: isSetSaved ? "rgba(46,204,113,0.08)" : colors.cardAltBg,
                   transition: "border 0.2s, background 0.2s",
+                  ...(isSetSaved ? { animation: "rowPulse 0.5s ease-out" } : {}),
                 }}>
                   <button
                     style={{
@@ -2311,7 +2311,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       color: isSetSaved ? "#fff" : colors.text,
                       fontWeight: 900, fontSize: 12,
                       transition: "all 0.2s",
-                      ...(isSetSaved ? { animation: "chipPop 0.2s ease-out" } : {}),
+                      ...(isSetSaved ? { animation: "chipPop 0.3s ease-out" } : {}),
                       WebkitTapHighlightColor: "transparent",
                     }}
                     onClick={() => {
@@ -2329,7 +2329,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   >
                     {isSetSaved ? (
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
+                        <polyline points="20 6 9 17 4 12" style={{ strokeDasharray: 24, animation: "checkDraw 0.3s ease-out forwards" }} />
                       </svg>
                     ) : (
                       i + 1
@@ -3160,17 +3160,17 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   const hasLog = !!exLog && Array.isArray(exLog.sets);
   const exUnit = getUnit(exercise.unit, exercise);
 
-  const completedSets = hasLog ? exLog.sets.filter((s) => Number(s.reps) > 0) : [];
+  const completedSets = hasLog ? exLog.sets.filter((s) => isSetCompleted(s)) : [];
   const templateSets = findPrior ? (findPrior(exercise.id)?.sets || []) : [];
   const schemeStr = exercise.scheme || workoutScheme || null;
   const schemeSets = schemeStr ? (parseScheme(schemeStr)?.sets || 0) : 0;
-  const totalSets = Math.max(templateSets.length, completedSets.length, schemeSets);
+  const totalSets = Math.max(templateSets.length, hasLog ? exLog.sets.length : 0, schemeSets);
   const completedCount = completedSets.length;
   const allDone = totalSets > 0 && completedCount >= totalSets;
 
   const setsText = hasLog
     ? exLog.sets
-        .filter((s) => Number(s.reps) > 0)
+        .filter((s) => isSetCompleted(s))
         .map((s) => {
           const isBW = String(s.weight).toUpperCase() === "BW";
           const w = isBW ? "BW" : s.weight;
@@ -3240,7 +3240,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
   const loggedEx = totalEx > 0
     ? workout.exercises.filter((ex) => {
         const log = logsForDate[ex.id];
-        return log && Array.isArray(log.sets) && log.sets.length > 0;
+        return log && Array.isArray(log.sets) && log.sets.some((s) => isSetCompleted(s));
       }).length
     : 0;
   const allDone = totalEx > 0 && loggedEx === totalEx;
