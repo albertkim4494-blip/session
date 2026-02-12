@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useTimer } from "../hooks/useTimer";
 import { formatTimerDisplay } from "../lib/timerUtils";
 import { isSetCompleted } from "../lib/setHelpers";
@@ -25,9 +25,10 @@ const MODE_TABS = [
   { value: "stopwatch", label: "Stopwatch" },
 ];
 
-export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles, timerSound }) {
+export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles, timerSound, autoStart, onAutoStartChange, autoStartSignal }) {
   const [mode, setMode] = useState("countdown");
   const completedRef = useRef(false);
+  const lastSignalRef = useRef(autoStartSignal || 0);
 
   // Find first uncompleted set — check modal sets against saved state
   const activeSetIndex = useMemo(() => {
@@ -60,6 +61,22 @@ export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles
       timer.start(0, "stopwatch");
     }
   }, [mode, targetSec, timer]);
+
+  // Auto-start when signal changes (rest timer completed/dismissed)
+  useEffect(() => {
+    if (!autoStart || !autoStartSignal) return;
+    if (autoStartSignal > lastSignalRef.current) {
+      lastSignalRef.current = autoStartSignal;
+      // Short delay so the new activeSetIndex has propagated
+      const t = setTimeout(() => {
+        if (activeSetIndex >= 0 && targetSec > 0 && mode === "countdown") {
+          completedRef.current = false;
+          timer.start(targetSec, "countdown");
+        }
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [autoStartSignal, autoStart, activeSetIndex, targetSec, mode, timer]);
 
   const handleStop = useCallback(() => {
     timer.stop();
@@ -169,6 +186,22 @@ export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles
           Reset
         </button>
       </div>
+
+      {/* Auto-start toggle */}
+      <label style={{
+        display: "flex", alignItems: "center", gap: 6,
+        fontSize: 12, opacity: 0.6, cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
+        userSelect: "none",
+      }}>
+        <input
+          type="checkbox"
+          checked={!!autoStart}
+          onChange={(e) => onAutoStartChange?.(e.target.checked)}
+          style={{ width: 16, height: 16, margin: 0 }}
+        />
+        Auto-start next set
+      </label>
     </div>
   );
 }

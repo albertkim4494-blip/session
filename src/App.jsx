@@ -68,6 +68,9 @@ function ensureAnimations() {
 @keyframes restBarSlideUp { from{transform:translateY(100%);opacity:0} to{transform:translateY(0);opacity:1} }
 @keyframes restBarSlideDown { from{transform:translateY(0);opacity:1} to{transform:translateY(100%);opacity:0} }
 @keyframes timerPulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
 `;
   document.head.appendChild(s);
 }
@@ -107,6 +110,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
+  const [autoStartTimer, setAutoStartTimer] = useState(false);
+  const [autoStartSignal, setAutoStartSignal] = useState(0);
 
   // Toast notification
   const [toast, setToast] = useState(null); // { message, coachLine }
@@ -779,6 +784,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             customUnitAbbr: exercise.customUnitAbbr || "",
             customUnitAllowDecimal: exercise.customUnitAllowDecimal ?? false,
             scheme: schemeStr,
+            workoutExercises: workout?.exercises || [],
           },
           sets: normalizedSets,
           notes: prior?.notes ?? "",
@@ -2228,8 +2234,40 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} footer={modals.log.isOpen ? (
+      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} footer={modals.log.isOpen ? (() => {
+        const fCtx = modals.log.context;
+        const fExList = fCtx?.workoutExercises || [];
+        const fExIdx = fExList.findIndex((e) => e.id === fCtx?.exerciseId);
+        const fPrevEx = fExIdx > 0 ? fExList[fExIdx - 1] : null;
+        const fNextEx = fExIdx < fExList.length - 1 ? fExList[fExIdx + 1] : null;
+        const navExercise = (ex) => {
+          if (!ex) return;
+          setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
+          saveLog();
+          setTimeout(() => openLog(fCtx.workoutId, ex), 50);
+        };
+        return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {fExList.length > 1 && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                disabled={!fPrevEx}
+                onClick={() => navExercise(fPrevEx)}
+                style={{ ...styles.secondaryBtn, flex: 1, opacity: fPrevEx ? 1 : 0.3, textAlign: "center", fontSize: 12, padding: "8px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {fPrevEx ? `\u2190 ${fPrevEx.name}` : "\u2190 Prev"}
+              </button>
+              <button
+                type="button"
+                disabled={!fNextEx}
+                onClick={() => navExercise(fNextEx)}
+                style={{ ...styles.secondaryBtn, flex: 1, opacity: fNextEx ? 1 : 0.3, textAlign: "center", fontSize: 12, padding: "8px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {fNextEx ? `${fNextEx.name} \u2192` : "Next \u2192"}
+              </button>
+            </div>
+          )}
           <button style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
             Save
           </button>
@@ -2240,7 +2278,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             Cancel
           </button>
         </div>
-      ) : null}>
+        );
+      })() : null}>
         {modals.log.isOpen && (() => {
           const logCtx = modals.log.context;
           let logExercise = null;
@@ -2368,6 +2407,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </button>
 
                   <input
+                    type="number"
                     value={String(s.reps ?? "")}
                     onChange={(e) => {
                       const newSets = [...modals.log.sets];
@@ -2377,16 +2417,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                     }}
                     onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                    inputMode={logUnit.allowDecimal ? "decimal" : "tel"}
-                    pattern={logUnit.allowDecimal ? "[0-9.]*" : "[0-9]*"}
                     enterKeyHint="done"
+                    step={logUnit.allowDecimal ? "0.01" : "1"}
+                    min="0"
                     style={styles.numInput}
                     placeholder="0"
                   />
 
                   {showWeight && (
                     <input
-                      value={isBW ? "BW" : String(s.weight ?? "")}
+                      type="number"
+                      value={isBW ? "" : String(s.weight ?? "")}
                       onChange={(e) => {
                         const newSets = [...modals.log.sets];
                         let w = e.target.value.replace(/[^\d.]/g, "");
@@ -2395,9 +2436,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                       }}
                       onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                      inputMode="tel"
-                      pattern="[0-9]*"
                       enterKeyHint="done"
+                      step="0.01"
+                      min="0"
                       style={{ ...styles.numInput, ...(isBW ? styles.disabledInput : {}) }}
                       placeholder="lbs"
                       disabled={isBW}
@@ -2449,8 +2490,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     restSec={restTimer.restSec}
                     exerciseName={restTimer.exerciseName}
                     isVisible={restTimer.active}
-                    onDismiss={() => setRestTimer((prev) => ({ ...prev, active: false }))}
-                    onComplete={() => {}}
+                    onDismiss={() => {
+                      setRestTimer((prev) => ({ ...prev, active: false }));
+                      setAutoStartSignal((s) => s + 1);
+                    }}
+                    onComplete={() => {
+                      setAutoStartSignal((s) => s + 1);
+                    }}
                     onRestTimeObserved={handleRestTimeObserved}
                     styles={styles}
                     colors={colors}
@@ -2487,6 +2533,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               colors={colors}
               styles={styles}
               timerSound={state.preferences?.timerSound !== false}
+              autoStart={autoStartTimer}
+              onAutoStartChange={setAutoStartTimer}
+              autoStartSignal={autoStartSignal}
             />
           )}
 
