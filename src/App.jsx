@@ -3164,14 +3164,15 @@ function MoodPicker({ value, onChange, colors }) {
 
 function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme }) {
   const exLog = logsForDate[exercise.id] ?? null;
-  const hasLog = !!exLog && Array.isArray(exLog.sets);
+  const hasAnySets = !!exLog && Array.isArray(exLog.sets) && exLog.sets.length > 0;
   const exUnit = getUnit(exercise.unit, exercise);
 
-  const completedSets = hasLog ? exLog.sets.filter((s) => isSetCompleted(s)) : [];
+  const completedSets = hasAnySets ? exLog.sets.filter((s) => isSetCompleted(s)) : [];
+  const hasLog = completedSets.length > 0;
   const templateSets = findPrior ? (findPrior(exercise.id)?.sets || []) : [];
   const schemeStr = exercise.scheme || workoutScheme || null;
   const schemeSets = schemeStr ? (parseScheme(schemeStr)?.sets || 0) : 0;
-  const totalSets = Math.max(templateSets.length, hasLog ? exLog.sets.length : 0, schemeSets);
+  const totalSets = Math.max(templateSets.length, hasAnySets ? exLog.sets.length : 0, schemeSets);
   const completedCount = completedSets.length;
   const allDone = totalSets > 0 && completedCount >= totalSets;
 

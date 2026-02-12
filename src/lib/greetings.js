@@ -268,7 +268,7 @@ function isFirstEverLog(exerciseId, logsByDate, dateKey) {
   for (const [dk, dayLogs] of Object.entries(logsByDate)) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) continue;
     if (dk === dateKey) continue;
-    if (dayLogs?.[exerciseId]?.sets?.length > 0) return false;
+    if (dayLogs?.[exerciseId]?.sets?.some(isSetCompleted)) return false;
   }
   return true;
 }
@@ -318,7 +318,7 @@ export function selectSetCompletionToast({
 
   // 3. First-ever log for this exercise (only on the first set, not every set)
   const todayExLog = logsByDate?.[dateKey]?.[exerciseId];
-  const hasCompletedSetsToday = todayExLog?.sets?.some((s) => Number(s.reps) > 0);
+  const hasCompletedSetsToday = todayExLog?.sets?.some((s) => isSetCompleted(s));
   if (!hasCompletedSetsToday && isFirstEverLog(exerciseId, logsByDate, dateKey)) {
     return { message: FIRST_EVER.message, emoji: FIRST_EVER.emoji, coachLine: null };
   }
@@ -327,7 +327,7 @@ export function selectSetCompletionToast({
   const todayLogs = logsByDate?.[dateKey];
   const isFirstSetToday = !todayLogs || Object.keys(todayLogs).length === 0 ||
     (Object.keys(todayLogs).length === 1 && todayLogs[exerciseId] &&
-     (!todayLogs[exerciseId].sets || todayLogs[exerciseId].sets.filter((s) => Number(s.reps) > 0).length === 0));
+     (!todayLogs[exerciseId].sets || todayLogs[exerciseId].sets.filter((s) => isSetCompleted(s)).length === 0));
   if (isFirstSetToday) {
     // getStreak uses pre-update state, so +1 to include today's new log
     const streak = getStreak(logsByDate, dateKey) + 1;
