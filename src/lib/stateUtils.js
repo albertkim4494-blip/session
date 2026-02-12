@@ -83,7 +83,9 @@ export function loadState() {
 
   // Migrate old log sets: stamp `completed` flag where missing
   // Old data had only { reps, weight } — if reps > 0 and no flag, mark completed
+  // Exception: today's data defaults to uncompleted (user may have only saved templates)
   if (next.logsByDate && typeof next.logsByDate === "object") {
+    const todayKey = new Date().toISOString().slice(0, 10);
     for (const dk of Object.keys(next.logsByDate)) {
       const dayLogs = next.logsByDate[dk];
       if (!dayLogs || typeof dayLogs !== "object") continue;
@@ -92,7 +94,7 @@ export function loadState() {
         if (!exLog?.sets || !Array.isArray(exLog.sets)) continue;
         for (const s of exLog.sets) {
           if (s.completed === undefined) {
-            s.completed = Number(s.reps) > 0;
+            s.completed = dk !== todayKey && Number(s.reps) > 0;
           }
         }
       }
