@@ -856,12 +856,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return st;
     });
 
-    // Toast for notes/mood changes or first save
+    // Toast only for meaningful changes (not template-only saves)
     const notesChanged = (modals.log.notes ?? "") !== (existing?.notes ?? "");
     const moodChanged = modals.log.mood !== (existing?.mood ?? null);
-    const isNewSave = !existing;
 
-    if (isNewSave || notesChanged || moodChanged) {
+    if (notesChanged || moodChanged) {
       const ack = selectAcknowledgment(modals.log.mood, dateKey, state.logsByDate);
       setToast(ack);
       clearTimeout(toastTimerRef.current);
