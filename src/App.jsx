@@ -889,12 +889,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const workout = workoutById.get(workoutId);
       const exercises = workout?.exercises || [];
 
-      // Figure out totalSets for this exercise from prior template or scheme
-      const prior = findMostRecentLogBefore(exerciseId, dateKey);
-      const schemeStr = exercises.find((e) => e.id === exerciseId)?.scheme || workout?.scheme || null;
-      const schemeParsed = schemeStr ? parseScheme(schemeStr) : null;
-      const totalSets = prior?.sets?.length || schemeParsed?.sets || 0;
-
       // Check if the whole workout is complete after this set
       const updatedDayLogs = { ...state.logsByDate[dateKey] };
       // Include the set we just saved
@@ -919,6 +913,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const exercisesDoneToday = Object.keys(updatedDayLogs).filter(
         (eid) => updatedDayLogs[eid]?.sets?.some((s) => isSetCompleted(s))
       ).length;
+
+      // Compute totalSets from today's template (updatedSets includes template slots)
+      const prior = findMostRecentLogBefore(exerciseId, dateKey);
+      const schemeStr = exercises.find((e) => e.id === exerciseId)?.scheme || workout?.scheme || null;
+      const schemeParsed = schemeStr ? parseScheme(schemeStr) : null;
+      const totalSets = Math.max(updatedSets.length, prior?.sets?.length || 0, schemeParsed?.sets || 0);
 
       const toast = selectSetCompletionToast({
         exerciseId,
