@@ -851,8 +851,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       toastTimerRef.current = setTimeout(() => setToast(null), 2500);
     }
 
+    // Start rest timer after saving if any sets have data
+    const hasSetsWithData = modals.log.sets?.some((s) => Number(s.reps ?? 0) > 0);
+    if (state.preferences?.restTimerEnabled !== false && hasSetsWithData) {
+      const exName = logCtx.exerciseName || "";
+      const learnedKey = exName.toLowerCase().trim();
+      const learnedRest = state.preferences?.exerciseRestTimes?.[learnedKey];
+      const restSec = learnedRest || state.preferences?.defaultRestSec || 90;
+      setRestTimer({ active: true, exerciseId: logCtx.exerciseId, exerciseName: exName, restSec });
+    }
+
     dispatchModal({ type: "CLOSE_LOG" });
-  }, [modals.log, dateKey, state.logsByDate]);
+  }, [modals.log, dateKey, state.logsByDate, state.preferences]);
 
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId) => {

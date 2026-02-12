@@ -19,10 +19,18 @@ export function RestTimerBar({ restSec, exerciseName, isVisible, onDismiss, onCo
   const [remaining, setRemaining] = useState(restSec);
   const startTimeRef = useRef(Date.now());
   const intervalRef = useRef(null);
+  const autoDismissRef = useRef(null);
   const completedRef = useRef(false);
   const dismissingRef = useRef(false);
 
-  // Reset when restSec or visibility changes
+  // Stable refs for callbacks to avoid useEffect re-runs
+  const onDismissRef = useRef(onDismiss);
+  const onCompleteRef = useRef(onComplete);
+  const onRestTimeObservedRef = useRef(onRestTimeObserved);
+  useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+  useEffect(() => { onRestTimeObservedRef.current = onRestTimeObserved; }, [onRestTimeObserved]);
+
   useEffect(() => {
     if (!isVisible) return;
     completedRef.current = false;
@@ -39,30 +47,33 @@ export function RestTimerBar({ restSec, exerciseName, isVisible, onDismiss, onCo
         clearInterval(intervalRef.current);
         navigator.vibrate?.([100, 50, 100]);
         if (timerSound) playBeep();
-        onComplete?.();
-        // Auto-dismiss after 1s
-        setTimeout(() => {
+        onCompleteRef.current?.();
+        autoDismissRef.current = setTimeout(() => {
           if (!dismissingRef.current) {
             dismissingRef.current = true;
-            onDismiss?.();
+            onDismissRef.current?.();
           }
         }, 1000);
       }
     }, 250);
 
-    return () => clearInterval(intervalRef.current);
-  }, [isVisible, restSec, timerSound, onComplete, onDismiss]);
+    return () => {
+      clearInterval(intervalRef.current);
+      clearTimeout(autoDismissRef.current);
+    };
+  }, [isVisible, restSec, timerSound]);
 
   const handleDismiss = useCallback(() => {
     if (dismissingRef.current) return;
     dismissingRef.current = true;
     clearInterval(intervalRef.current);
+    clearTimeout(autoDismissRef.current);
     const elapsed = (Date.now() - startTimeRef.current) / 1000;
     if (elapsed >= 5) {
-      onRestTimeObserved?.(exerciseName, Math.round(elapsed));
+      onRestTimeObservedRef.current?.(exerciseName, Math.round(elapsed));
     }
-    onDismiss?.();
-  }, [exerciseName, onRestTimeObserved, onDismiss]);
+    onDismissRef.current?.();
+  }, [exerciseName]);
 
   if (!isVisible) return null;
 
