@@ -74,6 +74,22 @@ const COACH_LINES = [
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Check if a set is completed (backward compat: old data without flag uses reps > 0). */
+function isSetCompleted(set) {
+  if (set.completed !== undefined) return set.completed;
+  return Number(set.reps) > 0;
+}
+
+/** Check if a day's logs contain at least one completed set. */
+function dayHasCompletedSets(dayLogs) {
+  if (!dayLogs || typeof dayLogs !== "object") return false;
+  for (const exId of Object.keys(dayLogs)) {
+    const exLog = dayLogs[exId];
+    if (exLog?.sets && Array.isArray(exLog.sets) && exLog.sets.some(isSetCompleted)) return true;
+  }
+  return false;
+}
+
 /** Pick a stable-ish item from an array based on a seed (avoids re-rolling every render). */
 function pick(arr, seed) {
   if (!arr.length) return "";
@@ -99,7 +115,7 @@ function getStreak(logsByDate, dateKey) {
   while (streak < 365) {
     const key = d.toISOString().slice(0, 10);
     const dayLogs = logsByDate[key];
-    if (!dayLogs || Object.keys(dayLogs).length === 0) break;
+    if (!dayHasCompletedSets(dayLogs)) break;
     streak++;
     d.setDate(d.getDate() - 1);
   }
@@ -115,7 +131,7 @@ function daysSinceLastLog(logsByDate, dateKey) {
 
   for (const k of keys) {
     const dayLogs = logsByDate[k];
-    if (dayLogs && Object.keys(dayLogs).length > 0) {
+    if (dayHasCompletedSets(dayLogs)) {
       const diff = (new Date(dateKey + "T00:00:00") - new Date(k + "T00:00:00")) / (1000 * 60 * 60 * 24);
       return Math.round(diff);
     }
@@ -168,8 +184,7 @@ const STREAK_MILESTONES = [
  */
 export function selectGreeting(logsByDate, dateKey) {
   const seed = dateSeed(dateKey);
-  const todayLogs = logsByDate[dateKey];
-  const hasLoggedToday = todayLogs && Object.keys(todayLogs).length > 0;
+  const hasLoggedToday = dayHasCompletedSets(logsByDate[dateKey]);
   const streak = getStreak(logsByDate, dateKey);
   const gap = daysSinceLastLog(logsByDate, dateKey);
 

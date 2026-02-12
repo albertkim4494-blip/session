@@ -69,6 +69,16 @@ function isSetCompleted(set) {
   return Number(set.reps) > 0;
 }
 
+/** Check if a day's logs contain at least one completed set. */
+function dayHasCompletedSets(dayLogs) {
+  if (!dayLogs || typeof dayLogs !== "object") return false;
+  for (const exId of Object.keys(dayLogs)) {
+    const exLog = dayLogs[exId];
+    if (exLog?.sets && Array.isArray(exLog.sets) && exLog.sets.some(isSetCompleted)) return true;
+  }
+  return false;
+}
+
 // ============================================================================
 // MAIN APP COMPONENT
 // ============================================================================
@@ -408,16 +418,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     while (d <= summaryRange.end) {
       total++;
       const dayLogs = state.logsByDate[d];
-      if (dayLogs && typeof dayLogs === "object") {
+      if (dayHasCompletedSets(dayLogs)) {
         const keys = Object.keys(dayLogs);
-        if (keys.length > 0) {
-          logged++;
-          const weekStart = startOfWeekSunday(d);
-          weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
-          for (const exId of keys) {
-            const exLog = dayLogs[exId];
-            if (exLog?.sets && Array.isArray(exLog.sets)) totalSets += exLog.sets.length;
-          }
+        logged++;
+        const weekStart = startOfWeekSunday(d);
+        weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
+        for (const exId of keys) {
+          const exLog = dayLogs[exId];
+          if (exLog?.sets && Array.isArray(exLog.sets)) totalSets += exLog.sets.filter(isSetCompleted).length;
         }
       }
       d = addDays(d, 1);
@@ -441,7 +449,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // All-time stats for profile modal (not tied to summary range)
   const profileStats = useMemo(() => {
     const activeDates = Object.keys(state.logsByDate)
-      .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k) && state.logsByDate[k] && typeof state.logsByDate[k] === "object" && Object.keys(state.logsByDate[k]).length > 0)
+      .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k) && dayHasCompletedSets(state.logsByDate[k]))
       .sort();
 
     const logged = activeDates.length;
@@ -476,7 +484,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (!dk.startsWith(prefix)) continue;
 
       const dayLogs = state.logsByDate[dk];
-      if (dayLogs && typeof dayLogs === "object" && Object.keys(dayLogs).length > 0) {
+      if (dayHasCompletedSets(dayLogs)) {
         set.add(dk);
       }
     }
