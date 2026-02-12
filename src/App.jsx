@@ -939,9 +939,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         setRestTimer({ active: true, exerciseId, exerciseName: exName, restSec, completedSetIndex: setIndex });
       } else {
         setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
+        // No rest timer — fire auto-start signal directly for the next set
+        if (autoStartTimer) {
+          setTimeout(() => setAutoStartSignal((s) => s + 1), 100);
+        }
       }
     },
-    [dateKey, state.logsByDate, state.preferences, workoutById]
+    [dateKey, state.logsByDate, state.preferences, workoutById, autoStartTimer]
   );
 
   const uncompleteSet = useCallback(
