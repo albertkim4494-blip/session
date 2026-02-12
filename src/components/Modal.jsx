@@ -1,7 +1,7 @@
 import React from "react";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
-export function Modal({ open, title, children, footer, onClose, styles }) {
+export function Modal({ open, title, children, footer, onClose, styles, fullScreen }) {
   const kbInset = useKeyboardInset();
 
   if (!open) return null;
@@ -15,11 +15,23 @@ export function Modal({ open, title, children, footer, onClose, styles }) {
     }
   };
 
+  const overlayStyle = fullScreen
+    ? { ...styles.modalOverlay, padding: 0, alignItems: "stretch" }
+    : { ...styles.modalOverlay, paddingBottom: 10 + kbInset };
+
+  const sheetStyle = fullScreen
+    ? { ...styles.modalSheet, borderRadius: 0, height: "100dvh", maxWidth: "100%", display: "flex", flexDirection: "column" }
+    : { ...styles.modalSheet, ...(footer ? { height: `calc(85dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column" };
+
+  const bodyStyle = fullScreen
+    ? { ...styles.modalBody, flex: 1, minHeight: 0, maxHeight: undefined }
+    : { ...styles.modalBody, maxHeight: footer ? undefined : `calc(78dvh - ${kbInset}px)`, flex: footer ? 1 : undefined, minHeight: footer ? 0 : undefined };
+
   return (
-    <div style={{ ...styles.modalOverlay, paddingBottom: 10 + kbInset }} onMouseDown={onClose}>
+    <div style={overlayStyle} onMouseDown={fullScreen ? undefined : onClose}>
       <div
-        style={{ ...styles.modalSheet, ...(footer ? { height: `calc(85dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column" }}
-        onMouseDown={(e) => e.stopPropagation()}
+        style={sheetStyle}
+        onMouseDown={fullScreen ? undefined : (e) => e.stopPropagation()}
       >
         <div style={styles.modalHeader}>
           <div style={styles.modalTitle}>{title}</div>
@@ -28,7 +40,7 @@ export function Modal({ open, title, children, footer, onClose, styles }) {
           </button>
         </div>
         <div
-          style={{ ...styles.modalBody, maxHeight: footer ? undefined : `calc(78dvh - ${kbInset}px)`, flex: footer ? 1 : undefined, minHeight: footer ? 0 : undefined }}
+          style={bodyStyle}
           onFocusCapture={handleFocusCapture}
         >
           {children}

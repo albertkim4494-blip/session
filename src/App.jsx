@@ -2225,7 +2225,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} footer={modals.log.isOpen ? (
+      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} fullScreen footer={modals.log.isOpen ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <button style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
             Save
@@ -2373,8 +2373,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       newSets[i] = { ...newSets[i], reps: v };
                       dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                     }}
+                    onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
                     inputMode={logUnit.allowDecimal ? "decimal" : "numeric"}
                     pattern={logUnit.allowDecimal ? "[0-9.]*" : "[0-9]*"}
+                    enterKeyHint="done"
                     style={styles.numInput}
                     placeholder="0"
                   />
@@ -2389,8 +2391,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         newSets[i] = { ...newSets[i], weight: w };
                         dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                       }}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
                       inputMode="numeric"
                       pattern="[0-9]*"
+                      enterKeyHint="done"
                       style={{ ...styles.numInput, ...(isBW ? styles.disabledInput : {}) }}
                       placeholder="lbs"
                       disabled={isBW}

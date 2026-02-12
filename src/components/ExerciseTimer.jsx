@@ -102,11 +102,7 @@ export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles
     pillInactive: styles.pillInactive,
   };
 
-  const startLabel = allDone
-    ? "All done"
-    : !timer.isRunning && timer.seconds === 0 && mode === "countdown" && timer.target > 0
-      ? "Restart"
-      : "Start";
+  const startLabel = allDone ? "All done" : "Start";
 
   return (
     <div style={styles.timerContainer}>
