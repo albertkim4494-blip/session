@@ -21,7 +21,7 @@ export function Modal({ open, title, children, footer, onClose, styles, fullScre
 
   const sheetStyle = fullScreen
     ? { ...styles.modalSheet, borderRadius: 0, height: "100dvh", maxWidth: "100%", display: "flex", flexDirection: "column" }
-    : { ...styles.modalSheet, ...(footer ? { height: `calc(85dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column" };
+    : { ...styles.modalSheet, ...(footer ? { height: `calc(95dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column" };
 
   const bodyStyle = fullScreen
     ? { ...styles.modalBody, flex: 1, minHeight: 0, maxHeight: undefined }

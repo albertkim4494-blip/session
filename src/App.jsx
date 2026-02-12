@@ -1532,18 +1532,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     onClick={() => {
                       const setter = tab === "train" ? setCollapsedToday : setCollapsedSummary;
                       const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                      const allCollapsed = workouts.every((w) => collapsed.has(w.id));
-                      allCollapsed ? expandAll(setter) : collapseAll(setter, workouts.map((w) => w.id));
+                      const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
+                      const allCollapsed = allCards.every((w) => collapsed.has(w.id));
+                      allCollapsed ? expandAll(setter) : collapseAll(setter, allCards.map((w) => w.id));
                     }}
                     title={(() => {
                       const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                      return workouts.every((w) => collapsed.has(w.id)) ? "Expand all" : "Collapse all";
+                      const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
+                      return allCards.every((w) => collapsed.has(w.id)) ? "Expand all" : "Collapse all";
                     })()}
                     type="button"
                   >
                     {(() => {
                       const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                      return workouts.every((w) => collapsed.has(w.id)) ? (
+                      const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
+                      return allCards.every((w) => collapsed.has(w.id)) ? (
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10l5-5 5 5" /><path d="M7 14l5 5 5-5" /></svg>
                       ) : (
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8l5 5 5-5" /><path d="M7 16l5-5 5 5" /></svg>
@@ -2225,7 +2228,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} fullScreen footer={modals.log.isOpen ? (
+      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} footer={modals.log.isOpen ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <button style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
             Save
@@ -2374,7 +2377,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                     }}
                     onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                    inputMode={logUnit.allowDecimal ? "decimal" : "numeric"}
+                    inputMode={logUnit.allowDecimal ? "decimal" : "tel"}
                     pattern={logUnit.allowDecimal ? "[0-9.]*" : "[0-9]*"}
                     enterKeyHint="done"
                     style={styles.numInput}
@@ -2392,7 +2395,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                       }}
                       onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                      inputMode="numeric"
+                      inputMode="tel"
                       pattern="[0-9]*"
                       enterKeyHint="done"
                       style={{ ...styles.numInput, ...(isBW ? styles.disabledInput : {}) }}
