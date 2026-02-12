@@ -789,15 +789,15 @@ export function getStyles(colors) {
       opacity: 0.8,
     },
 
-    // Rest timer bar
+    // Rest timer bar (inline in modal)
     restTimerBar: {
       display: "flex",
       alignItems: "center",
       gap: 10,
       padding: "10px 14px",
-      background: colors.cardBg,
-      borderTop: `1px solid ${colors.border}`,
-      animation: "restBarSlideUp 0.25s ease-out",
+      background: colors.cardAltBg,
+      border: `1px solid ${colors.border}`,
+      borderRadius: 12,
       flexShrink: 0,
     },
 
