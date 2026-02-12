@@ -22,7 +22,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { profile, workouts, recentLogs, dateRange, catalogSummary, equipment } = await req.json();
+    const {
+      profile,
+      workouts,
+      recentLogs,
+      dateRange,
+      catalogSummary,
+      equipment,
+      enrichedLogSummary,
+      progressionTrends,
+      adherence,
+      previousInsights,
+    } = await req.json();
 
     // Build exercise ID → info map from workouts
     const exerciseMap: Record<string, { name: string; unit: string; unitAbbr: string }> = {};
@@ -44,51 +55,55 @@ Deno.serve(async (req) => {
     const programLines: string[] = [];
     for (const w of workouts || []) {
       const exNames = (w.exercises || []).map((e: { name: string }) => e.name).join(", ");
-      programLines.push(`- ${w.name}: ${exNames || "(no exercises)"}`);
+      const schemeStr = w.scheme ? ` [${w.scheme}]` : "";
+      programLines.push(`- ${w.name}${schemeStr}: ${exNames || "(no exercises)"}`);
     }
     const programSummary = programLines.length > 0
       ? programLines.join("\n")
       : "No workouts configured.";
 
-    // Build a text summary of recent logs (unit-aware)
-    const logLines: string[] = [];
-    for (const [dateKey, dayLogs] of Object.entries(recentLogs || {})) {
-      if (!dayLogs || typeof dayLogs !== "object") continue;
-      for (const [exId, log] of Object.entries(dayLogs as Record<string, unknown>)) {
-        const exInfo = exerciseMap[exId];
-        const exName = exInfo?.name || exId;
-        const unit = exInfo?.unit || "reps";
-        const unitAbbr = exInfo?.unitAbbr || "reps";
-        const logData = log as { sets?: Array<{ reps?: number; weight?: number }> };
-        if (!logData?.sets || !Array.isArray(logData.sets)) continue;
+    // Build log summary — prefer enriched version from client, fall back to server-side builder
+    let logSummary: string;
+    if (enrichedLogSummary && typeof enrichedLogSummary === "string") {
+      logSummary = enrichedLogSummary;
+    } else {
+      // Fallback: build from raw recentLogs (backward compat with old clients)
+      const logLines: string[] = [];
+      for (const [dateKey, dayLogs] of Object.entries(recentLogs || {})) {
+        if (!dayLogs || typeof dayLogs !== "object") continue;
+        for (const [exId, log] of Object.entries(dayLogs as Record<string, unknown>)) {
+          const exInfo = exerciseMap[exId];
+          const exName = exInfo?.name || exId;
+          const unit = exInfo?.unit || "reps";
+          const unitAbbr = exInfo?.unitAbbr || "reps";
+          const logData = log as { sets?: Array<{ reps?: number; weight?: number }> };
+          if (!logData?.sets || !Array.isArray(logData.sets)) continue;
 
-        const totalValue = logData.sets.reduce(
-          (sum: number, s: { reps?: number }) => sum + (Number(s.reps) || 0),
-          0
-        );
-        const setCount = logData.sets.length;
-
-        if (unit in DURATION_FACTORS) {
-          // Duration units: convert to minutes
-          const minutes = Math.round(totalValue * DURATION_FACTORS[unit]);
-          logLines.push(`  ${dateKey}: ${exName} — ${minutes} min total (${setCount} session${setCount !== 1 ? "s" : ""})`);
-        } else if (DISTANCE_UNITS.has(unit)) {
-          // Distance units: show with unit abbreviation
-          logLines.push(`  ${dateKey}: ${exName} — ${totalValue} ${unitAbbr} (${setCount} set${setCount !== 1 ? "s" : ""})`);
-        } else {
-          // Reps (strength): show reps + weight as before
-          const maxWeight = Math.max(
-            ...logData.sets.map((s: { weight?: number }) => Number(s.weight) || 0),
+          const totalValue = logData.sets.reduce(
+            (sum: number, s: { reps?: number }) => sum + (Number(s.reps) || 0),
             0
           );
-          const weightStr = maxWeight > 0 ? ` @ up to ${maxWeight} lbs` : "";
-          logLines.push(`  ${dateKey}: ${exName} — ${totalValue} reps${weightStr} (${setCount} set${setCount !== 1 ? "s" : ""})`);
+          const setCount = logData.sets.length;
+
+          if (unit in DURATION_FACTORS) {
+            const minutes = Math.round(totalValue * DURATION_FACTORS[unit]);
+            logLines.push(`  ${dateKey}: ${exName} — ${minutes} min total (${setCount} session${setCount !== 1 ? "s" : ""})`);
+          } else if (DISTANCE_UNITS.has(unit)) {
+            logLines.push(`  ${dateKey}: ${exName} — ${totalValue} ${unitAbbr} (${setCount} set${setCount !== 1 ? "s" : ""})`);
+          } else {
+            const maxWeight = Math.max(
+              ...logData.sets.map((s: { weight?: number }) => Number(s.weight) || 0),
+              0
+            );
+            const weightStr = maxWeight > 0 ? ` @ up to ${maxWeight} lbs` : "";
+            logLines.push(`  ${dateKey}: ${exName} — ${totalValue} reps${weightStr} (${setCount} set${setCount !== 1 ? "s" : ""})`);
+          }
         }
       }
+      logSummary = logLines.length > 0
+        ? logLines.join("\n")
+        : "No logged sets in this date range.";
     }
-    const logSummary = logLines.length > 0
-      ? logLines.join("\n")
-      : "No logged sets in this date range.";
 
     // Build profile context
     const profileParts: string[] = [];
@@ -125,18 +140,47 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Build progression trends section
+    let progressionSection = "";
+    if (Array.isArray(progressionTrends) && progressionTrends.length > 0) {
+      progressionSection = `\nPROGRESSION TRENDS:\n${progressionTrends.map((t: string) => `  ${t}`).join("\n")}\n`;
+    }
+
+    // Build adherence section
+    let adherenceSection = "";
+    if (adherence && typeof adherence === "object") {
+      adherenceSection = `\nADHERENCE (last 30 days):\n  Sessions: ${adherence.sessionsLast30 ?? "?"}\n  Average: ${adherence.sessionsPerWeek ?? "?"} sessions/week\n`;
+    }
+
+    // Build anti-repetition section
+    let antiRepetitionSection = "";
+    if (previousInsights && Array.isArray(previousInsights.titles) && previousInsights.titles.length > 0) {
+      antiRepetitionSection = `\nPREVIOUS RECOMMENDATIONS (do NOT repeat these topics):\n${previousInsights.titles.map((t: string) => `  - ${t}`).join("\n")}\n`;
+    }
+
+    // Sport biomechanics section for system prompt
+    let sportBioSection = "";
+    if (profile?.sports) {
+      sportBioSection = `
+SPORT BIOMECHANICS AWARENESS:
+The user participates in: ${profile.sports}. Analyze the muscular and cardiovascular demands of their sport(s).
+Common sport demands — Water polo: heavy shoulders, chest, legs, cardio. Basketball: legs, shoulders, cardio. Soccer: legs, cardio, core. Swimming: shoulders, back, chest, cardio. Tennis: shoulders, forearm, core, legs. Running: legs, cardio. Cycling: quads, hamstrings, cardio. Rowing: back, legs, shoulders, cardio.
+Factor sport demands into ALL recommendations. Prioritize complementary work, antagonist muscles, and injury prevention. Avoid overloading muscles already heavily taxed by the sport.
+`;
+    }
+
     const systemPrompt = `You are an expert fitness coach analyzing a user's workout data. You give concise, actionable insights.
 
 USER PROFILE:
 ${profileContext}
-
+${sportBioSection}
 RULES:
 - Return ONLY valid JSON, no markdown, no explanation outside the JSON.
 - Return 1-3 insights based on the data.
 - Each insight must have: type, severity, title, message, suggestions.
-- type: one of "IMBALANCE", "NEGLECTED", "OVERTRAINING", "POSITIVE", "TIP"
+- type: one of "IMBALANCE", "NEGLECTED", "OVERTRAINING", "POSITIVE", "TIP", "RECOVERY", "PROGRESSION"
 - severity: one of "HIGH", "MEDIUM", "LOW", "INFO"
-- title: short title with a leading emoji (⚠️, 💡, 📊, ✅, 🔥)
+- title: short title with a leading emoji (⚠️, 💡, 📊, ✅, 🔥, 😴, 📈)
 - message: 1-2 sentences explaining the insight, referencing specific exercises/numbers from their logs.
 - suggestions: array of { "exercise": "<name>", "muscleGroup": "<GROUP>" } — only include if actionable. muscleGroup must be one of: ANTERIOR_DELT, LATERAL_DELT, POSTERIOR_DELT, CHEST, TRICEPS, BACK, BICEPS, QUADS, HAMSTRINGS, GLUTES, CALVES, ABS.
 - Consider the user's goal and sports when making suggestions. For example, a rower doesn't need extra pulling work; a runner benefits from hip/glute work.
@@ -153,6 +197,19 @@ RULES:
 - When suggesting exercises, prefer ones from the AVAILABLE EXERCISES list (if provided) since those are real exercises in the app's catalog that the user can easily add. Use the exact exercise names from that list.
 - The available exercises are already filtered to the user's equipment setup. Only suggest exercises from this list — do not suggest exercises requiring equipment the user doesn't have.
 
+RECOVERY & REST:
+- Recommend REST or a deload when: training frequency is 5+ sessions/week including sport days, mood trends are negative (rough/terrible), notes mention pain or fatigue, weight progression has stalled across multiple exercises. Use type "RECOVERY".
+- A deload suggestion is valuable — resting is training too. Frame it positively.
+
+PROGRESSION TRACKING:
+- Celebrate weight increases (type: "PROGRESSION"). This is motivating.
+- Flag stalls (2+ weeks flat on an exercise) — suggest rep range or variation changes.
+- Flag regressions — check for overtraining or recovery issues.
+
+ANTI-REPETITION:
+- If previous recommendations are listed below, do NOT repeat those exact topics. Find new angles, different exercises, or fresh observations each time.
+- Vary your insight types — don't always return the same mix.
+
 OUTPUT FORMAT:
 { "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...] } ] }`;
 
@@ -163,7 +220,7 @@ ${programSummary}
 
 RECENT TRAINING LOGS:
 ${logSummary}
-${catalogSection}
+${catalogSection}${progressionSection}${adherenceSection}${antiRepetitionSection}
 Analyze this data and return JSON insights.`;
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -179,7 +236,7 @@ Analyze this data and return JSON insights.`;
           { role: "user", content: userMessage },
         ],
         temperature: 0.7,
-        max_tokens: 800,
+        max_tokens: 1000,
       }),
     });
 

@@ -3,6 +3,9 @@ import { getUnitAbbr } from "./coachNormalize";
 
 const CACHE_KEY = "wt_coach_cache";
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const LAST_INSIGHTS_KEY = "wt_coach_last_insights";
+
+const MOOD_LABELS = { "-2": "terrible", "-1": "rough", "0": "okay", "1": "good", "2": "great" };
 
 /**
  * Build a fingerprint string from the inputs so we know when to invalidate cache.
@@ -30,11 +33,177 @@ function filterLogsToRange(logsByDate, start, end) {
 }
 
 /**
+ * Load previous insight titles/types from localStorage so the AI can avoid repeating itself.
+ */
+function loadPreviousInsights() {
+  try {
+    const raw = localStorage.getItem(LAST_INSIGHTS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed.titles) && parsed.titles.length > 0) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save insight titles/types after a successful fetch.
+ */
+function savePreviousInsights(insights) {
+  try {
+    localStorage.setItem(
+      LAST_INSIGHTS_KEY,
+      JSON.stringify({
+        titles: insights.map((i) => i.title),
+        types: insights.map((i) => i.type),
+      })
+    );
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Build an enriched text summary of recent logs with set-level detail, mood, and notes.
+ */
+function buildEnrichedLogSummary(recentLogs, allWorkouts) {
+  const exerciseMap = {};
+  for (const w of allWorkouts || []) {
+    for (const ex of w.exercises || []) {
+      exerciseMap[ex.id] = {
+        name: ex.name,
+        unit: ex.unit || "reps",
+        unitAbbr: getUnitAbbr(ex.unit, ex.customUnitAbbr),
+      };
+    }
+  }
+
+  const DURATION_FACTORS = { sec: 1 / 60, min: 1, hrs: 60 };
+  const DISTANCE_UNITS = new Set(["miles", "yards", "laps", "steps"]);
+
+  const lines = [];
+  for (const [dateKey, dayLogs] of Object.entries(recentLogs || {})) {
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    for (const [exId, log] of Object.entries(dayLogs)) {
+      const exInfo = exerciseMap[exId];
+      const exName = exInfo?.name || exId;
+      const unit = exInfo?.unit || "reps";
+      const unitAbbr = exInfo?.unitAbbr || "reps";
+      if (!log?.sets || !Array.isArray(log.sets)) continue;
+
+      let detail;
+      if (unit in DURATION_FACTORS) {
+        const totalMin = Math.round(
+          log.sets.reduce((s, set) => s + (Number(set.reps) || 0), 0) * DURATION_FACTORS[unit]
+        );
+        detail = `${totalMin} min total (${log.sets.length} session${log.sets.length !== 1 ? "s" : ""})`;
+      } else if (DISTANCE_UNITS.has(unit)) {
+        const total = log.sets.reduce((s, set) => s + (Number(set.reps) || 0), 0);
+        detail = `${total} ${unitAbbr} (${log.sets.length} set${log.sets.length !== 1 ? "s" : ""})`;
+      } else {
+        // Strength: show set-level detail like [8@185, 8@185, 6@185]
+        const setParts = log.sets.map((s) => {
+          const r = Number(s.reps) || 0;
+          const w = Number(s.weight) || 0;
+          return w > 0 ? `${r}@${w}` : `${r}`;
+        });
+        detail = `[${setParts.join(", ")}]`;
+      }
+
+      let line = `  ${dateKey}: ${exName} — ${detail}`;
+
+      // Append mood if present
+      if (log.mood != null && MOOD_LABELS[String(log.mood)]) {
+        line += ` (mood: ${MOOD_LABELS[String(log.mood)]})`;
+      }
+
+      // Append notes if present
+      if (log.notes && typeof log.notes === "string" && log.notes.trim()) {
+        const truncated = log.notes.trim().slice(0, 50);
+        line += ` [note: "${truncated}"]`;
+      }
+
+      lines.push(line);
+    }
+  }
+
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
+/**
+ * Compute progression trends: first vs last max weight for strength exercises with 2+ sessions.
+ */
+function computeProgressionTrends(recentLogs, allWorkouts) {
+  const exerciseMap = {};
+  for (const w of allWorkouts || []) {
+    for (const ex of w.exercises || []) {
+      exerciseMap[ex.id] = { name: ex.name, unit: ex.unit || "reps" };
+    }
+  }
+
+  // Collect per-exercise: array of { date, maxWeight }
+  const byExercise = {};
+  for (const [dateKey, dayLogs] of Object.entries(recentLogs || {})) {
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    for (const [exId, log] of Object.entries(dayLogs)) {
+      const info = exerciseMap[exId];
+      if (!info || info.unit !== "reps") continue; // Only strength exercises
+      if (!log?.sets || !Array.isArray(log.sets)) continue;
+      const maxWeight = Math.max(...log.sets.map((s) => Number(s.weight) || 0), 0);
+      if (maxWeight <= 0) continue;
+      if (!byExercise[exId]) byExercise[exId] = { name: info.name, entries: [] };
+      byExercise[exId].entries.push({ date: dateKey, maxWeight });
+    }
+  }
+
+  const trends = [];
+  for (const { name, entries } of Object.values(byExercise)) {
+    if (entries.length < 2) continue;
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    const first = entries[0].maxWeight;
+    const last = entries[entries.length - 1].maxWeight;
+    if (last > first) {
+      trends.push(`${name}: ${first} → ${last} lbs (UP)`);
+    } else if (last < first) {
+      trends.push(`${name}: ${first} → ${last} lbs (DOWN)`);
+    } else {
+      trends.push(`${name}: ${last} lbs (FLAT)`);
+    }
+  }
+
+  return trends.length > 0 ? trends : null;
+}
+
+/**
+ * Compute adherence stats: sessions in last 30 days and average per week.
+ */
+function computeAdherenceStats(logsByDate) {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoff = thirtyDaysAgo.toISOString().slice(0, 10);
+
+  let sessionsLast30 = 0;
+  for (const [dateKey, dayLogs] of Object.entries(logsByDate || {})) {
+    if (dateKey < cutoff) continue;
+    if (dayLogs && typeof dayLogs === "object" && Object.keys(dayLogs).length > 0) {
+      sessionsLast30++;
+    }
+  }
+
+  return {
+    sessionsLast30,
+    sessionsPerWeek: Math.round((sessionsLast30 / 30) * 7 * 10) / 10,
+  };
+}
+
+/**
  * Fetch AI coach insights. Uses localStorage cache with 15-min TTL.
  *
  * @param {Object} params
  * @param {Object} params.profile - User profile { age, weight_lbs, goal, about, sports }
- * @param {Object} params.state - App state with program.workouts and logsByDate
+ * @param {Object} params.state - App state with program.workouts, logsByDate, dailyWorkouts
  * @param {Object} params.dateRange - { start, end, label }
  * @param {Object} [params.options] - { forceRefresh: boolean }
  * @returns {Promise<{ insights: Array, fromCache: boolean }>}
@@ -61,11 +230,41 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     }
   }
 
+  // Merge daily workout exercises into the workouts array
+  const allWorkouts = workouts.map((w) => ({
+    name: w.name,
+    scheme: w.scheme || undefined,
+    exercises: (w.exercises || []).map((ex) => ({
+      id: ex.id,
+      name: ex.name,
+      unit: ex.unit || "reps",
+      unitAbbr: getUnitAbbr(ex.unit, ex.customUnitAbbr),
+    })),
+  }));
+
+  const dailyExercisesInRange = [];
+  for (const [date, ws] of Object.entries(state?.dailyWorkouts || {})) {
+    if (date >= dateRange.start && date <= dateRange.end) {
+      for (const w of (ws || []))
+        dailyExercisesInRange.push(
+          ...(w.exercises || []).map((ex) => ({
+            id: ex.id,
+            name: ex.name,
+            unit: ex.unit || "reps",
+            unitAbbr: getUnitAbbr(ex.unit, ex.customUnitAbbr),
+          }))
+        );
+    }
+  }
+  if (dailyExercisesInRange.length > 0) {
+    allWorkouts.push({ name: "Daily Workouts", exercises: dailyExercisesInRange });
+  }
+
   // Build catalog summary: exercises grouped by muscle, excluding user's current exercises
   let catalogSummary = null;
   if (catalog && catalog.length > 0) {
     const userNames = new Set();
-    for (const w of workouts) {
+    for (const w of allWorkouts) {
       for (const ex of w.exercises || []) {
         userNames.add(ex.name.toLowerCase());
       }
@@ -84,6 +283,12 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     catalogSummary = byMuscle;
   }
 
+  // Build enriched data for the AI
+  const enrichedLogSummary = buildEnrichedLogSummary(recentLogs, allWorkouts);
+  const progressionTrends = computeProgressionTrends(recentLogs, allWorkouts);
+  const adherence = computeAdherenceStats(state?.logsByDate);
+  const previousInsights = loadPreviousInsights();
+
   // Call Edge Function
   const { data, error } = await supabase.functions.invoke("ai-coach", {
     body: {
@@ -94,15 +299,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
         about: profile?.about,
         sports: profile?.sports,
       },
-      workouts: workouts.map((w) => ({
-        name: w.name,
-        exercises: (w.exercises || []).map((ex) => ({
-          id: ex.id,
-          name: ex.name,
-          unit: ex.unit || "reps",
-          unitAbbr: getUnitAbbr(ex.unit, ex.customUnitAbbr),
-        })),
-      })),
+      workouts: allWorkouts,
       recentLogs,
       dateRange: {
         start: dateRange.start,
@@ -111,6 +308,10 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       },
       catalogSummary,
       equipment: equipment || "gym",
+      enrichedLogSummary,
+      progressionTrends,
+      adherence,
+      previousInsights,
     },
   });
 
@@ -137,6 +338,9 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   } catch {
     // Ignore storage errors
   }
+
+  // Save insight titles/types for anti-repetition
+  savePreviousInsights(insights);
 
   return { insights, fromCache: false };
 }

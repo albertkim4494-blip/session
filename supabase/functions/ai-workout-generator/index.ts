@@ -75,6 +75,18 @@ The user plays ${sportName} on ${sportDayList} (${sportDayCount} days per week).
 - For sport day entries, set "scheme" to "sport" and name them like "${sportName} (${sportDayList})" or "${sportName} + Recovery".`
       : "";
 
+  // Sport biomechanics instruction (when profile.sports exists)
+  let sportBioSection = "";
+  if (profile.sports) {
+    sportBioSection = `
+SPORT BIOMECHANICS:
+The user participates in: ${profile.sports}. Consider the muscular demands of this sport.
+Common sport demands — Water polo: heavy shoulders, chest, legs, cardio. Basketball: legs, shoulders, cardio. Soccer: legs, cardio, core. Swimming: shoulders, back, chest, cardio. Tennis: shoulders, forearm, core, legs. Running: legs, cardio. Cycling: quads, hamstrings, cardio. Rowing: back, legs, shoulders, cardio.
+Avoid overloading muscles already heavily taxed by the sport.
+Prioritize complementary work, antagonist muscles, and injury prevention.
+`;
+  }
+
   const system = `You are an expert strength & conditioning coach designing a personalized ${daysPerWeek}-day weekly training program.
 
 USER PROFILE:
@@ -84,7 +96,7 @@ Equipment: ${equipmentLabels[equipment] || "Full gym"}
 Goal: ${goal}
 Days per week: ${daysPerWeek}
 Session duration: ~${duration} minutes
-${sportSection}
+${sportSection}${sportBioSection}
 
 TRAINING HISTORY (last 14 days):
 ${history || "No recent training data."}
@@ -168,6 +180,18 @@ function buildTodayPrompt(payload: {
   const dur = duration || 60;
   const exerciseCount = Math.max(2, Math.min(Math.round(dur / 7), 10));
 
+  // Sport biomechanics instruction (when profile.sports exists)
+  let sportBioSection = "";
+  if (profile.sports) {
+    sportBioSection = `
+SPORT BIOMECHANICS:
+The user participates in: ${profile.sports}. Consider the muscular demands of this sport.
+Common sport demands — Water polo: heavy shoulders, chest, legs, cardio. Basketball: legs, shoulders, cardio. Soccer: legs, cardio, core. Swimming: shoulders, back, chest, cardio. Tennis: shoulders, forearm, core, legs. Running: legs, cardio. Cycling: quads, hamstrings, cardio. Rowing: back, legs, shoulders, cardio.
+Avoid overloading muscles already heavily taxed by the sport.
+Prioritize complementary work, antagonist muscles, and injury prevention.
+`;
+  }
+
   const system = `You are an expert strength & conditioning coach designing a single workout for today.
 
 USER PROFILE:
@@ -176,7 +200,7 @@ ${profileLines.length > 0 ? profileLines.join("\n") : "No profile info."}
 Equipment: ${equipmentLabels[equipment] || "Full gym"}
 Goal: ${goal}
 Session duration: ~${dur} minutes
-
+${sportBioSection}
 MUSCLE RECENCY (days since last trained):
 ${recencyLines}
 
