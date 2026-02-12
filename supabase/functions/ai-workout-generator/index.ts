@@ -105,10 +105,15 @@ EXERCISE CATALOG (pick ONLY from these by catalogId):
 id | name | muscles | tags | unit
 ${catalogText}
 
+UNDERSTANDING THE USER:
+- Read the "About" field carefully. It tells you who this person is — health conditions, experience level, injuries, limitations.
+- A D1 athlete needs high-intensity programming with sport-specific periodization. Someone managing an autoimmune condition or chronic illness needs lower volume, more recovery built in, and careful exercise selection.
+- If injuries or conditions are mentioned, avoid aggravating exercises entirely — don't just reduce sets, pick different movements.
+- Beginners need simpler programs with fewer exercises. Advanced lifters benefit from more variety and periodization.
+
 RULES:
 1. Pick exercises ONLY from the catalog above, using exact catalogId values.
-2. Consider injuries/limitations mentioned in the "About" field — avoid exercises that could aggravate them.
-3. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.
+2. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.
    - For isometric/hold exercises (tagged "isometric", unit "sec") like planks: prescribe a SINGLE long hold, e.g. "1x60s", "1x45s", "1x90s". Do NOT prescribe multiple sets for holds.
    - For other exercises with unit "sec" (non-isometric): prescribe time-based schemes like "3x30s".
    - For exercises with unit "reps": prescribe rep-based schemes like "4x8-12", "3x10", "5x5".
@@ -118,11 +123,12 @@ RULES:
      * Lose Fat: 3 sets of 15-20 reps, keep rest short
      * General Fitness: 3 sets of 10-12 reps, balanced
      * Sport Performance: 3-4 sets of 6-8 reps, explosive movements
-4. No duplicate exercises within a single day.
-5. Vary exercises across days — don't repeat the same exercise on multiple days unless necessary.
-6. Order: compounds first, then isolation, then accessories/core.
-7. Each lifting day should have ~${exerciseCount} exercises to fill ~${duration} minutes.
-8. Give each day a descriptive name (e.g. "Push", "Upper Hypertrophy", "Legs & Glutes").
+   - If the user has health conditions or is a beginner, lean toward FEWER sets (2-3) with moderate intensity. Don't overwhelm them.
+3. No duplicate exercises within a single day.
+4. Vary exercises across days — don't repeat the same exercise on multiple days unless necessary.
+5. Order: compounds first, then isolation, then accessories/core.
+6. Each lifting day should have ~${exerciseCount} exercises to fill ~${duration} minutes.
+7. Give each day a descriptive name (e.g. "Push", "Upper Hypertrophy", "Legs & Glutes").
 
 Return ONLY valid JSON, no markdown fences, no explanation.
 
@@ -211,11 +217,15 @@ EXERCISE CATALOG (pick ONLY from these by catalogId):
 id | name | muscles | tags | unit
 ${catalogText}
 
+UNDERSTANDING THE USER:
+- Read the "About" field carefully. Health conditions, experience level, injuries — all of it matters for today's workout.
+- Someone with chronic fatigue or an autoimmune condition needs a lighter session than a collegiate athlete. Fewer exercises, lower volume, more recovery-friendly movements.
+- If injuries are mentioned, avoid those areas entirely — pick alternatives, not modifications.
+
 RULES:
 1. Prioritize muscles that haven't been trained recently (high days-ago or "never trained").
 2. Pick exercises ONLY from the catalog, using exact catalogId values.
-3. Consider injuries/limitations from the "About" field.
-4. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.
+3. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.
    - For isometric/hold exercises (tagged "isometric", unit "sec") like planks: prescribe a SINGLE long hold, e.g. "1x60s", "1x45s", "1x90s". Do NOT prescribe multiple sets for holds.
    - For other exercises with unit "sec" (non-isometric): prescribe time-based schemes like "3x30s".
    - For exercises with unit "reps": prescribe rep-based schemes like "4x8-12", "3x10", "5x5".
@@ -225,11 +235,12 @@ RULES:
      * Lose Fat: 3 sets of 15-20 reps
      * General Fitness: 3 sets of 10-12 reps
      * Sport Performance: 3-4 sets of 6-8 reps
-5. No duplicate exercises.
-6. Order: compounds first, then isolation, then accessories.
-7. Pick ~${exerciseCount} exercises to fit within ~${dur} minutes (including warm-up and rest between sets).
-8. Give the workout a descriptive name (e.g. "Pull", "Upper Body", "Chest & Shoulders").
-9. List the primary target muscle groups (use keys like CHEST, BACK, QUADS, etc.).
+   - If the user has health conditions or is a beginner, lean toward fewer sets (2-3) with moderate intensity.
+4. No duplicate exercises.
+5. Order: compounds first, then isolation, then accessories.
+6. Pick ~${exerciseCount} exercises to fit within ~${dur} minutes (including warm-up and rest between sets).
+7. Give the workout a descriptive name (e.g. "Pull", "Upper Body", "Chest & Shoulders").
+8. List the primary target muscle groups (use keys like CHEST, BACK, QUADS, etc.).
 
 Return ONLY valid JSON, no markdown fences, no explanation.
 
