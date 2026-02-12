@@ -42,6 +42,11 @@ import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast } from "./lib/greetings";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
+import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
+
+// Extracted components (timer)
+import { ExerciseTimer } from "./components/ExerciseTimer";
+import { RestTimerBar } from "./components/RestTimerBar";
 
 // Extracted styles
 import { getColors, getStyles } from "./styles/theme";
@@ -60,6 +65,9 @@ function ensureAnimations() {
 @keyframes chipPop { 0%{transform:scale(1)} 50%{transform:scale(1.3)} 60%{transform:scale(0.95)} 100%{transform:scale(1)} }
 @keyframes checkDraw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
 @keyframes rowPulse { 0% { box-shadow: inset 0 0 20px rgba(46,204,113,0.35); } 100% { box-shadow: none; } }
+@keyframes restBarSlideUp { from{transform:translateY(100%);opacity:0} to{transform:translateY(0);opacity:1} }
+@keyframes restBarSlideDown { from{transform:translateY(0);opacity:1} to{transform:translateY(100%);opacity:0} }
+@keyframes timerPulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
 `;
   document.head.appendChild(s);
 }
@@ -96,6 +104,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [collapsedSummary, setCollapsedSummary] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_summary"))); } catch { return new Set(); }
   });
+
+  // Rest timer state
+  const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90 });
 
   // Toast notification
   const [toast, setToast] = useState(null); // { message, coachLine }
@@ -907,8 +918,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       setToast(toast);
       clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setToast(null), isWorkoutComplete ? 3500 : 2000);
+
+      // Start rest timer if enabled and workout isn't complete
+      if (state.preferences?.restTimerEnabled !== false && !isWorkoutComplete) {
+        const exerciseObj = exercises.find((e) => e.id === exerciseId);
+        const exName = exerciseObj?.name || "";
+        const learnedKey = exName.toLowerCase().trim();
+        const learnedRest = state.preferences?.exerciseRestTimes?.[learnedKey];
+        const restSec = learnedRest || state.preferences?.defaultRestSec || 90;
+        setRestTimer({ active: true, exerciseId, exerciseName: exName, restSec });
+      } else {
+        setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
+      }
     },
-    [dateKey, state.logsByDate, workoutById]
+    [dateKey, state.logsByDate, state.preferences, workoutById]
   );
 
   const uncompleteSet = useCallback(
@@ -924,6 +947,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     },
     [dateKey]
   );
+
+  const handleRestTimeObserved = useCallback((exerciseName, observedSec) => {
+    if (!exerciseName || observedSec < 5) return;
+    updateState((st) => {
+      const key = exerciseName.toLowerCase().trim();
+      const current = st.preferences?.exerciseRestTimes?.[key];
+      if (!st.preferences) st.preferences = {};
+      if (!st.preferences.exerciseRestTimes) st.preferences.exerciseRestTimes = {};
+      st.preferences.exerciseRestTimes[key] = updateRestAverage(current, observedSec);
+      return st;
+    });
+  }, []);
+
+  const updatePreference = useCallback((key, value) => {
+    updateState((st) => {
+      if (!st.preferences) st.preferences = {};
+      st.preferences[key] = value;
+      return st;
+    });
+  }, []);
 
   const findPriorForExercise = useCallback(
     (exerciseId) => findMostRecentLogBefore(exerciseId, dateKey),
@@ -2135,6 +2178,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           ) : null}
         </div>
 
+        {/* Rest Timer Bar */}
+        {restTimer.active && (
+          <RestTimerBar
+            restSec={restTimer.restSec}
+            exerciseName={restTimer.exerciseName}
+            isVisible={restTimer.active}
+            onDismiss={() => setRestTimer((prev) => ({ ...prev, active: false }))}
+            onComplete={() => {}}
+            onRestTimeObserved={handleRestTimeObserved}
+            styles={styles}
+            colors={colors}
+            timerSound={state.preferences?.timerSound !== false}
+          />
+        )}
+
         {/* Bottom navigation */}
         <div style={styles.nav}>
           <button style={{ ...styles.navBtn, ...(tab === "train" ? styles.navBtnActive : {}) }} onClick={() => setTab("train")}>
@@ -2198,6 +2256,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             const found = wk.exercises.find((e) => e.id === logCtx?.exerciseId);
             if (found) { logExercise = found; break; }
           }
+          if (!logExercise) {
+            const dailyWs = Object.values(state.dailyWorkouts || {}).flat();
+            for (const wk of dailyWs) {
+              const found = (wk.exercises || []).find((e) => e.id === logCtx?.exerciseId);
+              if (found) { logExercise = found; break; }
+            }
+          }
           const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
           const logScheme = logCtx?.scheme;
           const showWeight = logUnit.key === "reps";
@@ -2240,6 +2305,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               Last session: <span style={{ fontWeight: 700 }}>{lastSessionText}</span>
             </div>
           )}
+
+          {/* Exercise Timer for sec-unit exercises */}
+          {isTimerEligible(logUnit.key) && (() => {
+            const savedSetsForTimer = state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets || [];
+            const activeSetIndex = savedSetsForTimer.findIndex((s) => !isSetCompleted(s));
+            const targetSetIdx = activeSetIndex >= 0 ? activeSetIndex : 0;
+            return (
+              <ExerciseTimer
+                targetSec={Number(modals.log.sets[targetSetIdx]?.reps) || 0}
+                onTimeRecorded={(sec) => {
+                  const newSets = [...modals.log.sets];
+                  newSets[targetSetIdx] = { ...newSets[targetSetIdx], reps: sec };
+                  dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                  completeSet(logCtx.exerciseId, targetSetIdx, { reps: sec, weight: "" }, logCtx.workoutId);
+                }}
+                colors={colors}
+                styles={styles}
+                timerSound={state.preferences?.timerSound !== false}
+              />
+            );
+          })()}
 
           {/* Column headers */}
           <div style={{
@@ -2825,6 +2911,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         styles={styles}
         summaryStats={profileStats}
         colors={colors}
+        preferences={state.preferences}
+        onUpdatePreference={updatePreference}
       />
 
       {/* Change Username Modal */}

@@ -57,7 +57,7 @@ function compressImage(file) {
   });
 }
 
-export function ProfileModal({ open, modalState, dispatch, profile, session, theme, onToggleTheme, equipment, onSetEquipment, onLogout, onSave, styles, summaryStats, colors }) {
+export function ProfileModal({ open, modalState, dispatch, profile, session, theme, onToggleTheme, equipment, onSetEquipment, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference }) {
   const fileInputRef = useRef(null);
   if (!open) return null;
 
@@ -447,6 +447,43 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
                 ))}
               </select>
               <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>AI Coach will tailor suggestions to your setup.</span>
+            </div>
+
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Default Rest Time</label>
+              <select
+                value={preferences?.defaultRestSec ?? 90}
+                onChange={(e) => onUpdatePreference?.("defaultRestSec", Number(e.target.value))}
+                style={styles.textInput}
+              >
+                <option value={30}>30s</option>
+                <option value={45}>45s</option>
+                <option value={60}>1 min</option>
+                <option value={90}>1:30</option>
+                <option value={120}>2 min</option>
+                <option value={150}>2:30</option>
+                <option value={180}>3 min</option>
+                <option value={240}>4 min</option>
+                <option value={300}>5 min</option>
+              </select>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Timer Sound</span>
+              <ThemeSwitch
+                theme={preferences?.timerSound !== false ? "dark" : "light"}
+                styles={styles}
+                onToggle={() => onUpdatePreference?.("timerSound", !(preferences?.timerSound !== false))}
+              />
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Auto Rest Timer</span>
+              <ThemeSwitch
+                theme={preferences?.restTimerEnabled !== false ? "dark" : "light"}
+                styles={styles}
+                onToggle={() => onUpdatePreference?.("restTimerEnabled", !(preferences?.restTimerEnabled !== false))}
+              />
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

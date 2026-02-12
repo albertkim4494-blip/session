@@ -724,5 +724,121 @@ export function getStyles(colors) {
       cursor: "pointer",
     },
 
+    // Timer styles
+    timerContainer: {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 10,
+      padding: 12,
+    },
+
+    timerRingWrap: {
+      width: 120,
+      height: 120,
+      position: "relative",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    timerDigital: {
+      fontSize: 28,
+      fontWeight: 900,
+      fontVariantNumeric: "tabular-nums",
+      position: "absolute",
+      textAlign: "center",
+    },
+
+    timerControls: {
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
+    },
+
+    timerBtn: {
+      padding: "8px 16px",
+      borderRadius: 10,
+      border: `1px solid ${colors.border}`,
+      background: colors.cardAltBg,
+      color: colors.text,
+      fontWeight: 800,
+      fontSize: 13,
+      cursor: "pointer",
+    },
+
+    timerBtnPrimary: {
+      padding: "8px 16px",
+      borderRadius: 10,
+      border: "1px solid rgba(255,255,255,0.18)",
+      background: colors.primaryBg,
+      color: colors.primaryText,
+      fontWeight: 800,
+      fontSize: 13,
+      cursor: "pointer",
+    },
+
+    timerModeToggle: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: colors.appBg === "#0b0f14" ? "#7dd3fc" : "#2b5b7a",
+      background: "transparent",
+      border: "none",
+      cursor: "pointer",
+      padding: "2px 0",
+      opacity: 0.8,
+    },
+
+    // Rest timer bar
+    restTimerBar: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "10px 14px",
+      background: colors.cardBg,
+      borderTop: `1px solid ${colors.border}`,
+      animation: "restBarSlideUp 0.25s ease-out",
+      flexShrink: 0,
+    },
+
+    restTimerTime: {
+      fontSize: 18,
+      fontWeight: 900,
+      fontVariantNumeric: "tabular-nums",
+      minWidth: 42,
+      textAlign: "right",
+    },
+
+    restTimerProgress: {
+      flex: 1,
+      height: 4,
+      borderRadius: 2,
+      background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+      overflow: "hidden",
+    },
+
+    restTimerProgressFill: {
+      height: "100%",
+      borderRadius: 2,
+      background: colors.appBg === "#0b0f14" ? "#7dd3fc" : "#2b5b7a",
+      transition: "width 0.3s linear",
+    },
+
+    restTimerDismiss: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      border: "none",
+      background: "transparent",
+      color: colors.text,
+      opacity: 0.5,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0,
+      flexShrink: 0,
+    },
+
   };
 }

@@ -79,6 +79,12 @@ export function makeDefaultState() {
     },
     dailyWorkouts: {},
     logsByDate: {},
+    preferences: {
+      defaultRestSec: 90,
+      timerSound: true,
+      restTimerEnabled: true,
+      exerciseRestTimes: {},
+    },
     meta: {
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -104,6 +110,13 @@ export function loadState() {
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
   };
+
+  // Merge preferences with defaults for existing users
+  const defaultPrefs = makeDefaultState().preferences;
+  next.preferences = { ...defaultPrefs, ...(next.preferences || {}) };
+  if (!next.preferences.exerciseRestTimes || typeof next.preferences.exerciseRestTimes !== "object") {
+    next.preferences.exerciseRestTimes = {};
+  }
 
   migrateCompletedFlag(next);
 
