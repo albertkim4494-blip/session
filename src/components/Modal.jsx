@@ -25,7 +25,7 @@ export function Modal({ open, title, children, footer, onClose, styles, fullScre
 
   const bodyStyle = fullScreen
     ? { ...styles.modalBody, flex: 1, minHeight: 0, maxHeight: undefined }
-    : { ...styles.modalBody, maxHeight: footer ? undefined : `calc(78dvh - ${kbInset}px)`, flex: footer ? 1 : undefined, minHeight: footer ? 0 : undefined };
+    : { ...styles.modalBody, maxHeight: footer ? undefined : `calc(78dvh - ${kbInset}px)`, flex: footer ? 1 : undefined, minHeight: footer ? 0 : undefined, display: footer ? "flex" : undefined, flexDirection: footer ? "column" : undefined };
 
   return (
     <div style={overlayStyle} onMouseDown={fullScreen ? undefined : onClose}>
