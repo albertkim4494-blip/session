@@ -80,18 +80,7 @@ input[type="number"] { -moz-appearance: textfield; }
 // TARGET COLUMN HELPERS
 // ============================================================================
 const TARGET_COL_ORDER = ["rpe", "pace", "custom"];
-const TARGET_WIDTHS = { rpe: "52px", pace: "56px", custom: "64px" };
 const TARGET_LABELS = { rpe: "RPE", pace: "Pace", custom: "Target" };
-
-function buildLogGridColumns(showWeight, targets = []) {
-  const cols = ["28px", "1fr"];
-  if (showWeight) cols.push("1fr", "40px");
-  for (const t of TARGET_COL_ORDER) {
-    if (targets.includes(t)) cols.push(TARGET_WIDTHS[t]);
-  }
-  cols.push("32px");
-  return cols.join(" ");
-}
 
 // ============================================================================
 // MAIN APP COMPONENT
@@ -2381,7 +2370,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           const logScheme = logCtx?.scheme;
           const showWeight = logUnit.key === "reps";
           const exerciseTargets = logExercise?.targets || [];
-          const logGridCols = buildLogGridColumns(showWeight, exerciseTargets);
+          const baseGridCols = showWeight ? "28px 1fr 1fr 40px 32px" : "28px 1fr 32px";
 
           // Find last session data for context
           const existingLog = state.logsByDate[dateKey]?.[logCtx?.exerciseId];
@@ -2425,7 +2414,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* Column headers */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: logGridCols,
+            gridTemplateColumns: baseGridCols,
             gap: 8,
             padding: "0 10px",
           }}>
@@ -2433,9 +2422,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{logUnit.label}</div>
             {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>Weight</div>}
             {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>BW</div>}
-            {TARGET_COL_ORDER.filter((t) => exerciseTargets.includes(t)).map((t) => (
-              <div key={t} style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>{TARGET_LABELS[t]}</div>
-            ))}
             <div ref={targetConfigRef} style={{ position: "relative" }}>
               <button
                 onClick={() => setShowTargetConfig((v) => !v)}
@@ -2490,17 +2476,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               return (
                 <React.Fragment key={i}>
                 <div style={{
-                  display: "grid",
-                  gridTemplateColumns: logGridCols,
-                  gap: 8,
-                  alignItems: "center",
-                  padding: "8px 10px",
                   borderRadius: 12,
                   border: isSetSaved ? "1px solid rgba(46,204,113,0.4)" : `1px solid ${colors.border}`,
                   background: isSetSaved ? "rgba(46,204,113,0.08)" : colors.cardAltBg,
                   transition: "border 0.2s, background 0.2s",
                   ...(isSetSaved ? { animation: "rowPulse 0.5s ease-out" } : {}),
+                  padding: "8px 10px",
                 }}>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: baseGridCols,
+                    gap: 8,
+                    alignItems: "center",
+                  }}>
                   <button
                     style={{
                       width: 26, height: 26, borderRadius: 999, padding: 0,
@@ -2605,60 +2593,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     </button>
                   )}
 
-                  {exerciseTargets.includes("rpe") && (
-                    <select
-                      value={s.targetRpe || ""}
-                      onChange={(e) => {
-                        const newSets = [...modals.log.sets];
-                        newSets[i] = { ...newSets[i], targetRpe: e.target.value };
-                        dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                      }}
-                      style={{
-                        ...styles.numInput, padding: "4px 2px", fontSize: 13,
-                        textAlign: "center", appearance: "auto", WebkitAppearance: "auto",
-                      }}
-                    >
-                      <option value="">—</option>
-                      <option value="6">6</option>
-                      <option value="7">7</option>
-                      <option value="8">8</option>
-                      <option value="9">9</option>
-                      <option value="10">10</option>
-                    </select>
-                  )}
-
-                  {exerciseTargets.includes("pace") && (
-                    <input
-                      type="text"
-                      value={s.targetPace || ""}
-                      onChange={(e) => {
-                        const newSets = [...modals.log.sets];
-                        newSets[i] = { ...newSets[i], targetPace: e.target.value };
-                        dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                      }}
-                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                      enterKeyHint="done"
-                      style={{ ...styles.numInput, fontSize: 12, textAlign: "center" }}
-                      placeholder="0:00"
-                    />
-                  )}
-
-                  {exerciseTargets.includes("custom") && (
-                    <input
-                      type="text"
-                      value={s.targetCustom || ""}
-                      onChange={(e) => {
-                        const newSets = [...modals.log.sets];
-                        newSets[i] = { ...newSets[i], targetCustom: e.target.value };
-                        dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                      }}
-                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                      enterKeyHint="done"
-                      style={{ ...styles.numInput, fontSize: 12, textAlign: "center" }}
-                      placeholder="Target"
-                    />
-                  )}
-
                   <button
                     style={{ ...styles.deleteLogBtn, opacity: modals.log.sets.length <= 1 ? 0.15 : 0.4 }}
                     onClick={() => {
@@ -2672,6 +2606,75 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       <path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
                     </svg>
                   </button>
+                  </div>
+
+                  {exerciseTargets.length > 0 && (
+                    <div style={{ display: "flex", gap: 8, paddingTop: 6, paddingLeft: 34, alignItems: "center" }}>
+                      {exerciseTargets.includes("rpe") && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>RPE</span>
+                          <select
+                            value={s.targetRpe || ""}
+                            onChange={(e) => {
+                              const newSets = [...modals.log.sets];
+                              newSets[i] = { ...newSets[i], targetRpe: e.target.value };
+                              dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                            }}
+                            style={{
+                              ...styles.numInput, padding: "4px 2px", fontSize: 13,
+                              textAlign: "center", appearance: "auto", WebkitAppearance: "auto",
+                              width: "100%",
+                            }}
+                          >
+                            <option value="">—</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {exerciseTargets.includes("pace") && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Pace</span>
+                          <input
+                            type="text"
+                            value={s.targetPace || ""}
+                            onChange={(e) => {
+                              const newSets = [...modals.log.sets];
+                              newSets[i] = { ...newSets[i], targetPace: e.target.value };
+                              dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                            }}
+                            onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                            enterKeyHint="done"
+                            style={{ ...styles.numInput, fontSize: 12, textAlign: "center", width: "100%" }}
+                            placeholder="0:00"
+                          />
+                        </div>
+                      )}
+
+                      {exerciseTargets.includes("custom") && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Target</span>
+                          <input
+                            type="text"
+                            value={s.targetCustom || ""}
+                            onChange={(e) => {
+                              const newSets = [...modals.log.sets];
+                              newSets[i] = { ...newSets[i], targetCustom: e.target.value };
+                              dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                            }}
+                            onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                            enterKeyHint="done"
+                            style={{ ...styles.numInput, fontSize: 12, textAlign: "center", width: "100%" }}
+                            placeholder=""
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {showRestAfter && (
                   <RestTimerBar
