@@ -135,6 +135,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Pace popover state
   const [pacePopoverIdx, setPacePopoverIdx] = useState(null);
   const pacePopoverRef = useRef(null);
+  // RPE popover state
+  const [rpePopoverIdx, setRpePopoverIdx] = useState(null);
+  const rpePopoverRef = useRef(null);
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -303,6 +306,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
     }
   }, [pacePopoverIdx]);
+
+  // Click-outside to dismiss RPE popover
+  useEffect(() => {
+    function handleDown(e) {
+      if (rpePopoverRef.current && !rpePopoverRef.current.contains(e.target)) {
+        setRpePopoverIdx(null);
+      }
+    }
+    if (rpePopoverIdx !== null) {
+      document.addEventListener("mousedown", handleDown);
+      document.addEventListener("touchstart", handleDown);
+      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
+    }
+  }, [rpePopoverIdx]);
 
   // After onboarding, show welcome choice modal
   useEffect(() => {
@@ -843,6 +860,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       setShowTargetConfig(false);
       setPacePopoverIdx(null);
+      setRpePopoverIdx(null);
       dispatchModal({
         type: "OPEN_LOG",
         payload: {
@@ -942,6 +960,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
     setShowTargetConfig(false);
     setPacePopoverIdx(null);
+    setRpePopoverIdx(null);
 
     dispatchModal({ type: "CLOSE_LOG" });
   }, [modals.log, dateKey, state.logsByDate, state.preferences, saveLogData]);
@@ -2347,7 +2366,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} footer={modals.log.isOpen ? (() => {
+      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} footer={modals.log.isOpen ? (() => {
         const fCtx = modals.log.context;
         const fExList = fCtx?.workoutExercises || [];
         const fExIdx = fExList.findIndex((e) => e.id === fCtx?.exerciseId);
@@ -2358,6 +2377,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
           setShowTargetConfig(false);
           setPacePopoverIdx(null);
+          setRpePopoverIdx(null);
           saveLogData();
           openLog(fCtx.workoutId, ex);
         };
@@ -2388,7 +2408,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </button>
           <button
             style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 0" }}
-            onClick={() => { setShowTargetConfig(false); setPacePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }}
+            onClick={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }}
           >
             Cancel
           </button>
@@ -2655,24 +2675,50 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   {exerciseTargets.length > 0 && (
                     <div style={{ display: "flex", gap: 8, paddingTop: 6, paddingLeft: 34, alignItems: "center" }}>
                       {exerciseTargets.includes("rpe") && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, position: "relative" }}>
                           <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>RPE</span>
-                          <select
-                            value={s.targetRpe || ""}
-                            onChange={(e) => {
-                              const newSets = [...modals.log.sets];
-                              newSets[i] = { ...newSets[i], targetRpe: e.target.value };
-                              dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                            }}
+                          <button
+                            type="button"
+                            onClick={() => { setRpePopoverIdx(rpePopoverIdx === i ? null : i); setPacePopoverIdx(null); }}
                             style={{
-                              ...styles.numInput, padding: "4px 2px", fontSize: 13,
-                              textAlign: "center", appearance: "auto", WebkitAppearance: "auto",
-                              width: "100%",
+                              ...styles.numInput, fontSize: 13, textAlign: "center",
+                              width: "100%", cursor: "pointer",
+                              opacity: s.targetRpe ? 1 : 0.4,
                             }}
                           >
-                            <option value="">—</option>
-                            {[1,2,3,4,5,6,7,8,9,10].map((n) => <option key={n} value={String(n)}>{n}</option>)}
-                          </select>
+                            {s.targetRpe || "—"}
+                          </button>
+                          {rpePopoverIdx === i && (
+                            <div ref={rpePopoverRef} style={{
+                              position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 20,
+                              background: colors.cardBg, border: `1px solid ${colors.border}`,
+                              borderRadius: 10, padding: 8,
+                              boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                              display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4,
+                            }}>
+                              {["", "1","2","3","4","5","6","7","8","9","10"].map((v) => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  onClick={() => {
+                                    const newSets = [...modals.log.sets];
+                                    newSets[i] = { ...newSets[i], targetRpe: v };
+                                    dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                                    setRpePopoverIdx(null);
+                                  }}
+                                  style={{
+                                    width: 32, height: 32, borderRadius: 8, border: "none",
+                                    background: s.targetRpe === v ? colors.primaryBg : "transparent",
+                                    color: s.targetRpe === v ? colors.primaryText : colors.text,
+                                    fontSize: 13, fontWeight: 700, cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                  }}
+                                >
+                                  {v || "—"}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -2681,7 +2727,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Pace</span>
                           <button
                             type="button"
-                            onClick={() => setPacePopoverIdx(pacePopoverIdx === i ? null : i)}
+                            onClick={() => { setPacePopoverIdx(pacePopoverIdx === i ? null : i); setRpePopoverIdx(null); }}
                             style={{
                               ...styles.numInput, fontSize: 12, textAlign: "center",
                               width: "100%", cursor: "pointer",
