@@ -77,6 +77,23 @@ input[type="number"] { -moz-appearance: textfield; }
 
 
 // ============================================================================
+// TARGET COLUMN HELPERS
+// ============================================================================
+const TARGET_COL_ORDER = ["rpe", "pace", "custom"];
+const TARGET_WIDTHS = { rpe: "52px", pace: "56px", custom: "64px" };
+const TARGET_LABELS = { rpe: "RPE", pace: "Pace", custom: "Target" };
+
+function buildLogGridColumns(showWeight, targets = []) {
+  const cols = ["28px", "1fr"];
+  if (showWeight) cols.push("1fr", "40px");
+  for (const t of TARGET_COL_ORDER) {
+    if (targets.includes(t)) cols.push(TARGET_WIDTHS[t]);
+  }
+  cols.push("32px");
+  return cols.join(" ");
+}
+
+// ============================================================================
 // MAIN APP COMPONENT
 // ============================================================================
 
@@ -107,6 +124,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [collapsedSummary, setCollapsedSummary] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_summary"))); } catch { return new Set(); }
   });
+
+  // Target config popover state
+  const [showTargetConfig, setShowTargetConfig] = useState(false);
+  const targetConfigRef = useRef(null);
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -247,6 +268,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       monthCursor: monthKeyFromDate(dateKey),
     },
   });
+
+  // Click-outside to dismiss target config popover
+  useEffect(() => {
+    function handleDown(e) {
+      if (targetConfigRef.current && !targetConfigRef.current.contains(e.target)) {
+        setShowTargetConfig(false);
+      }
+    }
+    if (showTargetConfig) {
+      document.addEventListener("mousedown", handleDown);
+      document.addEventListener("touchstart", handleDown);
+      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
+    }
+  }, [showTargetConfig]);
 
   // After onboarding, show welcome choice modal
   useEffect(() => {
@@ -738,14 +773,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         sets = prior.sets.map((s) => ({
           reps: Number(s.reps ?? 0) || 0,
           weight: typeof s.weight === "string" ? s.weight : "",
+          targetRpe: s.targetRpe || "",
+          targetPace: s.targetPace || "",
+          targetCustom: s.targetCustom || "",
         }));
       } else {
         // Pre-fill from scheme (e.g. "3x8-12" → 3 sets of 8 reps)
         const scheme = schemeStr ? parseScheme(schemeStr) : null;
         if (scheme) {
-          sets = Array.from({ length: scheme.sets }, () => ({ reps: scheme.reps, weight: "" }));
+          sets = Array.from({ length: scheme.sets }, () => ({ reps: scheme.reps, weight: "", targetRpe: "", targetPace: "", targetCustom: "" }));
         } else {
-          sets = [{ reps: 0, weight: "" }];
+          sets = [{ reps: 0, weight: "", targetRpe: "", targetPace: "", targetCustom: "" }];
         }
       }
 
@@ -756,6 +794,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           sets.push({
             reps: Number(ts.reps ?? 0) || 0,
             weight: typeof ts.weight === "string" ? ts.weight : "",
+            targetRpe: ts.targetRpe || "",
+            targetPace: ts.targetPace || "",
+            targetCustom: ts.targetCustom || "",
           });
         }
       }
@@ -764,15 +805,22 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const parsedScheme = schemeStr ? parseScheme(schemeStr) : null;
       if (existing && parsedScheme && sets.length < parsedScheme.sets) {
         for (let i = sets.length; i < parsedScheme.sets; i++) {
-          sets.push({ reps: parsedScheme.reps, weight: "" });
+          sets.push({ reps: parsedScheme.reps, weight: "", targetRpe: "", targetPace: "", targetCustom: "" });
         }
       }
 
       const normalizedSets = sets.map((s) => {
         const isBW = String(s.weight).toUpperCase() === "BW";
-        return { reps: s.reps, weight: isBW ? "BW" : String(s.weight ?? "").trim() };
+        return {
+          reps: s.reps,
+          weight: isBW ? "BW" : String(s.weight ?? "").trim(),
+          targetRpe: s.targetRpe || "",
+          targetPace: s.targetPace || "",
+          targetCustom: s.targetCustom || "",
+        };
       });
 
+      setShowTargetConfig(false);
       dispatchModal({
         type: "OPEN_LOG",
         payload: {
@@ -823,7 +871,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           : 0;
         const w = String(s.weight ?? "").trim();
         const weight = w.toUpperCase() === "BW" ? "BW" : w.replace(/[^\d.]/g, "");
-        return { reps: repsClean, weight: weight || "" };
+        const result = { reps: repsClean, weight: weight || "" };
+        if (s.targetRpe) result.targetRpe = s.targetRpe;
+        if (s.targetPace) result.targetPace = s.targetPace;
+        if (s.targetCustom) result.targetCustom = s.targetCustom;
+        return result;
       };
 
       const existingEntry = st.logsByDate[dateKey]?.[logCtx.exerciseId];
@@ -859,6 +911,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     // Dismiss rest timer when closing modal
     setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
+    setShowTargetConfig(false);
 
     dispatchModal({ type: "CLOSE_LOG" });
   }, [modals.log, dateKey, state.logsByDate, state.preferences]);
@@ -873,7 +926,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         const entry = st.logsByDate[dateKey][exerciseId] ?? { sets: [] };
         if (!Array.isArray(entry.sets)) entry.sets = [];
         while (entry.sets.length <= setIndex) entry.sets.push({ reps: 0, weight: "", completed: false });
-        entry.sets[setIndex] = { reps: setData.reps, weight: setData.weight, completed: true };
+        const savedSet = { reps: setData.reps, weight: setData.weight, completed: true };
+        if (setData.targetRpe) savedSet.targetRpe = setData.targetRpe;
+        if (setData.targetPace) savedSet.targetPace = setData.targetPace;
+        if (setData.targetCustom) savedSet.targetCustom = setData.targetCustom;
+        entry.sets[setIndex] = savedSet;
         st.logsByDate[dateKey][exerciseId] = entry;
         return st;
       });
@@ -960,6 +1017,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       });
     },
     [dateKey]
+  );
+
+  const toggleExerciseTarget = useCallback(
+    (exerciseId, targetKey) => {
+      updateState((st) => {
+        const toggle = (ex) => {
+          if (ex.id !== exerciseId) return;
+          const cur = ex.targets || [];
+          ex.targets = cur.includes(targetKey) ? cur.filter((t) => t !== targetKey) : [...cur, targetKey];
+        };
+        for (const wk of st.program.workouts) {
+          for (const ex of wk.exercises) toggle(ex);
+        }
+        for (const key of Object.keys(st.dailyWorkouts || {})) {
+          for (const wk of st.dailyWorkouts[key]) {
+            for (const ex of wk.exercises || []) toggle(ex);
+          }
+        }
+        return st;
+      });
+    },
+    []
   );
 
   const handleRestTimeObserved = useCallback((exerciseName, observedSec) => {
@@ -2238,7 +2317,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => dispatchModal({ type: "CLOSE_LOG" })} styles={styles} footer={modals.log.isOpen ? (() => {
+      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => { setShowTargetConfig(false); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} footer={modals.log.isOpen ? (() => {
         const fCtx = modals.log.context;
         const fExList = fCtx?.workoutExercises || [];
         const fExIdx = fExList.findIndex((e) => e.id === fCtx?.exerciseId);
@@ -2277,7 +2356,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </button>
           <button
             style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 0" }}
-            onClick={() => dispatchModal({ type: "CLOSE_LOG" })}
+            onClick={() => { setShowTargetConfig(false); dispatchModal({ type: "CLOSE_LOG" }); }}
           >
             Cancel
           </button>
@@ -2301,6 +2380,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
           const logScheme = logCtx?.scheme;
           const showWeight = logUnit.key === "reps";
+          const exerciseTargets = logExercise?.targets || [];
+          const logGridCols = buildLogGridColumns(showWeight, exerciseTargets);
 
           // Find last session data for context
           const existingLog = state.logsByDate[dateKey]?.[logCtx?.exerciseId];
@@ -2344,7 +2425,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* Column headers */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: showWeight ? "28px 1fr 1fr 40px 32px" : "28px 1fr 32px",
+            gridTemplateColumns: logGridCols,
             gap: 8,
             padding: "0 10px",
           }}>
@@ -2352,7 +2433,52 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{logUnit.label}</div>
             {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>Weight</div>}
             {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>BW</div>}
-            <div />
+            {TARGET_COL_ORDER.filter((t) => exerciseTargets.includes(t)).map((t) => (
+              <div key={t} style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>{TARGET_LABELS[t]}</div>
+            ))}
+            <div ref={targetConfigRef} style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowTargetConfig((v) => !v)}
+                style={{
+                  background: "transparent", border: "none", cursor: "pointer", padding: 0,
+                  color: colors.text, opacity: exerciseTargets.length > 0 ? 0.6 : 0.35,
+                  display: "flex", alignItems: "center", justifyContent: "center", width: "100%",
+                  fontSize: 14,
+                }}
+                aria-label="Configure target columns"
+              >
+                ⚙
+              </button>
+              {showTargetConfig && (
+                <div style={{
+                  position: "absolute", right: 0, top: "100%", zIndex: 20,
+                  background: colors.cardBg, border: `1px solid ${colors.border}`,
+                  borderRadius: 10, padding: "8px 12px", minWidth: 150,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                  display: "flex", flexDirection: "column", gap: 6,
+                }}>
+                  {[
+                    { key: "rpe", label: "RPE (6–10)" },
+                    { key: "pace", label: "Pace (MM:SS)" },
+                    { key: "custom", label: "Custom (text)" },
+                  ].map((opt) => (
+                    <label key={opt.key} style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      fontSize: 13, color: colors.text, cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={exerciseTargets.includes(opt.key)}
+                        onChange={() => toggleExerciseTarget(logCtx?.exerciseId, opt.key)}
+                        style={{ accentColor: colors.primaryBg }}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2365,7 +2491,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 <React.Fragment key={i}>
                 <div style={{
                   display: "grid",
-                  gridTemplateColumns: showWeight ? "28px 1fr 1fr 40px 32px" : "28px 1fr 32px",
+                  gridTemplateColumns: logGridCols,
                   gap: 8,
                   alignItems: "center",
                   padding: "8px 10px",
@@ -2395,7 +2521,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         const reps = Number(s.reps ?? 0);
                         const weight = String(s.weight ?? "").trim();
                         if (reps > 0) {
-                          completeSet(logCtx.exerciseId, i, { reps, weight: weight || "" }, logCtx.workoutId);
+                          const setPayload = { reps, weight: weight || "" };
+                          if (s.targetRpe) setPayload.targetRpe = s.targetRpe;
+                          if (s.targetPace) setPayload.targetPace = s.targetPace;
+                          if (s.targetCustom) setPayload.targetCustom = s.targetCustom;
+                          completeSet(logCtx.exerciseId, i, setPayload, logCtx.workoutId);
                         }
                       }
                     }}
@@ -2475,6 +2605,60 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     </button>
                   )}
 
+                  {exerciseTargets.includes("rpe") && (
+                    <select
+                      value={s.targetRpe || ""}
+                      onChange={(e) => {
+                        const newSets = [...modals.log.sets];
+                        newSets[i] = { ...newSets[i], targetRpe: e.target.value };
+                        dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                      }}
+                      style={{
+                        ...styles.numInput, padding: "4px 2px", fontSize: 13,
+                        textAlign: "center", appearance: "auto", WebkitAppearance: "auto",
+                      }}
+                    >
+                      <option value="">—</option>
+                      <option value="6">6</option>
+                      <option value="7">7</option>
+                      <option value="8">8</option>
+                      <option value="9">9</option>
+                      <option value="10">10</option>
+                    </select>
+                  )}
+
+                  {exerciseTargets.includes("pace") && (
+                    <input
+                      type="text"
+                      value={s.targetPace || ""}
+                      onChange={(e) => {
+                        const newSets = [...modals.log.sets];
+                        newSets[i] = { ...newSets[i], targetPace: e.target.value };
+                        dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                      enterKeyHint="done"
+                      style={{ ...styles.numInput, fontSize: 12, textAlign: "center" }}
+                      placeholder="0:00"
+                    />
+                  )}
+
+                  {exerciseTargets.includes("custom") && (
+                    <input
+                      type="text"
+                      value={s.targetCustom || ""}
+                      onChange={(e) => {
+                        const newSets = [...modals.log.sets];
+                        newSets[i] = { ...newSets[i], targetCustom: e.target.value };
+                        dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                      enterKeyHint="done"
+                      style={{ ...styles.numInput, fontSize: 12, textAlign: "center" }}
+                      placeholder="Target"
+                    />
+                  )}
+
                   <button
                     style={{ ...styles.deleteLogBtn, opacity: modals.log.sets.length <= 1 ? 0.15 : 0.4 }}
                     onClick={() => {
@@ -2519,7 +2703,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             style={{ ...styles.secondaryBtn, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, width: "100%" }}
             onClick={() => {
               const last = modals.log.sets[modals.log.sets.length - 1];
-              const nextSet = last ? { reps: last.reps ?? 0, weight: last.weight ?? "" } : { reps: 0, weight: "" };
+              const nextSet = last
+                ? { reps: last.reps ?? 0, weight: last.weight ?? "", targetRpe: last.targetRpe ?? "", targetPace: last.targetPace ?? "", targetCustom: last.targetCustom ?? "" }
+                : { reps: 0, weight: "", targetRpe: "", targetPace: "", targetCustom: "" };
               dispatchModal({ type: "UPDATE_LOG_SETS", payload: [...modals.log.sets, nextSet] });
             }}
           >
