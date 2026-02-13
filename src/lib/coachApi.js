@@ -102,11 +102,15 @@ function buildEnrichedLogSummary(recentLogs, allWorkouts) {
         const total = log.sets.reduce((s, set) => s + (Number(set.reps) || 0), 0);
         detail = `${total} ${unitAbbr} (${log.sets.length} set${log.sets.length !== 1 ? "s" : ""})`;
       } else {
-        // Strength: show set-level detail like [8@185, 8@185, 6@185]
+        // Strength: show set-level detail like [8@185 RPE8, 8@185, 6@185]
         const setParts = log.sets.map((s) => {
           const r = Number(s.reps) || 0;
           const w = Number(s.weight) || 0;
-          return w > 0 ? `${r}@${w}` : `${r}`;
+          let part = w > 0 ? `${r}@${w}` : `${r}`;
+          if (s.targetRpe) part += ` RPE${s.targetRpe}`;
+          if (s.targetPace) part += ` pace:${s.targetPace}`;
+          if (s.targetCustom) part += ` [${s.targetCustom}]`;
+          return part;
         });
         detail = `[${setParts.join(", ")}]`;
       }

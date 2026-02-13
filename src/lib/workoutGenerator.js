@@ -249,12 +249,21 @@ export function analyzeMuscleRecency(state, catalog) {
   const catalogById = new Map();
   for (const entry of catalog) catalogById.set(entry.id, entry);
 
-  // Build exerciseId → catalogEntry map from program workouts
+  // Build exerciseId → catalogEntry map from program + daily workouts
   const exerciseMap = new Map();
   for (const w of (state.program?.workouts || [])) {
     for (const ex of (w.exercises || [])) {
       if (ex.catalogId && catalogById.has(ex.catalogId)) {
         exerciseMap.set(ex.id, catalogById.get(ex.catalogId));
+      }
+    }
+  }
+  for (const ws of Object.values(state.dailyWorkouts || {})) {
+    for (const w of (ws || [])) {
+      for (const ex of (w.exercises || [])) {
+        if (ex.catalogId && catalogById.has(ex.catalogId)) {
+          exerciseMap.set(ex.id, catalogById.get(ex.catalogId));
+        }
       }
     }
   }

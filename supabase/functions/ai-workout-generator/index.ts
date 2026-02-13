@@ -155,8 +155,15 @@ function buildTodayPrompt(payload: {
   catalog: Array<{ id: string; name: string; muscles: string; tags: string; unit?: string }>;
   history: string;
   muscleRecency: Record<string, number | null>;
+  fatigue?: {
+    recentMoods?: Array<{ date: string; mood: number; label: string }>;
+    avgRpe?: string | null;
+    consecutiveTrainingDays?: number;
+    todayMusclesAlreadyTrained?: string[];
+    todayExercisesAlreadyDone?: string[];
+  };
 }) {
-  const { profile, equipment, duration, catalog, history, muscleRecency } = payload;
+  const { profile, equipment, duration, catalog, history, muscleRecency, fatigue } = payload;
 
   const profileLines: string[] = [];
   if (profile.age) profileLines.push(`Age: ${profile.age}`);
@@ -221,10 +228,42 @@ UNDERSTANDING THE USER:
 - Read the "About" field carefully. Health conditions, experience level, injuries — all of it matters for today's workout.
 - Someone with chronic fatigue or an autoimmune condition needs a lighter session than a collegiate athlete. Fewer exercises, lower volume, more recovery-friendly movements.
 - If injuries are mentioned, avoid those areas entirely — pick alternatives, not modifications.
+${(() => {
+  const sections: string[] = [];
+  if (fatigue) {
+    sections.push("\nFATIGUE & RECOVERY SIGNALS:");
+
+    if (fatigue.todayExercisesAlreadyDone && fatigue.todayExercisesAlreadyDone.length > 0) {
+      sections.push(`Already trained today: ${fatigue.todayExercisesAlreadyDone.join(", ")}`);
+    }
+    if (fatigue.todayMusclesAlreadyTrained && fatigue.todayMusclesAlreadyTrained.length > 0) {
+      sections.push(`Muscles already hit today: ${fatigue.todayMusclesAlreadyTrained.join(", ")}`);
+    }
+    if (fatigue.consecutiveTrainingDays != null && fatigue.consecutiveTrainingDays > 0) {
+      sections.push(`Consecutive training days (before today): ${fatigue.consecutiveTrainingDays}`);
+    }
+    if (fatigue.avgRpe) {
+      sections.push(`Average RPE (last 7 days): ${fatigue.avgRpe}/10`);
+    }
+    if (fatigue.recentMoods && fatigue.recentMoods.length > 0) {
+      const moodLine = fatigue.recentMoods.map((m: { date: string; label: string }) => `${m.date}: ${m.label}`).join(", ");
+      sections.push(`Recent session moods: ${moodLine}`);
+    }
+
+    const highRpe = fatigue.avgRpe ? parseFloat(fatigue.avgRpe) >= 8 : false;
+    const negativeMoods = (fatigue.recentMoods || []).filter((m: { mood: number }) => m.mood < 0).length;
+    const longStreak = (fatigue.consecutiveTrainingDays || 0) >= 4;
+
+    if (highRpe || negativeMoods >= 2 || longStreak) {
+      sections.push("⚠️ FATIGUE DETECTED — reduce volume/intensity. Use fewer sets, lighter schemes (e.g. 2x8-10 instead of 4x8-12), or suggest a recovery/mobility day. Do NOT prescribe the same volume as a fresh day.");
+    }
+  }
+  return sections.join("\n");
+})()}
 
 RULES:
-1. Prioritize muscles that haven't been trained recently (high days-ago or "never trained").
-2. Pick exercises ONLY from the catalog, using exact catalogId values.
+1. Prioritize muscles that haven't been trained recently (high days-ago or "never trained"). NEVER target muscles already trained today.
+2. Pick exercises ONLY from the catalog, using exact catalogId values. Do NOT pick exercises the user already did today.
 3. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.
    - For isometric/hold exercises (tagged "isometric", unit "sec") like planks: prescribe a SINGLE long hold, e.g. "1x60s", "1x45s", "1x90s". Do NOT prescribe multiple sets for holds.
    - For other exercises with unit "sec" (non-isometric): prescribe time-based schemes like "3x30s".
@@ -248,6 +287,7 @@ OUTPUT FORMAT:
 {
   "name": "Workout Name",
   "targetMuscles": ["BACK", "BICEPS"],
+  "note": "Brief explanation of why these muscles/exercises were chosen and any adjustments made for fatigue or recovery.",
   "exercises": [
     { "catalogId": "b-row-bb", "name": "Barbell Row", "scheme": "3x10-12" },
     { "catalogId": "x-plank", "name": "Plank", "scheme": "1x60s" }

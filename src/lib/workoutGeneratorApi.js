@@ -40,7 +40,7 @@ function buildCatalogPayload(catalog, equipment) {
 function buildHistorySummary(state, catalog) {
   const catalogMap = buildCatalogMap(catalog);
 
-  // Build exerciseId → name map from program workouts
+  // Build exerciseId → name map from program + daily workouts
   const exMap = new Map();
   for (const w of state.program?.workouts || []) {
     for (const ex of w.exercises || []) {
@@ -49,6 +49,19 @@ function buildHistorySummary(state, catalog) {
         catalogId: ex.catalogId,
         unit: ex.unit || "reps",
       });
+    }
+  }
+  for (const ws of Object.values(state.dailyWorkouts || {})) {
+    for (const w of (ws || [])) {
+      for (const ex of w.exercises || []) {
+        if (!exMap.has(ex.id)) {
+          exMap.set(ex.id, {
+            name: ex.name,
+            catalogId: ex.catalogId,
+            unit: ex.unit || "reps",
+          });
+        }
+      }
     }
   }
 
@@ -75,9 +88,27 @@ function buildHistorySummary(state, catalog) {
       );
 
       const weightStr = maxWeight > 0 ? ` @ ${maxWeight} lbs` : "";
-      lines.push(
-        `${dateKey}: ${info.name} — ${setCount} sets, ${totalReps} ${info.unit}${weightStr}`
-      );
+      let line = `${dateKey}: ${info.name} — ${setCount} sets, ${totalReps} ${info.unit}${weightStr}`;
+
+      // Include RPE data if present
+      const rpes = log.sets.map((s) => Number(s.targetRpe)).filter((v) => v > 0);
+      if (rpes.length > 0) {
+        const avgRpe = (rpes.reduce((a, b) => a + b, 0) / rpes.length).toFixed(1);
+        line += ` (avg RPE ${avgRpe})`;
+      }
+
+      // Include mood if present
+      const MOOD_LABELS = { "-2": "terrible", "-1": "rough", "0": "okay", "1": "good", "2": "great" };
+      if (log.mood != null && MOOD_LABELS[String(log.mood)]) {
+        line += ` [mood: ${MOOD_LABELS[String(log.mood)]}]`;
+      }
+
+      // Include notes if present
+      if (log.notes && typeof log.notes === "string" && log.notes.trim()) {
+        line += ` [note: "${log.notes.trim().slice(0, 50)}"]`;
+      }
+
+      lines.push(line);
     }
   }
 
@@ -124,6 +155,86 @@ function transformExercises(aiExercises, catalogMap) {
         scheme: e.scheme || null, // per-exercise scheme from AI
       };
     });
+}
+
+/**
+ * Build fatigue signals from recent logs: mood trend, RPE averages, today's trained muscles.
+ */
+function buildFatigueSignals(state, catalog, todayKey) {
+  const MOOD_LABELS = { "-2": "terrible", "-1": "rough", "0": "okay", "1": "good", "2": "great" };
+  const catalogMap = buildCatalogMap(catalog);
+  const logs = state.logsByDate || {};
+  const today = todayKey || new Date().toISOString().slice(0, 10);
+
+  // Recent moods (last 7 days)
+  const recentDates = Object.keys(logs)
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort()
+    .reverse()
+    .slice(0, 7);
+
+  const moods = [];
+  const rpes = [];
+  for (const dk of recentDates) {
+    const dayLogs = logs[dk];
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    for (const log of Object.values(dayLogs)) {
+      if (log.mood != null) moods.push({ date: dk, mood: Number(log.mood), label: MOOD_LABELS[String(log.mood)] || "unknown" });
+      if (Array.isArray(log.sets)) {
+        for (const s of log.sets) {
+          if (s.targetRpe && Number(s.targetRpe) > 0) rpes.push(Number(s.targetRpe));
+        }
+      }
+    }
+  }
+
+  // Today's already-trained muscles
+  const todayMuscles = new Set();
+  const todayExercises = [];
+  const todayLogs = logs[today];
+  if (todayLogs && typeof todayLogs === "object") {
+    // Build exercise ID map from all workouts
+    const exMap = new Map();
+    for (const w of state.program?.workouts || []) {
+      for (const ex of w.exercises || []) exMap.set(ex.id, ex);
+    }
+    for (const ws of Object.values(state.dailyWorkouts || {})) {
+      for (const w of (ws || [])) {
+        for (const ex of w.exercises || []) exMap.set(ex.id, ex);
+      }
+    }
+
+    for (const exId of Object.keys(todayLogs)) {
+      const ex = exMap.get(exId);
+      if (!ex) continue;
+      todayExercises.push(ex.name);
+      if (ex.catalogId && catalogMap.has(ex.catalogId)) {
+        const entry = catalogMap.get(ex.catalogId);
+        for (const m of entry.muscles?.primary || []) todayMuscles.add(m);
+      }
+    }
+  }
+
+  // Compute consecutive training days
+  let consecutiveDays = 0;
+  const d = new Date(today + "T00:00:00");
+  for (let i = 1; i <= 7; i++) {
+    d.setDate(d.getDate() - 1);
+    const dk = d.toISOString().slice(0, 10);
+    if (logs[dk] && Object.keys(logs[dk]).length > 0) {
+      consecutiveDays++;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    recentMoods: moods.slice(0, 10),
+    avgRpe: rpes.length > 0 ? (rpes.reduce((a, b) => a + b, 0) / rpes.length).toFixed(1) : null,
+    consecutiveTrainingDays: consecutiveDays,
+    todayMusclesAlreadyTrained: [...todayMuscles],
+    todayExercisesAlreadyDone: todayExercises,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +318,7 @@ export async function generateTodayAI({
     const catalogPayload = buildCatalogPayload(catalog, equipment);
     const history = buildHistorySummary(state, catalog);
     const muscleRecency = buildMuscleRecency(state, catalog, todayKey);
+    const fatigue = buildFatigueSignals(state, catalog, todayKey);
     const catalogMap = buildCatalogMap(catalog);
 
     const { data, error } = await supabase.functions.invoke(
@@ -220,6 +332,7 @@ export async function generateTodayAI({
           catalog: catalogPayload,
           history,
           muscleRecency,
+          fatigue,
         },
       }
     );
