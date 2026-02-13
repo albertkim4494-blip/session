@@ -85,6 +85,21 @@ const INLINE_TARGETS = ["rpe", "pace"];
 const TARGET_WIDTHS = { rpe: "52px", pace: "56px" };
 const OVERFLOW_TARGETS = TARGET_COL_ORDER.filter((t) => !INLINE_TARGETS.includes(t));
 
+function parsePace(str) {
+  if (!str) return { h: 0, m: 0, s: 0 };
+  const parts = str.split(":").map(Number);
+  if (parts.length === 3) return { h: parts[0] || 0, m: parts[1] || 0, s: parts[2] || 0 };
+  if (parts.length === 2) return { h: 0, m: parts[0] || 0, s: parts[1] || 0 };
+  return { h: 0, m: 0, s: parts[0] || 0 };
+}
+
+function formatPace(h, m, s) {
+  if (!h && !m && !s) return "";
+  const ss = String(s).padStart(2, "0");
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${ss}`;
+  return `${m}:${ss}`;
+}
+
 function buildLogGridColumns(showWeight, targets = []) {
   const cols = ["28px", "1fr"];
   if (showWeight) cols.push("1fr", "40px");
@@ -130,6 +145,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Target config popover state
   const [showTargetConfig, setShowTargetConfig] = useState(false);
   const targetConfigRef = useRef(null);
+  // Pace popover state
+  const [pacePopoverIdx, setPacePopoverIdx] = useState(null);
+  const pacePopoverRef = useRef(null);
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -284,6 +302,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
     }
   }, [showTargetConfig]);
+
+  // Click-outside to dismiss pace popover
+  useEffect(() => {
+    function handleDown(e) {
+      if (pacePopoverRef.current && !pacePopoverRef.current.contains(e.target)) {
+        setPacePopoverIdx(null);
+      }
+    }
+    if (pacePopoverIdx !== null) {
+      document.addEventListener("mousedown", handleDown);
+      document.addEventListener("touchstart", handleDown);
+      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
+    }
+  }, [pacePopoverIdx]);
 
   // After onboarding, show welcome choice modal
   useEffect(() => {
@@ -823,6 +855,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       });
 
       setShowTargetConfig(false);
+      setPacePopoverIdx(null);
       dispatchModal({
         type: "OPEN_LOG",
         payload: {
@@ -914,6 +947,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     // Dismiss rest timer when closing modal
     setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
     setShowTargetConfig(false);
+    setPacePopoverIdx(null);
 
     dispatchModal({ type: "CLOSE_LOG" });
   }, [modals.log, dateKey, state.logsByDate, state.preferences]);
@@ -2319,7 +2353,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => { setShowTargetConfig(false); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} footer={modals.log.isOpen ? (() => {
+      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} footer={modals.log.isOpen ? (() => {
         const fCtx = modals.log.context;
         const fExList = fCtx?.workoutExercises || [];
         const fExIdx = fExList.findIndex((e) => e.id === fCtx?.exerciseId);
@@ -2358,7 +2392,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </button>
           <button
             style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 0" }}
-            onClick={() => { setShowTargetConfig(false); dispatchModal({ type: "CLOSE_LOG" }); }}
+            onClick={() => { setShowTargetConfig(false); setPacePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }}
           >
             Cancel
           </button>
@@ -2449,9 +2483,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 }}
                 aria-label="Configure target columns"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="17" x2="20" y2="17" />
-                  <circle cx="8" cy="7" r="2.5" fill="currentColor" /><circle cx="16" cy="17" r="2.5" fill="currentColor" />
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001.08 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z" />
                 </svg>
               </button>
               {showTargetConfig && (
@@ -2463,7 +2496,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   display: "flex", flexDirection: "column", gap: 6,
                 }}>
                   {[
-                    { key: "rpe", label: "RPE (6–10)" },
+                    { key: "rpe", label: "RPE (1–10)" },
                     { key: "pace", label: "Pace (MM:SS)" },
                     { key: "custom", label: "Custom (text)" },
                   ].map((opt) => (
@@ -2626,6 +2659,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       }}
                     >
                       <option value="">—</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
                       <option value="6">6</option>
                       <option value="7">7</option>
                       <option value="8">8</option>
@@ -2635,19 +2673,72 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   )}
 
                   {exerciseTargets.includes("pace") && (
-                    <input
-                      type="text"
-                      value={s.targetPace || ""}
-                      onChange={(e) => {
-                        const newSets = [...modals.log.sets];
-                        newSets[i] = { ...newSets[i], targetPace: e.target.value };
-                        dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                      }}
-                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                      enterKeyHint="done"
-                      style={{ ...styles.numInput, fontSize: 12, textAlign: "center" }}
-                      placeholder="0:00"
-                    />
+                    <div style={{ position: "relative" }}>
+                      <button
+                        type="button"
+                        onClick={() => setPacePopoverIdx(pacePopoverIdx === i ? null : i)}
+                        style={{
+                          ...styles.numInput, fontSize: 12, textAlign: "center",
+                          width: "100%", cursor: "pointer",
+                          color: s.targetPace ? colors.text : colors.text,
+                          opacity: s.targetPace ? 1 : 0.4,
+                        }}
+                      >
+                        {s.targetPace || "—"}
+                      </button>
+                      {pacePopoverIdx === i && (
+                        <div ref={pacePopoverRef} style={{
+                          position: "absolute", right: -32, top: "100%", marginTop: 4, zIndex: 20,
+                          background: colors.cardBg, border: `1px solid ${colors.border}`,
+                          borderRadius: 10, padding: "10px 12px",
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                          display: "flex", alignItems: "center", gap: 6,
+                        }}>
+                          {(() => {
+                            const p = parsePace(s.targetPace);
+                            const update = (h, m, sec) => {
+                              const newSets = [...modals.log.sets];
+                              newSets[i] = { ...newSets[i], targetPace: formatPace(h, m, sec) };
+                              dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                            };
+                            return (<>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Hrs</span>
+                                <input type="number" inputMode="numeric" min="0" max="23"
+                                  value={p.h || ""}
+                                  onChange={(e) => update(Math.min(23, Math.max(0, parseInt(e.target.value) || 0)), p.m, p.s)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                                  style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Min</span>
+                                <input type="number" inputMode="numeric" min="0" max="59"
+                                  value={p.m || ""}
+                                  onChange={(e) => update(p.h, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)), p.s)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                                  style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Sec</span>
+                                <input type="number" inputMode="numeric" min="0" max="59"
+                                  value={p.s || ""}
+                                  onChange={(e) => update(p.h, p.m, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                                  onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                                  style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
+                                  placeholder="0"
+                                />
+                              </div>
+                            </>);
+                          })()}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   <button
