@@ -501,6 +501,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let logged = 0;
     let total = 0;
     let totalSets = 0;
+    let totalReps = 0;
+    let totalVolume = 0;
+    let topLift = 0;
     let d = summaryRange.start;
     const weekMap = {};
     while (d <= summaryRange.end) {
@@ -513,13 +516,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
         for (const exId of keys) {
           const exLog = dayLogs[exId];
-          if (exLog?.sets && Array.isArray(exLog.sets)) totalSets += exLog.sets.filter(isSetCompleted).length;
+          if (exLog?.sets && Array.isArray(exLog.sets)) {
+            for (const s of exLog.sets) {
+              if (!isSetCompleted(s)) continue;
+              totalSets++;
+              const reps = Number(s.reps ?? 0);
+              if (Number.isFinite(reps)) totalReps += reps;
+              const w = String(s.weight ?? "").trim();
+              if (w && w.toUpperCase() !== "BW") {
+                const n = Number(w);
+                if (Number.isFinite(n) && n > 0) {
+                  if (n > topLift) topLift = n;
+                  if (Number.isFinite(reps)) totalVolume += n * reps;
+                }
+              }
+            }
+          }
         }
       }
       d = addDays(d, 1);
     }
 
-    return { logged, total, totalSets, weekStreak: calculateWeekStreak(weekMap) };
+    return { logged, total, totalSets, totalReps, totalVolume, topLift, weekStreak: calculateWeekStreak(weekMap) };
   }, [state.logsByDate, summaryRange]);
 
   // All-time stats for profile modal (not tied to summary range)
@@ -1868,97 +1886,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             );
           })()}
 
-          {tab === "progress" && (() => {
-            const pctLogged = summaryStats.total > 0 ? Math.round((summaryStats.logged / summaryStats.total) * 100) : 0;
-            const navBtnStyle = { background: "transparent", border: "none", color: colors.text, cursor: "pointer", padding: "4px 8px", fontSize: 18, fontWeight: 700, lineHeight: 1 };
-            return (
-            <div style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
-              <PillTabs
-                styles={styles}
-                value={summaryMode}
-                onChange={(v) => { setSummaryMode(v); setSummaryOffset(0); }}
-                tabs={[
-                  { value: "week", label: "Week" },
-                  { value: "month", label: "Month" },
-                  { value: "year", label: "Year" },
-                  { value: "all", label: "All" },
-                ]}
-              />
-
-              {/* Date navigation row */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                {summaryMode !== "all" && (
-                  <button style={{ ...navBtnStyle, opacity: 0.5 }} onClick={() => setSummaryOffset((o) => o - 1)} aria-label="Previous period">
-                    ‹
-                  </button>
-                )}
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>
-                    {formatDateLabel(summaryRange.start)} {"\u2013"} {formatDateLabel(summaryRange.end)}
-                  </div>
-                </div>
-                {summaryMode !== "all" && (
-                  <button style={{ ...navBtnStyle, opacity: summaryOffset >= 0 ? 0.15 : 0.5 }} onClick={() => { if (summaryOffset < 0) setSummaryOffset((o) => o + 1); }} disabled={summaryOffset >= 0} aria-label="Next period">
-                    ›
-                  </button>
-                )}
-                {summaryOffset !== 0 && summaryMode !== "all" && (
-                  <button
-                    style={{ background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, opacity: 0.6, cursor: "pointer", padding: "2px 8px", fontSize: 11, fontWeight: 700, marginLeft: 4 }}
-                    onClick={() => setSummaryOffset(0)}
-                  >
-                    Today
-                  </button>
-                )}
-              </div>
-
-              {/* Quick stats row */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 8,
-              }}>
-                <div style={{
-                  textAlign: "center", padding: "10px 6px", borderRadius: 12,
-                  background: colors.cardAltBg, border: `1px solid ${colors.border}`,
-                }}>
-                  <div style={{ fontSize: 20, fontWeight: 700 }}>{summaryStats.logged}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
-                </div>
-                {summaryMode === "week" ? (
-                  <div style={{
-                    textAlign: "center", padding: "10px 6px", borderRadius: 12,
-                    background: colors.cardAltBg, border: `1px solid ${colors.border}`,
-                  }}>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: summaryStats.logged > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.logged}/{summaryStats.total}</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Days Active</div>
-                  </div>
-                ) : (
-                  <div style={{
-                    textAlign: "center", padding: "10px 6px", borderRadius: 12,
-                    background: colors.cardAltBg, border: `1px solid ${colors.border}`,
-                  }}>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Week Streak</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Progress bar */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ flex: 1, height: 6, borderRadius: 4, background: colors.cardAltBg, overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%", borderRadius: 4,
-                    width: `${pctLogged}%`,
-                    background: pctLogged >= 80 ? "#2ecc71" : pctLogged >= 40 ? "#f59e0b" : colors.primaryBg,
-                    transition: "width 0.3s ease",
-                  }} />
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, whiteSpace: "nowrap" }}>{summaryStats.logged}/{summaryStats.total} days</span>
-              </div>
-            </div>
-            );
-          })()}
         </div>
 
         {/* Main body */}
@@ -2077,6 +2004,83 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* SUMMARY TAB */}
           {tab === "progress" ? (
             <div key="progress" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
+              {(() => {
+                const pctLogged = summaryStats.total > 0 ? Math.round((summaryStats.logged / summaryStats.total) * 100) : 0;
+                const navBtnStyle = { background: "transparent", border: "none", color: colors.text, cursor: "pointer", padding: "4px 8px", fontSize: 18, fontWeight: 700, lineHeight: 1 };
+                const formatNum = (n) => n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : n.toLocaleString();
+                const weightUnit = getWeightLabel(state.preferences?.measurementSystem);
+                const hasWeighted = summaryStats.totalVolume > 0;
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <PillTabs
+                      styles={styles}
+                      value={summaryMode}
+                      onChange={(v) => { setSummaryMode(v); setSummaryOffset(0); }}
+                      tabs={[
+                        { value: "week", label: "Week" },
+                        { value: "month", label: "Month" },
+                        { value: "year", label: "Year" },
+                        { value: "all", label: "All" },
+                      ]}
+                    />
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                      {summaryMode !== "all" && (
+                        <button style={{ ...navBtnStyle, opacity: 0.5 }} onClick={() => setSummaryOffset((o) => o - 1)} aria-label="Previous period">‹</button>
+                      )}
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>
+                          {formatDateLabel(summaryRange.start)} {"\u2013"} {formatDateLabel(summaryRange.end)}
+                        </div>
+                      </div>
+                      {summaryMode !== "all" && (
+                        <button style={{ ...navBtnStyle, opacity: summaryOffset >= 0 ? 0.15 : 0.5 }} onClick={() => { if (summaryOffset < 0) setSummaryOffset((o) => o + 1); }} disabled={summaryOffset >= 0} aria-label="Next period">›</button>
+                      )}
+                      {summaryOffset !== 0 && summaryMode !== "all" && (
+                        <button style={{ background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, opacity: 0.6, cursor: "pointer", padding: "2px 8px", fontSize: 11, fontWeight: 700, marginLeft: 4 }} onClick={() => setSummaryOffset(0)}>Today</button>
+                      )}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                      <div style={{ textAlign: "center", padding: "10px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
+                        <div style={{ fontSize: 18, fontWeight: 700 }}>{summaryStats.logged}</div>
+                        <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
+                      </div>
+                      {summaryMode === "week" ? (
+                        <div style={{ textAlign: "center", padding: "10px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: summaryStats.logged > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.logged}/{summaryStats.total}</div>
+                          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Days Active</div>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: "center", padding: "10px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
+                          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Week Streak</div>
+                        </div>
+                      )}
+                      <div style={{ textAlign: "center", padding: "10px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: summaryStats.totalReps > 0 ? "#7dd3fc" : "inherit" }}>{formatNum(summaryStats.totalReps)}</div>
+                        <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Total Reps</div>
+                      </div>
+                    </div>
+                    {hasWeighted && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div style={{ textAlign: "center", padding: "8px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
+                          <div style={{ fontSize: 16, fontWeight: 700 }}>{formatNum(Math.round(summaryStats.totalVolume))}</div>
+                          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Volume ({weightUnit})</div>
+                        </div>
+                        <div style={{ textAlign: "center", padding: "8px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
+                          <div style={{ fontSize: 16, fontWeight: 700 }}>{summaryStats.topLift} {weightUnit}</div>
+                          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Top Lift</div>
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ flex: 1, height: 6, borderRadius: 4, background: colors.cardAltBg, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 4, width: `${pctLogged}%`, background: pctLogged >= 80 ? "#2ecc71" : pctLogged >= 40 ? "#f59e0b" : colors.primaryBg, transition: "width 0.3s ease" }} />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, whiteSpace: "nowrap" }}>{summaryStats.logged}/{summaryStats.total} days</span>
+                    </div>
+                  </div>
+                );
+              })()}
               <CoachInsightsCard
                 insights={coachInsights}
                 onAddExercise={handleAddSuggestion}
