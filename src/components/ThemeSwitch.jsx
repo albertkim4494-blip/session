@@ -1,13 +1,14 @@
 import React from "react";
 
-export function ThemeSwitch({ theme, onToggle, styles }) {
+export function ThemeSwitch({ theme, onToggle, styles, labels }) {
   const isDark = theme === "dark";
+  const [onLabel, offLabel] = labels || ["Dark", "Light"];
 
   return (
     <button
       onClick={onToggle}
       style={styles.themeSwitch}
-      aria-label="Toggle theme"
+      aria-label="Toggle"
       type="button"
     >
       <span
@@ -24,7 +25,7 @@ export function ThemeSwitch({ theme, onToggle, styles }) {
           }}
         />
       </span>
-      <span style={styles.themeSwitchLabel}>{isDark ? "Dark" : "Light"}</span>
+      <span style={styles.themeSwitchLabel}>{isDark ? onLabel : offLabel}</span>
     </button>
   );
 }

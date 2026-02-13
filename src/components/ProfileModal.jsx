@@ -473,17 +473,22 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
               <ThemeSwitch
                 theme={preferences?.timerSound !== false ? "dark" : "light"}
                 styles={styles}
+                labels={["On", "Off"]}
                 onToggle={() => onUpdatePreference?.("timerSound", !(preferences?.timerSound !== false))}
               />
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 14, fontWeight: 700 }}>Auto Rest Timer</span>
-              <ThemeSwitch
-                theme={preferences?.restTimerEnabled !== false ? "dark" : "light"}
-                styles={styles}
-                onToggle={() => onUpdatePreference?.("restTimerEnabled", !(preferences?.restTimerEnabled !== false))}
-              />
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>Rest Timer</span>
+                <ThemeSwitch
+                  theme={preferences?.restTimerEnabled !== false ? "dark" : "light"}
+                  styles={styles}
+                  labels={["On", "Off"]}
+                  onToggle={() => onUpdatePreference?.("restTimerEnabled", !(preferences?.restTimerEnabled !== false))}
+                />
+              </div>
+              <span style={{ fontSize: 11, opacity: 0.5 }}>Countdown between sets after completing one</span>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
