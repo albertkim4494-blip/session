@@ -31,6 +31,7 @@ export function GenerateWizardModal({
   state,
   styles,
   colors,
+  measurementSystem,
 }) {
   const {
     step,
@@ -86,6 +87,7 @@ export function GenerateWizardModal({
         catalog: catalog || EXERCISE_CATALOG,
         sportName: hasSport ? sportName : "",
         sportDays: hasSport ? sportDays : [],
+        measurementSystem,
       });
 
       // Don't apply if a newer generation was triggered

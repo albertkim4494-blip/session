@@ -29,11 +29,14 @@ Deno.serve(async (req) => {
       dateRange,
       catalogSummary,
       equipment,
+      weightUnit,
       enrichedLogSummary,
       progressionTrends,
       adherence,
       previousInsights,
     } = await req.json();
+
+    const wUnit = weightUnit || "lb";
 
     // Build exercise ID → info map from workouts
     const exerciseMap: Record<string, { name: string; unit: string; unitAbbr: string }> = {};
@@ -95,7 +98,7 @@ Deno.serve(async (req) => {
               ...logData.sets.map((s: { weight?: number }) => Number(s.weight) || 0),
               0
             );
-            const weightStr = maxWeight > 0 ? ` @ up to ${maxWeight} lbs` : "";
+            const weightStr = maxWeight > 0 ? ` @ up to ${maxWeight} ${wUnit}` : "";
             logLines.push(`  ${dateKey}: ${exName} — ${totalValue} reps${weightStr} (${setCount} set${setCount !== 1 ? "s" : ""})`);
           }
         }
@@ -108,7 +111,7 @@ Deno.serve(async (req) => {
     // Build profile context
     const profileParts: string[] = [];
     if (profile?.age) profileParts.push(`Age: ${profile.age}`);
-    if (profile?.weight_lbs) profileParts.push(`Weight: ${profile.weight_lbs} lbs`);
+    if (profile?.weight_lbs) profileParts.push(`Weight: ${profile.weight_lbs} ${wUnit}`);
     if (profile?.goal) profileParts.push(`Goal: ${profile.goal}`);
     if (profile?.sports) profileParts.push(`Sports/Activities: ${profile.sports}`);
     if (profile?.about) profileParts.push(`About: ${profile.about}`);
@@ -229,7 +232,7 @@ BODY-RELATIVE STRENGTH AWARENESS:
   * Intermediate man: Squat 1.25-1.75x BW, Bench 1-1.25x BW, Deadlift 1.5-2x BW
 - Smaller/lighter individuals naturally lift less absolute weight. A 110lb woman squatting 95lb (0.86x BW) is stronger relative to her body than a 200lb man squatting 135lb (0.68x BW).
 - Do NOT push someone to increase weight if they're already at or above intermediate ratios for their profile. Acknowledge their strength level instead.
-- If someone is well below beginner ratios and the weight has been flat for 3+ weeks, gently suggest progressive overload with specific increments (e.g., "Try adding 5 lbs next session").
+- If someone is well below beginner ratios and the weight has been flat for 3+ weeks, gently suggest progressive overload with specific increments (e.g., "Try adding ${wUnit === "kg" ? "2.5 kg" : "5 lb"} next session").
 - For bodyweight exercises (pushups, pull-ups, dips), evaluate volume and rep quality rather than added weight. High-rep bodyweight work is legitimate training.
 - If profile data is missing (no weight, no age), don't guess — just evaluate based on the trend data you have.
 

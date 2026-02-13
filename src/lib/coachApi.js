@@ -10,13 +10,20 @@ const MOOD_LABELS = { "-2": "terrible", "-1": "rough", "0": "okay", "1": "good",
 /**
  * Build a fingerprint string from the inputs so we know when to invalidate cache.
  */
-function buildFingerprint(dateRange, recentLogs, exerciseCount, goal) {
+function buildFingerprint(dateRange, recentLogs, exerciseCount, profile) {
   const logDates = Object.keys(recentLogs || {}).sort().join(",");
   const logEntryCount = Object.values(recentLogs || {}).reduce(
     (sum, day) => sum + (day ? Object.keys(day).length : 0),
     0
   );
-  return `${dateRange.start}|${dateRange.end}|${logDates}|${logEntryCount}|${exerciseCount}|${goal || ""}`;
+  const profileStr = [
+    profile?.goal || "",
+    profile?.age || "",
+    profile?.weight_lbs || "",
+    profile?.about || "",
+    profile?.sports || "",
+  ].join("|");
+  return `${dateRange.start}|${dateRange.end}|${logDates}|${logEntryCount}|${exerciseCount}|${profileStr}`;
 }
 
 /**
@@ -138,7 +145,7 @@ function buildEnrichedLogSummary(recentLogs, allWorkouts) {
 /**
  * Compute progression trends: first vs last max weight for strength exercises with 2+ sessions.
  */
-function computeProgressionTrends(recentLogs, allWorkouts) {
+function computeProgressionTrends(recentLogs, allWorkouts, weightLabel = "lb") {
   const exerciseMap = {};
   for (const w of allWorkouts || []) {
     for (const ex of w.exercises || []) {
@@ -168,11 +175,11 @@ function computeProgressionTrends(recentLogs, allWorkouts) {
     const first = entries[0].maxWeight;
     const last = entries[entries.length - 1].maxWeight;
     if (last > first) {
-      trends.push(`${name}: ${first} → ${last} lbs (UP)`);
+      trends.push(`${name}: ${first} → ${last} ${weightLabel} (UP)`);
     } else if (last < first) {
-      trends.push(`${name}: ${first} → ${last} lbs (DOWN)`);
+      trends.push(`${name}: ${first} → ${last} ${weightLabel} (DOWN)`);
     } else {
-      trends.push(`${name}: ${last} lbs (FLAT)`);
+      trends.push(`${name}: ${last} ${weightLabel} (FLAT)`);
     }
   }
 
@@ -212,11 +219,11 @@ function computeAdherenceStats(logsByDate) {
  * @param {Object} [params.options] - { forceRefresh: boolean }
  * @returns {Promise<{ insights: Array, fromCache: boolean }>}
  */
-export async function fetchCoachInsights({ profile, state, dateRange, options, catalog, equipment }) {
+export async function fetchCoachInsights({ profile, state, dateRange, options, catalog, equipment, measurementSystem }) {
   const workouts = state?.program?.workouts || [];
   const recentLogs = filterLogsToRange(state?.logsByDate, dateRange.start, dateRange.end);
   const exerciseCount = workouts.reduce((sum, w) => sum + (w.exercises?.length || 0), 0);
-  const fingerprint = buildFingerprint(dateRange, recentLogs, exerciseCount, profile?.goal);
+  const fingerprint = buildFingerprint(dateRange, recentLogs, exerciseCount, profile);
 
   // Check cache unless force refresh
   if (!options?.forceRefresh) {
@@ -289,7 +296,8 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
 
   // Build enriched data for the AI
   const enrichedLogSummary = buildEnrichedLogSummary(recentLogs, allWorkouts);
-  const progressionTrends = computeProgressionTrends(recentLogs, allWorkouts);
+  const weightLabel = measurementSystem === "metric" ? "kg" : "lb";
+  const progressionTrends = computeProgressionTrends(recentLogs, allWorkouts, weightLabel);
   const adherence = computeAdherenceStats(state?.logsByDate);
   const previousInsights = loadPreviousInsights();
 
@@ -315,6 +323,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       },
       catalogSummary,
       equipment: equipment || "gym",
+      weightUnit: weightLabel,
       enrichedLogSummary,
       progressionTrends,
       adherence,
@@ -344,12 +353,12 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
 
   // Normalize each insight so UI never crashes on missing fields
   const insights = (data?.insights || []).map((i) => ({
+    ...i,
     type: i.type || "INFO",
     severity: i.severity || "LOW",
     title: i.title || "Insight",
     message: i.message || "",
     suggestions: Array.isArray(i.suggestions) ? i.suggestions : [],
-    ...i,
   }));
 
   // Save to cache

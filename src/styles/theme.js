@@ -353,7 +353,7 @@ export function getStyles(colors) {
     primaryBtn: {
       padding: "10px 12px",
       borderRadius: 12,
-      border: "1px solid rgba(255,255,255,0.10)",
+      border: `1px solid ${colors.border}`,
       background: colors.primaryBg,
       color: colors.primaryText,
       fontWeight: 700,
@@ -455,7 +455,7 @@ export function getStyles(colors) {
       flex: 1,
       padding: "10px 12px",
       borderRadius: 999,
-      border: "1px solid rgba(255,255,255,0.06)",
+      border: `1px solid ${colors.border}`,
       fontWeight: 700,
     },
 
@@ -720,7 +720,7 @@ export function getStyles(colors) {
       flex: 1,
       padding: "12px 16px",
       borderRadius: 12,
-      border: `1px solid rgba(255,255,255,0.10)`,
+      border: `1px solid ${colors.border}`,
       background: colors.primaryBg,
       color: colors.primaryText,
       fontWeight: 700,
@@ -803,7 +803,7 @@ export function getStyles(colors) {
     timerBtnPrimary: {
       padding: "8px 16px",
       borderRadius: 8,
-      border: "1px solid rgba(255,255,255,0.10)",
+      border: `1px solid ${colors.border}`,
       background: colors.primaryBg,
       color: colors.primaryText,
       fontWeight: 700,

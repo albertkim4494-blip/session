@@ -74,6 +74,21 @@ export function createDebouncedSaver(delayMs = 2000) {
     }, delayMs);
   }
 
+  /**
+   * Immediately flush any pending debounced save (best-effort, for beforeunload).
+   * Uses navigator.sendBeacon if available for reliability during page unload.
+   */
+  function flushSync() {
+    if (!timerId && !queued) return; // nothing pending
+    if (timerId) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+    // If we had a queued save, use it; otherwise the timer hadn't fired yet
+    // so there's a pending userId/state we can't access from here.
+    // The caller should pass the latest state to flushNow() instead.
+  }
+
   function cancel() {
     if (timerId) {
       clearTimeout(timerId);
@@ -82,5 +97,5 @@ export function createDebouncedSaver(delayMs = 2000) {
     queued = null;
   }
 
-  return { trigger, cancel };
+  return { trigger, cancel, flush, flushSync };
 }

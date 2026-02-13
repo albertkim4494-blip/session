@@ -72,8 +72,8 @@ function ensureAnimations() {
 .btn-press { transition: transform 0.15s ease, opacity 0.15s ease; }
 .btn-press:active { transform: scale(0.97); opacity: 0.85; }
 @media (hover: hover) {
-  .card-hover { transition: border-color 0.2s ease; }
-  .card-hover:hover { border-color: rgba(255,255,255,0.15); }
+  .card-hover { transition: box-shadow 0.2s ease; }
+  .card-hover:hover { box-shadow: 0 0 0 1px rgba(128,128,128,0.18); }
 }
 .nav-press:active { transform: scale(0.92); }
 .nav-press { transition: transform 0.12s ease; }
@@ -425,7 +425,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const styles = useMemo(() => getStyles(colors), [colors]);
 
   const workouts = state.program.workouts;
-  const dailyWorkoutsToday = state.dailyWorkouts?.[dateKey] || [];
+  const EMPTY_ARRAY = useMemo(() => [], []);
+  const EMPTY_OBJ = useMemo(() => ({}), []);
+  const dailyWorkoutsToday = state.dailyWorkouts?.[dateKey] || EMPTY_ARRAY;
 
   const categoryOptions = useMemo(() => {
     const defaults = ["Workout", "Push", "Pull", "Legs", "Upper", "Lower", "Cardio", "Stretch", "Abs"];
@@ -451,7 +453,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const catalogMap = useMemo(() => buildCatalogMap(EXERCISE_CATALOG), []);
 
-  const logsForDate = state.logsByDate[dateKey] ?? {};
+  const logsForDate = state.logsByDate[dateKey] ?? EMPTY_OBJ;
 
   const summaryRange = useMemo(() => {
     // Shift the anchor date by offset periods
@@ -524,41 +526,57 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let total = 0;
     let totalSets = 0;
     const weekMap = {};
-    // Per-exercise accumulators
     const exReps = {};   // exId → total reps
     const exVol = {};    // exId → total volume (weight × reps)
     const exLift = {};   // exId → max single weight
 
-    let d = summaryRange.start;
-    while (d <= summaryRange.end) {
-      total++;
-      const dayLogs = state.logsByDate[d];
-      if (dayHasCompletedSets(dayLogs)) {
-        const keys = Object.keys(dayLogs);
-        logged++;
-        const weekStart = startOfWeekSunday(d);
-        weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
-        for (const exId of keys) {
-          const exLog = dayLogs[exId];
-          if (exLog?.sets && Array.isArray(exLog.sets)) {
-            for (const s of exLog.sets) {
-              if (!isSetCompleted(s)) continue;
-              totalSets++;
-              const reps = Number(s.reps ?? 0);
-              if (Number.isFinite(reps)) exReps[exId] = (exReps[exId] || 0) + reps;
-              const w = String(s.weight ?? "").trim();
-              if (w && w.toUpperCase() !== "BW") {
-                const n = Number(w);
-                if (Number.isFinite(n) && n > 0) {
-                  exLift[exId] = Math.max(exLift[exId] || 0, n);
-                  if (Number.isFinite(reps)) exVol[exId] = (exVol[exId] || 0) + n * reps;
-                }
+    const processDayLogs = (d, dayLogs) => {
+      if (!dayHasCompletedSets(dayLogs)) return;
+      const keys = Object.keys(dayLogs);
+      logged++;
+      const weekStart = startOfWeekSunday(d);
+      weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
+      for (const exId of keys) {
+        const exLog = dayLogs[exId];
+        if (exLog?.sets && Array.isArray(exLog.sets)) {
+          for (const s of exLog.sets) {
+            if (!isSetCompleted(s)) continue;
+            totalSets++;
+            const reps = Number(s.reps ?? 0);
+            if (Number.isFinite(reps)) exReps[exId] = (exReps[exId] || 0) + reps;
+            const wt = String(s.weight ?? "").trim();
+            if (wt && wt.toUpperCase() !== "BW") {
+              const n = Number(wt);
+              if (Number.isFinite(n) && n > 0) {
+                exLift[exId] = Math.max(exLift[exId] || 0, n);
+                if (Number.isFinite(reps)) exVol[exId] = (exVol[exId] || 0) + n * reps;
               }
             }
           }
         }
       }
-      d = addDays(d, 1);
+    };
+
+    // For short ranges (week/month), iterate day-by-day to get accurate total count.
+    // For large ranges (year/all), iterate log keys directly to avoid thousands of empty-day checks.
+    const rangeSize = Math.round((new Date(summaryRange.end) - new Date(summaryRange.start)) / 86400000) + 1;
+    if (rangeSize <= 35) {
+      // Day-by-day: accurate total count for progress bar
+      let d = summaryRange.start;
+      while (d <= summaryRange.end) {
+        total++;
+        const dayLogs = state.logsByDate[d];
+        if (dayLogs) processDayLogs(d, dayLogs);
+        d = addDays(d, 1);
+      }
+    } else {
+      // Iterate log entries directly for large ranges
+      total = rangeSize;
+      for (const [d, dayLogs] of Object.entries(state.logsByDate)) {
+        if (d >= summaryRange.start && d <= summaryRange.end && dayLogs) {
+          processDayLogs(d, dayLogs);
+        }
+      }
     }
 
     // Find best exercise for each metric
@@ -668,7 +686,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const filteredCatalog = EXERCISE_CATALOG.filter((e) => exerciseFitsEquipment(e, equipment));
     const coachOpts = { catalog: filteredCatalog, userExerciseNames: userExNames };
 
-    fetchCoachInsights({ profile, state, dateRange: summaryRange, catalog: filteredCatalog, equipment })
+    fetchCoachInsights({ profile, state, dateRange: summaryRange, catalog: filteredCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
       .then(({ insights }) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
@@ -750,11 +768,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [manageWorkoutId]);
 
   // Persist state changes
+  const latestStateRef = useRef(state);
   useEffect(() => {
     const stateWithMeta = {
       ...state,
       meta: { ...(state.meta ?? {}), updatedAt: Date.now() },
     };
+    latestStateRef.current = stateWithMeta;
 
     const result = persistState(stateWithMeta);
 
@@ -766,6 +786,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       cloudSaver.current?.trigger(session.user.id, stateWithMeta);
     }
   }, [state, dataReady, session.user.id]);
+
+  // Flush pending cloud sync on tab close / navigation
+  useEffect(() => {
+    const handleUnload = () => {
+      if (cloudSaver.current && latestStateRef.current && dataReady) {
+        cloudSaver.current.flush(session.user.id, latestStateRef.current);
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, [session.user.id, dataReady]);
 
   // ---------------------------------------------------------------------------
   // BACK-BUTTON CLOSES MODALS (Android / PWA)
@@ -1572,6 +1603,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       state,
       catalog: EXERCISE_CATALOG,
       todayKey: dateKey,
+      measurementSystem: state.preferences?.measurementSystem,
     });
 
     if (result.success) {
@@ -2212,7 +2244,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   setCoachError(null);
                   const refreshExNames = progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
                   const refreshCatalog = EXERCISE_CATALOG.filter((e) => exerciseFitsEquipment(e, equipment));
-                  fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true }, catalog: refreshCatalog, equipment })
+                  fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true }, catalog: refreshCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
                     .then(({ insights }) => {
                       if (coachReqIdRef.current !== reqId) return;
                       setCoachInsights(insights);
@@ -3839,6 +3871,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         state={state}
         styles={styles}
         colors={colors}
+        measurementSystem={state.preferences?.measurementSystem}
       />
 
       {/* Generate Today Modal */}

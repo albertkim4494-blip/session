@@ -12,6 +12,7 @@ function playBeep() {
     gain.gain.value = 0.3;
     osc.start();
     osc.stop(ctx.currentTime + 0.15);
+    osc.onended = () => ctx.close();
   } catch {}
 }
 

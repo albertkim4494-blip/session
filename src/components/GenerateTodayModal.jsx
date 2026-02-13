@@ -38,9 +38,7 @@ export function GenerateTodayModal({
   styles,
   colors,
 }) {
-  if (!open) return null;
-
-  const { step, duration, equipment, preview, loading, error } = todayState;
+  const { step, duration, equipment, preview, loading, error } = todayState || {};
   const genRef = useRef(0);
 
   const update = (payload) =>
@@ -48,12 +46,14 @@ export function GenerateTodayModal({
 
   // Auto-generate when entering step 3 (preview)
   useEffect(() => {
-    if (step !== 3 || preview || loading) return;
+    if (!open || step !== 3 || preview || loading) return;
     const genId = ++genRef.current;
     onGenerate({ equipment, duration });
     // onGenerate handles setting loading/preview state
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, preview, loading, equipment, duration]);
+  }, [open, step, preview, loading, equipment, duration]);
+
+  if (!open) return null;
 
   const TOTAL_STEPS = 3; // 1=duration, 2=equipment, 3=preview
 

@@ -37,7 +37,7 @@ function buildCatalogPayload(catalog, equipment) {
 /**
  * Build a compact training history summary from logsByDate (last 14 days).
  */
-function buildHistorySummary(state, catalog) {
+function buildHistorySummary(state, catalog, weightLabel = "lb") {
   const catalogMap = buildCatalogMap(catalog);
 
   // Build exerciseId → name map from program + daily workouts
@@ -87,7 +87,7 @@ function buildHistorySummary(state, catalog) {
         0
       );
 
-      const weightStr = maxWeight > 0 ? ` @ ${maxWeight} lbs` : "";
+      const weightStr = maxWeight > 0 ? ` @ ${maxWeight} ${weightLabel}` : "";
       let line = `${dateKey}: ${info.name} — ${setCount} sets, ${totalReps} ${info.unit}${weightStr}`;
 
       // Include RPE data if present
@@ -255,10 +255,12 @@ export async function generateProgramAI({
   catalog,
   sportName,
   sportDays,
+  measurementSystem,
 }) {
   try {
+    const wLabel = measurementSystem === "metric" ? "kg" : "lb";
     const catalogPayload = buildCatalogPayload(catalog, equipment);
-    const history = buildHistorySummary(state, catalog);
+    const history = buildHistorySummary(state, catalog, wLabel);
     const catalogMap = buildCatalogMap(catalog);
 
     const { data, error } = await supabase.functions.invoke(
@@ -313,10 +315,12 @@ export async function generateTodayAI({
   state,
   catalog,
   todayKey,
+  measurementSystem,
 }) {
   try {
+    const wLabel = measurementSystem === "metric" ? "kg" : "lb";
     const catalogPayload = buildCatalogPayload(catalog, equipment);
-    const history = buildHistorySummary(state, catalog);
+    const history = buildHistorySummary(state, catalog, wLabel);
     const muscleRecency = buildMuscleRecency(state, catalog, todayKey);
     const fatigue = buildFatigueSignals(state, catalog, todayKey);
     const catalogMap = buildCatalogMap(catalog);
