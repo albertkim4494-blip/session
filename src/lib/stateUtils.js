@@ -93,11 +93,11 @@ export function makeDefaultState() {
   };
 }
 
-export function loadState() {
-  const raw = localStorage.getItem(LS_KEY);
-  if (!raw) return makeDefaultState();
-
-  const st = safeParse(raw, null);
+/**
+ * Normalize a raw state object: merge with defaults, fix missing/invalid fields.
+ * Used by both loadState (localStorage) and cloud sync to ensure consistent structure.
+ */
+export function normalizeState(st) {
   if (!st || typeof st !== "object") return makeDefaultState();
 
   const rawProgram = st.program && typeof st.program === "object" ? st.program : {};
@@ -132,6 +132,14 @@ export function loadState() {
   }));
 
   return next;
+}
+
+export function loadState() {
+  const raw = localStorage.getItem(LS_KEY);
+  if (!raw) return makeDefaultState();
+
+  const st = safeParse(raw, null);
+  return normalizeState(st);
 }
 
 export function persistState(state) {

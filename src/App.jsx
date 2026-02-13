@@ -14,7 +14,7 @@ import {
   endOfWeekSunday, endOfMonth, endOfYear,
   inRangeInclusive, isValidDateKey,
 } from "./lib/dateUtils";
-import { uid, loadState, persistState, makeDefaultState, safeParse, migrateCompletedFlag } from "./lib/stateUtils";
+import { uid, loadState, normalizeState, persistState, makeDefaultState, safeParse, migrateCompletedFlag } from "./lib/stateUtils";
 import {
   validateExerciseName, validateWorkoutName,
   toNumberOrNull, formatMaxWeight,
@@ -371,10 +371,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (cancelled) return;
 
         if (cloudState && typeof cloudState === "object" && Object.keys(cloudState).length > 0) {
-          // Apply completed-flag migration to cloud data (cloud may lack the flag)
-          migrateCompletedFlag(cloudState);
-          setState(cloudState);
-          persistState(cloudState);
+          // Normalize cloud data the same way as localStorage (merge defaults, migrate flags)
+          const normalized = normalizeState(cloudState);
+          setState(normalized);
+          persistState(normalized);
         } else {
           const localState = loadState();
           await saveCloudState(session.user.id, localState);
@@ -740,7 +740,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Load onboarding measurement system choice (one-time)
   useEffect(() => {
     const onboardingMs = localStorage.getItem("wt_measurement_system");
-    if (onboardingMs && !state.preferences.measurementSystem) {
+    if (onboardingMs && !state.preferences?.measurementSystem) {
       updateState((st) => {
         if (!st.preferences) st.preferences = {};
         if (!st.preferences.measurementSystem) {
@@ -2709,7 +2709,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           }}>
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>Set</div>
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{logUnit.label}</div>
-            {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>Weight ({getWeightLabel(state.preferences.measurementSystem)})</div>}
+            {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>Weight ({getWeightLabel(state.preferences?.measurementSystem)})</div>}
             {singleTarget && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{exerciseTargets[0] === "rpe" ? "RPE" : exerciseTargets[0] === "pace" ? "Pace" : "Target"}</div>}
             <div ref={targetConfigRef} style={{ position: "relative" }}>
               <button
@@ -2870,7 +2870,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       step="0.01"
                       min="0"
                       style={{ ...styles.numInput, ...(isBW ? styles.disabledInput : {}) }}
-                      placeholder={getWeightLabel(state.preferences.measurementSystem)}
+                      placeholder={getWeightLabel(state.preferences?.measurementSystem)}
                       disabled={isBW}
                     />
                   )}
