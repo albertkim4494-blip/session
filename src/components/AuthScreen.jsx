@@ -173,7 +173,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#0b0f14",
+    background: "#0d1117",
     padding: 16,
     overflow: "hidden",
     position: "fixed",
@@ -182,7 +182,7 @@ const styles = {
   card: {
     width: "100%",
     maxWidth: 380,
-    background: "#0f1722",
+    background: "#161b22",
     borderRadius: 16,
     padding: 32,
   },
@@ -212,7 +212,7 @@ const styles = {
   },
   pillActive: {
     background: "#2dd4bf",
-    color: "#0b0f14",
+    color: "#0d1117",
   },
   pillInactive: {
     background: "transparent",
@@ -268,7 +268,7 @@ const styles = {
     borderRadius: 10,
     border: "none",
     background: "#2dd4bf",
-    color: "#0b0f14",
+    color: "#0d1117",
     cursor: "pointer",
     marginTop: 4,
   },

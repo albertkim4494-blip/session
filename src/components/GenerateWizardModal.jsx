@@ -321,7 +321,7 @@ export function GenerateWizardModal({
                     background: colors.cardAltBg,
                   }}
                 >
-                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 6 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
                     {w.name}
                     {w.scheme === "sport" && (
                       <span style={{ fontWeight: 400, fontSize: 11, opacity: 0.6, marginLeft: 6 }}>
@@ -355,18 +355,19 @@ export function GenerateWizardModal({
         {/* Footer */}
         <div style={styles.modalFooter}>
           {currentContent === "welcome" && onBackToChoice && (
-            <button style={styles.secondaryBtn} onClick={onBackToChoice}>
+            <button className="btn-press" style={styles.secondaryBtn} onClick={onBackToChoice}>
               Back
             </button>
           )}
           {step > 1 && currentContent !== "welcome" && !loading && (
-            <button style={styles.secondaryBtn} onClick={goBack}>
+            <button className="btn-press" style={styles.secondaryBtn} onClick={goBack}>
               Back
             </button>
           )}
           <div style={{ flex: 1 }} />
           {currentContent !== "preview" && (
             <button
+              className="btn-press"
               style={{
                 ...styles.primaryBtn,
                 opacity: canNext ? 1 : 0.4,
@@ -379,10 +380,11 @@ export function GenerateWizardModal({
           )}
           {currentContent === "preview" && !loading && (
             <>
-              <button style={styles.secondaryBtn} onClick={handleRegenerate}>
+              <button className="btn-press" style={styles.secondaryBtn} onClick={handleRegenerate}>
                 Regenerate
               </button>
               <button
+                className="btn-press"
                 style={{ ...styles.primaryBtn, marginLeft: 8 }}
                 onClick={handleAccept}
                 disabled={!preview}

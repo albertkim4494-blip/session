@@ -142,7 +142,7 @@ export function CoachInsightsCard({
             paddingLeft: 14,
           }}
         >
-          <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.35, marginBottom: 4 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.35, marginBottom: 4 }}>
             {hero.headline}
           </div>
           <div style={{ fontSize: 14, opacity: 0.8, lineHeight: 1.45 }}>
@@ -208,7 +208,7 @@ function CompactInsight({ item, onAddExercise, colors }) {
       paddingTop: 4,
       paddingBottom: 4,
     }}>
-      <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>{item.headline}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{item.headline}</div>
       <div style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{item.detail}</div>
       {item.cta && (
         <button
@@ -274,7 +274,7 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
     flex: 1, padding: "7px 0", border: "none", borderRadius: 8,
     fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "background 0.15s",
   };
-  const toggleActive = { ...toggleBase, background: colors?.primaryBg || "#152338", color: colors?.primaryText || "#e8eef7" };
+  const toggleActive = { ...toggleBase, background: colors?.primaryBg || "#1a2744", color: colors?.primaryText || "#e8eef7" };
   const toggleInactive = { ...toggleBase, background: "transparent", color: colors?.text || "#e8eef7", opacity: 0.5 };
 
   return (
@@ -282,7 +282,7 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{
           display: "flex", gap: 4, padding: 3, borderRadius: 8,
-          background: colors?.cardAltBg || "#0b111a",
+          background: colors?.cardAltBg || "#0d1117",
           border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
         }}>
           <button style={mode === "today" ? toggleActive : toggleInactive} onClick={() => setMode("today")}>
@@ -318,10 +318,11 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
         </div>
 
         <div style={styles.modalFooter}>
-          <button style={styles.secondaryBtn} onClick={onCancel}>
+          <button className="btn-press" style={styles.secondaryBtn} onClick={onCancel}>
             Cancel
           </button>
           <button
+            className="btn-press"
             style={styles.primaryBtn}
             onClick={() => onConfirm(mode === "today" ? "__today__" : selectedWorkoutId, exerciseName)}
             disabled={mode === "program" && !selectedWorkoutId}

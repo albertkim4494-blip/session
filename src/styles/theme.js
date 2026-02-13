@@ -31,16 +31,16 @@ export const icon = {
 export function getColors(theme) {
   return theme === "dark"
     ? {
-        appBg: "#0b0f14",
+        appBg: "#0d1117",
         text: "#e8eef7",
-        border: "rgba(255,255,255,0.10)",
-        cardBg: "#0f1722",
-        cardAltBg: "#0b111a",
-        inputBg: "#0f1722",
-        navBg: "#0b0f14",
-        topBarBg: "#0b0f14",
-        shadow: "0 8px 18px rgba(0,0,0,0.25)",
-        primaryBg: "#152338",
+        border: "rgba(255,255,255,0.06)",
+        cardBg: "#161b22",
+        cardAltBg: "#0d1117",
+        inputBg: "#161b22",
+        navBg: "#0d1117",
+        topBarBg: "#0d1117",
+        shadow: "0 2px 8px rgba(0,0,0,0.3)",
+        primaryBg: "#1a2744",
         primaryText: "#e8eef7",
         dangerBg: "rgba(255, 80, 80, 0.14)",
         dangerBorder: "rgba(255, 120, 120, 0.45)",
@@ -48,15 +48,15 @@ export function getColors(theme) {
         dot: "#7dd3fc",
       }
     : {
-        appBg: "#f5f9fc",
+        appBg: "#f8f9fa",
         text: "#1f2933",
-        border: "#dde5ec",
+        border: "rgba(0,0,0,0.08)",
         cardBg: "#ffffff",
-        cardAltBg: "#eef6f3",
+        cardAltBg: "#f1f3f5",
         inputBg: "#ffffff",
-        navBg: "#f5f9fc",
-        topBarBg: "#f5f9fc",
-        shadow: "0 8px 18px rgba(31,41,51,0.08)",
+        navBg: "#f8f9fa",
+        topBarBg: "#f8f9fa",
+        shadow: "0 1px 3px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04)",
         primaryBg: "#2b5b7a",
         primaryText: "#ffffff",
         dangerBg: "rgba(220, 38, 38, 0.12)",
@@ -86,8 +86,8 @@ export function getStyles(colors) {
       display: "flex",
       flexDirection: "column",
       height: "100%",
-      paddingLeft: "calc(14px + var(--safe-left, 0px))",
-      paddingRight: "calc(14px + var(--safe-right, 0px))",
+      paddingLeft: "calc(16px + var(--safe-left, 0px))",
+      paddingRight: "calc(16px + var(--safe-right, 0px))",
       paddingTop: "calc(10px + var(--safe-top, 0px))",
     },
 
@@ -95,8 +95,8 @@ export function getStyles(colors) {
       flexShrink: 0,
       zIndex: 10,
       background: colors.topBarBg,
-      padding: "14px 0 10px",
-      borderBottom: `1px solid ${colors.border}`,
+      padding: "16px 0 12px",
+      borderBottom: "none",
     },
 
     label: { fontSize: 12, opacity: 0.85 },
@@ -108,7 +108,7 @@ export function getStyles(colors) {
       border: `1px solid ${colors.border}`,
       background: colors.primaryBg,
       color: colors.primaryText,
-      fontWeight: 900,
+      fontWeight: 700,
       fontSize: 15,
       display: "flex",
       alignItems: "center",
@@ -171,9 +171,9 @@ export function getStyles(colors) {
     todayChip: {
       padding: "4px 10px",
       borderRadius: 999,
-      border: `1px solid ${colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.3)" : "rgba(43,91,122,0.25)"}`,
-      background: colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.1)" : "rgba(43,91,122,0.08)",
-      color: colors.appBg === "#0b0f14" ? "#7dd3fc" : "#2b5b7a",
+      border: `1px solid ${colors.appBg === "#0d1117" ? "rgba(125,211,252,0.3)" : "rgba(43,91,122,0.25)"}`,
+      background: colors.appBg === "#0d1117" ? "rgba(125,211,252,0.1)" : "rgba(43,91,122,0.08)",
+      color: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
       fontSize: 12,
       fontWeight: 700,
       cursor: "pointer",
@@ -190,7 +190,7 @@ export function getStyles(colors) {
       paddingTop: 10,
       paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
       background: colors.navBg,
-      borderTop: `1px solid ${colors.border}`,
+      borderTop: "none",
       touchAction: "none",
     },
 
@@ -216,14 +216,14 @@ export function getStyles(colors) {
 
     navBtnActive: {
       opacity: 1,
-      color: colors.appBg === "#0b0f14" ? "#7dd3fc" : "#2b5b7a",
+      color: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
     },
 
     card: {
       background: colors.cardBg,
       border: `1px solid ${colors.border}`,
       borderRadius: 16,
-      padding: 12,
+      padding: 16,
       boxShadow: colors.shadow,
     },
 
@@ -253,7 +253,7 @@ export function getStyles(colors) {
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
-      fontWeight: 700,
+      fontWeight: 600,
       fontSize: 12,
       opacity: 0.85,
       cursor: "pointer",
@@ -289,14 +289,14 @@ export function getStyles(colors) {
       cursor: "pointer",
     },
 
-    cardTitle: { fontWeight: 900, fontSize: 16 },
+    cardTitle: { fontWeight: 700, fontSize: 16 },
 
     tagMuted: {
       fontSize: 11,
       fontWeight: 600,
       padding: "2px 7px",
       borderRadius: 999,
-      background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+      background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
       border: `1px solid ${colors.border}`,
       opacity: 0.65,
     },
@@ -308,7 +308,7 @@ export function getStyles(colors) {
     exerciseBtn: {
       flex: 1,
       textAlign: "left",
-      padding: "12px 14px",
+      padding: "14px 16px",
       borderRadius: 14,
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
@@ -320,7 +320,7 @@ export function getStyles(colors) {
       borderLeft: "3px solid #2ecc71",
     },
 
-    exerciseName: { fontWeight: 800, fontSize: 14 },
+    exerciseName: { fontWeight: 700, fontSize: 14 },
     exerciseSub: { marginTop: 4, fontSize: 12, opacity: 0.7 },
 
     badge: {
@@ -345,7 +345,7 @@ export function getStyles(colors) {
       fontWeight: 600,
       padding: "2px 7px",
       borderRadius: 999,
-      background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+      background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
       border: `1px solid ${colors.border}`,
       opacity: 0.65,
     },
@@ -353,10 +353,10 @@ export function getStyles(colors) {
     primaryBtn: {
       padding: "10px 12px",
       borderRadius: 12,
-      border: "1px solid rgba(255,255,255,0.18)",
+      border: "1px solid rgba(255,255,255,0.10)",
       background: colors.primaryBg,
       color: colors.primaryText,
-      fontWeight: 900,
+      fontWeight: 700,
       fontSize: 14,
     },
 
@@ -366,7 +366,7 @@ export function getStyles(colors) {
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
-      fontWeight: 800,
+      fontWeight: 600,
       fontSize: 14,
     },
 
@@ -376,7 +376,7 @@ export function getStyles(colors) {
       border: `1px solid ${colors.dangerBorder}`,
       background: colors.dangerBg,
       color: colors.dangerText,
-      fontWeight: 900,
+      fontWeight: 700,
       fontSize: 14,
     },
 
@@ -455,8 +455,8 @@ export function getStyles(colors) {
       flex: 1,
       padding: "10px 12px",
       borderRadius: 999,
-      border: "1px solid rgba(255,255,255,0.10)",
-      fontWeight: 900,
+      border: "1px solid rgba(255,255,255,0.06)",
+      fontWeight: 700,
     },
 
     pillActive: {
@@ -496,7 +496,7 @@ export function getStyles(colors) {
 
     summaryChip: {
       fontSize: 12,
-      fontWeight: 900,
+      fontWeight: 700,
       padding: "6px 10px",
       borderRadius: 999,
       background: colors.primaryBg,
@@ -509,7 +509,9 @@ export function getStyles(colors) {
     modalOverlay: {
       position: "fixed",
       inset: 0,
-      background: "rgba(0,0,0,0.55)",
+      background: "rgba(0,0,0,0.4)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
       display: "flex",
       alignItems: "flex-end",
       justifyContent: "center",
@@ -524,11 +526,11 @@ export function getStyles(colors) {
       border: `1px solid ${colors.border}`,
       borderRadius: 18,
       overflow: "hidden",
-      boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
     },
 
     modalHeader: {
-      padding: 12,
+      padding: "14px 16px",
       borderBottom: `1px solid ${colors.border}`,
       display: "flex",
       alignItems: "center",
@@ -536,8 +538,8 @@ export function getStyles(colors) {
       gap: 10,
     },
 
-    modalTitle: { fontWeight: 900, fontSize: 16 },
-    modalBody: { padding: 12, maxHeight: "78vh", overflow: "auto" },
+    modalTitle: { fontWeight: 700, fontSize: 16 },
+    modalBody: { padding: 16, maxHeight: "78vh", overflow: "auto" },
     modalFooter: { display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 },
 
     iconBtn: {
@@ -568,7 +570,7 @@ export function getStyles(colors) {
     },
 
     setIndex: {
-      fontWeight: 900,
+      fontWeight: 700,
       opacity: 0.85,
       textAlign: "center",
       paddingBottom: 10,
@@ -615,7 +617,7 @@ export function getStyles(colors) {
 
     calendarDow: {
       fontSize: 11,
-      fontWeight: 800,
+      fontWeight: 600,
       opacity: 0.75,
       textAlign: "center",
       padding: "4px 0",
@@ -627,7 +629,7 @@ export function getStyles(colors) {
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
-      fontWeight: 900,
+      fontWeight: 700,
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
@@ -666,7 +668,7 @@ export function getStyles(colors) {
       border: `1px solid ${colors.border}`,
       background: colors.cardBg,
       color: colors.text,
-      fontWeight: 800,
+      fontWeight: 600,
       userSelect: "none",
       WebkitTapHighlightColor: "transparent",
       cursor: "pointer",
@@ -718,10 +720,10 @@ export function getStyles(colors) {
       flex: 1,
       padding: "12px 16px",
       borderRadius: 12,
-      border: `1px solid rgba(255,255,255,0.18)`,
+      border: `1px solid rgba(255,255,255,0.10)`,
       background: colors.primaryBg,
       color: colors.primaryText,
-      fontWeight: 900,
+      fontWeight: 700,
       fontSize: 14,
       cursor: "pointer",
     },
@@ -750,7 +752,7 @@ export function getStyles(colors) {
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
-      fontWeight: 800,
+      fontWeight: 600,
       fontSize: 12,
       cursor: "pointer",
     },
@@ -775,7 +777,7 @@ export function getStyles(colors) {
 
     timerDigital: {
       fontSize: 28,
-      fontWeight: 900,
+      fontWeight: 700,
       fontVariantNumeric: "tabular-nums",
       position: "absolute",
       textAlign: "center",
@@ -793,7 +795,7 @@ export function getStyles(colors) {
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
-      fontWeight: 800,
+      fontWeight: 600,
       fontSize: 13,
       cursor: "pointer",
     },
@@ -801,10 +803,10 @@ export function getStyles(colors) {
     timerBtnPrimary: {
       padding: "8px 16px",
       borderRadius: 8,
-      border: "1px solid rgba(255,255,255,0.18)",
+      border: "1px solid rgba(255,255,255,0.10)",
       background: colors.primaryBg,
       color: colors.primaryText,
-      fontWeight: 800,
+      fontWeight: 700,
       fontSize: 13,
       cursor: "pointer",
     },
@@ -812,7 +814,7 @@ export function getStyles(colors) {
     timerModeToggle: {
       fontSize: 12,
       fontWeight: 700,
-      color: colors.appBg === "#0b0f14" ? "#7dd3fc" : "#2b5b7a",
+      color: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
       background: "transparent",
       border: "none",
       cursor: "pointer",
@@ -834,7 +836,7 @@ export function getStyles(colors) {
 
     restTimerTime: {
       fontSize: 18,
-      fontWeight: 900,
+      fontWeight: 700,
       fontVariantNumeric: "tabular-nums",
       minWidth: 42,
       textAlign: "right",
@@ -844,14 +846,14 @@ export function getStyles(colors) {
       flex: 1,
       height: 4,
       borderRadius: 2,
-      background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+      background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
       overflow: "hidden",
     },
 
     restTimerProgressFill: {
       height: "100%",
       borderRadius: 2,
-      background: colors.appBg === "#0b0f14" ? "#7dd3fc" : "#2b5b7a",
+      background: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
       transition: "width 0.3s linear",
     },
 

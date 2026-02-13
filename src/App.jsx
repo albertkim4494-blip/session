@@ -60,14 +60,25 @@ function ensureAnimations() {
   _animInjected = true;
   const s = document.createElement("style");
   s.textContent = `
-@keyframes tabFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toastPop { from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes tabFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastPop { from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes modalSlideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes chipPop { 0%{transform:scale(1)} 50%{transform:scale(1.3)} 60%{transform:scale(0.95)} 100%{transform:scale(1)} }
 @keyframes checkDraw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
 @keyframes rowPulse { 0% { box-shadow: inset 0 0 20px rgba(46,204,113,0.35); } 100% { box-shadow: none; } }
 @keyframes restBarSlideUp { from{transform:translateY(100%);opacity:0} to{transform:translateY(0);opacity:1} }
 @keyframes restBarSlideDown { from{transform:translateY(0);opacity:1} to{transform:translateY(100%);opacity:0} }
 @keyframes timerPulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
+.btn-press { transition: transform 0.15s ease, opacity 0.15s ease; }
+.btn-press:active { transform: scale(0.97); opacity: 0.85; }
+@media (hover: hover) {
+  .card-hover { transition: border-color 0.2s ease; }
+  .card-hover:hover { border-color: rgba(255,255,255,0.15); }
+}
+.nav-press:active { transform: scale(0.92); }
+.nav-press { transition: transform 0.12s ease; }
+.input-focus:focus { outline: none; border-color: rgba(125,211,252,0.4) !important; box-shadow: 0 0 0 3px rgba(125,211,252,0.08); }
+.input-focus-light:focus { outline: none; border-color: rgba(43,91,122,0.3) !important; box-shadow: 0 0 0 3px rgba(43,91,122,0.06); }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
@@ -1640,7 +1651,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#0b0f14",
+        background: "#0d1117",
         color: "#64748b",
       }}>
         Loading your workouts...
@@ -1696,7 +1707,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.55, textTransform: "uppercase" }}>
                     {new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" })}
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 900 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700 }}>
                     {formatDateLabel(dateKey)}
                   </div>
                 </button>
@@ -1911,7 +1922,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   textAlign: "center", padding: "10px 6px", borderRadius: 12,
                   background: colors.cardAltBg, border: `1px solid ${colors.border}`,
                 }}>
-                  <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.logged}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700 }}>{summaryStats.logged}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
                 </div>
                 {summaryMode === "week" ? (
@@ -1919,7 +1930,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     textAlign: "center", padding: "10px 6px", borderRadius: 12,
                     background: colors.cardAltBg, border: `1px solid ${colors.border}`,
                   }}>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.logged > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.logged}/{summaryStats.total}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: summaryStats.logged > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.logged}/{summaryStats.total}</div>
                     <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Days Active</div>
                   </div>
                 ) : (
@@ -1927,7 +1938,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     textAlign: "center", padding: "10px 6px", borderRadius: 12,
                     background: colors.cardAltBg, border: `1px solid ${colors.border}`,
                   }}>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
                     <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Week Streak</div>
                   </div>
                 )}
@@ -1943,7 +1954,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     transition: "width 0.3s ease",
                   }} />
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, whiteSpace: "nowrap" }}>{summaryStats.logged}/{summaryStats.total} days</span>
+                <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, whiteSpace: "nowrap" }}>{summaryStats.logged}/{summaryStats.total} days</span>
               </div>
             </div>
             );
@@ -1967,6 +1978,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 Set your username to complete your profile.
               </div>
               <button
+                className="btn-press"
                 type="button"
                 style={{ ...styles.primaryBtn, whiteSpace: "nowrap", padding: "6px 14px", fontSize: 12 }}
                 onClick={() => dispatchModal({
@@ -1981,7 +1993,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           {/* TODAY TAB */}
           {tab === "train" ? (
-            <div key="train" style={{ ...styles.section, animation: "tabFadeIn 0.2s ease-out" }}>
+            <div key="train" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
               <CoachNudge insights={coachInsights} colors={colors} />
               {workouts.length === 0 && dailyWorkoutsToday.length === 0 ? (
                 <div style={{
@@ -1996,11 +2008,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}>
                     <path d="M4 12h16" /><rect x="2" y="8" width="4" height="8" rx="1" /><rect x="18" y="8" width="4" height="8" rx="1" /><rect x="6" y="6" width="3" height="12" rx="1" /><rect x="15" y="6" width="3" height="12" rx="1" />
                   </svg>
-                  <div style={{ fontWeight: 800, fontSize: 16 }}>No workouts yet</div>
+                  <div style={{ fontWeight: 600, fontSize: 16 }}>No workouts yet</div>
                   <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
                     Head to the <b>Plan</b> tab to create your program, or generate one with AI.
                   </div>
                   <button
+                    className="btn-press"
                     style={{ ...styles.primaryBtn, marginTop: 4, padding: "10px 20px" }}
                     onClick={() => setTab("plan")}
                   >
@@ -2063,7 +2076,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           {/* SUMMARY TAB */}
           {tab === "progress" ? (
-            <div key="progress" style={{ ...styles.section, animation: "tabFadeIn 0.2s ease-out" }}>
+            <div key="progress" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
               <CoachInsightsCard
                 insights={coachInsights}
                 onAddExercise={handleAddSuggestion}
@@ -2116,7 +2129,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}>
                     <path d="M3 20h18" /><path d="M7 20V10" /><path d="M12 20V4" /><path d="M17 20V14" />
                   </svg>
-                  <div style={{ fontWeight: 800, fontSize: 16 }}>No data yet</div>
+                  <div style={{ fontWeight: 600, fontSize: 16 }}>No data yet</div>
                   <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
                     Log a workout on the <b>Train</b> tab and your progress will show up here.
                   </div>
@@ -2140,12 +2153,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           {/* MANAGE TAB */}
           {tab === "plan" ? (
-            <div key="plan" style={{ ...styles.section, animation: "tabFadeIn 0.2s ease-out" }}>
-              <div style={styles.card}>
+            <div key="plan" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
+              <div className="card-hover" style={styles.card}>
                 <div style={styles.cardHeader}>
                   <div style={styles.cardTitle}>Structure</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
+                      className="btn-press"
                       style={{ ...(reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn), display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }}
                       onClick={() => setReorderWorkouts((v) => !v)}
                       title={reorderWorkouts ? "Done reordering" : "Reorder workouts"}
@@ -2156,7 +2170,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>
                       )}
                     </button>
-                    <button style={{ ...styles.primaryBtn, display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }} onClick={addWorkout} title="Add workout">
+                    <button className="btn-press" style={{ ...styles.primaryBtn, display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }} onClick={addWorkout} title="Add workout">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                     </button>
                   </div>
@@ -2238,7 +2252,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               display: "flex",
                               flexDirection: "column",
                               gap: 8,
-                              animation: "tabFadeIn 0.15s ease-out",
+                              animation: "tabFadeIn 0.2s cubic-bezier(.2,.8,.3,1)",
                             }}>
                               {w.exercises.length === 0 ? (
                                 <div style={styles.emptyText}>No exercises yet.</div>
@@ -2300,7 +2314,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </div>
 
               {/* Backup section */}
-              <div style={styles.card}>
+              <div className="card-hover" style={styles.card}>
                 <div style={styles.cardHeader}>
                   <div style={styles.cardTitle}>Data</div>
                 </div>
@@ -2380,19 +2394,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
         {/* Bottom navigation */}
         <div style={styles.nav}>
-          <button style={{ ...styles.navBtn, ...(tab === "train" ? styles.navBtnActive : {}) }} onClick={() => setTab("train")}>
+          <button className="nav-press btn-press" style={{ ...styles.navBtn, ...(tab === "train" ? styles.navBtnActive : {}) }} onClick={() => setTab("train")}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 12h16" /><rect x="2" y="8" width="4" height="8" rx="1" /><rect x="18" y="8" width="4" height="8" rx="1" /><rect x="6" y="6" width="3" height="12" rx="1" /><rect x="15" y="6" width="3" height="12" rx="1" />
             </svg>
             Train
           </button>
-          <button style={{ ...styles.navBtn, ...(tab === "progress" ? styles.navBtnActive : {}) }} onClick={() => setTab("progress")}>
+          <button className="nav-press btn-press" style={{ ...styles.navBtn, ...(tab === "progress" ? styles.navBtnActive : {}) }} onClick={() => setTab("progress")}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 20h18" /><path d="M7 20V10" /><path d="M12 20V4" /><path d="M17 20V14" />
             </svg>
             Progress
           </button>
-          <button style={{ ...styles.navBtn, ...(tab === "plan" ? styles.navBtnActive : {}) }} onClick={() => setTab("plan")}>
+          <button className="nav-press btn-press" style={{ ...styles.navBtn, ...(tab === "plan" ? styles.navBtnActive : {}) }} onClick={() => setTab("plan")}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 7h8" /><path d="M8 12h8" /><path d="M8 17h4" />
             </svg>
@@ -2407,11 +2421,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           position: "fixed", top: "45%", left: "50%", transform: "translate(-50%, -50%)",
           background: colors.cardBg, color: colors.text, border: `1px solid ${colors.border}`,
           borderRadius: 18, padding: "16px 28px", boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
-          zIndex: 9999, textAlign: "center", animation: "toastPop 0.25s ease-out",
+          zIndex: 9999, textAlign: "center", animation: "toastPop 0.3s cubic-bezier(.2,.8,.3,1)",
           maxWidth: "80vw",
         }}>
           <div style={{ fontSize: 20, marginBottom: 4 }}>{toast.emoji || ""}</div>
-          <div style={{ fontSize: 16, fontWeight: 800 }}>{toast.message}</div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{toast.message}</div>
           {toast.coachLine && (
             <div style={{ fontSize: 12, opacity: 0.5, marginTop: 4 }}>{toast.coachLine}</div>
           )}
@@ -2459,7 +2473,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </button>
             </div>
           )}
-          <button style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
+          <button className="btn-press" style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
             Save
           </button>
           <button
@@ -2638,7 +2652,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       color: isSetSaved ? "#fff" : colors.text,
-                      fontWeight: 900, fontSize: 12,
+                      fontWeight: 700, fontSize: 12,
                       transition: "all 0.2s",
                       ...(isSetSaved ? { animation: "chipPop 0.3s ease-out" } : {}),
                       WebkitTapHighlightColor: "transparent",
@@ -3023,6 +3037,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </div>
 
           <button
+            className="btn-press"
             style={{ ...styles.secondaryBtn, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, width: "100%" }}
             onClick={() => {
               const last = modals.log.sets[modals.log.sets.length - 1];
@@ -3102,6 +3117,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                 <button
+                  className="btn-press"
                   style={styles.secondaryBtn}
                   onClick={() =>
                     dispatchModal({
@@ -3114,9 +3130,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   Prev
                 </button>
 
-                <div style={{ fontWeight: 900, alignSelf: "center" }}>{formatMonthLabel(modals.datePicker.monthCursor)}</div>
+                <div style={{ fontWeight: 700, alignSelf: "center" }}>{formatMonthLabel(modals.datePicker.monthCursor)}</div>
 
                 <button
+                  className="btn-press"
                   style={styles.secondaryBtn}
                   onClick={() =>
                     dispatchModal({
@@ -3171,10 +3188,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </div>
 
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                <button style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_DATE_PICKER" })} type="button">
+                <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_DATE_PICKER" })} type="button">
                   Close
                 </button>
                 <button
+                  className="btn-press"
                   style={styles.primaryBtn}
                   onClick={() => {
                     setDateKey(yyyyMmDd(new Date()));
@@ -3258,10 +3276,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </div>
 
           <div style={styles.modalFooter}>
-            <button style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_ADD_WORKOUT" })}>
+            <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_ADD_WORKOUT" })}>
               Cancel
             </button>
             <button
+              className="btn-press"
               style={styles.primaryBtn}
               onClick={() => {
                 const validation = validateWorkoutName(modals.addWorkout.name, workouts);
@@ -3427,10 +3446,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           )}
 
           <div style={styles.modalFooter}>
-            <button style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_ADD_EXERCISE" })}>
+            <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_ADD_EXERCISE" })}>
               Cancel
             </button>
             <button
+              className="btn-press"
               style={styles.primaryBtn}
               onClick={() => {
                 const workout = workoutById.get(modals.addExercise.workoutId);
@@ -3555,10 +3575,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               />
             </div>
             <div style={styles.modalFooter}>
-              <button style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_WORKOUT" })}>
+              <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_WORKOUT" })}>
                 Cancel
               </button>
-              <button style={styles.primaryBtn} onClick={saveEditWorkout}>
+              <button className="btn-press" style={styles.primaryBtn} onClick={saveEditWorkout}>
                 Save
               </button>
             </div>
@@ -3631,10 +3651,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </div>
             )}
             <div style={styles.modalFooter}>
-              <button style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_EXERCISE" })}>
+              <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_EXERCISE" })}>
                 Cancel
               </button>
-              <button style={styles.primaryBtn} onClick={saveEditExercise}>
+              <button className="btn-press" style={styles.primaryBtn} onClick={saveEditExercise}>
                 Save
               </button>
             </div>
@@ -3655,6 +3675,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             Your profile is all set. How would you like to get started?
           </div>
           <button
+            className="btn-press"
             style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 14 }}
             onClick={() => {
               dispatchModal({ type: "CLOSE_WELCOME_CHOICE" });
@@ -3665,6 +3686,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             Generate My Program
           </button>
           <button
+            className="btn-press"
             style={{ ...styles.secondaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 14 }}
             onClick={() => {
               dispatchModal({ type: "CLOSE_WELCOME_CHOICE" });
@@ -3885,7 +3907,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
   const allDone = totalEx > 0 && loggedEx === totalEx;
 
   return (
-    <div style={styles.card}>
+    <div className="card-hover" style={styles.card}>
       <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <div style={styles.cardTitle}>{workout.name}</div>
@@ -3932,8 +3954,8 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
       {!collapsed && workout.note && (
         <div style={{
           fontSize: 12, padding: "8px 12px", borderRadius: 8, marginBottom: 10,
-          background: colors ? (colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.06)" : "rgba(43,91,122,0.06)") : "transparent",
-          border: colors ? `1px solid ${colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.15)" : "rgba(43,91,122,0.12)"}` : "none",
+          background: colors ? (colors.appBg === "#0d1117" ? "rgba(125,211,252,0.06)" : "rgba(43,91,122,0.06)") : "transparent",
+          border: colors ? `1px solid ${colors.appBg === "#0d1117" ? "rgba(125,211,252,0.15)" : "rgba(43,91,122,0.12)"}` : "none",
           opacity: 0.85, lineHeight: 1.4,
         }}>
           {workout.note}
@@ -3979,14 +4001,14 @@ function SummaryBlock({ workout, collapsed, onToggle, summaryRange, computeExerc
   const inactiveCount = exSummaries.length - active.length;
 
   return (
-    <div style={styles.card}>
+    <div className="card-hover" style={styles.card}>
       <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
         </div>
         {active.length > 0 && (
-          <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.45, whiteSpace: "nowrap" }}>
             {active.length}/{exSummaries.length}
           </span>
         )}

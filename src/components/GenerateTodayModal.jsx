@@ -104,7 +104,7 @@ export function GenerateTodayModal({
     borderRadius: 999,
     fontSize: 10,
     fontWeight: 700,
-    background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+    background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
     border: `1px solid ${colors.border}`,
     opacity: 0.85,
   };
@@ -184,7 +184,7 @@ export function GenerateTodayModal({
               }}
             >
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-                <div style={{ fontWeight: 800, fontSize: 14 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>
                   {preview.name}
                 </div>
                 {preview.scheme && (
@@ -221,22 +221,23 @@ export function GenerateTodayModal({
         {/* Footer */}
         <div style={styles.modalFooter}>
           {step > 1 && !loading && (
-            <button style={styles.secondaryBtn} onClick={goBack}>
+            <button className="btn-press" style={styles.secondaryBtn} onClick={goBack}>
               Back
             </button>
           )}
           <div style={{ flex: 1 }} />
           {step < 3 && (
-            <button style={styles.primaryBtn} onClick={goNext}>
+            <button className="btn-press" style={styles.primaryBtn} onClick={goNext}>
               Next
             </button>
           )}
           {step === 3 && !loading && (
             <>
-              <button style={styles.secondaryBtn} onClick={handleRegenerate}>
+              <button className="btn-press" style={styles.secondaryBtn} onClick={handleRegenerate}>
                 Regenerate
               </button>
               <button
+                className="btn-press"
                 style={{ ...styles.primaryBtn, marginLeft: 8 }}
                 onClick={() => onAccept(preview)}
                 disabled={!preview}

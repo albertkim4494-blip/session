@@ -137,7 +137,7 @@ export function CatalogBrowseModal({
     borderRadius: 999,
     fontSize: 10,
     fontWeight: 700,
-    background: colors.appBg === "#0b0f14" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+    background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
     border: `1px solid ${colors.border}`,
     opacity: 0.85,
   };
@@ -209,7 +209,7 @@ export function CatalogBrowseModal({
 
           {/* User exercises section */}
           {showRecentLabel && (
-            <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.5, padding: "2px 2px 0" }}>Recent</div>
+            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "2px 2px 0" }}>Recent</div>
           )}
           {userResults.map((ex) => (
             <button
@@ -218,7 +218,7 @@ export function CatalogBrowseModal({
               onClick={() => onSelectUserExercise(ex)}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontWeight: 800, fontSize: 14 }}>{ex.name}</span>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{ex.name}</span>
                 <span style={userLabelStyle}>your exercise</span>
               </div>
             </button>
@@ -226,7 +226,7 @@ export function CatalogBrowseModal({
 
           {/* Divider between sections when both present */}
           {hasUserResults && catalogResults.length > 0 && !q && (
-            <div style={{ fontSize: 11, fontWeight: 800, opacity: 0.5, padding: "6px 2px 0" }}>Catalog</div>
+            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>Catalog</div>
           )}
 
           {/* Catalog results */}
@@ -236,7 +236,7 @@ export function CatalogBrowseModal({
               style={resultBtnStyle}
               onClick={() => onSelectCatalogExercise(entry)}
             >
-              <div style={{ fontWeight: 800, fontSize: 14 }}>{entry.name}</div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{entry.name}</div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {entry.muscles.primary.map((m) => (
                   <span key={m} style={muscleChipStyle}>
@@ -252,6 +252,7 @@ export function CatalogBrowseModal({
         </div>
 
         <button
+          className="btn-press"
           style={{
             ...styles.secondaryBtn,
             textAlign: "center",

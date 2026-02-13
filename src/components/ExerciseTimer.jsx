@@ -109,7 +109,7 @@ export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles
     : 0;
   const dashOffset = CIRCUMFERENCE * (1 - progress);
 
-  const accentColor = colors.appBg === "#0b0f14" ? "#7dd3fc" : "#2b5b7a";
+  const accentColor = colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a";
 
   // Compact pill styles for timer mode toggle
   const pillStyles = {

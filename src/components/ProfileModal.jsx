@@ -16,7 +16,7 @@ import { getWeightLabel } from "../lib/constants";
 
 const sectionHeader = {
   fontSize: 13,
-  fontWeight: 800,
+  fontWeight: 600,
   opacity: 0.7,
   textTransform: "uppercase",
   letterSpacing: "0.05em",
@@ -162,7 +162,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
 
   const footerContent = (
     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-      <button style={styles.dangerBtn} onClick={onLogout} type="button">
+      <button className="btn-press" style={styles.dangerBtn} onClick={onLogout} type="button">
         Logout
       </button>
       <div style={{ flex: 1 }} />
@@ -180,10 +180,10 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
           {error}
         </div>
       )}
-      <button style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })}>
+      <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })}>
         Cancel
       </button>
-      <button style={styles.primaryBtn} onClick={handleSave} disabled={saving}>
+      <button className="btn-press" style={styles.primaryBtn} onClick={handleSave} disabled={saving}>
         {saving ? "Saving..." : "Save"}
       </button>
     </div>
@@ -212,12 +212,12 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
                 width: 68,
                 height: 68,
                 borderRadius: 999,
-                background: colors?.primaryBg || "#152338",
+                background: colors?.primaryBg || "#1a2744",
                 color: colors?.primaryText || "#e8eef7",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: 900,
+                fontWeight: 700,
                 fontSize: 28,
                 border: `2px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
                 cursor: "pointer",
@@ -242,8 +242,8 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
                 width: 22,
                 height: 22,
                 borderRadius: 999,
-                background: colors?.primaryBg || "#152338",
-                border: `2px solid ${colors?.cardBg || "#0f1722"}`,
+                background: colors?.primaryBg || "#1a2744",
+                border: `2px solid ${colors?.cardBg || "#161b22"}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -257,7 +257,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
               </svg>
             </div>
           </div>
-          <div style={{ fontSize: 16, fontWeight: 900, marginTop: 4 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>
             {displayName?.trim() || profile?.username || "User"}
           </div>
           <div style={{ fontSize: 13, opacity: 0.5, fontWeight: 600 }}>
@@ -289,14 +289,14 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
               textAlign: "center", padding: "10px 6px", borderRadius: 12,
               background: colors?.cardAltBg, border: `1px solid ${colors?.border}`,
             }}>
-              <div style={{ fontSize: 20, fontWeight: 900 }}>{summaryStats.logged}</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{summaryStats.logged}</div>
               <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
             </div>
             <div style={{
               textAlign: "center", padding: "10px 6px", borderRadius: 12,
               background: colors?.cardAltBg, border: `1px solid ${colors?.border}`,
             }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
               <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>Week Streak</div>
             </div>
           </div>
@@ -408,6 +408,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
                 </span>
                 <button
                   type="button"
+                  className="btn-press"
                   onClick={openChangeUsername}
                   style={{ ...styles.secondaryBtn, padding: "4px 10px", fontSize: 12 }}
                 >
@@ -424,6 +425,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
                 </span>
                 <button
                   type="button"
+                  className="btn-press"
                   onClick={() => dispatch({ type: "OPEN_CHANGE_PASSWORD" })}
                   style={{ ...styles.secondaryBtn, padding: "4px 10px", fontSize: 12 }}
                 >
@@ -618,11 +620,11 @@ export function ChangeUsernameModal({ open, modalState, dispatch, profile, sessi
         )}
 
         <div style={styles.modalFooter}>
-          <button style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_CHANGE_USERNAME" })}>
+          <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_CHANGE_USERNAME" })}>
             Cancel
           </button>
           {!onCooldown && (
-            <button style={styles.primaryBtn} onClick={handleConfirm} disabled={checking}>
+            <button className="btn-press" style={styles.primaryBtn} onClick={handleConfirm} disabled={checking}>
               {checking ? "Checking..." : "Confirm"}
             </button>
           )}
@@ -724,10 +726,10 @@ export function ChangePasswordModal({ open, modalState, dispatch, styles, colors
 
         {!success && (
           <div style={styles.modalFooter}>
-            <button style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_CHANGE_PASSWORD" })}>
+            <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_CHANGE_PASSWORD" })}>
               Cancel
             </button>
-            <button style={styles.primaryBtn} onClick={handleConfirm} disabled={saving}>
+            <button className="btn-press" style={styles.primaryBtn} onClick={handleConfirm} disabled={saving}>
               {saving ? "Updating..." : "Update Password"}
             </button>
           </div>
