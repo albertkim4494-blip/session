@@ -142,6 +142,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // Target config popover state
   const [showTargetConfig, setShowTargetConfig] = useState(false);
+  const [showStatsConfig, setShowStatsConfig] = useState(false);
+  const statsConfigRef = useRef(null);
   const targetConfigRef = useRef(null);
   // Pace popover state
   const [pacePopoverIdx, setPacePopoverIdx] = useState(null);
@@ -303,6 +305,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
     }
   }, [showTargetConfig]);
+
+  // Click-outside to dismiss stats config popover
+  useEffect(() => {
+    function handleDown(e) {
+      if (statsConfigRef.current && !statsConfigRef.current.contains(e.target)) {
+        setShowStatsConfig(false);
+      }
+    }
+    if (showStatsConfig) {
+      document.addEventListener("mousedown", handleDown);
+      document.addEventListener("touchstart", handleDown);
+      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
+    }
+  }, [showStatsConfig]);
 
   // Click-outside to dismiss pace popover
   useEffect(() => {
@@ -498,14 +514,22 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [workouts, state.dailyWorkouts, summaryRange]);
 
   const summaryStats = useMemo(() => {
+    // Build exercise ID → name map from all workout sources
+    const exNameMap = {};
+    for (const w of progressWorkouts) {
+      for (const ex of w.exercises || []) exNameMap[ex.id] = ex.name;
+    }
+
     let logged = 0;
     let total = 0;
     let totalSets = 0;
-    let totalReps = 0;
-    let totalVolume = 0;
-    let topLift = 0;
-    let d = summaryRange.start;
     const weekMap = {};
+    // Per-exercise accumulators
+    const exReps = {};   // exId → total reps
+    const exVol = {};    // exId → total volume (weight × reps)
+    const exLift = {};   // exId → max single weight
+
+    let d = summaryRange.start;
     while (d <= summaryRange.end) {
       total++;
       const dayLogs = state.logsByDate[d];
@@ -521,13 +545,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               if (!isSetCompleted(s)) continue;
               totalSets++;
               const reps = Number(s.reps ?? 0);
-              if (Number.isFinite(reps)) totalReps += reps;
+              if (Number.isFinite(reps)) exReps[exId] = (exReps[exId] || 0) + reps;
               const w = String(s.weight ?? "").trim();
               if (w && w.toUpperCase() !== "BW") {
                 const n = Number(w);
                 if (Number.isFinite(n) && n > 0) {
-                  if (n > topLift) topLift = n;
-                  if (Number.isFinite(reps)) totalVolume += n * reps;
+                  exLift[exId] = Math.max(exLift[exId] || 0, n);
+                  if (Number.isFinite(reps)) exVol[exId] = (exVol[exId] || 0) + n * reps;
                 }
               }
             }
@@ -537,8 +561,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       d = addDays(d, 1);
     }
 
-    return { logged, total, totalSets, totalReps, totalVolume, topLift, weekStreak: calculateWeekStreak(weekMap) };
-  }, [state.logsByDate, summaryRange]);
+    // Find best exercise for each metric
+    const bestOf = (map) => {
+      let bestId = null, bestVal = 0;
+      for (const [id, val] of Object.entries(map)) {
+        if (val > bestVal) { bestVal = val; bestId = id; }
+      }
+      return bestId ? { value: bestVal, name: exNameMap[bestId] || "Unknown" } : null;
+    };
+
+    return {
+      logged, total, totalSets,
+      weekStreak: calculateWeekStreak(weekMap),
+      bestReps: bestOf(exReps),
+      bestVolume: bestOf(exVol),
+      bestLift: bestOf(exLift),
+    };
+  }, [state.logsByDate, summaryRange, progressWorkouts]);
 
   // All-time stats for profile modal (not tied to summary range)
   const profileStats = useMemo(() => {
@@ -2009,7 +2048,48 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 const navBtnStyle = { background: "transparent", border: "none", color: colors.text, cursor: "pointer", padding: "4px 8px", fontSize: 18, fontWeight: 700, lineHeight: 1 };
                 const formatNum = (n) => n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : n.toLocaleString();
                 const weightUnit = getWeightLabel(state.preferences?.measurementSystem);
-                const hasWeighted = summaryStats.totalVolume > 0;
+                const selectedStats = state.preferences?.progressStats || ["totalReps"];
+                const toggleStat = (key) => {
+                  const cur = state.preferences?.progressStats || ["totalReps"];
+                  const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key];
+                  updatePreference("progressStats", next.length > 0 ? next : cur);
+                };
+
+                const badgeStyle = { textAlign: "center", padding: "10px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}`, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" };
+                const valStyle = { fontSize: 18, fontWeight: 700 };
+                const subStyle = { fontSize: 10, fontWeight: 600, opacity: 0.5 };
+                const exStyle = { fontSize: 9, fontWeight: 600, opacity: 0.4, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+
+                const statBadges = [];
+                if (selectedStats.includes("totalReps") && summaryStats.bestReps) {
+                  statBadges.push(
+                    <div key="reps" style={badgeStyle}>
+                      <div style={exStyle}>{summaryStats.bestReps.name}</div>
+                      <div style={{ ...valStyle, color: "#7dd3fc" }}>{formatNum(summaryStats.bestReps.value)}</div>
+                      <div style={subStyle}>Total Reps</div>
+                    </div>
+                  );
+                }
+                if (selectedStats.includes("volume") && summaryStats.bestVolume) {
+                  statBadges.push(
+                    <div key="vol" style={badgeStyle}>
+                      <div style={exStyle}>{summaryStats.bestVolume.name}</div>
+                      <div style={valStyle}>{formatNum(Math.round(summaryStats.bestVolume.value))}</div>
+                      <div style={subStyle}>Volume ({weightUnit})</div>
+                    </div>
+                  );
+                }
+                if (selectedStats.includes("topLift") && summaryStats.bestLift) {
+                  statBadges.push(
+                    <div key="lift" style={badgeStyle}>
+                      <div style={exStyle}>{summaryStats.bestLift.name}</div>
+                      <div style={valStyle}>{summaryStats.bestLift.value} {weightUnit}</div>
+                      <div style={subStyle}>Top Lift ({weightUnit})</div>
+                    </div>
+                  );
+                }
+
+                const topRowCols = statBadges.length === 1 ? "1fr 1fr 1fr" : "1fr 1fr";
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     <PillTabs
@@ -2023,7 +2103,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         { value: "all", label: "All" },
                       ]}
                     />
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, position: "relative" }}>
                       {summaryMode !== "all" && (
                         <button style={{ ...navBtnStyle, opacity: 0.5 }} onClick={() => setSummaryOffset((o) => o - 1)} aria-label="Previous period">‹</button>
                       )}
@@ -2038,40 +2118,77 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       {summaryOffset !== 0 && summaryMode !== "all" && (
                         <button style={{ background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, opacity: 0.6, cursor: "pointer", padding: "2px 8px", fontSize: 11, fontWeight: 700, marginLeft: 4 }} onClick={() => setSummaryOffset(0)}>Today</button>
                       )}
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                      <div style={{ textAlign: "center", padding: "10px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
-                        <div style={{ fontSize: 18, fontWeight: 700 }}>{summaryStats.logged}</div>
-                        <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Sessions</div>
+                      {/* Gear icon — absolutely positioned so it doesn't shift the centered date */}
+                      <div ref={statsConfigRef} style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", zIndex: 30 }}>
+                        <button
+                          onClick={() => setShowStatsConfig((v) => !v)}
+                          style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: colors.text, opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
+                          aria-label="Configure stats"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001.08 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z" />
+                          </svg>
+                        </button>
+                        {showStatsConfig && (
+                          <div style={{
+                            position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 30,
+                            background: colors.cardBg, border: `1px solid ${colors.border}`,
+                            borderRadius: 10, padding: "10px 14px", minWidth: 160,
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                            display: "flex", flexDirection: "column", gap: 6,
+                          }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 2 }}>Show Highlights</div>
+                            {[
+                              { key: "totalReps", label: "Total Reps" },
+                              { key: "volume", label: `Volume (${weightUnit})` },
+                              { key: "topLift", label: `Top Lift (${weightUnit})` },
+                            ].map((opt) => (
+                              <label key={opt.key} style={{
+                                display: "flex", alignItems: "center", gap: 8,
+                                fontSize: 13, color: colors.text, cursor: "pointer",
+                                whiteSpace: "nowrap",
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedStats.includes(opt.key)}
+                                  onChange={() => toggleStat(opt.key)}
+                                  style={{ accentColor: colors.primaryBg }}
+                                />
+                                {opt.label}
+                              </label>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {summaryMode === "week" ? (
-                        <div style={{ textAlign: "center", padding: "10px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: summaryStats.logged > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.logged}/{summaryStats.total}</div>
-                          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Days Active</div>
+                    </div>
+                    {/* Stats grid — row 1: Sessions + Days Active (+ 1 stat if only 1 selected) */}
+                    <div>
+                      <div style={{ display: "grid", gridTemplateColumns: topRowCols, gap: 8 }}>
+                        <div style={badgeStyle}>
+                          <div style={valStyle}>{summaryStats.logged}</div>
+                          <div style={subStyle}>Sessions</div>
                         </div>
-                      ) : (
-                        <div style={{ textAlign: "center", padding: "10px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
-                          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Week Streak</div>
-                        </div>
-                      )}
-                      <div style={{ textAlign: "center", padding: "10px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: summaryStats.totalReps > 0 ? "#7dd3fc" : "inherit" }}>{formatNum(summaryStats.totalReps)}</div>
-                        <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Total Reps</div>
+                        {summaryMode === "week" ? (
+                          <div style={badgeStyle}>
+                            <div style={{ ...valStyle, color: summaryStats.logged > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.logged}/{summaryStats.total}</div>
+                            <div style={subStyle}>Days Active</div>
+                          </div>
+                        ) : (
+                          <div style={badgeStyle}>
+                            <div style={{ ...valStyle, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
+                            <div style={subStyle}>Week Streak</div>
+                          </div>
+                        )}
+                        {statBadges.length === 1 && statBadges[0]}
                       </div>
                     </div>
-                    {hasWeighted && (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                        <div style={{ textAlign: "center", padding: "8px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
-                          <div style={{ fontSize: 16, fontWeight: 700 }}>{formatNum(Math.round(summaryStats.totalVolume))}</div>
-                          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Volume ({weightUnit})</div>
-                        </div>
-                        <div style={{ textAlign: "center", padding: "8px 4px", borderRadius: 12, background: colors.cardAltBg, border: `1px solid ${colors.border}` }}>
-                          <div style={{ fontSize: 16, fontWeight: 700 }}>{summaryStats.topLift} {weightUnit}</div>
-                          <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.5 }}>Top Lift</div>
-                        </div>
+                    {/* Stats grid — row 2: 2 or 3 selected stats */}
+                    {statBadges.length >= 2 && (
+                      <div style={{ display: "grid", gridTemplateColumns: statBadges.length === 2 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
+                        {statBadges}
                       </div>
                     )}
+                    {/* Progress bar */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ flex: 1, height: 6, borderRadius: 4, background: colors.cardAltBg, overflow: "hidden" }}>
                         <div style={{ height: "100%", borderRadius: 4, width: `${pctLogged}%`, background: pctLogged >= 80 ? "#2ecc71" : pctLogged >= 40 ? "#f59e0b" : colors.primaryBg, transition: "width 0.3s ease" }} />
