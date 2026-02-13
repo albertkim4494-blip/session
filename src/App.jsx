@@ -878,11 +878,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     [state.logsByDate, dateKey]
   );
 
-  const saveLog = useCallback(() => {
+  // Save log data to state without closing the modal
+  const saveLogData = useCallback(() => {
     if (!modals.log.context) return;
 
     const logCtx = modals.log.context;
-    const existing = state.logsByDate[dateKey]?.[logCtx.exerciseId];
 
     updateState((st) => {
       let logExercise = null;
@@ -932,6 +932,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       return st;
     });
+  }, [modals.log, dateKey]);
+
+  const saveLog = useCallback(() => {
+    if (!modals.log.context) return;
+
+    const existing = state.logsByDate[dateKey]?.[modals.log.context.exerciseId];
+    saveLogData();
 
     // Toast only for meaningful changes (not template-only saves)
     const notesChanged = (modals.log.notes ?? "") !== (existing?.notes ?? "");
@@ -950,7 +957,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setPacePopoverIdx(null);
 
     dispatchModal({ type: "CLOSE_LOG" });
-  }, [modals.log, dateKey, state.logsByDate, state.preferences]);
+  }, [modals.log, dateKey, state.logsByDate, state.preferences, saveLogData]);
 
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId) => {
@@ -2362,8 +2369,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         const navExercise = (ex) => {
           if (!ex) return;
           setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
-          saveLog();
-          setTimeout(() => openLog(fCtx.workoutId, ex), 50);
+          setShowTargetConfig(false);
+          setPacePopoverIdx(null);
+          saveLogData();
+          openLog(fCtx.workoutId, ex);
         };
         return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
