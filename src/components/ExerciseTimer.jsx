@@ -182,7 +182,15 @@ export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles
             {mode === "stopwatch" ? "Stop" : "Pause"}
           </button>
         )}
-        <button type="button" style={styles.timerBtn} onClick={handleReset}>
+        <button
+          type="button"
+          style={{
+            ...styles.timerBtn,
+            ...(allDone ? { opacity: 0.4, cursor: "default" } : {}),
+          }}
+          onClick={handleReset}
+          disabled={allDone}
+        >
           Reset
         </button>
       </div>

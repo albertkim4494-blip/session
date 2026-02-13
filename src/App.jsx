@@ -2502,6 +2502,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       setAutoStartSignal((s) => s + 1);
                     }}
                     onRestTimeObserved={handleRestTimeObserved}
+                    onRestTimeAdjust={(newSec) => {
+                      setRestTimer((prev) => ({ ...prev, restSec: newSec }));
+                    }}
                     styles={styles}
                     colors={colors}
                     timerSound={state.preferences?.timerSound !== false}
