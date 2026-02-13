@@ -2512,7 +2512,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             : null;
 
           return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }} {...logSwipe}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, minHeight: "100%" }} {...logSwipe}>
           {logScheme && (
             <div style={{
               fontSize: 13, padding: "8px 12px", borderRadius: 8,
