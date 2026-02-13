@@ -12,6 +12,7 @@ import {
   avatarInitial,
 } from "../lib/userIdentity";
 import { EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
+import { getWeightLabel } from "../lib/constants";
 
 const sectionHeader = {
   fontSize: 13,
@@ -120,8 +121,11 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
       return;
     }
     const wNum = Number(weightLbs);
-    if (weightLbs && (wNum < 50 || wNum > 1000)) {
-      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: "Weight must be 50-1000 lbs" } });
+    const isMetric = preferences?.measurementSystem === "metric";
+    const wMin = isMetric ? 23 : 50;
+    const wMax = isMetric ? 454 : 1000;
+    if (weightLbs && (wNum < wMin || wNum > wMax)) {
+      dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: `Weight must be ${wMin}-${wMax} ${isMetric ? "kg" : "lbs"}` } });
       return;
     }
 
@@ -341,15 +345,15 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
               </select>
             </div>
             <div style={{ ...styles.fieldCol, flex: 1 }}>
-              <label style={styles.label}>Weight (lbs)</label>
+              <label style={styles.label}>Weight ({preferences?.measurementSystem === "metric" ? "kg" : "lbs"})</label>
               <input
                 type="number"
                 value={weightLbs}
                 onChange={(e) => update("weightLbs", e.target.value)}
                 style={styles.textInput}
-                placeholder="e.g. 170"
-                min={50}
-                max={1000}
+                placeholder={preferences?.measurementSystem === "metric" ? "e.g. 77" : "e.g. 170"}
+                min={preferences?.measurementSystem === "metric" ? 23 : 50}
+                max={preferences?.measurementSystem === "metric" ? 454 : 1000}
               />
             </div>
           </div>
@@ -435,6 +439,16 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
           <div style={{ ...sectionHeader, marginBottom: 10 }}>Preferences</div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Units</span>
+              <ThemeSwitch
+                theme={preferences?.measurementSystem === "metric" ? "dark" : "light"}
+                styles={styles}
+                labels={["Metric", "Imperial"]}
+                onToggle={() => onUpdatePreference?.("measurementSystem", preferences?.measurementSystem === "metric" ? "imperial" : "metric")}
+              />
+            </div>
+
             <div style={styles.fieldCol}>
               <label style={styles.label}>Equipment Access</label>
               <select

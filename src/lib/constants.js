@@ -9,6 +9,9 @@ export const REP_UNITS = [
   { key: "yards", label: "Yards", abbr: "yd", allowDecimal: false },
   { key: "laps", label: "Laps", abbr: "laps", allowDecimal: false },
   { key: "steps", label: "Steps", abbr: "steps", allowDecimal: false },
+  // Distance (metric)
+  { key: "km", label: "Kilometers", abbr: "km", allowDecimal: true },
+  { key: "meters", label: "Meters", abbr: "m", allowDecimal: false },
   // Time
   { key: "sec", label: "Seconds", abbr: "sec", allowDecimal: true },
   { key: "min", label: "Minutes", abbr: "min", allowDecimal: true },
@@ -25,4 +28,8 @@ export function getUnit(key, exercise) {
     };
   }
   return REP_UNITS.find((u) => u.key === key) || REP_UNITS[0];
+}
+
+export function getWeightLabel(ms) {
+  return ms === "metric" ? "kg" : "lb";
 }

@@ -19,6 +19,7 @@ export default function OnboardingScreen({ session, onComplete }) {
   const [about, setAbout] = useState("");
   const [sports, setSports] = useState("");
   const [equipment, setEquipment] = useState("gym");
+  const [measurementSystem, setMeasurementSystem] = useState("imperial");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -59,13 +60,16 @@ export default function OnboardingScreen({ session, onComplete }) {
     const ageNum = computeAge(birthdate);
     const weightNum = Number(weightLbs);
 
-    if (weightNum < 50 || weightNum > 1000) {
-      setError("Weight must be between 50 and 1000 lbs.");
+    const wMin = measurementSystem === "metric" ? 23 : 50;
+    const wMax = measurementSystem === "metric" ? 454 : 1000;
+    if (weightNum < wMin || weightNum > wMax) {
+      setError(`Weight must be between ${wMin} and ${wMax} ${measurementSystem === "metric" ? "kg" : "lbs"}.`);
       return;
     }
 
-    // Save equipment to localStorage so App picks it up
+    // Save equipment and measurement system to localStorage so App picks it up
     try { localStorage.setItem("wt_equipment", equipment); } catch {}
+    try { localStorage.setItem("wt_measurement_system", measurementSystem); } catch {}
 
     setLoading(true);
     try {
@@ -156,15 +160,41 @@ export default function OnboardingScreen({ session, onComplete }) {
           />
           <span style={styles.helper}>Enter as MM/DD/YYYY</span>
 
-          <label style={styles.label}>Weight (lbs) *</label>
+          <label style={styles.label}>Weight ({measurementSystem === "metric" ? "kg" : "lbs"}) *</label>
+          <div style={{ display: "flex", gap: 8, width: "100%", boxSizing: "border-box", marginBottom: 4 }}>
+            {[
+              { key: "imperial", label: "Imperial (lb)" },
+              { key: "metric", label: "Metric (kg)" },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setMeasurementSystem(opt.key)}
+                style={{
+                  flex: 1,
+                  padding: "8px 8px",
+                  borderRadius: 10,
+                  border: `2px solid ${measurementSystem === opt.key ? "#2dd4bf" : "#1e293b"}`,
+                  background: measurementSystem === opt.key ? "rgba(45,212,191,0.12)" : "#1a2332",
+                  color: measurementSystem === opt.key ? "#2dd4bf" : "#94a3b8",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  textAlign: "center",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <input
             type="number"
-            placeholder="e.g. 170"
+            placeholder={measurementSystem === "metric" ? "e.g. 77" : "e.g. 170"}
             value={weightLbs}
             onChange={(e) => setWeightLbs(e.target.value)}
             required
-            min={50}
-            max={1000}
+            min={measurementSystem === "metric" ? 23 : 50}
+            max={measurementSystem === "metric" ? 454 : 1000}
             style={styles.input}
           />
 

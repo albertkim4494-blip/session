@@ -6,7 +6,7 @@ import { buildNormalizedAnalysis, detectImbalancesNormalized } from "./lib/coach
 import { avatarInitial } from "./lib/userIdentity";
 
 // Extracted lib modules
-import { REP_UNITS, getUnit } from "./lib/constants";
+import { REP_UNITS, getUnit, getWeightLabel } from "./lib/constants";
 import {
   yyyyMmDd, addDays, formatDateLabel, monthKeyFromDate, daysInMonth,
   weekdaySunday0, shiftMonth, formatMonthLabel,
@@ -37,7 +37,7 @@ import { GenerateTodayModal } from "./components/GenerateTodayModal";
 
 // Exercise catalog
 import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
-import { buildCatalogMap } from "./lib/exerciseCatalogUtils";
+import { buildCatalogMap, isBodyweightOnly } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast } from "./lib/greetings";
@@ -651,6 +651,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     localStorage.setItem("wt_equipment", equipment);
   }, [equipment]);
 
+  // Load onboarding measurement system choice (one-time)
+  useEffect(() => {
+    const onboardingMs = localStorage.getItem("wt_measurement_system");
+    if (onboardingMs && !state.preferences.measurementSystem) {
+      updateState((st) => {
+        if (!st.preferences) st.preferences = {};
+        if (!st.preferences.measurementSystem) {
+          st.preferences.measurementSystem = onboardingMs;
+        }
+        return st;
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     sessionStorage.setItem("wt_tab", tab);
   }, [tab]);
@@ -965,6 +979,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     dispatchModal({ type: "CLOSE_LOG" });
   }, [modals.log, dateKey, state.logsByDate, state.preferences, saveLogData]);
 
+  const navLogExercise = useCallback((direction) => {
+    const ctx = modals.log.context;
+    if (!ctx) return;
+    const exList = ctx.workoutExercises || [];
+    const idx = exList.findIndex((e) => e.id === ctx.exerciseId);
+    const target = exList[idx + direction];
+    if (!target) return;
+    setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
+    setShowTargetConfig(false);
+    setPacePopoverIdx(null);
+    setRpePopoverIdx(null);
+    saveLogData();
+    openLog(ctx.workoutId, target);
+  }, [modals.log.context, saveLogData, openLog]);
+
+  const logSwipe = useSwipe({
+    onSwipeLeft: () => navLogExercise(1),
+    onSwipeRight: () => navLogExercise(-1),
+  });
+
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId) => {
       // Haptic feedback
@@ -1075,6 +1109,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           if (ex.id !== exerciseId) return;
           const cur = ex.targets || [];
           ex.targets = cur.includes(targetKey) ? cur.filter((t) => t !== targetKey) : [...cur, targetKey];
+        };
+        for (const wk of st.program.workouts) {
+          for (const ex of wk.exercises) toggle(ex);
+        }
+        for (const key of Object.keys(st.dailyWorkouts || {})) {
+          for (const wk of st.dailyWorkouts[key]) {
+            for (const ex of wk.exercises || []) toggle(ex);
+          }
+        }
+        return st;
+      });
+    },
+    []
+  );
+
+  const toggleExerciseBodyweight = useCallback(
+    (exerciseId) => {
+      updateState((st) => {
+        const toggle = (ex) => {
+          if (ex.id !== exerciseId) return;
+          ex.bodyweight = !ex.bodyweight;
         };
         for (const wk of st.program.workouts) {
           for (const ex of wk.exercises) toggle(ex);
@@ -2372,34 +2427,35 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         const fExIdx = fExList.findIndex((e) => e.id === fCtx?.exerciseId);
         const fPrevEx = fExIdx > 0 ? fExList[fExIdx - 1] : null;
         const fNextEx = fExIdx < fExList.length - 1 ? fExList[fExIdx + 1] : null;
-        const navExercise = (ex) => {
-          if (!ex) return;
-          setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
-          setShowTargetConfig(false);
-          setPacePopoverIdx(null);
-          setRpePopoverIdx(null);
-          saveLogData();
-          openLog(fCtx.workoutId, ex);
-        };
         return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {fExList.length > 1 && (
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <button
                 type="button"
                 disabled={!fPrevEx}
-                onClick={() => navExercise(fPrevEx)}
-                style={{ ...styles.secondaryBtn, flex: 1, opacity: fPrevEx ? 1 : 0.3, textAlign: "center", fontSize: 12, padding: "8px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                onClick={() => navLogExercise(-1)}
+                style={{
+                  ...styles.secondaryBtn, flex: 1, opacity: fPrevEx ? 1 : 0.3,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  fontSize: 12, padding: "8px 6px", overflow: "hidden", whiteSpace: "nowrap",
+                }}
               >
-                {fPrevEx ? `\u2190 ${fPrevEx.name}` : "\u2190 Prev"}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{fPrevEx?.name || "Prev"}</span>
               </button>
               <button
                 type="button"
                 disabled={!fNextEx}
-                onClick={() => navExercise(fNextEx)}
-                style={{ ...styles.secondaryBtn, flex: 1, opacity: fNextEx ? 1 : 0.3, textAlign: "center", fontSize: 12, padding: "8px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                onClick={() => navLogExercise(1)}
+                style={{
+                  ...styles.secondaryBtn, flex: 1, opacity: fNextEx ? 1 : 0.3,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  fontSize: 12, padding: "8px 6px", overflow: "hidden", whiteSpace: "nowrap",
+                }}
               >
-                {fNextEx ? `${fNextEx.name} \u2192` : "Next \u2192"}
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{fNextEx?.name || "Next"}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
               </button>
             </div>
           )}
@@ -2431,9 +2487,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           }
           const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
           const logScheme = logCtx?.scheme;
-          const showWeight = logUnit.key === "reps";
+          const showWeight = logUnit.key === "reps" && !logExercise?.bodyweight;
           const exerciseTargets = logExercise?.targets || [];
-          const baseGridCols = showWeight ? "28px 1fr 1fr 40px 32px" : "28px 1fr 32px";
+          const singleTarget = exerciseTargets.length === 1;
+          const baseGridCols = showWeight
+            ? (singleTarget ? "28px 1fr 1fr 1fr 32px" : "28px 1fr 1fr 32px")
+            : (singleTarget ? "28px 1fr 1fr 32px" : "28px 1fr 32px");
 
           // Find last session data for context
           const existingLog = state.logsByDate[dateKey]?.[logCtx?.exerciseId];
@@ -2453,7 +2512,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             : null;
 
           return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }} {...logSwipe}>
           {logScheme && (
             <div style={{
               fontSize: 13, padding: "8px 12px", borderRadius: 10,
@@ -2483,8 +2542,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           }}>
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>Set</div>
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{logUnit.label}</div>
-            {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>Weight</div>}
-            {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>BW</div>}
+            {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>Weight ({getWeightLabel(state.preferences.measurementSystem)})</div>}
+            {singleTarget && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{exerciseTargets[0] === "rpe" ? "RPE" : exerciseTargets[0] === "pace" ? "Pace" : "Target"}</div>}
             <div ref={targetConfigRef} style={{ position: "relative" }}>
               <button
                 onClick={() => setShowTargetConfig((v) => !v)}
@@ -2507,6 +2566,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
                   display: "flex", flexDirection: "column", gap: 6,
                 }}>
+                  {logUnit.key === "reps" && (
+                    <>
+                      <label style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        fontSize: 13, color: colors.text, cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={!!logExercise?.bodyweight}
+                          onChange={() => toggleExerciseBodyweight(logCtx?.exerciseId)}
+                          style={{ accentColor: colors.primaryBg }}
+                        />
+                        Bodyweight
+                      </label>
+                      <div style={{ borderBottom: `1px solid ${colors.border}`, margin: "2px 0" }} />
+                    </>
+                  )}
                   {[
                     { key: "rpe", label: "RPE (1–10)" },
                     { key: "pace", label: "Pace (MM:SS)" },
@@ -2626,35 +2703,142 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       step="0.01"
                       min="0"
                       style={{ ...styles.numInput, ...(isBW ? styles.disabledInput : {}) }}
-                      placeholder="lbs"
+                      placeholder={getWeightLabel(state.preferences.measurementSystem)}
                       disabled={isBW}
                     />
                   )}
 
-                  {showWeight && (
-                    <button
-                      style={{
-                        width: 28, height: 28, borderRadius: 8,
-                        border: `2px solid ${isBW ? colors.primaryBg : colors.border}`,
-                        background: isBW ? colors.primaryBg : "transparent",
-                        cursor: "pointer",
-                        justifySelf: "center",
-                        padding: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}
-                      onClick={() => {
-                        const newSets = [...modals.log.sets];
-                        newSets[i] = { ...newSets[i], weight: isBW ? "" : "BW" };
-                        dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                      }}
-                      aria-label="Bodyweight toggle"
-                    >
-                      {isBW && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.primaryText} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
+                  {singleTarget && exerciseTargets.includes("rpe") && (
+                    <div style={{ position: "relative" }}>
+                      <button
+                        type="button"
+                        onClick={() => { setRpePopoverIdx(rpePopoverIdx === i ? null : i); setPacePopoverIdx(null); }}
+                        style={{
+                          ...styles.numInput, fontSize: 13, textAlign: "center",
+                          width: "100%", cursor: "pointer",
+                          opacity: s.targetRpe ? 1 : 0.4,
+                        }}
+                      >
+                        {s.targetRpe || "—"}
+                      </button>
+                      {rpePopoverIdx === i && (
+                        <div ref={rpePopoverRef} style={{
+                          position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
+                          background: colors.cardBg, border: `1px solid ${colors.border}`,
+                          borderRadius: 10, padding: 4,
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                          maxHeight: 200, overflowY: "auto",
+                        }}>
+                          {["1","2","3","4","5","6","7","8","9","10"].map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => {
+                                const newSets = [...modals.log.sets];
+                                newSets[i] = { ...newSets[i], targetRpe: v };
+                                dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                                setRpePopoverIdx(null);
+                              }}
+                              style={{
+                                width: "100%", padding: "7px 0", borderRadius: 8, border: "none",
+                                background: s.targetRpe === v ? colors.primaryBg : "transparent",
+                                color: s.targetRpe === v ? colors.primaryText : colors.text,
+                                fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                textAlign: "center",
+                              }}
+                            >
+                              {v}
+                            </button>
+                          ))}
+                        </div>
                       )}
-                    </button>
+                    </div>
+                  )}
+
+                  {singleTarget && exerciseTargets.includes("pace") && (
+                    <div style={{ position: "relative" }}>
+                      <button
+                        type="button"
+                        onClick={() => { setPacePopoverIdx(pacePopoverIdx === i ? null : i); setRpePopoverIdx(null); }}
+                        style={{
+                          ...styles.numInput, fontSize: 12, textAlign: "center",
+                          width: "100%", cursor: "pointer",
+                          opacity: s.targetPace ? 1 : 0.4,
+                        }}
+                      >
+                        {s.targetPace || "—"}
+                      </button>
+                      {pacePopoverIdx === i && (
+                        <div ref={pacePopoverRef} style={{
+                          position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 20,
+                          background: colors.cardBg, border: `1px solid ${colors.border}`,
+                          borderRadius: 10, padding: "10px 12px",
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                          display: "flex", alignItems: "center", gap: 6,
+                        }}>
+                          {(() => {
+                            const p = parsePace(s.targetPace);
+                            const update = (h, m, sec) => {
+                              const newSets = [...modals.log.sets];
+                              newSets[i] = { ...newSets[i], targetPace: formatPace(h, m, sec) };
+                              dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                            };
+                            return (<>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Hrs</span>
+                                <input type="number" inputMode="numeric" min="0" max="23"
+                                  value={p.h || ""}
+                                  onChange={(e) => update(Math.min(23, Math.max(0, parseInt(e.target.value) || 0)), p.m, p.s)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                                  style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Min</span>
+                                <input type="number" inputMode="numeric" min="0" max="59"
+                                  value={p.m || ""}
+                                  onChange={(e) => update(p.h, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)), p.s)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                                  style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Sec</span>
+                                <input type="number" inputMode="numeric" min="0" max="59"
+                                  value={p.s || ""}
+                                  onChange={(e) => update(p.h, p.m, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                                  onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                                  style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
+                                  placeholder="0"
+                                />
+                              </div>
+                            </>);
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {singleTarget && exerciseTargets.includes("custom") && (
+                    <div>
+                      <input
+                        type="text"
+                        value={s.targetCustom || ""}
+                        onChange={(e) => {
+                          const newSets = [...modals.log.sets];
+                          newSets[i] = { ...newSets[i], targetCustom: e.target.value };
+                          dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                        enterKeyHint="done"
+                        style={{ ...styles.numInput, fontSize: 12, textAlign: "center", width: "100%" }}
+                        placeholder=""
+                      />
+                    </div>
                   )}
 
                   <button
@@ -2672,7 +2856,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </button>
                   </div>
 
-                  {exerciseTargets.length > 0 && (
+                  {exerciseTargets.length >= 2 && (
                     <div style={{ display: "flex", gap: 8, paddingTop: 6, paddingLeft: 34, alignItems: "center" }}>
                       {exerciseTargets.includes("rpe") && (
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, position: "relative" }}>
@@ -2690,13 +2874,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           </button>
                           {rpePopoverIdx === i && (
                             <div ref={rpePopoverRef} style={{
-                              position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 20,
+                              position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
                               background: colors.cardBg, border: `1px solid ${colors.border}`,
-                              borderRadius: 10, padding: 8,
+                              borderRadius: 10, padding: 4,
                               boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
-                              display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4,
+                              maxHeight: 200, overflowY: "auto",
                             }}>
-                              {["", "1","2","3","4","5","6","7","8","9","10"].map((v) => (
+                              {["1","2","3","4","5","6","7","8","9","10"].map((v) => (
                                 <button
                                   key={v}
                                   type="button"
@@ -2707,14 +2891,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                     setRpePopoverIdx(null);
                                   }}
                                   style={{
-                                    width: 32, height: 32, borderRadius: 8, border: "none",
+                                    width: "100%", padding: "7px 0", borderRadius: 8, border: "none",
                                     background: s.targetRpe === v ? colors.primaryBg : "transparent",
                                     color: s.targetRpe === v ? colors.primaryText : colors.text,
-                                    fontSize: 13, fontWeight: 700, cursor: "pointer",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                    textAlign: "center",
                                   }}
                                 >
-                                  {v || "—"}
+                                  {v}
                                 </button>
                               ))}
                             </div>
@@ -3126,12 +3310,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           updateState((st) => {
             const w = st.program.workouts.find((x) => x.id === wId);
             if (!w) return st;
-            w.exercises.push({
+            const newEx = {
               id: uid("ex"),
               name: entry.name,
               unit: entry.defaultUnit,
               catalogId: entry.id,
-            });
+            };
+            if (isBodyweightOnly(entry)) newEx.bodyweight = true;
+            w.exercises.push(newEx);
             return st;
           });
           dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
@@ -3583,9 +3769,9 @@ function FaceIcon({ face, selected, color, onSelect }) {
 
 function MoodPicker({ value, onChange, colors }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
       <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.7 }}>How did this feel?</div>
-      <div style={{ display: "flex", justifyContent: "space-between", maxWidth: 260 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 260 }}>
         {MOOD_FACES.map((face) => (
           <FaceIcon
             key={face.value}
@@ -3625,6 +3811,9 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
           const isBW = String(s.weight).toUpperCase() === "BW";
           const w = isBW ? "BW" : s.weight;
           if (exUnit.key === "reps") {
+            if (exercise.bodyweight && (!w || w === "BW" || w === "" || w === "0")) {
+              return `${s.reps}`;
+            }
             return `${s.reps}x${w}`;
           }
           const hasWeight = w && w !== "BW" && w !== "" && w !== "0";

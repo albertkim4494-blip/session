@@ -191,6 +191,15 @@ export function getFrequentExercises({ logsByDate, workouts, windowDays = 30, li
 }
 
 /**
+ * Returns true if the catalog entry has equipment: ["bodyweight"] only.
+ * Exercises with additional equipment (e.g. pull-up bar) are NOT auto-bodyweight.
+ */
+export function isBodyweightOnly(entry) {
+  if (!entry?.equipment || !Array.isArray(entry.equipment)) return false;
+  return entry.equipment.length === 1 && entry.equipment[0] === "bodyweight";
+}
+
+/**
  * Resolve catalog metadata for an exercise.
  * Returns the catalog entry if the exercise has a catalogId, else null.
  */

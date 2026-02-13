@@ -83,6 +83,7 @@ export function makeDefaultState() {
       defaultRestSec: 90,
       timerSound: true,
       restTimerEnabled: true,
+      measurementSystem: "imperial",
       exerciseRestTimes: {},
     },
     meta: {
