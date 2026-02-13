@@ -251,13 +251,13 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, the
                 pointerEvents: "auto",
               }}
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors?.primaryText || "#e8eef7"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors?.primaryText || "#e8eef7"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                 <circle cx="12" cy="13" r="4" />
               </svg>
             </div>
           </div>
-          <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, marginTop: 4 }}>
             {displayName?.trim() || profile?.username || "User"}
           </div>
           <div style={{ fontSize: 13, opacity: 0.5, fontWeight: 600 }}>
@@ -670,9 +670,9 @@ export function ChangePasswordModal({ open, modalState, dispatch, styles, colors
           <div style={{
             textAlign: "center",
             padding: "18px 0",
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: 700,
-            color: "#2ecc71",
+            color: "#2ecc71", // success green
           }}>
             Password updated!
           </div>

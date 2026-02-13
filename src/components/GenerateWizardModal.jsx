@@ -196,8 +196,8 @@ export function GenerateWizardModal({
         {/* Welcome step */}
         {currentContent === "welcome" && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, paddingTop: 12, paddingBottom: 8, textAlign: "center" }}>
-            <div style={{ fontSize: 36 }}>{"\uD83C\uDFCB\uFE0F"}</div>
-            <div style={{ fontSize: 15, opacity: 0.85, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 20 }}>{"\uD83C\uDFCB\uFE0F"}</div>
+            <div style={{ fontSize: 14, opacity: 0.85, lineHeight: 1.6 }}>
               Let's build your personalized workout program. We'll ask a few quick questions about your schedule and preferences, then generate a plan tailored just for you.
             </div>
             <div style={{ fontSize: 13, opacity: 0.5 }}>

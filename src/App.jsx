@@ -1680,7 +1680,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   aria-label="Previous day"
                   type="button"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                 </button>
                 <button
                   style={styles.dateBtn}
@@ -1706,7 +1706,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   aria-label="Next day"
                   type="button"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                 </button>
                 {dateKey !== yyyyMmDd(new Date()) && (
                   <button
@@ -1740,9 +1740,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
                       const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
                       return allCards.every((w) => collapsed.has(w.id)) ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10l5-5 5 5" /><path d="M7 14l5 5 5-5" /></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10l5-5 5 5" /><path d="M7 14l5 5 5-5" /></svg>
                       ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8l5 5 5-5" /><path d="M7 16l5-5 5 5" /></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8l5 5 5-5" /><path d="M7 16l5-5 5 5" /></svg>
                       );
                     })()}
                   </button>
@@ -1753,7 +1753,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   title="Search exercises"
                   type="button"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                 </button>
                 <button
                   onClick={() => dispatchModal({
@@ -1800,7 +1800,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               return <div style={{ padding: "8px 4px", opacity: 0.5, fontSize: 12 }}>No exercises found</div>;
             }
             const resultBtnStyle = {
-              textAlign: "left", padding: "8px 10px", borderRadius: 10,
+              textAlign: "left", padding: "8px 10px", borderRadius: 8,
               border: `1px solid ${colors.border}`, background: colors.cardAltBg,
               color: colors.text, cursor: "pointer",
             };
@@ -1935,9 +1935,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
               {/* Progress bar */}
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ flex: 1, height: 6, borderRadius: 3, background: colors.cardAltBg, overflow: "hidden" }}>
+                <div style={{ flex: 1, height: 6, borderRadius: 4, background: colors.cardAltBg, overflow: "hidden" }}>
                   <div style={{
-                    height: "100%", borderRadius: 3,
+                    height: "100%", borderRadius: 4,
                     width: `${pctLogged}%`,
                     background: pctLogged >= 80 ? "#2ecc71" : pctLogged >= 40 ? "#f59e0b" : colors.primaryBg,
                     transition: "width 0.3s ease",
@@ -2151,13 +2151,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       title={reorderWorkouts ? "Done reordering" : "Reorder workouts"}
                     >
                       {reorderWorkouts ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                       ) : (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>
                       )}
                     </button>
                     <button style={{ ...styles.primaryBtn, display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }} onClick={addWorkout} title="Add workout">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                     </button>
                   </div>
                 </div>
@@ -2184,9 +2184,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
                       const pencilIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>;
                       const trashIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>;
-                      const plusIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>;
-                      const reorderIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>;
-                      const checkIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
+                      const plusIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>;
+                      const reorderIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>;
+                      const checkIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
 
                       return (
                         <div key={w.id}>
@@ -2208,10 +2208,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             {reorderWorkouts ? (
                               <div style={styles.reorderBtnGroup}>
                                 <button style={{ ...styles.reorderBtn, opacity: isFirst ? 0.15 : 0.5, padding: "0 4px" }} disabled={isFirst} onClick={() => moveWorkout(w.id, -1)} title="Move up">
-                                  <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
+                                  <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
                                 </button>
                                 <button style={{ ...styles.reorderBtn, opacity: isLast ? 0.15 : 0.5, padding: "0 4px" }} disabled={isLast} onClick={() => moveWorkout(w.id, 1)} title="Move down">
-                                  <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
+                                  <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
                                 </button>
                               </div>
                             ) : (
@@ -2255,10 +2255,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                       {reorderExercises ? (
                                         <div style={styles.reorderBtnGroup}>
                                           <button style={{ ...styles.reorderBtn, opacity: isFirstEx ? 0.15 : 0.5, padding: "0 4px" }} disabled={isFirstEx} onClick={() => moveExercise(w.id, ex.id, -1)} title="Move up">
-                                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
+                                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
                                           </button>
                                           <button style={{ ...styles.reorderBtn, opacity: isLastEx ? 0.15 : 0.5, padding: "0 4px" }} disabled={isLastEx} onClick={() => moveExercise(w.id, ex.id, 1)} title="Move down">
-                                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
+                                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
                                           </button>
                                         </div>
                                       ) : (
@@ -2410,7 +2410,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           zIndex: 9999, textAlign: "center", animation: "toastPop 0.25s ease-out",
           maxWidth: "80vw",
         }}>
-          <div style={{ fontSize: 22, marginBottom: 4 }}>{toast.emoji || ""}</div>
+          <div style={{ fontSize: 20, marginBottom: 4 }}>{toast.emoji || ""}</div>
           <div style={{ fontSize: 16, fontWeight: 800 }}>{toast.message}</div>
           {toast.coachLine && (
             <div style={{ fontSize: 12, opacity: 0.5, marginTop: 4 }}>{toast.coachLine}</div>
@@ -2441,7 +2441,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   fontSize: 12, padding: "8px 6px", overflow: "hidden", whiteSpace: "nowrap",
                 }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{fPrevEx?.name || "Prev"}</span>
               </button>
               <button
@@ -2455,7 +2455,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 }}
               >
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{fNextEx?.name || "Next"}</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
               </button>
             </div>
           )}
@@ -2515,7 +2515,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }} {...logSwipe}>
           {logScheme && (
             <div style={{
-              fontSize: 13, padding: "8px 12px", borderRadius: 10,
+              fontSize: 13, padding: "8px 12px", borderRadius: 8,
               background: colors.primaryBg + "18", border: `1px solid ${colors.primaryBg}44`,
               color: colors.text,
             }}>
@@ -2525,7 +2525,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           {lastSessionText && (
             <div style={{
-              fontSize: 12, padding: "8px 12px", borderRadius: 10,
+              fontSize: 12, padding: "8px 12px", borderRadius: 8,
               background: colors.cardAltBg, border: `1px solid ${colors.border}`,
               color: colors.text, opacity: 0.7,
             }}>
@@ -2554,7 +2554,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 }}
                 aria-label="Configure target columns"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001.08 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z" />
                 </svg>
               </button>
@@ -2562,7 +2562,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 <div style={{
                   position: "absolute", right: 0, top: "100%", zIndex: 20,
                   background: colors.cardBg, border: `1px solid ${colors.border}`,
-                  borderRadius: 10, padding: "8px 12px", minWidth: 150,
+                  borderRadius: 8, padding: "8px 12px", minWidth: 150,
                   boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
                   display: "flex", flexDirection: "column", gap: 6,
                 }}>
@@ -2661,7 +2661,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     aria-label={isSetSaved ? `Uncomplete set ${i + 1}` : `Complete set ${i + 1}`}
                   >
                     {isSetSaved ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12" style={{ strokeDasharray: 24, animation: "checkDraw 0.3s ease-out forwards" }} />
                       </svg>
                     ) : (
@@ -2725,7 +2725,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         <div ref={rpePopoverRef} style={{
                           position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
                           background: colors.cardBg, border: `1px solid ${colors.border}`,
-                          borderRadius: 10, padding: 4,
+                          borderRadius: 8, padding: 4,
                           boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
                           maxHeight: 200, overflowY: "auto",
                         }}>
@@ -2772,7 +2772,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         <div ref={pacePopoverRef} style={{
                           position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 20,
                           background: colors.cardBg, border: `1px solid ${colors.border}`,
-                          borderRadius: 10, padding: "10px 12px",
+                          borderRadius: 8, padding: "10px 12px",
                           boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
                           display: "flex", alignItems: "center", gap: 6,
                         }}>
@@ -2785,7 +2785,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             };
                             return (<>
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Hrs</span>
+                                <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Hrs</span>
                                 <input type="number" inputMode="numeric" min="0" max="23"
                                   value={p.h || ""}
                                   onChange={(e) => update(Math.min(23, Math.max(0, parseInt(e.target.value) || 0)), p.m, p.s)}
@@ -2796,7 +2796,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               </div>
                               <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Min</span>
+                                <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Min</span>
                                 <input type="number" inputMode="numeric" min="0" max="59"
                                   value={p.m || ""}
                                   onChange={(e) => update(p.h, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)), p.s)}
@@ -2807,7 +2807,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               </div>
                               <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Sec</span>
+                                <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Sec</span>
                                 <input type="number" inputMode="numeric" min="0" max="59"
                                   value={p.s || ""}
                                   onChange={(e) => update(p.h, p.m, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -2876,7 +2876,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             <div ref={rpePopoverRef} style={{
                               position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
                               background: colors.cardBg, border: `1px solid ${colors.border}`,
-                              borderRadius: 10, padding: 4,
+                              borderRadius: 8, padding: 4,
                               boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
                               maxHeight: 200, overflowY: "auto",
                             }}>
@@ -2924,7 +2924,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             <div ref={pacePopoverRef} style={{
                               position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 20,
                               background: colors.cardBg, border: `1px solid ${colors.border}`,
-                              borderRadius: 10, padding: "10px 12px",
+                              borderRadius: 8, padding: "10px 12px",
                               boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
                               display: "flex", alignItems: "center", gap: 6,
                             }}>
@@ -2937,7 +2937,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                 };
                                 return (<>
                                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                    <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Hrs</span>
+                                    <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Hrs</span>
                                     <input type="number" inputMode="numeric" min="0" max="23"
                                       value={p.h || ""}
                                       onChange={(e) => update(Math.min(23, Math.max(0, parseInt(e.target.value) || 0)), p.m, p.s)}
@@ -2948,7 +2948,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                   </div>
                                   <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
                                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                    <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Min</span>
+                                    <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Min</span>
                                     <input type="number" inputMode="numeric" min="0" max="59"
                                       value={p.m || ""}
                                       onChange={(e) => update(p.h, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)), p.s)}
@@ -2959,7 +2959,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                   </div>
                                   <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
                                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                    <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.45 }}>Sec</span>
+                                    <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Sec</span>
                                     <input type="number" inputMode="numeric" min="0" max="59"
                                       value={p.s || ""}
                                       onChange={(e) => update(p.h, p.m, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
@@ -3650,12 +3650,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         styles={styles}
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "8px 0" }}>
-          <div style={{ fontSize: 40 }}>{"\uD83C\uDFCB\uFE0F"}</div>
-          <div style={{ fontSize: 15, opacity: 0.85, lineHeight: 1.6, textAlign: "center" }}>
+          <div style={{ fontSize: 20 }}>{"\uD83C\uDFCB\uFE0F"}</div>
+          <div style={{ fontSize: 14, opacity: 0.85, lineHeight: 1.6, textAlign: "center" }}>
             Your profile is all set. How would you like to get started?
           </div>
           <button
-            style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 15 }}
+            style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 14 }}
             onClick={() => {
               dispatchModal({ type: "CLOSE_WELCOME_CHOICE" });
               setTab("plan");
@@ -3665,7 +3665,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             Generate My Program
           </button>
           <button
-            style={{ ...styles.secondaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 15 }}
+            style={{ ...styles.secondaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 14 }}
             onClick={() => {
               dispatchModal({ type: "CLOSE_WELCOME_CHOICE" });
               setTab("plan");
@@ -3931,7 +3931,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
 
       {!collapsed && workout.note && (
         <div style={{
-          fontSize: 12, padding: "8px 12px", borderRadius: 10, marginBottom: 10,
+          fontSize: 12, padding: "8px 12px", borderRadius: 8, marginBottom: 10,
           background: colors ? (colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.06)" : "rgba(43,91,122,0.06)") : "transparent",
           border: colors ? `1px solid ${colors.appBg === "#0b0f14" ? "rgba(125,211,252,0.15)" : "rgba(43,91,122,0.12)"}` : "none",
           opacity: 0.85, lineHeight: 1.4,

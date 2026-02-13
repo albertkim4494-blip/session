@@ -184,7 +184,7 @@ export function GenerateTodayModal({
               }}
             >
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-                <div style={{ fontWeight: 800, fontSize: 15 }}>
+                <div style={{ fontWeight: 800, fontSize: 14 }}>
                   {preview.name}
                 </div>
                 {preview.scheme && (

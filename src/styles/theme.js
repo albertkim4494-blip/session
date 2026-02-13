@@ -1,3 +1,33 @@
+// Design tokens
+export const fontSize = {
+  xs: 10,    // sub-labels (RPE/Pace/Target labels, tiny annotations)
+  sm: 11,    // captions, badges, column headers, day-of-week
+  md: 12,    // secondary text, helper text, small buttons
+  base: 13,  // body text, button labels, search results
+  lg: 14,    // input text, primary buttons, exercise names
+  xl: 16,    // section titles, card titles, modal titles, date display
+  "2xl": 20, // stat numbers, hero numbers
+  "3xl": 28, // timer display
+};
+
+export const radius = {
+  sm: 8,     // small buttons, chips, popovers, compact elements
+  md: 12,    // inputs, buttons, set rows, standard cards
+  lg: 14,    // exercise rows, manage items, calendar cells
+  xl: 16,    // main cards
+  "2xl": 18, // modal sheet
+  full: 999, // pills, avatars, badges, dots
+};
+
+export const icon = {
+  xs: 14,    // inline icons (gear, edit, trash, add, checkmark)
+  sm: 16,    // search icon, chevrons, expand/collapse
+  md: 18,    // nav arrows, export/import/reset icons, password eye
+  lg: 22,    // bottom nav icons
+  xl: 40,    // empty state illustrations
+  stroke: 2, // standard stroke for ALL icons
+};
+
 export function getColors(theme) {
   return theme === "dark"
     ? {
@@ -219,7 +249,7 @@ export function getStyles(colors) {
 
     collapseAllBtn: {
       padding: "6px 12px",
-      borderRadius: 10,
+      borderRadius: 8,
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
@@ -347,11 +377,12 @@ export function getStyles(colors) {
       background: colors.dangerBg,
       color: colors.dangerText,
       fontWeight: 900,
+      fontSize: 14,
     },
 
     deleteLogBtn: {
       padding: 8,
-      borderRadius: 10,
+      borderRadius: 8,
       border: "none",
       background: "transparent",
       color: colors.dangerText,
@@ -758,7 +789,7 @@ export function getStyles(colors) {
 
     timerBtn: {
       padding: "8px 16px",
-      borderRadius: 10,
+      borderRadius: 8,
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
@@ -769,7 +800,7 @@ export function getStyles(colors) {
 
     timerBtnPrimary: {
       padding: "8px 16px",
-      borderRadius: 10,
+      borderRadius: 8,
       border: "1px solid rgba(255,255,255,0.18)",
       background: colors.primaryBg,
       color: colors.primaryText,

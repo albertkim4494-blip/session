@@ -241,7 +241,7 @@ export function CoachNudge({ insights, colors }) {
       fontSize: 13,
       lineHeight: 1.4,
       padding: "8px 12px",
-      borderRadius: 10,
+      borderRadius: 8,
       background: `${SEVERITY_COLORS[hero.severity] || "#6b7280"}12`,
       border: `1px solid ${SEVERITY_COLORS[hero.severity] || "#6b7280"}30`,
       color: colors.text,
@@ -281,7 +281,7 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
     <Modal open={open} title={`Add "${exerciseName}"`} onClose={onCancel} styles={styles}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{
-          display: "flex", gap: 4, padding: 3, borderRadius: 10,
+          display: "flex", gap: 4, padding: 3, borderRadius: 8,
           background: colors?.cardAltBg || "#0b111a",
           border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
         }}>
