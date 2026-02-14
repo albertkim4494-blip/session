@@ -187,7 +187,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Swipe navigation between tabs
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
   const bodyRef = useRef(null);
-  const TAB_ORDER = ["train", "progress", "plan"];
+  const TAB_ORDER = ["train", "progress", "program"];
 
   const handleTouchStart = useCallback((e) => {
     touchRef.current.startX = e.touches[0].clientX;
@@ -1623,9 +1623,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }
 
-  const confirmAddSuggestion = useCallback((workoutId, exerciseName) => {
-    if (workoutId === "__today__") {
-      // Add to daily workout for today
+  const confirmAddSuggestion = useCallback((workoutIdOrIds, exerciseName) => {
+    if (workoutIdOrIds === "__today__") {
       updateState((st) => {
         if (!st.dailyWorkouts) st.dailyWorkouts = {};
         if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
@@ -1642,31 +1641,29 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return;
     }
 
-    const workout = workoutById.get(workoutId);
-    if (!workout) {
-      showToast("Workout not found");
-      return;
-    }
-
-    const exists = workout.exercises.some(
-      ex => ex.name.toLowerCase() === exerciseName.toLowerCase()
-    );
-
-    if (exists) {
-      showToast(`"${exerciseName}" already exists in ${workout.name}`);
-      dispatchModal({ type: "CLOSE_ADD_SUGGESTION" });
-      return;
-    }
+    const ids = Array.isArray(workoutIdOrIds) ? workoutIdOrIds : [workoutIdOrIds];
+    const addedNames = [];
 
     updateState((st) => {
-      const w = st.program.workouts.find((x) => x.id === workoutId);
-      if (!w) return st;
-      w.exercises.push({ id: uid("ex"), name: exerciseName, unit: "reps" });
+      for (const wId of ids) {
+        const w = st.program.workouts.find((x) => x.id === wId);
+        if (!w) continue;
+        const exists = w.exercises.some(ex => ex.name.toLowerCase() === exerciseName.toLowerCase());
+        if (exists) continue;
+        w.exercises.push({ id: uid("ex"), name: exerciseName, unit: "reps" });
+        addedNames.push(w.name);
+      }
       return st;
     });
 
     dispatchModal({ type: "CLOSE_ADD_SUGGESTION" });
-    showToast(`Added "${exerciseName}" to ${workout.name}`);
+    if (addedNames.length === 0) {
+      showToast(`"${exerciseName}" already exists in selected workouts`);
+    } else if (addedNames.length === 1) {
+      showToast(`Added "${exerciseName}" to ${addedNames[0]}`);
+    } else {
+      showToast(`Added "${exerciseName}" to ${addedNames.length} workouts`);
+    }
   }, [workoutById, dateKey]);
 
   function handleAcceptGeneratedProgram(workouts, prefs) {
@@ -1900,7 +1897,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 <input
                   value={trainSearch}
                   onChange={(e) => setTrainSearch(e.target.value)}
-                  placeholder="Search across all tabs..."
+                  placeholder={tab === "train" ? "Search exercises..." : tab === "progress" ? "Search progress..." : "Search plan..."}
                   autoFocus
                   style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1, minWidth: 0 }}
                 />
@@ -1913,8 +1910,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </div>
           ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {(tab === "train" || tab === "progress" || tab === "plan") && workouts.length > 0 && (() => {
-                  if (tab === "plan") {
+                {(tab === "train" || tab === "progress" || tab === "program") && workouts.length > 0 && (() => {
+                  if (tab === "program") {
                     const sections = ["programs", "data"];
                     const allCollapsed = sections.every((s) => collapsedManage.has(s));
                     return (
@@ -2047,12 +2044,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </div>
               );
             }
-            // Plan tab
+            // Program tab
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 6 }}>
                 {results.map((r) => (
                   <button key={r.exercise.id} style={{ ...resultBtnStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}
-                    onClick={() => { setManageWorkoutId(r.workout.id); setTrainSearchOpen(false); setTrainSearch(""); setTab("plan"); }}>
+                    onClick={() => { setManageWorkoutId(r.workout.id); setTrainSearchOpen(false); setTrainSearch(""); setTab("program"); }}>
                     <span style={{ fontWeight: 700, fontSize: 13 }}>{r.exercise.name}</span>
                     <span style={{ fontSize: 11, opacity: 0.5 }}>{r.workout.name}</span>
                   </button>
@@ -2112,14 +2109,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </svg>
                   <div style={{ fontWeight: 600, fontSize: 16 }}>No workouts yet</div>
                   <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
-                    Head to the <b>Plan</b> tab to create your program, or generate one with AI.
+                    Head to the <b>Program</b> tab to create your program, or generate one with AI.
                   </div>
                   <button
                     className="btn-press"
                     style={{ ...styles.primaryBtn, marginTop: 4, padding: "10px 20px" }}
-                    onClick={() => setTab("plan")}
+                    onClick={() => setTab("program")}
                   >
-                    Go to Plan
+                    Go to Program
                   </button>
                 </div>
               ) : (
@@ -2421,8 +2418,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           ) : null}
 
           {/* MANAGE TAB */}
-          {tab === "plan" ? (
-            <div key="plan" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
+          {tab === "program" ? (
+            <div key="program" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
               <ExerciseCatalogSection styles={styles} colors={colors} catalogCount={fullCatalog.length} onOpen={() => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: null } })} />
 
               <div className="card-hover" style={styles.card}>
@@ -2593,7 +2590,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
                     <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
                   </svg>
-                  Generate Plan
+                  Generate Program
                 </button>
                 </>)}
               </div>
@@ -2700,7 +2697,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             </svg>
             Progress
           </button>
-          <button className="nav-press btn-press" style={{ ...styles.navBtn, ...(tab === "plan" ? styles.navBtnActive : {}) }} onClick={() => setTab("plan")}>
+          <button className="nav-press btn-press" style={{ ...styles.navBtn, ...(tab === "program" ? styles.navBtnActive : {}) }} onClick={() => setTab("program")}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 7h8" /><path d="M8 12h8" /><path d="M8 17h4" />
             </svg>
@@ -3644,7 +3641,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
                 dispatchModal({ type: "CLOSE_ADD_WORKOUT" });
                 setManageWorkoutId(newId);
-                setTab("plan");
+                setTab("program");
               }}
             >
               Save
@@ -4085,7 +4082,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 14 }}
             onClick={() => {
               dispatchModal({ type: "CLOSE_WELCOME_CHOICE" });
-              setTab("plan");
+              setTab("program");
               dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment, welcome: true } });
             }}
           >
@@ -4096,14 +4093,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             style={{ ...styles.secondaryBtn, width: "100%", padding: "14px 12px", textAlign: "center", fontSize: 14 }}
             onClick={() => {
               dispatchModal({ type: "CLOSE_WELCOME_CHOICE" });
-              setTab("plan");
-              showToast("Tap the + button in Plans to add your first workout");
+              setTab("program");
+              showToast("Tap the + button in Programs to add your first workout");
             }}
           >
             I'll Build My Own
           </button>
           <div style={{ fontSize: 12, opacity: 0.4, textAlign: "center" }}>
-            You can always generate or add workouts later from the Plan tab.
+            You can always generate or add workouts later from the Program tab.
           </div>
         </div>
       </Modal>

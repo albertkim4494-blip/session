@@ -12,11 +12,11 @@ function formatMuscleName(muscle) {
 /**
  * ExerciseDetailModal — two modes:
  *
- * 1. targetWorkoutId set (from Plans + button):
- *    Shows a simple "Add to Plan" button in the footer.
+ * 1. targetWorkoutId set (from Programs + button):
+ *    Shows a simple "Add to Workout" button in the footer.
  *
  * 2. targetWorkoutId NOT set (from catalog browse card):
- *    Shows a dropdown with checkbox list of all workouts + "Add to Plan" button in the footer.
+ *    Shows a dropdown with checkbox list of all workouts + "Add to Workout" button in the footer.
  *
  * Both modes always render a footer so Modal uses fixed height (95dvh).
  */
@@ -162,7 +162,7 @@ export function ExerciseDetailModal({
       onClick={handleAddDirect}
     >
       {addBtnIcon}
-      {added ? "Added" : "Add to Plan"}
+      {added ? "Added" : "Add to Workout"}
     </button>
   ) : null;
 
@@ -278,7 +278,7 @@ export function ExerciseDetailModal({
         onClick={handleAddMultiple}
       >
         {addBtnIcon}
-        {added ? "Added" : `Add to Plan${checked.size > 0 ? ` (${checked.size})` : ""}`}
+        {added ? "Added" : `Add to Workout${checked.size > 0 ? ` (${checked.size})` : ""}`}
       </button>
     </div>
   ) : null;

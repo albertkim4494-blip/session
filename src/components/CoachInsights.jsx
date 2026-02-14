@@ -260,16 +260,29 @@ export function CoachNudge({ insights, colors }) {
 // ---------------------------------------------------------------------------
 export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCancel, onConfirm, styles, colors }) {
   const [mode, setMode] = useState("today");
-  const [selectedWorkoutId, setSelectedWorkoutId] = useState(workouts[0]?.id || null);
+  const [checked, setChecked] = useState(new Set());
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [added, setAdded] = useState(false);
 
   useEffect(() => {
     if (open) {
       setMode("today");
-      if (workouts.length > 0) setSelectedWorkoutId(workouts[0].id);
+      setChecked(new Set());
+      setDropdownOpen(false);
+      setAdded(false);
     }
-  }, [open, workouts]);
+  }, [open]);
 
   if (!open) return null;
+
+  const toggleChecked = (id) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const toggleBase = {
     flex: 1, padding: "7px 0", border: "none", borderRadius: 8,
@@ -277,6 +290,16 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
   };
   const toggleActive = { ...toggleBase, background: colors?.primaryBg || "#1a2744", color: colors?.primaryText || "#e8eef7" };
   const toggleInactive = { ...toggleBase, background: "transparent", color: colors?.text || "#e8eef7", opacity: 0.5 };
+
+  const handleConfirm = () => {
+    if (mode === "today") {
+      onConfirm("__today__", exerciseName);
+    } else {
+      onConfirm([...checked], exerciseName);
+    }
+  };
+
+  const canConfirm = mode === "today" || checked.size > 0;
 
   return (
     <Modal open={open} title={`Add "${exerciseName}"`} onClose={onCancel} styles={styles}>
@@ -289,48 +312,106 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
           <button style={mode === "today" ? toggleActive : toggleInactive} onClick={() => setMode("today")}>
             Just for Today
           </button>
-          <button style={mode === "program" ? toggleActive : toggleInactive} onClick={() => setMode("program")}>
-            Add to Program
+          <button style={mode === "workout" ? toggleActive : toggleInactive} onClick={() => setMode("workout")}>
+            Add to Workout
           </button>
         </div>
 
-        {mode === "program" && (
-          <div style={styles.fieldCol}>
-            <label style={styles.label}>Add to which workout?</label>
-            <select
-              value={selectedWorkoutId || ""}
-              onChange={(e) => setSelectedWorkoutId(e.target.value)}
-              style={{ ...styles.textInput, paddingRight: 32, appearance: "auto" }}
+        {mode === "workout" && (
+          <>
+            {/* Dropdown toggle */}
+            <button
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                width: "100%", padding: "10px 12px", borderRadius: 12,
+                border: `1px solid ${colors.border}`, background: colors.cardAltBg,
+                color: colors.text, cursor: "pointer", textAlign: "left",
+              }}
+              onClick={() => setDropdownOpen((v) => !v)}
             >
-              {workouts.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name} ({w.category})
-                </option>
-              ))}
-            </select>
-          </div>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>
+                {checked.size === 0
+                  ? "Select workouts..."
+                  : `${checked.size} workout${checked.size > 1 ? "s" : ""} selected`}
+              </span>
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ opacity: 0.4, transform: dropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {/* Dropdown list */}
+            {dropdownOpen && (
+              <div style={{
+                display: "flex", flexDirection: "column", gap: 2, padding: "6px 0",
+                borderRadius: 12, border: `1px solid ${colors.border}`,
+                background: colors.cardBg, maxHeight: 180, overflowY: "auto",
+              }}>
+                {workouts.map((w) => {
+                  const isChecked = checked.has(w.id);
+                  return (
+                    <button
+                      key={w.id}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+                        background: "transparent", border: "none", color: colors.text,
+                        cursor: "pointer", textAlign: "left",
+                      }}
+                      onClick={() => toggleChecked(w.id)}
+                    >
+                      <div style={{
+                        width: 18, height: 18, borderRadius: 4,
+                        border: `2px solid ${isChecked ? colors.accent : colors.border}`,
+                        background: isChecked ? colors.accent : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, transition: "all 0.15s",
+                      }}>
+                        {isChecked && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{w.name}</span>
+                      </div>
+                      {w.category && (
+                        <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.4 }}>{w.category}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
 
         <div style={styles.smallText}>
           {mode === "today"
             ? <>This will add <b>&quot;{exerciseName}&quot;</b> to today&apos;s workout. It won&apos;t appear on other days.</>
-            : <>This will add <b>&quot;{exerciseName}&quot;</b> to your selected workout permanently.</>
+            : <>This will add <b>&quot;{exerciseName}&quot;</b> to your selected workout{checked.size > 1 ? "s" : ""} permanently.</>
           }
         </div>
 
-        <div style={styles.modalFooter}>
-          <button className="btn-press" style={styles.secondaryBtn} onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            className="btn-press"
-            style={styles.primaryBtn}
-            onClick={() => onConfirm(mode === "today" ? "__today__" : selectedWorkoutId, exerciseName)}
-            disabled={mode === "program" && !selectedWorkoutId}
-          >
-            {mode === "today" ? "Add for Today" : "Add Exercise"}
-          </button>
-        </div>
+        <button
+          className="btn-press"
+          disabled={!canConfirm || added}
+          style={{
+            ...styles.primaryBtn, width: "100%", textAlign: "center",
+            opacity: canConfirm && !added ? 1 : 0.4,
+          }}
+          onClick={handleConfirm}
+        >
+          {added
+            ? "Added"
+            : mode === "today"
+              ? "Add for Today"
+              : `Add to Workout${checked.size > 0 ? ` (${checked.size})` : ""}`
+          }
+        </button>
       </div>
     </Modal>
   );
