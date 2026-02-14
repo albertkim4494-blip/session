@@ -33,9 +33,12 @@ import { ProfileModal } from "./components/ProfileModal";
 import { ChangeUsernameModal } from "./components/profile/ChangeUsernameModal";
 import { ChangePasswordModal } from "./components/profile/ChangePasswordModal";
 import { CoachInsightsCard, CoachNudge, AddSuggestedExerciseModal } from "./components/CoachInsights";
-import { CatalogBrowseModal } from "./components/CatalogBrowseModal";
+import { ExerciseCatalogSection } from "./components/ExerciseCatalogSection";
+import { ExerciseCatalogModal } from "./components/ExerciseCatalogModal";
 import { GenerateWizardModal } from "./components/GenerateWizardModal";
 import { GenerateTodayModal } from "./components/GenerateTodayModal";
+import { CustomExerciseModal } from "./components/CustomExerciseModal";
+import { enrichExercise } from "./lib/exerciseEnrichmentApi";
 
 // Exercise catalog
 import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
@@ -128,7 +131,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [summaryMode, setSummaryMode] = useState("week");
   const [summaryOffset, setSummaryOffset] = useState(0);
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
-  const [manageWorkoutId, setManageWorkoutId] = useState(null);
+  const [expandedManage, setExpandedManage] = useState(new Set());
   const theme = state.preferences?.theme || "dark";
   const equipment = state.preferences?.equipment || "gym";
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
@@ -794,7 +797,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   useEffect(() => {
     setReorderExercises(false);
-  }, [manageWorkoutId]);
+  }, [expandedManage]);
 
   // Persist state changes
   const latestStateRef = useRef(state);
@@ -1427,13 +1430,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               st.program.workouts = st.program.workouts.filter((x) => x.id !== workoutId);
               return st;
             });
-            if (manageWorkoutId === workoutId) setManageWorkoutId(null);
+            setExpandedManage((prev) => { const next = new Set(prev); next.delete(workoutId); return next; });
             dispatchModal({ type: "CLOSE_CONFIRM" });
           },
         },
       });
     },
-    [workoutById, manageWorkoutId]
+    [workoutById]
   );
 
   const addExercise = useCallback(
@@ -1909,7 +1912,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {(tab === "train" || tab === "progress") && workouts.length > 0 && (() => {
+                {(tab === "train" || tab === "progress" || tab === "plan") && workouts.length > 0 && (() => {
+                  if (tab === "plan") {
+                    const allExpanded = workouts.every((w) => expandedManage.has(w.id));
+                    return (
+                      <button
+                        style={{ ...styles.navArrow, opacity: 0.45 }}
+                        onClick={() => allExpanded ? setExpandedManage(new Set()) : setExpandedManage(new Set(workouts.map((w) => w.id)))}
+                        title={allExpanded ? "Collapse all" : "Expand all"}
+                        type="button"
+                      >
+                        {allExpanded ? (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg>
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                        )}
+                      </button>
+                    );
+                  }
                   const setter = tab === "train" ? setCollapsedToday : setCollapsedSummary;
                   const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
                   const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
@@ -2401,9 +2421,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* MANAGE TAB */}
           {tab === "plan" ? (
             <div key="plan" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
+              <ExerciseCatalogSection styles={styles} colors={colors} onOpen={() => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: null } })} />
+
               <div className="card-hover" style={styles.card}>
                 <div style={styles.cardHeader}>
-                  <div style={styles.cardTitle}>Structure</div>
+                  <div style={styles.cardTitle}>Plans</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       className="btn-press"
@@ -2430,7 +2452,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 ) : (
                   <div style={styles.manageList}>
                     {workouts.map((w, wi) => {
-                      const active = manageWorkoutId === w.id;
+                      const active = expandedManage.has(w.id);
                       const isFirst = wi === 0;
                       const isLast = wi === workouts.length - 1;
 
@@ -2461,7 +2483,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           >
                             <div
                               style={{ flex: 1, minWidth: 0, cursor: reorderWorkouts ? "default" : "pointer", display: "flex", alignItems: "center", gap: 8 }}
-                              onClick={() => { if (!reorderWorkouts) setManageWorkoutId(active ? null : w.id); }}
+                              onClick={() => { if (!reorderWorkouts) setExpandedManage((prev) => { const next = new Set(prev); if (next.has(w.id)) next.delete(w.id); else next.add(w.id); return next; }); }}
                             >
                               <div style={{ ...styles.manageExerciseName, fontWeight: 700 }}>{w.name}</div>
                               <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
@@ -3607,56 +3629,77 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         </div>
       </Modal>
 
-      {/* Catalog Browse Modal */}
-      <CatalogBrowseModal
+      {/* Exercise Catalog Modal (browse + add to workout) */}
+      <ExerciseCatalogModal
         open={modals.catalogBrowse.isOpen}
         onClose={() => dispatchModal({ type: "CLOSE_CATALOG_BROWSE" })}
         styles={styles}
         colors={colors}
         workouts={workouts}
         logsByDate={state.logsByDate}
-        onSelectCatalogExercise={(entry) => {
-          const wId = modals.catalogBrowse.workoutId;
-          const workout = workoutById.get(wId);
-          if (!workout) return;
+        targetWorkoutId={modals.catalogBrowse.workoutId}
+        onAddExercise={(entry, workoutIdOrIds, userEx) => {
+          if (!workoutIdOrIds) return;
+          const ids = Array.isArray(workoutIdOrIds) ? workoutIdOrIds : [workoutIdOrIds];
           updateState((st) => {
-            const w = st.program.workouts.find((x) => x.id === wId);
-            if (!w) return st;
-            const newEx = {
-              id: uid("ex"),
-              name: entry.name,
-              unit: entry.defaultUnit,
-              catalogId: entry.id,
-            };
-            if (isBodyweightOnly(entry)) newEx.bodyweight = true;
-            w.exercises.push(newEx);
+            for (const wId of ids) {
+              const w = st.program.workouts.find((x) => x.id === wId);
+              if (!w) continue;
+              let newEx;
+              if (userEx) {
+                newEx = { id: uid("ex"), name: userEx.name, unit: userEx.unit || "reps" };
+                if (userEx.catalogId) newEx.catalogId = userEx.catalogId;
+                if (userEx.customUnitAbbr) newEx.customUnitAbbr = userEx.customUnitAbbr;
+                if (userEx.customUnitAllowDecimal) newEx.customUnitAllowDecimal = userEx.customUnitAllowDecimal;
+              } else {
+                newEx = { id: uid("ex"), name: entry.name, unit: entry.defaultUnit, catalogId: entry.id };
+                if (isBodyweightOnly(entry)) newEx.bodyweight = true;
+              }
+              w.exercises.push(newEx);
+            }
             return st;
           });
-          dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
-        }}
-        onSelectUserExercise={(ex) => {
-          const wId = modals.catalogBrowse.workoutId;
-          const workout = workoutById.get(wId);
-          if (!workout) return;
-          updateState((st) => {
-            const w = st.program.workouts.find((x) => x.id === wId);
-            if (!w) return st;
-            const newEx = { id: uid("ex"), name: ex.name, unit: ex.unit || "reps" };
-            if (ex.catalogId) newEx.catalogId = ex.catalogId;
-            if (ex.customUnitAbbr) newEx.customUnitAbbr = ex.customUnitAbbr;
-            if (ex.customUnitAllowDecimal) newEx.customUnitAllowDecimal = ex.customUnitAllowDecimal;
-            w.exercises.push(newEx);
-            return st;
-          });
-          dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
+          if (modals.catalogBrowse.workoutId) {
+            dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
+          } else {
+            showToast(`Exercise added to workout${ids.length > 1 ? "s" : ""}`);
+          }
         }}
         onCustomExercise={() => {
           const wId = modals.catalogBrowse.workoutId;
           dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
-          dispatchModal({
-            type: "OPEN_ADD_EXERCISE",
-            payload: { workoutId: wId },
+          dispatchModal({ type: "OPEN_CUSTOM_EXERCISE", payload: { workoutId: wId } });
+        }}
+      />
+
+      {/* Custom Exercise Modal (AI-enriched) */}
+      <CustomExerciseModal
+        open={modals.customExercise.isOpen}
+        modalState={modals.customExercise}
+        onUpdate={(payload) => dispatchModal({ type: "UPDATE_CUSTOM_EXERCISE", payload })}
+        onClose={() => dispatchModal({ type: "CLOSE_CUSTOM_EXERCISE" })}
+        enrichExercise={enrichExercise}
+        workouts={workouts}
+        styles={styles}
+        colors={colors}
+        onSave={(exercise, workoutIds) => {
+          updateState((st) => {
+            for (const wId of workoutIds) {
+              const w = st.program.workouts.find((x) => x.id === wId);
+              if (!w) continue;
+              const newEx = { id: uid("ex"), name: exercise.name, unit: exercise.unit };
+              if (exercise.customUnitAbbr) newEx.customUnitAbbr = exercise.customUnitAbbr;
+              if (exercise.customUnitAllowDecimal) newEx.customUnitAllowDecimal = exercise.customUnitAllowDecimal;
+              if (exercise.muscles) newEx.muscles = exercise.muscles;
+              if (exercise.equipment) newEx.equipment = exercise.equipment;
+              if (exercise.tags) newEx.tags = exercise.tags;
+              if (exercise.movement) newEx.movement = exercise.movement;
+              w.exercises.push(newEx);
+            }
+            return st;
           });
+          dispatchModal({ type: "CLOSE_CUSTOM_EXERCISE" });
+          showToast(`Exercise added to workout${workoutIds.length > 1 ? "s" : ""}`);
         }}
       />
 
@@ -4010,7 +4053,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             onClick={() => {
               dispatchModal({ type: "CLOSE_WELCOME_CHOICE" });
               setTab("plan");
-              showToast("Tap the + button in Structure to add your first workout");
+              showToast("Tap the + button in Plans to add your first workout");
             }}
           >
             I'll Build My Own

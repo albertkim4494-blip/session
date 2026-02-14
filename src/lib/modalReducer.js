@@ -121,6 +121,21 @@ export const initialModalState = {
     loading: false,
     error: null,
   },
+  customExercise: {
+    isOpen: false,
+    workoutId: null,
+    name: "",
+    unit: "reps",
+    customUnitAbbr: "",
+    customUnitAllowDecimal: false,
+    enriching: false,
+    enriched: false,
+    enrichError: null,
+    muscles: { primary: [] },
+    equipment: [],
+    tags: [],
+    movement: "",
+  },
 };
 
 export function modalReducer(state, action) {
@@ -533,6 +548,29 @@ export function modalReducer(state, action) {
       return {
         ...state,
         generateToday: initialModalState.generateToday,
+      };
+
+    // ===== CUSTOM EXERCISE MODAL =====
+    case "OPEN_CUSTOM_EXERCISE":
+      return {
+        ...state,
+        customExercise: {
+          ...initialModalState.customExercise,
+          isOpen: true,
+          workoutId: action.payload?.workoutId || null,
+        },
+      };
+
+    case "UPDATE_CUSTOM_EXERCISE":
+      return {
+        ...state,
+        customExercise: { ...state.customExercise, ...action.payload },
+      };
+
+    case "CLOSE_CUSTOM_EXERCISE":
+      return {
+        ...state,
+        customExercise: initialModalState.customExercise,
       };
 
     // ===== CLOSE ALL (for back-button navigation) =====
