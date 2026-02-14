@@ -106,14 +106,27 @@ Deno.serve(async (req) => {
       "push", "pull", "legs", "shoulders", "arms", "core", "cardio", "sport", "mobility", "stretch",
     ]);
     const VALID_UNITS = new Set(["reps", "sec", "min", "miles", "yards", "laps", "steps"]);
+    const VALID_EQUIPMENT = new Set([
+      "bodyweight", "dumbbell", "barbell", "kettlebell", "cable", "machine",
+      "pull-up bar", "dip bar", "bench", "ab wheel", "jump rope", "foam roller",
+      "band", "medicine ball", "trap bar", "smith machine", "leg press", "sled",
+    ]);
+    const VALID_TAGS = new Set([
+      "compound", "isolation", "push", "pull", "unilateral", "bilateral",
+      "plyometric", "isometric", "explosive",
+    ]);
 
     const muscles = {
       primary: Array.isArray(parsed.muscles?.primary)
         ? parsed.muscles.primary.filter((m: string) => VALID_MUSCLES.has(m))
         : [],
     };
-    const equipment = Array.isArray(parsed.equipment) ? parsed.equipment.slice(0, 3) : [];
-    const tags = Array.isArray(parsed.tags) ? parsed.tags.slice(0, 3) : [];
+    const equipment = Array.isArray(parsed.equipment)
+      ? parsed.equipment.filter((e: string) => VALID_EQUIPMENT.has(e)).slice(0, 3)
+      : [];
+    const tags = Array.isArray(parsed.tags)
+      ? parsed.tags.filter((t: string) => VALID_TAGS.has(t)).slice(0, 3)
+      : [];
     const movement = VALID_MOVEMENTS.has(parsed.movement) ? parsed.movement : "push";
     const defaultUnit = VALID_UNITS.has(parsed.defaultUnit) ? parsed.defaultUnit : "reps";
 

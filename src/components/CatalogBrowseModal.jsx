@@ -238,12 +238,12 @@ export function CatalogBrowseModal({
             >
               <div style={{ fontWeight: 700, fontSize: 14 }}>{entry.name}</div>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {entry.muscles.primary.map((m) => (
+                {(entry.muscles?.primary || []).map((m) => (
                   <span key={m} style={muscleChipStyle}>
                     {m.replace(/_/g, " ").toLowerCase()}
                   </span>
                 ))}
-                {entry.equipment.filter((e) => e !== "bodyweight").map((e) => (
+                {(entry.equipment || []).filter((e) => e !== "bodyweight").map((e) => (
                   <span key={e} style={equipChipStyle}>{e}</span>
                 ))}
               </div>

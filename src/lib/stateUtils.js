@@ -112,7 +112,16 @@ export function normalizeState(st) {
     ...makeDefaultState(),
     ...st,
     program: { ...rawProgram, workouts: rawWorkouts },
-    customExercises: Array.isArray(st.customExercises) ? st.customExercises : [],
+    customExercises: Array.isArray(st.customExercises)
+      ? st.customExercises.map((ex) => ({
+          ...ex,
+          muscles: ex.muscles && ex.muscles.primary ? ex.muscles : { primary: [] },
+          equipment: Array.isArray(ex.equipment) ? ex.equipment : [],
+          tags: Array.isArray(ex.tags) ? ex.tags : [],
+          movement: ex.movement || "",
+          aliases: ex.aliases || [],
+        }))
+      : [],
     dailyWorkouts: st.dailyWorkouts && typeof st.dailyWorkouts === "object" ? st.dailyWorkouts : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
