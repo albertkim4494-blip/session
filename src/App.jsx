@@ -1849,48 +1849,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       <div style={styles.content}>
         {/* Top bar */}
         <div style={styles.topBar}>
-          {trainSearchOpen ? (
             <div style={styles.topBarRow}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                <button
-                  style={styles.dateBtn}
-                  onClick={() =>
-                    dispatchModal({
-                      type: "OPEN_DATE_PICKER",
-                      payload: { monthCursor: monthKeyFromDate(dateKey) },
-                    })
-                  }
-                  aria-label="Pick date"
-                  type="button"
-                >
-                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.55, textTransform: "uppercase" }}>
-                    {new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" })}
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>
-                    {formatDateLabel(dateKey)}
-                  </div>
-                </button>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, flexShrink: 0 }}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                <input
-                  value={trainSearch}
-                  onChange={(e) => setTrainSearch(e.target.value)}
-                  placeholder={tab === "train" ? "Search to log..." : "Search exercises..."}
-                  autoFocus
-                  style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1, minWidth: 0 }}
-                />
-                <button
-                  style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "4px 2px", flexShrink: 0 }}
-                  onClick={() => { setTrainSearchOpen(false); setTrainSearch(""); }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div style={styles.topBarRow}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button
                   style={styles.navArrow}
                   onClick={() => setDateKey((k) => addDays(k, -1))}
@@ -1925,7 +1885,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
                 </button>
-                {dateKey !== yyyyMmDd(new Date()) && (
+                {!trainSearchOpen && dateKey !== yyyyMmDd(new Date()) && (
                   <button
                     style={styles.todayChip}
                     onClick={() => setDateKey(yyyyMmDd(new Date()))}
@@ -1935,10 +1895,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </button>
                 )}
               </div>
+          {trainSearchOpen ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                <input
+                  value={trainSearch}
+                  onChange={(e) => setTrainSearch(e.target.value)}
+                  placeholder="Search across all tabs..."
+                  autoFocus
+                  style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1, minWidth: 0 }}
+                />
+                <button
+                  style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "4px 2px", flexShrink: 0 }}
+                  onClick={() => { setTrainSearchOpen(false); setTrainSearch(""); }}
+                >
+                  Cancel
+                </button>
+              </div>
+          ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {(tab === "train" || tab === "progress" || tab === "plan") && workouts.length > 0 && (() => {
                   if (tab === "plan") {
-                    const sections = ["plans", "data"];
+                    const sections = ["programs", "data"];
                     const allCollapsed = sections.every((s) => collapsedManage.has(s));
                     return (
                       <button
@@ -2008,8 +1985,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   )}
                 </button>
               </div>
-            </div>
           )}
+            </div>
 
           {/* Search results (tab-aware) */}
           {trainSearchOpen && trainSearch.trim() && (() => {
@@ -2449,33 +2426,39 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               <ExerciseCatalogSection styles={styles} colors={colors} catalogCount={fullCatalog.length} onOpen={() => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: null } })} />
 
               <div className="card-hover" style={styles.card}>
-                <div style={collapsedManage.has("plans") ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader}>
-                  <div style={{ ...styles.cardTitle, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }} onClick={() => toggleCollapse(setCollapsedManage, "plans")}>
-                    Plans
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3, transform: collapsedManage.has("plans") ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </div>
-                  {!collapsedManage.has("plans") && <div style={{ display: "flex", gap: 8 }}>
+                <div style={collapsedManage.has("programs") ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader}>
+                  <div style={styles.cardTitle}>Programs</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {!collapsedManage.has("programs") && <>
+                      <button
+                        className="btn-press"
+                        style={{ ...(reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn), display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }}
+                        onClick={() => setReorderWorkouts((v) => !v)}
+                        title={reorderWorkouts ? "Done reordering" : "Reorder workouts"}
+                      >
+                        {reorderWorkouts ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>
+                        )}
+                      </button>
+                      <button className="btn-press" style={{ ...styles.primaryBtn, display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }} onClick={addWorkout} title="Add workout">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                      </button>
+                    </>}
                     <button
-                      className="btn-press"
-                      style={{ ...(reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn), display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }}
-                      onClick={() => setReorderWorkouts((v) => !v)}
-                      title={reorderWorkouts ? "Done reordering" : "Reorder workouts"}
+                      style={{ ...styles.navArrow, opacity: 0.35, padding: 4 }}
+                      onClick={() => toggleCollapse(setCollapsedManage, "programs")}
+                      type="button"
                     >
-                      {reorderWorkouts ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                      ) : (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>
-                      )}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: collapsedManage.has("programs") ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
                     </button>
-                    <button className="btn-press" style={{ ...styles.primaryBtn, display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }} onClick={addWorkout} title="Add workout">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                    </button>
-                  </div>}
+                  </div>
                 </div>
 
-                {!collapsedManage.has("plans") && (<>
+                {!collapsedManage.has("programs") && (<>
                 {workouts.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "16px 12px", opacity: 0.5, fontSize: 13, lineHeight: 1.5 }}>
                     No workouts yet. Add one manually or generate a full program with AI.
@@ -2618,12 +2601,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               {/* Backup section */}
               <div className="card-hover" style={styles.card}>
                 <div style={collapsedManage.has("data") ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader}>
-                  <div style={{ ...styles.cardTitle, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }} onClick={() => toggleCollapse(setCollapsedManage, "data")}>
-                    Data
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3, transform: collapsedManage.has("data") ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                  <div style={styles.cardTitle}>Data</div>
+                  <button
+                    style={{ ...styles.navArrow, opacity: 0.35, padding: 4 }}
+                    onClick={() => toggleCollapse(setCollapsedManage, "data")}
+                    type="button"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: collapsedManage.has("data") ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
                       <path d="M6 9l6 6 6-6" />
                     </svg>
-                  </div>
+                  </button>
                 </div>
                 {!collapsedManage.has("data") && <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <button

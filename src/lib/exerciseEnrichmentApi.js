@@ -1,25 +1,19 @@
-import { supabase } from "./supabase";
-
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /**
  * Calls the ai-exercise-enrichment edge function to classify a custom exercise.
- * Uses direct fetch (not supabase.functions.invoke) for reliability.
+ * Uses anon key auth (function doesn't need user-specific data).
  * Returns { muscles, equipment, tags, movement, defaultUnit } or throws.
  */
 export async function enrichExercise(name) {
-  // Get fresh session for the auth token
-  const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData?.session?.access_token;
-
   const res = await fetch(
     `${SUPABASE_URL}/functions/v1/ai-exercise-enrichment`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         apikey: SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({ name }),
