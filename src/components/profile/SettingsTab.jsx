@@ -238,7 +238,19 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
                   <button
                     key={String(opt.key)}
                     type="button"
-                    onClick={() => onUpdatePreference?.("voiceInput", opt.key)}
+                    onClick={async () => {
+                      if (opt.key && navigator.mediaDevices) {
+                        try {
+                          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                          stream.getTracks().forEach((t) => t.stop());
+                          onUpdatePreference?.("voiceInput", true);
+                        } catch (_) {
+                          // Permission denied — don't enable
+                        }
+                      } else {
+                        onUpdatePreference?.("voiceInput", opt.key);
+                      }
+                    }}
                     style={{
                       padding: "5px 12px",
                       fontSize: 12,
