@@ -15,8 +15,17 @@ const TABS = [
   )},
 ];
 
+const DIRTY_FIELDS = ["displayName", "birthdate", "gender", "weightLbs", "goal", "sports", "about", "avatarUrl"];
+
+function isDirty(modalState) {
+  const init = modalState._initial;
+  if (!init) return false;
+  return DIRTY_FIELDS.some((k) => (modalState[k] ?? "") !== (init[k] ?? ""));
+}
+
 export function ProfileModal({ open, modalState, dispatch, profile, session, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference }) {
   const [activeTab, setActiveTab] = useState("profile");
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   const swipeHandlers = useSwipe({
     onSwipeLeft: () => setActiveTab("settings"),
@@ -26,6 +35,19 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
   if (!open) return null;
 
   const { displayName, birthdate, weightLbs, avatarUrl, saving, error } = modalState;
+
+  function handleCancel() {
+    if (isDirty(modalState)) {
+      setShowDiscardConfirm(true);
+    } else {
+      dispatch({ type: "CLOSE_PROFILE_MODAL" });
+    }
+  }
+
+  function handleDiscard() {
+    setShowDiscardConfirm(false);
+    dispatch({ type: "CLOSE_PROFILE_MODAL" });
+  }
 
   async function handleSave() {
     const dnErr = validateDisplayName(displayName);
@@ -67,9 +89,8 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
     }
   }
 
-  const profileFooter = (
-    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-      <div style={{ flex: 1 }} />
+  const unifiedFooter = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {error && (
         <div style={{
           fontSize: 12,
@@ -78,30 +99,22 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
           border: `1px solid ${colors?.dangerBorder || "rgba(248,113,113,0.3)"}`,
           borderRadius: 8,
           padding: "6px 10px",
-          flex: 1,
-          minWidth: 0,
         }}>
           {error}
         </div>
       )}
-      <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })}>
-        Cancel
-      </button>
-      <button className="btn-press" style={styles.primaryBtn} onClick={handleSave} disabled={saving}>
-        {saving ? "Saving..." : "Save"}
-      </button>
-    </div>
-  );
-
-  const settingsFooter = (
-    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-      <button className="btn-press" style={styles.dangerBtn} onClick={onLogout} type="button">
-        Logout
-      </button>
-      <div style={{ flex: 1 }} />
-      <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })}>
-        Close
-      </button>
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <button className="btn-press" style={styles.dangerBtn} onClick={onLogout} type="button">
+          Logout
+        </button>
+        <div style={{ flex: 1 }} />
+        <button className="btn-press" style={styles.secondaryBtn} onClick={handleCancel}>
+          Cancel
+        </button>
+        <button className="btn-press" style={styles.primaryBtn} onClick={handleSave} disabled={saving}>
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
     </div>
   );
 
@@ -154,9 +167,10 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
     <Modal
       open={open}
       headerContent={headerTabs}
-      onClose={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })}
+      hideClose
+      onClose={handleCancel}
       styles={styles}
-      footer={activeTab === "profile" ? profileFooter : settingsFooter}
+      footer={unifiedFooter}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }} {...swipeHandlers}>
         {activeTab === "profile" ? (
@@ -182,6 +196,59 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
           />
         )}
       </div>
+
+      {/* Discard unsaved changes confirmation */}
+      {showDiscardConfirm && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+            borderRadius: "inherit",
+          }}
+          onMouseDown={handleDiscard}
+        >
+          <div
+            style={{
+              background: colors?.cardBg || "#161b22",
+              border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
+              borderRadius: 14,
+              padding: "20px 24px",
+              maxWidth: 300,
+              textAlign: "center",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8, color: colors?.text || "#e8eef7" }}>
+              Discard unsaved changes?
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 16, color: colors?.text || "#e8eef7" }}>
+              You have unsaved profile changes that will be lost.
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button
+                className="btn-press"
+                style={styles.secondaryBtn}
+                onClick={() => setShowDiscardConfirm(false)}
+              >
+                Keep Editing
+              </button>
+              <button
+                className="btn-press"
+                style={styles.dangerBtn}
+                onClick={handleDiscard}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

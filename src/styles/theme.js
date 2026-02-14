@@ -139,6 +139,28 @@ const THEMES = {
     subtleBg: "rgba(45,38,64,0.06)",
     subtleTrack: "rgba(45,38,64,0.08)",
   },
+  pastel: {
+    appBg: "#eef7f3",
+    text: "#2d3d35",
+    border: "rgba(45,61,53,0.10)",
+    cardBg: "#e2f0e9",
+    cardAltBg: "#d6e8de",
+    inputBg: "#eef7f3",
+    navBg: "#eef7f3",
+    topBarBg: "#eef7f3",
+    shadow: "0 1px 3px rgba(45,61,53,0.06), 0 2px 8px rgba(45,61,53,0.03)",
+    primaryBg: "#5bae8a",
+    primaryText: "#ffffff",
+    dangerBg: "rgba(232,120,100,0.15)",
+    dangerBorder: "rgba(232,120,100,0.40)",
+    dangerText: "#c44b3f",
+    dot: "#f2a593",
+    accent: "#7ac4d6",
+    accentBg: "rgba(122,196,214,0.14)",
+    accentBorder: "rgba(122,196,214,0.35)",
+    subtleBg: "rgba(45,61,53,0.05)",
+    subtleTrack: "rgba(45,61,53,0.07)",
+  },
 };
 
 export const THEME_LIST = [
@@ -147,6 +169,7 @@ export const THEME_LIST = [
   { key: "japandi", label: "Nature" },
   { key: "spring", label: "Spring" },
   { key: "whimsical", label: "Dusk" },
+  { key: "pastel", label: "Pastel" },
 ];
 
 export function getColors(theme) {

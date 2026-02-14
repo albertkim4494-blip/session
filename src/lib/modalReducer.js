@@ -94,6 +94,9 @@ export const initialModalState = {
     workoutId: null,
     query: "",
   },
+  billing: {
+    isOpen: false,
+  },
   welcomeChoice: {
     isOpen: false,
   },
@@ -367,25 +370,30 @@ export function modalReducer(state, action) {
       };
 
     // ===== PROFILE MODAL =====
-    case "OPEN_PROFILE_MODAL":
+    case "OPEN_PROFILE_MODAL": {
+      const _initial = {
+        displayName: action.payload.displayName || "",
+        birthdate: action.payload.birthdate || "",
+        gender: action.payload.gender || "",
+        weightLbs: String(action.payload.weightLbs || ""),
+        goal: action.payload.goal || "",
+        sports: action.payload.sports || "",
+        about: action.payload.about || "",
+        avatarUrl: action.payload.avatarUrl || null,
+      };
       return {
         ...state,
         profile: {
           isOpen: true,
           username: action.payload.username || "",
-          displayName: action.payload.displayName || "",
-          birthdate: action.payload.birthdate || "",
-          gender: action.payload.gender || "",
-          weightLbs: String(action.payload.weightLbs || ""),
-          goal: action.payload.goal || "",
-          sports: action.payload.sports || "",
-          about: action.payload.about || "",
-          avatarUrl: action.payload.avatarUrl || null,
+          ..._initial,
           avatarPreview: null,
           saving: false,
           error: "",
+          _initial,
         },
       };
+    }
 
     case "UPDATE_PROFILE_MODAL":
       return {
@@ -449,6 +457,19 @@ export function modalReducer(state, action) {
       return {
         ...state,
         changePassword: initialModalState.changePassword,
+      };
+
+    // ===== BILLING MODAL =====
+    case "OPEN_BILLING":
+      return {
+        ...state,
+        billing: { isOpen: true },
+      };
+
+    case "CLOSE_BILLING":
+      return {
+        ...state,
+        billing: initialModalState.billing,
       };
 
     // ===== WELCOME CHOICE MODAL =====

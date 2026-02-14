@@ -3820,6 +3820,35 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         colors={colors}
       />
 
+      {/* Billing Modal */}
+      <Modal
+        open={modals.billing?.isOpen}
+        title="Billing"
+        onClose={() => dispatchModal({ type: "CLOSE_BILLING" })}
+        styles={styles}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "4px 0" }}>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "12px 14px", borderRadius: 12,
+            background: colors.accentBg, border: `1px solid ${colors.accentBorder}`,
+          }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Free Plan</div>
+              <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>Your current plan</div>
+            </div>
+            <div style={{
+              padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700,
+              background: colors.accent, color: "#fff",
+            }}>Active</div>
+          </div>
+
+          <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
+            Pro plans coming soon with unlimited AI coaching, advanced analytics, and more.
+          </div>
+        </div>
+      </Modal>
+
       {/* Add Suggested Exercise Modal */}
       <AddSuggestedExerciseModal
         open={modals.addSuggestion.isOpen}

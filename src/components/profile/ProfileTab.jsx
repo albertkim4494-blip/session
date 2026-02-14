@@ -148,7 +148,7 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
 
       {/* Mic pulse animation */}
-      {hasSpeechRecognition && listeningField && (
+      {hasSpeechRecognition && preferences?.voiceInput && listeningField && (
         <style>{`@keyframes micPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
       )}
 
@@ -468,7 +468,7 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
             <div style={styles.fieldCol}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <label style={styles.label}>Fitness Goal</label>
-                {hasSpeechRecognition && <MicButton field="goal" listeningField={listeningField} onToggle={toggleListening} colors={colors} />}
+                {hasSpeechRecognition && preferences?.voiceInput && <MicButton field="goal" listeningField={listeningField} onToggle={toggleListening} colors={colors} />}
               </div>
               <input
                 value={goal}
@@ -481,7 +481,7 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
             <div style={styles.fieldCol}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <label style={styles.label}>Sports / Activities</label>
-                {hasSpeechRecognition && <MicButton field="sports" listeningField={listeningField} onToggle={toggleListening} colors={colors} />}
+                {hasSpeechRecognition && preferences?.voiceInput && <MicButton field="sports" listeningField={listeningField} onToggle={toggleListening} colors={colors} />}
               </div>
               <input
                 value={sports}
@@ -494,7 +494,7 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
             <div style={styles.fieldCol}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <label style={styles.label}>About You</label>
-                {hasSpeechRecognition && <MicButton field="about" listeningField={listeningField} onToggle={toggleListening} colors={colors} />}
+                {hasSpeechRecognition && preferences?.voiceInput && <MicButton field="about" listeningField={listeningField} onToggle={toggleListening} colors={colors} />}
               </div>
               <textarea
                 value={about}
