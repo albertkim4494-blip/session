@@ -131,7 +131,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [summaryMode, setSummaryMode] = useState("week");
   const [summaryOffset, setSummaryOffset] = useState(0);
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
-  const [expandedManage, setExpandedManage] = useState(new Set());
+  const [manageWorkoutId, setManageWorkoutId] = useState(null);
+  const [collapsedManage, setCollapsedManage] = useState(new Set());
   const theme = state.preferences?.theme || "dark";
   const equipment = state.preferences?.equipment || "gym";
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
@@ -797,7 +798,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   useEffect(() => {
     setReorderExercises(false);
-  }, [expandedManage]);
+  }, [manageWorkoutId]);
 
   // Persist state changes
   const latestStateRef = useRef(state);
@@ -1430,13 +1431,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               st.program.workouts = st.program.workouts.filter((x) => x.id !== workoutId);
               return st;
             });
-            setExpandedManage((prev) => { const next = new Set(prev); next.delete(workoutId); return next; });
+            if (manageWorkoutId === workoutId) setManageWorkoutId(null);
             dispatchModal({ type: "CLOSE_CONFIRM" });
           },
         },
       });
     },
-    [workoutById]
+    [workoutById, manageWorkoutId]
   );
 
   const addExercise = useCallback(
@@ -1914,18 +1915,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {(tab === "train" || tab === "progress" || tab === "plan") && workouts.length > 0 && (() => {
                   if (tab === "plan") {
-                    const allExpanded = workouts.every((w) => expandedManage.has(w.id));
+                    const sections = ["plans", "data"];
+                    const allCollapsed = sections.every((s) => collapsedManage.has(s));
                     return (
                       <button
                         style={{ ...styles.navArrow, opacity: 0.45 }}
-                        onClick={() => allExpanded ? setExpandedManage(new Set()) : setExpandedManage(new Set(workouts.map((w) => w.id)))}
-                        title={allExpanded ? "Collapse all" : "Expand all"}
+                        onClick={() => allCollapsed ? setCollapsedManage(new Set()) : setCollapsedManage(new Set(sections))}
+                        title={allCollapsed ? "Expand all" : "Collapse all"}
                         type="button"
                       >
-                        {allExpanded ? (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg>
-                        ) : (
+                        {allCollapsed ? (
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg>
                         )}
                       </button>
                     );
@@ -2424,9 +2426,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               <ExerciseCatalogSection styles={styles} colors={colors} onOpen={() => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: null } })} />
 
               <div className="card-hover" style={styles.card}>
-                <div style={styles.cardHeader}>
-                  <div style={styles.cardTitle}>Plans</div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                <div style={collapsedManage.has("plans") ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader}>
+                  <div style={{ ...styles.cardTitle, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }} onClick={() => toggleCollapse(setCollapsedManage, "plans")}>
+                    Plans
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3, transform: collapsedManage.has("plans") ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </div>
+                  {!collapsedManage.has("plans") && <div style={{ display: "flex", gap: 8 }}>
                     <button
                       className="btn-press"
                       style={{ ...(reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn), display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }}
@@ -2442,9 +2449,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     <button className="btn-press" style={{ ...styles.primaryBtn, display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }} onClick={addWorkout} title="Add workout">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                     </button>
-                  </div>
+                  </div>}
                 </div>
 
+                {!collapsedManage.has("plans") && (<>
                 {workouts.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "16px 12px", opacity: 0.5, fontSize: 13, lineHeight: 1.5 }}>
                     No workouts yet. Add one manually or generate a full program with AI.
@@ -2452,7 +2460,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 ) : (
                   <div style={styles.manageList}>
                     {workouts.map((w, wi) => {
-                      const active = expandedManage.has(w.id);
+                      const active = manageWorkoutId === w.id;
                       const isFirst = wi === 0;
                       const isLast = wi === workouts.length - 1;
 
@@ -2483,7 +2491,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           >
                             <div
                               style={{ flex: 1, minWidth: 0, cursor: reorderWorkouts ? "default" : "pointer", display: "flex", alignItems: "center", gap: 8 }}
-                              onClick={() => { if (!reorderWorkouts) setExpandedManage((prev) => { const next = new Set(prev); if (next.has(w.id)) next.delete(w.id); else next.add(w.id); return next; }); }}
+                              onClick={() => { if (!reorderWorkouts) setManageWorkoutId(active ? null : w.id); }}
                             >
                               <div style={{ ...styles.manageExerciseName, fontWeight: 700 }}>{w.name}</div>
                               <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
@@ -2581,14 +2589,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </svg>
                   Generate Plan
                 </button>
+                </>)}
               </div>
 
               {/* Backup section */}
               <div className="card-hover" style={styles.card}>
-                <div style={styles.cardHeader}>
-                  <div style={styles.cardTitle}>Data</div>
+                <div style={collapsedManage.has("data") ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader}>
+                  <div style={{ ...styles.cardTitle, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }} onClick={() => toggleCollapse(setCollapsedManage, "data")}>
+                    Data
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3, transform: collapsedManage.has("data") ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {!collapsedManage.has("data") && <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <button
                     style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors.border}`, background: colors.cardAltBg, color: colors.text, cursor: "pointer", textAlign: "left", width: "100%" }}
                     onClick={exportJson}
@@ -2656,7 +2670,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       <div style={{ fontSize: 12, opacity: 0.7 }}>Delete all workouts and logs</div>
                     </div>
                   </button>
-                </div>
+                </div>}
               </div>
             </div>
           ) : null}
