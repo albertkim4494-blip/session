@@ -761,7 +761,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange, catalogMap);
           setCoachInsights(detectImbalancesNormalized(analysis, coachOpts));
         }
-        setCoachError("AI coach unavailable \u2014 showing basic analysis");
+        const detail = err?.message || String(err);
+        setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
       })
       .finally(() => {
         if (!cancelled && coachReqIdRef.current === reqId) {
@@ -1897,7 +1898,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 <input
                   value={trainSearch}
                   onChange={(e) => setTrainSearch(e.target.value)}
-                  placeholder={tab === "train" ? "Search for exercise to log..." : tab === "progress" ? "Search for exercise progress..." : "Search exercises in programs..."}
+                  placeholder="Search exercises..."
                   autoFocus
                   style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1, minWidth: 0 }}
                 />
@@ -2374,7 +2375,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange, catalogMap);
                         setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, userExerciseNames: refreshExNames }));
                       }
-                      setCoachError("AI coach unavailable \u2014 showing basic analysis");
+                      const detail = err?.message || String(err);
+                      setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
                     })
                     .finally(() => {
                       if (coachReqIdRef.current === reqId) setCoachLoading(false);

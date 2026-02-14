@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal } from "./Modal";
 import { useSwipe } from "../hooks/useSwipe";
 import { isValidBirthdateString, computeAge } from "../lib/validation";
@@ -26,6 +26,11 @@ function isDirty(modalState) {
 export function ProfileModal({ open, modalState, dispatch, profile, session, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference }) {
   const [activeTab, setActiveTab] = useState("profile");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+  // Reset to profile tab when modal opens
+  useEffect(() => {
+    if (open) setActiveTab("profile");
+  }, [open]);
 
   const swipeHandlers = useSwipe({
     onSwipeLeft: () => setActiveTab("settings"),
