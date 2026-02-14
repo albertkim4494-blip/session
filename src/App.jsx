@@ -140,7 +140,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [summaryOffset, setSummaryOffset] = useState(0);
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
-  const [collapsedManage, setCollapsedManage] = useState(new Set());
+  const [collapsedManage, setCollapsedManage] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("wt_collapsed_manage"));
+      return saved ? new Set(saved) : new Set(["programs", "data"]);
+    } catch { return new Set(["programs", "data"]); }
+  });
   const theme = state.preferences?.theme || "dark";
   const equipment = state.preferences?.equipment || "gym";
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
@@ -844,6 +849,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   useEffect(() => {
     localStorage.setItem("wt_collapsed_summary", JSON.stringify([...collapsedSummary]));
   }, [collapsedSummary]);
+
+  useEffect(() => {
+    localStorage.setItem("wt_collapsed_manage", JSON.stringify([...collapsedManage]));
+  }, [collapsedManage]);
 
   useEffect(() => {
     setReorderExercises(false);
@@ -1970,9 +1979,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         type="button"
                       >
                         {allCollapsed ? (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l5 5 5-5" /><path d="M7 8l5 5 5-5" /><line x1="4" y1="16" x2="20" y2="16" /><line x1="4" y1="20" x2="20" y2="20" /></svg>
                         ) : (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 13l5-5 5 5" /><path d="M7 19l5-5 5 5" /><line x1="4" y1="4" x2="20" y2="4" /><line x1="4" y1="8" x2="20" y2="8" /></svg>
                         )}
                       </button>
                     );
@@ -1989,13 +1998,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       type="button"
                     >
                       {allCollapsed ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l5 5 5-5" /><path d="M7 8l5 5 5-5" /><line x1="4" y1="16" x2="20" y2="16" /><line x1="4" y1="20" x2="20" y2="20" /></svg>
                       ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 13l5-5 5 5" /><path d="M7 19l5-5 5 5" /><line x1="4" y1="4" x2="20" y2="4" /><line x1="4" y1="8" x2="20" y2="8" /></svg>
                       )}
                     </button>
                   );
                 })()}
+                {tab !== "social" && (
                 <button
                   style={{ ...styles.navArrow, opacity: 0.45 }}
                   onClick={() => { setTrainSearchOpen(true); }}
@@ -2004,6 +2014,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                 </button>
+                )}
+                {tab === "social" && (
+                <button
+                  style={{ ...styles.navArrow, opacity: 0.45 }}
+                  onClick={() => dispatchModal({ type: "OPEN_FRIEND_SEARCH" })}
+                  title="Search friends"
+                  type="button"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                </button>
+                )}
                 <button
                   onClick={() => dispatchModal({
                     type: "OPEN_PROFILE_MODAL",

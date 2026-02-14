@@ -57,7 +57,7 @@ export function FriendSearchModal({ open, state: searchState, dispatch, styles, 
           className="input-focus"
           value={searchState.query || ""}
           onChange={(e) => dispatch({ type: "UPDATE_FRIEND_SEARCH", payload: { query: e.target.value } })}
-          placeholder="Search by username or name..."
+          placeholder="Search by username or name"
           style={{ ...styles.textInput, fontFamily: "inherit" }}
         />
 
