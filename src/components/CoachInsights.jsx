@@ -274,15 +274,15 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
     flex: 1, padding: "7px 0", border: "none", borderRadius: 8,
     fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "background 0.15s",
   };
-  const toggleActive = { ...toggleBase, background: colors?.primaryBg || "#1a2744", color: colors?.primaryText || "#e8eef7" };
-  const toggleInactive = { ...toggleBase, background: "transparent", color: colors?.text || "#e8eef7", opacity: 0.5 };
+  const toggleActive = { ...toggleBase, background: colors?.primaryBg || "#D4A574", color: colors?.primaryText || "#171412" };
+  const toggleInactive = { ...toggleBase, background: "transparent", color: colors?.text || "#F0E8DF", opacity: 0.5 };
 
   return (
     <Modal open={open} title={`Add "${exerciseName}"`} onClose={onCancel} styles={styles}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{
           display: "flex", gap: 4, padding: 3, borderRadius: 8,
-          background: colors?.cardAltBg || "#0d1117",
+          background: colors?.cardAltBg || "#171412",
           border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
         }}>
           <button style={mode === "today" ? toggleActive : toggleInactive} onClick={() => setMode("today")}>

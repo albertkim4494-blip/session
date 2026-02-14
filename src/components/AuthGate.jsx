@@ -142,6 +142,6 @@ const loadingStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#0d1117",
-  color: "#64748b",
+  background: "#171412",
+  color: "#9C8E80",
 };

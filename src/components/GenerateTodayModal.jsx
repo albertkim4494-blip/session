@@ -104,7 +104,7 @@ export function GenerateTodayModal({
     borderRadius: 999,
     fontSize: 10,
     fontWeight: 700,
-    background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+    background: colors.appBg === "#171412" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
     border: `1px solid ${colors.border}`,
     opacity: 0.85,
   };

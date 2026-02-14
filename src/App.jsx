@@ -67,7 +67,7 @@ function ensureAnimations() {
 @keyframes modalSlideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes chipPop { 0%{transform:scale(1)} 50%{transform:scale(1.3)} 60%{transform:scale(0.95)} 100%{transform:scale(1)} }
 @keyframes checkDraw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
-@keyframes rowPulse { 0% { box-shadow: inset 0 0 20px rgba(46,204,113,0.35); } 100% { box-shadow: none; } }
+@keyframes rowPulse { 0% { box-shadow: inset 0 0 20px rgba(139,175,127,0.35); } 100% { box-shadow: none; } }
 @keyframes restBarSlideUp { from{transform:translateY(100%);opacity:0} to{transform:translateY(0);opacity:1} }
 @keyframes restBarSlideDown { from{transform:translateY(0);opacity:1} to{transform:translateY(100%);opacity:0} }
 @keyframes timerPulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
@@ -79,8 +79,8 @@ function ensureAnimations() {
 }
 .nav-press:active { transform: scale(0.92); }
 .nav-press { transition: transform 0.12s ease; }
-.input-focus:focus { outline: none; border-color: rgba(125,211,252,0.4) !important; box-shadow: 0 0 0 3px rgba(125,211,252,0.08); }
-.input-focus-light:focus { outline: none; border-color: rgba(43,91,122,0.3) !important; box-shadow: 0 0 0 3px rgba(43,91,122,0.06); }
+.input-focus:focus { outline: none; border-color: rgba(212,165,116,0.4) !important; box-shadow: 0 0 0 3px rgba(212,165,116,0.08); }
+.input-focus-light:focus { outline: none; border-color: rgba(196,154,108,0.3) !important; box-shadow: 0 0 0 3px rgba(196,154,108,0.06); }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
@@ -1726,8 +1726,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#0d1117",
-        color: "#64748b",
+        background: "#171412",
+        color: "#9C8E80",
       }}>
         Loading your workouts...
       </div>
@@ -2098,7 +2098,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   statBadges.push(
                     <div key="reps" style={badgeStyle}>
                       <div style={exStyle}>{summaryStats.bestReps.name}</div>
-                      <div style={{ ...valStyle, color: "#7dd3fc" }}>{formatNum(summaryStats.bestReps.value)}</div>
+                      <div style={{ ...valStyle, color: "#D4A574" }}>{formatNum(summaryStats.bestReps.value)}</div>
                       <div style={subStyle}>Total {unitLabel}</div>
                     </div>
                   );
@@ -2192,12 +2192,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         </div>
                         {summaryMode === "week" ? (
                           <div style={badgeStyle}>
-                            <div style={{ ...valStyle, color: summaryStats.logged > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.logged}/{summaryStats.total}</div>
+                            <div style={{ ...valStyle, color: summaryStats.logged > 0 ? "#8BAF7F" : "inherit" }}>{summaryStats.logged}/{summaryStats.total}</div>
                             <div style={subStyle}>Days Active</div>
                           </div>
                         ) : (
                           <div style={badgeStyle}>
-                            <div style={{ ...valStyle, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
+                            <div style={{ ...valStyle, color: summaryStats.weekStreak > 0 ? "#8BAF7F" : "inherit" }}>{summaryStats.weekStreak}</div>
                             <div style={subStyle}>Week Streak</div>
                           </div>
                         )}
@@ -2213,7 +2213,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     {/* Progress bar */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ flex: 1, height: 6, borderRadius: 4, background: colors.cardAltBg, overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: 4, width: `${pctLogged}%`, background: pctLogged >= 80 ? "#2ecc71" : pctLogged >= 40 ? "#f59e0b" : colors.primaryBg, transition: "width 0.3s ease" }} />
+                        <div style={{ height: "100%", borderRadius: 4, width: `${pctLogged}%`, background: pctLogged >= 80 ? "#8BAF7F" : pctLogged >= 40 ? "#f59e0b" : colors.primaryBg, transition: "width 0.3s ease" }} />
                       </div>
                       <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, whiteSpace: "nowrap" }}>{summaryStats.logged}/{summaryStats.total} days</span>
                     </div>
@@ -2790,8 +2790,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <button
                     style={{
                       width: 26, height: 26, borderRadius: 999, padding: 0,
-                      border: isSetSaved ? "2px solid #2ecc71" : `2px solid ${colors.border}`,
-                      background: isSetSaved ? "#2ecc71" : "transparent",
+                      border: isSetSaved ? "2px solid #8BAF7F" : `2px solid ${colors.border}`,
+                      background: isSetSaved ? "#8BAF7F" : "transparent",
                       cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       color: isSetSaved ? "#fff" : colors.text,
@@ -4059,8 +4059,8 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
             fontWeight: 700,
             padding: "2px 8px",
             borderRadius: 999,
-            background: allDone ? "rgba(46, 204, 113, 0.18)" : "transparent",
-            color: allDone ? "#2ecc71" : "inherit",
+            background: allDone ? "rgba(139, 175, 127, 0.18)" : "transparent",
+            color: allDone ? "#8BAF7F" : "inherit",
             opacity: allDone ? 1 : 0.45,
             whiteSpace: "nowrap",
           }}>
@@ -4094,8 +4094,8 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
       {!collapsed && workout.note && (
         <div style={{
           fontSize: 12, padding: "8px 12px", borderRadius: 8, marginBottom: 10,
-          background: colors ? (colors.appBg === "#0d1117" ? "rgba(125,211,252,0.06)" : "rgba(43,91,122,0.06)") : "transparent",
-          border: colors ? `1px solid ${colors.appBg === "#0d1117" ? "rgba(125,211,252,0.15)" : "rgba(43,91,122,0.12)"}` : "none",
+          background: colors ? (colors.appBg === "#171412" ? "rgba(212,165,116,0.06)" : "rgba(196,154,108,0.06)") : "transparent",
+          border: colors ? `1px solid ${colors.appBg === "#171412" ? "rgba(212,165,116,0.15)" : "rgba(196,154,108,0.12)"}` : "none",
           opacity: 0.85, lineHeight: 1.4,
         }}>
           {workout.note}

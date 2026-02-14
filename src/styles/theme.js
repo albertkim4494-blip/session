@@ -31,38 +31,38 @@ export const icon = {
 export function getColors(theme) {
   return theme === "dark"
     ? {
-        appBg: "#0d1117",
-        text: "#e8eef7",
-        border: "rgba(255,255,255,0.06)",
-        cardBg: "#161b22",
-        cardAltBg: "#0d1117",
-        inputBg: "#161b22",
-        navBg: "#0d1117",
-        topBarBg: "#0d1117",
+        appBg: "#171412",
+        text: "#F0E8DF",
+        border: "rgba(255,255,255,0.07)",
+        cardBg: "#231F1A",
+        cardAltBg: "#171412",
+        inputBg: "#231F1A",
+        navBg: "#171412",
+        topBarBg: "#171412",
         shadow: "0 2px 8px rgba(0,0,0,0.3)",
-        primaryBg: "#1a2744",
-        primaryText: "#e8eef7",
+        primaryBg: "#D4A574",
+        primaryText: "#171412",
         dangerBg: "rgba(255, 80, 80, 0.14)",
         dangerBorder: "rgba(255, 120, 120, 0.45)",
         dangerText: "#ffd7d7",
-        dot: "#7dd3fc",
+        dot: "#D4A574",
       }
     : {
-        appBg: "#f8f9fa",
-        text: "#1f2933",
-        border: "rgba(0,0,0,0.08)",
+        appBg: "#F5F0EB",
+        text: "#2D2A26",
+        border: "rgba(0,0,0,0.06)",
         cardBg: "#ffffff",
-        cardAltBg: "#f1f3f5",
+        cardAltBg: "#F9F5F0",
         inputBg: "#ffffff",
-        navBg: "#f8f9fa",
-        topBarBg: "#f8f9fa",
+        navBg: "#171412",
+        topBarBg: "#F5F0EB",
         shadow: "0 1px 3px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04)",
-        primaryBg: "#2b5b7a",
+        primaryBg: "#C49A6C",
         primaryText: "#ffffff",
         dangerBg: "rgba(220, 38, 38, 0.12)",
         dangerBorder: "rgba(220, 38, 38, 0.35)",
         dangerText: "#b91c1c",
-        dot: "#2563eb",
+        dot: "#C49A6C",
       };
 }
 
@@ -172,9 +172,9 @@ export function getStyles(colors) {
     todayChip: {
       padding: "4px 10px",
       borderRadius: 999,
-      border: `1px solid ${colors.appBg === "#0d1117" ? "rgba(125,211,252,0.3)" : "rgba(43,91,122,0.25)"}`,
-      background: colors.appBg === "#0d1117" ? "rgba(125,211,252,0.1)" : "rgba(43,91,122,0.08)",
-      color: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
+      border: `1px solid ${colors.appBg === "#171412" ? "rgba(212,165,116,0.3)" : "rgba(196,154,108,0.25)"}`,
+      background: colors.appBg === "#171412" ? "rgba(212,165,116,0.1)" : "rgba(196,154,108,0.08)",
+      color: colors.appBg === "#171412" ? "#D4A574" : "#C49A6C",
       fontSize: 12,
       fontWeight: 700,
       cursor: "pointer",
@@ -201,7 +201,7 @@ export function getStyles(colors) {
       borderRadius: 12,
       border: "none",
       background: "transparent",
-      color: colors.text,
+      color: "#F0E8DF",
       opacity: 0.45,
       fontWeight: 700,
       fontSize: 11,
@@ -217,7 +217,7 @@ export function getStyles(colors) {
 
     navBtnActive: {
       opacity: 1,
-      color: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
+      color: "#D4A574",
     },
 
     card: {
@@ -297,7 +297,7 @@ export function getStyles(colors) {
       fontWeight: 600,
       padding: "2px 7px",
       borderRadius: 999,
-      background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+      background: colors.appBg === "#171412" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
       border: `1px solid ${colors.border}`,
       opacity: 0.65,
     },
@@ -318,7 +318,7 @@ export function getStyles(colors) {
     },
 
     exerciseBtnLogged: {
-      borderLeft: "3px solid #2ecc71",
+      borderLeft: "3px solid #8BAF7F",
     },
 
     exerciseName: { fontWeight: 700, fontSize: 14 },
@@ -330,7 +330,7 @@ export function getStyles(colors) {
       padding: "2px 7px",
       borderRadius: 999,
       background: "rgba(46, 204, 113, 0.18)",
-      color: "#2ecc71",
+      color: "#8BAF7F",
     },
 
     badgeMuted: {
@@ -346,7 +346,7 @@ export function getStyles(colors) {
       fontWeight: 600,
       padding: "2px 7px",
       borderRadius: 999,
-      background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+      background: colors.appBg === "#171412" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
       border: `1px solid ${colors.border}`,
       opacity: 0.65,
     },
@@ -818,7 +818,7 @@ export function getStyles(colors) {
     timerModeToggle: {
       fontSize: 12,
       fontWeight: 700,
-      color: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
+      color: colors.appBg === "#171412" ? "#D4A574" : "#C49A6C",
       background: "transparent",
       border: "none",
       cursor: "pointer",
@@ -850,14 +850,14 @@ export function getStyles(colors) {
       flex: 1,
       height: 4,
       borderRadius: 2,
-      background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+      background: colors.appBg === "#171412" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
       overflow: "hidden",
     },
 
     restTimerProgressFill: {
       height: "100%",
       borderRadius: 2,
-      background: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
+      background: colors.appBg === "#171412" ? "#D4A574" : "#C49A6C",
       transition: "width 0.3s linear",
     },
 

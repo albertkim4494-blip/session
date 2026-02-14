@@ -42,7 +42,7 @@ export function ChangePasswordModal({ open, modalState, dispatch, styles, colors
             padding: "18px 0",
             fontSize: 14,
             fontWeight: 700,
-            color: "#2ecc71",
+            color: "#8BAF7F",
           }}>
             Password updated!
           </div>

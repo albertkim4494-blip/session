@@ -9,7 +9,7 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #0d1117;
+  background-color: #171412;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -37,7 +37,7 @@ body {
   margin: 0;
   width: 100%;
   height: 100%;
-  background: #0d1117;
+  background: #171412;
 }
 
 #root {
@@ -45,17 +45,17 @@ body {
   width: 100%;
   max-width: 100vw;
   min-height: 100dvh;
-  background: #0d1117;
+  background: #171412;
   overflow: hidden;
 }
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: #C49A6C;
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: #D4A574;
 }
 
 h1 {
@@ -77,23 +77,23 @@ button {
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: #C49A6C;
 }
 button:focus {
   outline: none;
 }
 button:focus-visible {
-  outline: 2px solid #646cff;
+  outline: 2px solid #C49A6C;
   outline-offset: 2px;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
-    background-color: #0d1117; /* keep consistent */
+    background-color: #171412; /* keep consistent */
   }
   a:hover {
-    color: #747bff;
+    color: #D4A574;
   }
   button {
     background-color: #f9f9f9;
