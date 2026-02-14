@@ -2,22 +2,8 @@ import React, { useState, useCallback, useRef, useMemo, useEffect } from "react"
 import { useTimer } from "../hooks/useTimer";
 import { formatTimerDisplay } from "../lib/timerUtils";
 import { isSetCompleted } from "../lib/setHelpers";
+import { playTimerSound } from "../lib/timerSounds";
 import { PillTabs } from "./PillTabs";
-
-function playBeep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    gain.gain.value = 0.3;
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-    osc.onended = () => ctx.close();
-  } catch {}
-}
 
 const CIRCUMFERENCE = 2 * Math.PI * 52;
 
@@ -26,7 +12,7 @@ const MODE_TABS = [
   { value: "stopwatch", label: "Stopwatch" },
 ];
 
-export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles, timerSound, autoStart, onAutoStartChange, autoStartSignal }) {
+export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles, timerSound, timerSoundType, autoStart, onAutoStartChange, autoStartSignal }) {
   const [mode, setMode] = useState("countdown");
   const completedRef = useRef(false);
   const lastSignalRef = useRef(autoStartSignal || 0);
@@ -45,12 +31,12 @@ export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles
 
   const handleComplete = useCallback(() => {
     navigator.vibrate?.([100, 50, 100]);
-    if (timerSound) playBeep();
+    if (timerSound) playTimerSound(timerSoundType || "beep");
     if (!completedRef.current) {
       completedRef.current = true;
       onTimerComplete?.(activeSetIndex, targetSec);
     }
-  }, [timerSound, onTimerComplete, activeSetIndex, targetSec]);
+  }, [timerSound, timerSoundType, onTimerComplete, activeSetIndex, targetSec]);
 
   const timer = useTimer(handleComplete);
 
@@ -84,10 +70,10 @@ export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles
     if (mode === "stopwatch" && timer.seconds > 0 && !completedRef.current) {
       completedRef.current = true;
       navigator.vibrate?.([100, 50, 100]);
-      if (timerSound) playBeep();
+      if (timerSound) playTimerSound(timerSoundType || "beep");
       onTimerComplete?.(activeSetIndex, timer.seconds);
     }
-  }, [timer, mode, timerSound, onTimerComplete, activeSetIndex]);
+  }, [timer, mode, timerSound, timerSoundType, onTimerComplete, activeSetIndex]);
 
   const handleReset = useCallback(() => {
     timer.reset();
@@ -110,7 +96,7 @@ export function ExerciseTimer({ sets, savedSets, onTimerComplete, colors, styles
     : 0;
   const dashOffset = CIRCUMFERENCE * (1 - progress);
 
-  const accentColor = colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a";
+  const accentColor = colors.accent;
 
   // Compact pill styles for timer mode toggle
   const pillStyles = {

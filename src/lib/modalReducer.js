@@ -67,6 +67,7 @@ export const initialModalState = {
   },
   changePassword: {
     isOpen: false,
+    currentPassword: "",
     newPassword: "",
     confirmPassword: "",
     saving: false,
@@ -429,6 +430,7 @@ export function modalReducer(state, action) {
         ...state,
         changePassword: {
           isOpen: true,
+          currentPassword: "",
           newPassword: "",
           confirmPassword: "",
           saving: false,

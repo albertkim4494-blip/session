@@ -1,26 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { formatTimerDisplay } from "../lib/timerUtils";
-
-function playBeep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    gain.gain.value = 0.3;
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-    osc.onended = () => ctx.close();
-  } catch {}
-}
+import { playTimerSound } from "../lib/timerSounds";
 
 const ADJUST_STEP = 15; // seconds per tap
 const MIN_REST = 15;
 const MAX_REST = 300;
 
-export function RestTimerBar({ restSec, exerciseName, isVisible, onDismiss, onComplete, onRestTimeObserved, onRestTimeAdjust, styles, colors, timerSound }) {
+export function RestTimerBar({ restSec, exerciseName, isVisible, onDismiss, onComplete, onRestTimeObserved, onRestTimeAdjust, styles, colors, timerSound, timerSoundType, restTimerSoundType }) {
   const [remaining, setRemaining] = useState(restSec);
   const totalRef = useRef(restSec);     // tracks adjusted total for progress bar
   const startTimeRef = useRef(Date.now());
@@ -55,7 +41,7 @@ export function RestTimerBar({ restSec, exerciseName, isVisible, onDismiss, onCo
         completedRef.current = true;
         clearInterval(intervalRef.current);
         navigator.vibrate?.([100, 50, 100]);
-        if (timerSound) playBeep();
+        if (timerSound) playTimerSound(restTimerSoundType || timerSoundType || "beep");
         // Save adjusted duration as observed rest time
         if (totalRef.current !== restSec) {
           onRestTimeObservedRef.current?.(exerciseName, totalRef.current);
@@ -74,7 +60,7 @@ export function RestTimerBar({ restSec, exerciseName, isVisible, onDismiss, onCo
       clearInterval(intervalRef.current);
       clearTimeout(autoDismissRef.current);
     };
-  }, [isVisible, restSec, timerSound, exerciseName]);
+  }, [isVisible, restSec, timerSound, timerSoundType, restTimerSoundType, exerciseName]);
 
   const handleAdjust = useCallback((delta) => {
     if (completedRef.current) return;

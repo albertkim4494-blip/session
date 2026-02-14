@@ -28,42 +28,129 @@ export const icon = {
   stroke: 2, // standard stroke for ALL icons
 };
 
+const THEMES = {
+  dark: {
+    appBg: "#0d1117",
+    text: "#e8eef7",
+    border: "rgba(255,255,255,0.06)",
+    cardBg: "#161b22",
+    cardAltBg: "#0d1117",
+    inputBg: "#161b22",
+    navBg: "#0d1117",
+    topBarBg: "#0d1117",
+    shadow: "0 2px 8px rgba(0,0,0,0.3)",
+    primaryBg: "#1a2744",
+    primaryText: "#e8eef7",
+    dangerBg: "rgba(255, 80, 80, 0.14)",
+    dangerBorder: "rgba(255, 120, 120, 0.45)",
+    dangerText: "#ffd7d7",
+    dot: "#7dd3fc",
+    accent: "#7dd3fc",
+    accentBg: "rgba(125,211,252,0.1)",
+    accentBorder: "rgba(125,211,252,0.3)",
+    subtleBg: "rgba(255,255,255,0.06)",
+    subtleTrack: "rgba(255,255,255,0.08)",
+  },
+  light: {
+    appBg: "#f8f9fa",
+    text: "#1f2933",
+    border: "rgba(0,0,0,0.08)",
+    cardBg: "#ffffff",
+    cardAltBg: "#f1f3f5",
+    inputBg: "#ffffff",
+    navBg: "#f8f9fa",
+    topBarBg: "#f8f9fa",
+    shadow: "0 1px 3px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04)",
+    primaryBg: "#2b5b7a",
+    primaryText: "#ffffff",
+    dangerBg: "rgba(220, 38, 38, 0.12)",
+    dangerBorder: "rgba(220, 38, 38, 0.35)",
+    dangerText: "#b91c1c",
+    dot: "#2563eb",
+    accent: "#2b5b7a",
+    accentBg: "rgba(43,91,122,0.08)",
+    accentBorder: "rgba(43,91,122,0.25)",
+    subtleBg: "rgba(0,0,0,0.05)",
+    subtleTrack: "rgba(0,0,0,0.06)",
+  },
+  japandi: {
+    appBg: "#f5f0e8",
+    text: "#3d3529",
+    border: "rgba(61,53,41,0.12)",
+    cardBg: "#ede7db",
+    cardAltBg: "#e4dcd0",
+    inputBg: "#f5f0e8",
+    navBg: "#f5f0e8",
+    topBarBg: "#f5f0e8",
+    shadow: "0 1px 3px rgba(61,53,41,0.08), 0 2px 8px rgba(61,53,41,0.04)",
+    primaryBg: "#8a7e6b",
+    primaryText: "#ffffff",
+    dangerBg: "rgba(220, 38, 38, 0.12)",
+    dangerBorder: "rgba(220, 38, 38, 0.35)",
+    dangerText: "#b91c1c",
+    dot: "#7a8c6e",
+    accent: "#7a8c6e",
+    accentBg: "rgba(122,140,110,0.12)",
+    accentBorder: "rgba(122,140,110,0.3)",
+    subtleBg: "rgba(61,53,41,0.06)",
+    subtleTrack: "rgba(61,53,41,0.08)",
+  },
+  spring: {
+    appBg: "#f7f5f0",
+    text: "#2d3a2e",
+    border: "rgba(45,58,46,0.12)",
+    cardBg: "#eceae4",
+    cardAltBg: "#e2dfda",
+    inputBg: "#f7f5f0",
+    navBg: "#f7f5f0",
+    topBarBg: "#f7f5f0",
+    shadow: "0 1px 3px rgba(45,58,46,0.08), 0 2px 8px rgba(45,58,46,0.04)",
+    primaryBg: "#4a7c5c",
+    primaryText: "#ffffff",
+    dangerBg: "rgba(220, 38, 38, 0.12)",
+    dangerBorder: "rgba(220, 38, 38, 0.35)",
+    dangerText: "#b91c1c",
+    dot: "#4a8c5c",
+    accent: "#4a8c5c",
+    accentBg: "rgba(74,140,92,0.12)",
+    accentBorder: "rgba(74,140,92,0.3)",
+    subtleBg: "rgba(45,58,46,0.06)",
+    subtleTrack: "rgba(45,58,46,0.08)",
+  },
+  whimsical: {
+    appBg: "#f3f0f8",
+    text: "#2d2640",
+    border: "rgba(45,38,64,0.12)",
+    cardBg: "#e9e4f0",
+    cardAltBg: "#dfd9e8",
+    inputBg: "#f3f0f8",
+    navBg: "#f3f0f8",
+    topBarBg: "#f3f0f8",
+    shadow: "0 1px 3px rgba(45,38,64,0.08), 0 2px 8px rgba(45,38,64,0.04)",
+    primaryBg: "#7c6aad",
+    primaryText: "#ffffff",
+    dangerBg: "rgba(220, 38, 38, 0.12)",
+    dangerBorder: "rgba(220, 38, 38, 0.35)",
+    dangerText: "#b91c1c",
+    dot: "#7c6aad",
+    accent: "#7c6aad",
+    accentBg: "rgba(124,106,173,0.12)",
+    accentBorder: "rgba(124,106,173,0.3)",
+    subtleBg: "rgba(45,38,64,0.06)",
+    subtleTrack: "rgba(45,38,64,0.08)",
+  },
+};
+
+export const THEME_LIST = [
+  { key: "dark", label: "Night", swatch: "#000000" },
+  { key: "light", label: "Day", swatch: "#ffffff" },
+  { key: "japandi", label: "Nature" },
+  { key: "spring", label: "Spring" },
+  { key: "whimsical", label: "Dusk" },
+];
+
 export function getColors(theme) {
-  return theme === "dark"
-    ? {
-        appBg: "#0d1117",
-        text: "#e8eef7",
-        border: "rgba(255,255,255,0.06)",
-        cardBg: "#161b22",
-        cardAltBg: "#0d1117",
-        inputBg: "#161b22",
-        navBg: "#0d1117",
-        topBarBg: "#0d1117",
-        shadow: "0 2px 8px rgba(0,0,0,0.3)",
-        primaryBg: "#1a2744",
-        primaryText: "#e8eef7",
-        dangerBg: "rgba(255, 80, 80, 0.14)",
-        dangerBorder: "rgba(255, 120, 120, 0.45)",
-        dangerText: "#ffd7d7",
-        dot: "#7dd3fc",
-      }
-    : {
-        appBg: "#f8f9fa",
-        text: "#1f2933",
-        border: "rgba(0,0,0,0.08)",
-        cardBg: "#ffffff",
-        cardAltBg: "#f1f3f5",
-        inputBg: "#ffffff",
-        navBg: "#f8f9fa",
-        topBarBg: "#f8f9fa",
-        shadow: "0 1px 3px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04)",
-        primaryBg: "#2b5b7a",
-        primaryText: "#ffffff",
-        dangerBg: "rgba(220, 38, 38, 0.12)",
-        dangerBorder: "rgba(220, 38, 38, 0.35)",
-        dangerText: "#b91c1c",
-        dot: "#2563eb",
-      };
+  return THEMES[theme] || THEMES.dark;
 }
 
 export function getStyles(colors) {
@@ -172,9 +259,9 @@ export function getStyles(colors) {
     todayChip: {
       padding: "4px 10px",
       borderRadius: 999,
-      border: `1px solid ${colors.appBg === "#0d1117" ? "rgba(125,211,252,0.3)" : "rgba(43,91,122,0.25)"}`,
-      background: colors.appBg === "#0d1117" ? "rgba(125,211,252,0.1)" : "rgba(43,91,122,0.08)",
-      color: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
+      border: `1px solid ${colors.accentBorder}`,
+      background: colors.accentBg,
+      color: colors.accent,
       fontSize: 12,
       fontWeight: 700,
       cursor: "pointer",
@@ -217,7 +304,7 @@ export function getStyles(colors) {
 
     navBtnActive: {
       opacity: 1,
-      color: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
+      color: colors.accent,
     },
 
     card: {
@@ -297,7 +384,7 @@ export function getStyles(colors) {
       fontWeight: 600,
       padding: "2px 7px",
       borderRadius: 999,
-      background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+      background: colors.subtleBg,
       border: `1px solid ${colors.border}`,
       opacity: 0.65,
     },
@@ -346,7 +433,7 @@ export function getStyles(colors) {
       fontWeight: 600,
       padding: "2px 7px",
       borderRadius: 999,
-      background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+      background: colors.subtleBg,
       border: `1px solid ${colors.border}`,
       opacity: 0.65,
     },
@@ -690,11 +777,11 @@ export function getStyles(colors) {
     },
 
     themeSwitchTrackDark: {
-      background: "rgba(255,255,255,0.12)",
+      background: colors.accentBg,
     },
 
     themeSwitchTrackLight: {
-      background: "rgba(0,0,0,0.08)",
+      background: colors.subtleTrack,
     },
 
     themeSwitchThumb: {
@@ -708,11 +795,12 @@ export function getStyles(colors) {
     },
 
     themeSwitchThumbDark: {
-      background: "#e8eef7",
+      background: colors.accent,
     },
 
     themeSwitchThumbLight: {
-      background: "#1f2933",
+      background: colors.text,
+      opacity: 0.35,
     },
 
     themeSwitchLabel: {
@@ -818,7 +906,7 @@ export function getStyles(colors) {
     timerModeToggle: {
       fontSize: 12,
       fontWeight: 700,
-      color: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
+      color: colors.accent,
       background: "transparent",
       border: "none",
       cursor: "pointer",
@@ -850,14 +938,14 @@ export function getStyles(colors) {
       flex: 1,
       height: 4,
       borderRadius: 2,
-      background: colors.appBg === "#0d1117" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+      background: colors.subtleTrack,
       overflow: "hidden",
     },
 
     restTimerProgressFill: {
       height: "100%",
       borderRadius: 2,
-      background: colors.appBg === "#0d1117" ? "#7dd3fc" : "#2b5b7a",
+      background: colors.accent,
       transition: "width 0.3s linear",
     },
 

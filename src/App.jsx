@@ -605,21 +605,63 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // All-time stats for profile modal (not tied to summary range)
   const profileStats = useMemo(() => {
-    const activeDates = Object.keys(state.logsByDate)
-      .filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k) && dayHasCompletedSets(state.logsByDate[k]))
-      .sort();
+    // Build exercise ID → name map from all workout sources
+    const exNameMap = {};
+    for (const w of progressWorkouts) {
+      for (const ex of w.exercises || []) {
+        exNameMap[ex.id] = ex.name;
+      }
+    }
 
-    const logged = activeDates.length;
-    if (logged === 0) return { logged: 0, weekStreak: 0 };
-
-    // Compute week streak: consecutive weeks with 2+ sessions
+    let logged = 0;
+    let totalSets = 0;
     const weekMap = {};
-    for (const d of activeDates) {
+    const exReps = {};
+    const exVol = {};
+    const exLift = {};
+
+    for (const [d, dayLogs] of Object.entries(state.logsByDate)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !dayHasCompletedSets(dayLogs)) continue;
+      logged++;
       const weekStart = startOfWeekSunday(d);
       weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
+      for (const exId of Object.keys(dayLogs)) {
+        const exLog = dayLogs[exId];
+        if (!exLog?.sets || !Array.isArray(exLog.sets)) continue;
+        for (const s of exLog.sets) {
+          if (!isSetCompleted(s)) continue;
+          totalSets++;
+          const reps = Number(s.reps ?? 0);
+          if (Number.isFinite(reps)) exReps[exId] = (exReps[exId] || 0) + reps;
+          const wt = String(s.weight ?? "").trim();
+          if (wt && wt.toUpperCase() !== "BW") {
+            const n = Number(wt);
+            if (Number.isFinite(n) && n > 0) {
+              exLift[exId] = Math.max(exLift[exId] || 0, n);
+              if (Number.isFinite(reps)) exVol[exId] = (exVol[exId] || 0) + n * reps;
+            }
+          }
+        }
+      }
     }
-    return { logged, weekStreak: calculateWeekStreak(weekMap) };
-  }, [state.logsByDate]);
+
+    const bestOf = (map) => {
+      let bestId = null, bestVal = 0;
+      for (const [id, val] of Object.entries(map)) {
+        if (val > bestVal) { bestVal = val; bestId = id; }
+      }
+      return bestId ? { value: bestVal, name: exNameMap[bestId] || "Unknown" } : null;
+    };
+
+    return {
+      logged,
+      totalSets,
+      weekStreak: calculateWeekStreak(weekMap),
+      bestReps: bestOf(exReps),
+      bestVolume: bestOf(exVol),
+      bestLift: bestOf(exLift),
+    };
+  }, [state.logsByDate, progressWorkouts]);
 
   const loggedDaysInMonth = useMemo(() => {
     const set = new Set();
@@ -1726,8 +1768,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#0d1117",
-        color: "#64748b",
+        background: colors.appBg,
+        color: colors.text,
+        opacity: 0.5,
       }}>
         Loading your workouts...
       </div>
@@ -2098,7 +2141,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   statBadges.push(
                     <div key="reps" style={badgeStyle}>
                       <div style={exStyle}>{summaryStats.bestReps.name}</div>
-                      <div style={{ ...valStyle, color: "#7dd3fc" }}>{formatNum(summaryStats.bestReps.value)}</div>
+                      <div style={{ ...valStyle, color: colors.accent }}>{formatNum(summaryStats.bestReps.value)}</div>
                       <div style={subStyle}>Total {unitLabel}</div>
                     </div>
                   );
@@ -3172,6 +3215,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     styles={styles}
                     colors={colors}
                     timerSound={state.preferences?.timerSound !== false}
+                    timerSoundType={state.preferences?.timerSoundType || "beep"}
+                    restTimerSoundType={state.preferences?.restTimerSoundType || "beep"}
                   />
                 )}
                 </React.Fragment>
@@ -3207,6 +3252,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               colors={colors}
               styles={styles}
               timerSound={state.preferences?.timerSound !== false}
+              timerSoundType={state.preferences?.timerSoundType || "beep"}
               autoStart={autoStartTimer}
               onAutoStartChange={setAutoStartTimer}
               autoStartSignal={autoStartSignal}
@@ -3665,6 +3711,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         open={modals.changePassword.isOpen}
         modalState={modals.changePassword}
         dispatch={dispatchModal}
+        session={session}
         styles={styles}
         colors={colors}
       />
@@ -4094,8 +4141,8 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
       {!collapsed && workout.note && (
         <div style={{
           fontSize: 12, padding: "8px 12px", borderRadius: 8, marginBottom: 10,
-          background: colors ? (colors.appBg === "#0d1117" ? "rgba(125,211,252,0.06)" : "rgba(43,91,122,0.06)") : "transparent",
-          border: colors ? `1px solid ${colors.appBg === "#0d1117" ? "rgba(125,211,252,0.15)" : "rgba(43,91,122,0.12)"}` : "none",
+          background: colors ? colors.accentBg : "transparent",
+          border: colors ? `1px solid ${colors.accentBorder}` : "none",
           opacity: 0.85, lineHeight: 1.4,
         }}>
           {workout.note}

@@ -150,19 +150,6 @@ export function AvatarUpload({ displayName, username, avatarUrl, avatarPreview, 
         <div style={{ fontSize: 13, opacity: 0.5, fontWeight: 600 }}>
           @{username || "\u2014"}
         </div>
-        {age !== null && (
-          <div style={{
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "3px 10px",
-            borderRadius: 999,
-            background: colors?.cardAltBg || "rgba(255,255,255,0.06)",
-            border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
-            marginTop: 2,
-          }}>
-            {age} yrs old
-          </div>
-        )}
       </div>
     </>
   );

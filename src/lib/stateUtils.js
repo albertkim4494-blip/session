@@ -82,7 +82,9 @@ export function makeDefaultState() {
     preferences: {
       defaultRestSec: 90,
       timerSound: true,
+      timerSoundType: "beep",
       restTimerEnabled: true,
+      restTimerSoundType: "beep",
       measurementSystem: "imperial",
       equipment: "gym",
       theme: "dark",

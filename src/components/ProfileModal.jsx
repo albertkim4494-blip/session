@@ -1,18 +1,27 @@
 import React, { useState } from "react";
 import { Modal } from "./Modal";
-import { PillTabs } from "./PillTabs";
+import { useSwipe } from "../hooks/useSwipe";
 import { isValidBirthdateString, computeAge } from "../lib/validation";
 import { validateDisplayName } from "../lib/userIdentity";
 import { ProfileTab } from "./profile/ProfileTab";
 import { SettingsTab } from "./profile/SettingsTab";
 
 const TABS = [
-  { value: "profile", label: "Profile" },
-  { value: "settings", label: "Settings" },
+  { value: "profile", label: "Profile", icon: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+  )},
+  { value: "settings", label: "Settings", icon: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001.08 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z" /></svg>
+  )},
 ];
 
 export function ProfileModal({ open, modalState, dispatch, profile, session, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference }) {
   const [activeTab, setActiveTab] = useState("profile");
+
+  const swipeHandlers = useSwipe({
+    onSwipeLeft: () => setActiveTab("settings"),
+    onSwipeRight: () => setActiveTab("profile"),
+  });
 
   if (!open) return null;
 
@@ -96,17 +105,60 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
     </div>
   );
 
+  const headerTabs = (
+    <div style={{
+      display: "flex",
+      flex: 1,
+      padding: 3,
+      borderRadius: 10,
+      background: colors?.cardAltBg || "rgba(255,255,255,0.06)",
+      gap: 2,
+    }}>
+      {TABS.map((t) => {
+        const active = t.value === activeTab;
+        return (
+          <button
+            key={t.value}
+            onClick={() => setActiveTab(t.value)}
+            style={{
+              flex: 1,
+              padding: "6px 0",
+              background: active ? (colors?.cardBg || "#161b22") : "transparent",
+              border: "none",
+              borderRadius: 8,
+              color: colors?.text || "#e8eef7",
+              opacity: active ? 1 : 0.5,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              WebkitTapHighlightColor: "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              boxShadow: active ? "0 1px 3px rgba(0,0,0,0.2)" : "none",
+              transition: "background 0.15s, opacity 0.15s, box-shadow 0.15s",
+              outline: "none",
+            }}
+          >
+            {t.icon}
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <Modal
       open={open}
-      title="Profile"
+      headerContent={headerTabs}
       onClose={() => dispatch({ type: "CLOSE_PROFILE_MODAL" })}
       styles={styles}
       footer={activeTab === "profile" ? profileFooter : settingsFooter}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <PillTabs tabs={TABS} value={activeTab} onChange={setActiveTab} styles={styles} />
-
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }} {...swipeHandlers}>
         {activeTab === "profile" ? (
           <ProfileTab
             modalState={modalState}

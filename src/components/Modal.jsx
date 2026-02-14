@@ -1,7 +1,7 @@
 import React from "react";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
-export function Modal({ open, title, children, footer, onClose, styles, fullScreen }) {
+export function Modal({ open, title, headerContent, children, footer, onClose, styles, fullScreen }) {
   const kbInset = useKeyboardInset();
 
   if (!open) return null;
@@ -34,7 +34,7 @@ export function Modal({ open, title, children, footer, onClose, styles, fullScre
         onMouseDown={fullScreen ? undefined : (e) => e.stopPropagation()}
       >
         <div style={styles.modalHeader}>
-          <div style={styles.modalTitle}>{title}</div>
+          {headerContent || <div style={styles.modalTitle}>{title}</div>}
           <button onClick={onClose} style={styles.iconBtn} aria-label="Close">
             ×
           </button>

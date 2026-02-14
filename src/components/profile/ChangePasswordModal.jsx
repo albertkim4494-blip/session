@@ -2,24 +2,45 @@ import React from "react";
 import { Modal } from "../Modal";
 import { supabase } from "../../lib/supabase";
 
-export function ChangePasswordModal({ open, modalState, dispatch, styles, colors }) {
+export function ChangePasswordModal({ open, modalState, dispatch, session, styles, colors }) {
   if (!open) return null;
 
-  const { newPassword, confirmPassword, saving, error, success } = modalState;
+  const { currentPassword, newPassword, confirmPassword, saving, error, success } = modalState;
 
   async function handleConfirm() {
+    if (!currentPassword) {
+      dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { error: "Please enter your current password" } });
+      return;
+    }
     if (newPassword.length < 6) {
-      dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { error: "Password must be at least 6 characters" } });
+      dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { error: "New password must be at least 6 characters" } });
       return;
     }
     if (newPassword !== confirmPassword) {
-      dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { error: "Passwords do not match" } });
+      dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { error: "New passwords do not match" } });
       return;
     }
 
     dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { saving: true, error: "" } });
 
     try {
+      // Verify current password
+      const email = session?.user?.email;
+      if (!email) {
+        dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { saving: false, error: "Unable to verify account" } });
+        return;
+      }
+
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (signInErr) {
+        dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { saving: false, error: "Current password is incorrect" } });
+        return;
+      }
+
+      // Update to new password
       const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
       if (updateErr) {
         dispatch({ type: "UPDATE_CHANGE_PASSWORD", payload: { saving: false, error: updateErr.message } });
@@ -49,6 +70,21 @@ export function ChangePasswordModal({ open, modalState, dispatch, styles, colors
         ) : (
           <>
             <div style={styles.fieldCol}>
+              <label style={styles.label}>Current Password</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => dispatch({
+                  type: "UPDATE_CHANGE_PASSWORD",
+                  payload: { currentPassword: e.target.value, error: "" },
+                })}
+                style={styles.textInput}
+                placeholder="Enter current password"
+                autoFocus
+              />
+            </div>
+
+            <div style={styles.fieldCol}>
               <label style={styles.label}>New Password</label>
               <input
                 type="password"
@@ -59,7 +95,6 @@ export function ChangePasswordModal({ open, modalState, dispatch, styles, colors
                 })}
                 style={styles.textInput}
                 placeholder="Min 6 characters"
-                autoFocus
               />
             </div>
 
