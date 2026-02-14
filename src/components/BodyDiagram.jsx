@@ -41,7 +41,7 @@ export function BodyDiagram({ highlightedMuscles = [], colors }) {
   ];
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", gap: 16, padding: "4px 0" }}>
+    <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "4px 0" }}>
       {/* Front view */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
         <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, marginBottom: 2, letterSpacing: 1, textTransform: "uppercase" }}>
@@ -50,7 +50,7 @@ export function BodyDiagram({ highlightedMuscles = [], colors }) {
         <Body
           data={data}
           side="front"
-          scale={1.2}
+          scale={0.8}
           border={colors.border}
           defaultFill={colors.subtleBg}
           hiddenParts={HIDDEN}
@@ -65,7 +65,7 @@ export function BodyDiagram({ highlightedMuscles = [], colors }) {
         <Body
           data={data}
           side="back"
-          scale={1.2}
+          scale={0.8}
           border={colors.border}
           defaultFill={colors.subtleBg}
           hiddenParts={HIDDEN}
