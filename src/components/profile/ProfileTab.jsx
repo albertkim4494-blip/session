@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { isValidBirthdateString, computeAge } from "../../lib/validation";
 
 import { AvatarUpload } from "./AvatarUpload";
@@ -15,11 +15,51 @@ const sectionHeaderStyle = {
   gap: 6,
 };
 
+const GENDER_LABELS = { male: "Male", female: "Female", other: "Other" };
+
+const hasSpeechRecognition = typeof window !== "undefined" &&
+  !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+function MicButton({ field, listeningField, onToggle, colors }) {
+  const active = listeningField === field;
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(field)}
+      aria-label={active ? "Stop listening" : "Voice input"}
+      style={{
+        background: "transparent",
+        border: "none",
+        cursor: "pointer",
+        padding: 4,
+        color: active ? colors?.accent : colors?.text,
+        opacity: active ? 1 : 0.4,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        animation: active ? "micPulse 1.2s ease-in-out infinite" : "none",
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+        <path d="M19 10v2a7 7 0 01-14 0v-2" />
+        <line x1="12" y1="19" x2="12" y2="23" />
+        <line x1="8" y1="23" x2="16" y2="23" />
+      </svg>
+    </button>
+  );
+}
+
 export function ProfileTab({ modalState, dispatch, profile, session, styles, colors, summaryStats, preferences, onUpdatePreference }) {
   const { displayName, birthdate, gender, weightLbs, goal, sports, about, avatarUrl, avatarPreview } = modalState;
   const age = birthdate && isValidBirthdateString(birthdate) ? computeAge(birthdate) : null;
   const [showStatsConfig, setShowStatsConfig] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [editingTraining, setEditingTraining] = useState(false);
+  const [listeningField, setListeningField] = useState(null);
   const statsConfigRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     if (!showStatsConfig) return;
@@ -32,6 +72,15 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     return () => document.removeEventListener("mousedown", handler);
   }, [showStatsConfig]);
 
+  // Cleanup speech recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch (_) {}
+      }
+    };
+  }, []);
+
   const update = (field, value) => dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { [field]: value, error: "" } });
 
   const selectedStats = preferences?.profileHighlights || ["totalReps"];
@@ -41,8 +90,67 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     onUpdatePreference?.("profileHighlights", next);
   };
 
+  const weightUnit = preferences?.measurementSystem === "metric" ? "kg" : "lbs";
+
+  // Voice input toggle
+  const toggleListening = useCallback((field) => {
+    if (!hasSpeechRecognition) return;
+
+    // If already listening on this field, stop
+    if (listeningField === field) {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (_) {}
+      }
+      setListeningField(null);
+      return;
+    }
+
+    // Stop any existing recognition
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch (_) {}
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = navigator.language || "en-US";
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) {
+        // Read current value from modalState and append
+        const currentVal = modalState[field] || "";
+        const separator = currentVal && !currentVal.endsWith(" ") ? " " : "";
+        update(field, currentVal + separator + transcript);
+      }
+    };
+
+    recognition.onerror = () => {
+      setListeningField(null);
+      recognitionRef.current = null;
+    };
+
+    recognition.onend = () => {
+      setListeningField(null);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    setListeningField(field);
+    recognition.start();
+  }, [listeningField, modalState, update]);
+
+  // Read-only display value helper
+  const notSet = <span style={{ opacity: 0.35, fontStyle: "italic" }}>Not set</span>;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+
+      {/* Mic pulse animation */}
+      {hasSpeechRecognition && listeningField && (
+        <style>{`@keyframes micPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
+      )}
 
       {/* Avatar Hero */}
       <AvatarUpload
@@ -67,7 +175,6 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
         const subStyle = { fontSize: 10, fontWeight: 600, opacity: 0.5 };
         const exStyle = { fontSize: 9, fontWeight: 600, opacity: 0.4, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" };
         const formatNum = (n) => n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : n.toLocaleString();
-        const weightUnit = preferences?.measurementSystem === "metric" ? "kg" : "lbs";
 
         const statBadges = [];
         if (selectedStats.includes("totalReps")) {
@@ -176,103 +283,254 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
 
       {/* Personal Info */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={sectionHeaderStyle}>
-          Personal Info
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+        <div style={{ ...sectionHeaderStyle, justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            Personal Info
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+          </div>
+          <button
+            type="button"
+            onClick={() => setEditingInfo((v) => !v)}
+            aria-label={editingInfo ? "Done editing" : "Edit personal info"}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 4,
+              color: editingInfo ? colors?.accent : colors?.text,
+              opacity: editingInfo ? 1 : 0.4,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {editingInfo ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
+            )}
+          </button>
         </div>
 
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Display Name</label>
-          <input
-            value={displayName}
-            onChange={(e) => update("displayName", e.target.value)}
-            style={styles.textInput}
-            placeholder="e.g. John Doe"
-            maxLength={30}
-          />
-          <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>Shown publicly. Falls back to username if empty.</span>
-        </div>
+        {editingInfo ? (
+          <>
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Display Name</label>
+              <input
+                value={displayName}
+                onChange={(e) => update("displayName", e.target.value)}
+                style={styles.textInput}
+                placeholder="e.g. John Doe"
+                maxLength={30}
+              />
+              <span style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>Shown publicly. Falls back to username if empty.</span>
+            </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
-          <div style={{ ...styles.fieldCol, flex: 1 }}>
-            <label style={styles.label}>
-              Birthdate{age !== null && <span style={{ opacity: 0.5, fontWeight: 500 }}> ({age} yrs)</span>}
-            </label>
-            <input
-              type="date"
-              value={birthdate}
-              onChange={(e) => update("birthdate", e.target.value)}
-              style={styles.textInput}
-            />
-          </div>
-        </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ ...styles.fieldCol, flex: 1 }}>
+                <label style={styles.label}>
+                  Birthdate{age !== null && <span style={{ opacity: 0.5, fontWeight: 500 }}> ({age} yrs)</span>}
+                </label>
+                <input
+                  type="date"
+                  value={birthdate}
+                  onChange={(e) => update("birthdate", e.target.value)}
+                  style={styles.textInput}
+                />
+              </div>
+            </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
-          <div style={{ ...styles.fieldCol, flex: 1 }}>
-            <label style={styles.label}>Gender</label>
-            <select
-              value={gender}
-              onChange={(e) => update("gender", e.target.value)}
-              style={styles.textInput}
-            >
-              <option value="">Prefer not to say</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
-            </select>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ ...styles.fieldCol, flex: 1 }}>
+                <label style={styles.label}>Gender</label>
+                <select
+                  value={gender}
+                  onChange={(e) => update("gender", e.target.value)}
+                  style={styles.textInput}
+                >
+                  <option value="">Prefer not to say</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div style={{ ...styles.fieldCol, flex: 1 }}>
+                <label style={styles.label}>Weight ({weightUnit})</label>
+                <input
+                  type="number"
+                  value={weightLbs}
+                  onChange={(e) => update("weightLbs", e.target.value)}
+                  style={styles.textInput}
+                  placeholder={preferences?.measurementSystem === "metric" ? "e.g. 77" : "e.g. 170"}
+                  min={preferences?.measurementSystem === "metric" ? 23 : 50}
+                  max={preferences?.measurementSystem === "metric" ? 454 : 1000}
+                />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+              padding: "10px 12px",
+              borderRadius: 12,
+              background: colors?.cardAltBg,
+              border: `1px solid ${colors?.border}`,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Name</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{displayName || notSet}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Birthdate</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                {birthdate && isValidBirthdateString(birthdate)
+                  ? <>{new Date(birthdate + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}{age !== null && <span style={{ opacity: 0.5, fontWeight: 500 }}> ({age})</span>}</>
+                  : notSet}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Gender</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{gender ? GENDER_LABELS[gender] || gender : notSet}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Weight</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{weightLbs ? `${weightLbs} ${weightUnit}` : notSet}</div>
+            </div>
           </div>
-          <div style={{ ...styles.fieldCol, flex: 1 }}>
-            <label style={styles.label}>Weight ({preferences?.measurementSystem === "metric" ? "kg" : "lbs"})</label>
-            <input
-              type="number"
-              value={weightLbs}
-              onChange={(e) => update("weightLbs", e.target.value)}
-              style={styles.textInput}
-              placeholder={preferences?.measurementSystem === "metric" ? "e.g. 77" : "e.g. 170"}
-              min={preferences?.measurementSystem === "metric" ? 23 : 50}
-              max={preferences?.measurementSystem === "metric" ? 454 : 1000}
-            />
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Training */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={sectionHeaderStyle}>
-          Training
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="1" y="9.5" width="3" height="5" rx="0.75" /><rect x="4" y="7" width="3" height="10" rx="0.75" /><rect x="17" y="7" width="3" height="10" rx="0.75" /><rect x="20" y="9.5" width="3" height="5" rx="0.75" /><rect x="7" y="11" width="10" height="2" rx="0.5" /></svg>
+        <div style={{ ...sectionHeaderStyle, justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            Training
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="1" y="9.5" width="3" height="5" rx="0.75" /><rect x="4" y="7" width="3" height="10" rx="0.75" /><rect x="17" y="7" width="3" height="10" rx="0.75" /><rect x="20" y="9.5" width="3" height="5" rx="0.75" /><rect x="7" y="11" width="10" height="2" rx="0.5" /></svg>
+          </div>
+          <button
+            type="button"
+            onClick={() => setEditingTraining((v) => !v)}
+            aria-label={editingTraining ? "Done editing" : "Edit training info"}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: 4,
+              color: editingTraining ? colors?.accent : colors?.text,
+              opacity: editingTraining ? 1 : 0.4,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {editingTraining ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
+            )}
+          </button>
         </div>
 
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Fitness Goal</label>
-          <input
-            value={goal}
-            onChange={(e) => update("goal", e.target.value)}
-            style={styles.textInput}
-            placeholder="e.g. Build muscle"
-          />
+        {/* AI context banner */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "6px 10px",
+          borderRadius: 8,
+          background: colors?.accentBg,
+          border: `1px solid ${colors?.accentBorder}`,
+          fontSize: 11,
+          color: colors?.accent,
+          fontWeight: 500,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#f0b429" stroke="none" style={{ flexShrink: 0 }}>
+            <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+            <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+          </svg>
+          Your AI coach uses this to personalize recommendations
         </div>
 
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Sports / Activities</label>
-          <input
-            value={sports}
-            onChange={(e) => update("sports", e.target.value)}
-            style={styles.textInput}
-            placeholder="e.g. Running, Basketball"
-          />
-        </div>
+        {editingTraining ? (
+          <>
+            <div style={styles.fieldCol}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <label style={styles.label}>Fitness Goal</label>
+                {hasSpeechRecognition && <MicButton field="goal" listeningField={listeningField} onToggle={toggleListening} colors={colors} />}
+              </div>
+              <input
+                value={goal}
+                onChange={(e) => update("goal", e.target.value)}
+                style={styles.textInput}
+                placeholder="e.g. Build muscle, lose 10lbs, run a 5k under 25min"
+              />
+            </div>
 
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>About You</label>
-          <textarea
-            value={about}
-            onChange={(e) => update("about", e.target.value)}
-            style={styles.textarea}
-            placeholder="Anything you'd like to share..."
-            rows={3}
-          />
-        </div>
+            <div style={styles.fieldCol}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <label style={styles.label}>Sports / Activities</label>
+                {hasSpeechRecognition && <MicButton field="sports" listeningField={listeningField} onToggle={toggleListening} colors={colors} />}
+              </div>
+              <input
+                value={sports}
+                onChange={(e) => update("sports", e.target.value)}
+                style={styles.textInput}
+                placeholder="e.g. Basketball 3x/week, running, yoga on rest days"
+              />
+            </div>
+
+            <div style={styles.fieldCol}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <label style={styles.label}>About You</label>
+                {hasSpeechRecognition && <MicButton field="about" listeningField={listeningField} onToggle={toggleListening} colors={colors} />}
+              </div>
+              <textarea
+                value={about}
+                onChange={(e) => update("about", e.target.value)}
+                style={styles.textarea}
+                placeholder="e.g. Recovering from knee injury, prefer morning workouts, 2 years lifting experience"
+                rows={3}
+              />
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              padding: "10px 12px",
+              borderRadius: 12,
+              background: colors?.cardAltBg,
+              border: `1px solid ${colors?.border}`,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Fitness Goal</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{goal || notSet}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Sports / Activities</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{sports || notSet}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>About You</div>
+              <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: "pre-wrap" }}>{about || notSet}</div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
