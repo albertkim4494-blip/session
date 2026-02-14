@@ -136,6 +136,13 @@ export const initialModalState = {
     tags: [],
     movement: "",
   },
+  social: { isOpen: false, tab: "friends" },
+  friendSearch: { isOpen: false, query: "", results: [], searching: false },
+  shareWorkout: {
+    isOpen: false, workoutId: null, workoutName: "",
+    friends: [], selectedFriendId: null, message: "", sending: false,
+  },
+  workoutPreview: { isOpen: false, sharedWorkout: null, importing: false },
 };
 
 export function modalReducer(state, action) {
@@ -571,6 +578,95 @@ export function modalReducer(state, action) {
       return {
         ...state,
         customExercise: initialModalState.customExercise,
+      };
+
+    // ===== SOCIAL MODAL =====
+    case "OPEN_SOCIAL":
+      return {
+        ...state,
+        social: { isOpen: true, tab: action.payload?.tab || "friends" },
+      };
+
+    case "UPDATE_SOCIAL":
+      return {
+        ...state,
+        social: { ...state.social, ...action.payload },
+      };
+
+    case "CLOSE_SOCIAL":
+      return {
+        ...state,
+        social: initialModalState.social,
+      };
+
+    // ===== FRIEND SEARCH MODAL =====
+    case "OPEN_FRIEND_SEARCH":
+      return {
+        ...state,
+        friendSearch: {
+          ...initialModalState.friendSearch,
+          isOpen: true,
+        },
+      };
+
+    case "UPDATE_FRIEND_SEARCH":
+      return {
+        ...state,
+        friendSearch: { ...state.friendSearch, ...action.payload },
+      };
+
+    case "CLOSE_FRIEND_SEARCH":
+      return {
+        ...state,
+        friendSearch: initialModalState.friendSearch,
+      };
+
+    // ===== SHARE WORKOUT MODAL =====
+    case "OPEN_SHARE_WORKOUT":
+      return {
+        ...state,
+        shareWorkout: {
+          ...initialModalState.shareWorkout,
+          isOpen: true,
+          workoutId: action.payload?.workoutId || null,
+          workoutName: action.payload?.workoutName || "",
+          selectedFriendId: action.payload?.selectedFriendId || null,
+        },
+      };
+
+    case "UPDATE_SHARE_WORKOUT":
+      return {
+        ...state,
+        shareWorkout: { ...state.shareWorkout, ...action.payload },
+      };
+
+    case "CLOSE_SHARE_WORKOUT":
+      return {
+        ...state,
+        shareWorkout: initialModalState.shareWorkout,
+      };
+
+    // ===== WORKOUT PREVIEW MODAL =====
+    case "OPEN_WORKOUT_PREVIEW":
+      return {
+        ...state,
+        workoutPreview: {
+          ...initialModalState.workoutPreview,
+          isOpen: true,
+          sharedWorkout: action.payload?.sharedWorkout || null,
+        },
+      };
+
+    case "UPDATE_WORKOUT_PREVIEW":
+      return {
+        ...state,
+        workoutPreview: { ...state.workoutPreview, ...action.payload },
+      };
+
+    case "CLOSE_WORKOUT_PREVIEW":
+      return {
+        ...state,
+        workoutPreview: initialModalState.workoutPreview,
       };
 
     // ===== CLOSE ALL (for back-button navigation) =====

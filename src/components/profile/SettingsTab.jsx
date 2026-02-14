@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { THEME_LIST, getColors } from "../../styles/theme";
 import { usernameChangeCooldownMs } from "../../lib/userIdentity";
 import { SOUND_LIST, playTimerSound } from "../../lib/timerSounds";
 import { EQUIPMENT_LABELS } from "../../lib/exerciseCatalog";
+import { updateSearchable } from "../../lib/socialApi";
 
 const sectionHeaderStyle = {
   fontSize: 13,
@@ -17,6 +18,7 @@ const sectionHeaderStyle = {
 };
 
 export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference, styles, colors }) {
+  const [isSearchable, setIsSearchable] = useState(profile?.is_searchable !== false);
 
   function openChangeUsername() {
     const cooldownMs = usernameChangeCooldownMs(profile?.username_last_changed_at);
@@ -416,6 +418,47 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
               >
                 Manage
               </button>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>Discoverable in Search</span>
+                <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>Allow other users to find you by username</span>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[
+                  { key: true, label: "On" },
+                  { key: false, label: "Off" },
+                ].map((opt) => {
+                  const isActive = isSearchable === opt.key;
+                  return (
+                    <button
+                      key={String(opt.key)}
+                      type="button"
+                      onClick={async () => {
+                        setIsSearchable(opt.key);
+                        await updateSearchable(opt.key);
+                      }}
+                      style={{
+                        padding: "5px 12px",
+                        fontSize: 12,
+                        fontWeight: isActive ? 700 : 500,
+                        borderRadius: 999,
+                        border: `1.5px solid ${isActive ? (colors?.accent || "#7dd3fc") : (colors?.border || "rgba(255,255,255,0.10)")}`,
+                        background: isActive ? (colors?.accent || "#7dd3fc") + "22" : "transparent",
+                        color: isActive ? (colors?.accent || "#7dd3fc") : (colors?.text || "#e8eef7"),
+                        cursor: "pointer",
+                        WebkitTapHighlightColor: "transparent",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
