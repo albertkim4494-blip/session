@@ -77,6 +77,7 @@ export function makeDefaultState() {
     program: {
       workouts: defaultWorkouts(),
     },
+    customExercises: [],
     dailyWorkouts: {},
     logsByDate: {},
     preferences: {
@@ -111,6 +112,7 @@ export function normalizeState(st) {
     ...makeDefaultState(),
     ...st,
     program: { ...rawProgram, workouts: rawWorkouts },
+    customExercises: Array.isArray(st.customExercises) ? st.customExercises : [],
     dailyWorkouts: st.dailyWorkouts && typeof st.dailyWorkouts === "object" ? st.dailyWorkouts : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },

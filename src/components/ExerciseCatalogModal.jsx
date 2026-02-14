@@ -65,7 +65,7 @@ function getRecentUserExercises(workouts, logsByDate, limit) {
 export function ExerciseCatalogModal({
   open, onClose, onAddExercise, onCustomExercise,
   styles, colors, workouts, logsByDate,
-  targetWorkoutId,
+  targetWorkoutId, catalog,
 }) {
   const [query, setQuery] = useState("");
   const [movementFilter, setMovementFilter] = useState(null);
@@ -80,8 +80,8 @@ export function ExerciseCatalogModal({
   }, [open]);
 
   const catalogResults = useMemo(
-    () => catalogSearch(EXERCISE_CATALOG, query, { movement: movementFilter, limit: 50 }),
-    [query, movementFilter]
+    () => catalogSearch(catalog || EXERCISE_CATALOG, query, { movement: movementFilter, limit: 50 }),
+    [query, movementFilter, catalog]
   );
 
   const catalogNameSet = useMemo(
@@ -180,7 +180,7 @@ export function ExerciseCatalogModal({
     </button>
   ) : (
     <div style={{ fontSize: 11, opacity: 0.4, textAlign: "center", padding: "2px 0" }}>
-      {EXERCISE_CATALOG.length} exercises available
+      {(catalog || EXERCISE_CATALOG).length} exercises available
     </div>
   );
 

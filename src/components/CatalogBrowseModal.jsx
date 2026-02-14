@@ -70,7 +70,7 @@ function getRecentUserExercises(workouts, logsByDate, limit) {
 
 export function CatalogBrowseModal({
   open, onClose, onSelectCatalogExercise, onSelectUserExercise,
-  onCustomExercise, styles, colors, workouts, logsByDate,
+  onCustomExercise, styles, colors, workouts, logsByDate, catalog,
 }) {
   const [query, setQuery] = useState("");
   const [movementFilter, setMovementFilter] = useState(null);
@@ -85,8 +85,8 @@ export function CatalogBrowseModal({
 
   // Catalog search results
   const catalogResults = useMemo(
-    () => catalogSearch(EXERCISE_CATALOG, query, { movement: movementFilter, limit: 50 }),
-    [query, movementFilter]
+    () => catalogSearch(catalog || EXERCISE_CATALOG, query, { movement: movementFilter, limit: 50 }),
+    [query, movementFilter, catalog]
   );
 
   // Build set of catalog result names (lowercase) for dedup

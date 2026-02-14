@@ -14,7 +14,7 @@ function formatMuscleName(muscle) {
 
 export function CustomExerciseModal({
   open, modalState, onUpdate, onClose, onSave,
-  enrichExercise, workouts, styles, colors,
+  enrichExercise, workouts, styles, colors, catalog,
 }) {
   const [checked, setChecked] = useState(new Set());
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -34,8 +34,8 @@ export function CustomExerciseModal({
   const suggestions = useMemo(() => {
     const q = name.trim();
     if (q.length < 2) return [];
-    return catalogSearch(EXERCISE_CATALOG, q, { limit: 6 });
-  }, [name]);
+    return catalogSearch(catalog || EXERCISE_CATALOG, q, { limit: 6 });
+  }, [name, catalog]);
 
   // Reset local state when modal opens
   useEffect(() => {
@@ -72,6 +72,7 @@ export function CustomExerciseModal({
           unit: result.defaultUnit || "reps",
         });
       } catch (err) {
+        console.error("Exercise enrichment failed:", err);
         onUpdate({
           enriching: false,
           enrichError: err.message || "Failed to classify exercise",
@@ -287,24 +288,27 @@ export function CustomExerciseModal({
 
         {enrichError && !enriching && (
           <div style={{
-            display: "flex", alignItems: "center", gap: 8,
+            display: "flex", flexDirection: "column", gap: 6,
             padding: "8px 12px", borderRadius: 10,
             background: colors.subtleBg, fontSize: 12, opacity: 0.7,
           }}>
-            <span style={{ flex: 1 }}>Auto-classify unavailable — you can still add the exercise manually.</span>
-            <button
-              style={{
-                background: "transparent", border: "none", color: colors.accent,
-                fontWeight: 700, fontSize: 12, cursor: "pointer", padding: "2px 6px",
-                whiteSpace: "nowrap",
-              }}
-              onClick={() => {
-                onUpdate({ enrichError: null, enriched: false });
-                lastEnrichedRef.current = "";
-              }}
-            >
-              Retry
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ flex: 1 }}>Auto-classify unavailable — you can still add the exercise manually.</span>
+              <button
+                style={{
+                  background: "transparent", border: "none", color: colors.accent,
+                  fontWeight: 700, fontSize: 12, cursor: "pointer", padding: "2px 6px",
+                  whiteSpace: "nowrap",
+                }}
+                onClick={() => {
+                  onUpdate({ enrichError: null, enriched: false });
+                  lastEnrichedRef.current = "";
+                }}
+              >
+                Retry
+              </button>
+            </div>
+            <div style={{ fontSize: 10, opacity: 0.5, fontFamily: "monospace" }}>{enrichError}</div>
           </div>
         )}
 

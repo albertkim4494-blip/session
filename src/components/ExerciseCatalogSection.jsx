@@ -1,7 +1,7 @@
 import React from "react";
 import { EXERCISE_CATALOG } from "../lib/exerciseCatalog";
 
-export function ExerciseCatalogSection({ styles, colors, onOpen }) {
+export function ExerciseCatalogSection({ styles, colors, onOpen, catalogCount }) {
   return (
     <div
       className="card-hover"
@@ -26,7 +26,7 @@ export function ExerciseCatalogSection({ styles, colors, onOpen }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14 }}>Exercise Catalog</div>
           <div style={{ fontSize: 12, opacity: 0.5 }}>
-            Browse {EXERCISE_CATALOG.length} exercises with muscle diagrams
+            Browse {catalogCount || EXERCISE_CATALOG.length} exercises with muscle diagrams
           </div>
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3, flexShrink: 0 }}>

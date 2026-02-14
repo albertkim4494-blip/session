@@ -458,7 +458,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return m;
   }, [workouts, dailyWorkoutsToday]);
 
-  const catalogMap = useMemo(() => buildCatalogMap(EXERCISE_CATALOG), []);
+  const fullCatalog = useMemo(() => [...EXERCISE_CATALOG, ...(state.customExercises || [])], [state.customExercises]);
+  const catalogMap = useMemo(() => buildCatalogMap(fullCatalog), [fullCatalog]);
 
   const logsForDate = state.logsByDate[dateKey] ?? EMPTY_OBJ;
 
@@ -736,7 +737,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setCoachLoading(true);
 
     const userExNames = workouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
-    const filteredCatalog = EXERCISE_CATALOG.filter((e) => exerciseFitsEquipment(e, equipment));
+    const filteredCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
     const coachOpts = { catalog: filteredCatalog, userExerciseNames: userExNames };
 
     fetchCoachInsights({ profile, state, dateRange: summaryRange, catalog: filteredCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
@@ -1694,7 +1695,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       duration: dur,
       profile,
       state,
-      catalog: EXERCISE_CATALOG,
+      catalog: fullCatalog,
       todayKey: dateKey,
       measurementSystem: state.preferences?.measurementSystem,
     });
@@ -1707,7 +1708,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         state,
         equipment: eq,
         profile,
-        catalog: EXERCISE_CATALOG,
+        catalog: fullCatalog,
         todayKey: dateKey,
       });
       dispatchModal({
@@ -1849,21 +1850,43 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         {/* Top bar */}
         <div style={styles.topBar}>
           {trainSearchOpen ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, flexShrink: 0 }}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-              <input
-                value={trainSearch}
-                onChange={(e) => setTrainSearch(e.target.value)}
-                placeholder={tab === "train" ? "Search to log..." : tab === "progress" ? "Search exercises..." : "Search exercises..."}
-                autoFocus
-                style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1 }}
-              />
-              <button
-                style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "4px 2px", flexShrink: 0 }}
-                onClick={() => { setTrainSearchOpen(false); setTrainSearch(""); }}
-              >
-                Cancel
-              </button>
+            <div style={styles.topBarRow}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <button
+                  style={styles.dateBtn}
+                  onClick={() =>
+                    dispatchModal({
+                      type: "OPEN_DATE_PICKER",
+                      payload: { monthCursor: monthKeyFromDate(dateKey) },
+                    })
+                  }
+                  aria-label="Pick date"
+                  type="button"
+                >
+                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.55, textTransform: "uppercase" }}>
+                    {new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" })}
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 700 }}>
+                    {formatDateLabel(dateKey)}
+                  </div>
+                </button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, flexShrink: 0 }}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                <input
+                  value={trainSearch}
+                  onChange={(e) => setTrainSearch(e.target.value)}
+                  placeholder={tab === "train" ? "Search to log..." : "Search exercises..."}
+                  autoFocus
+                  style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1, minWidth: 0 }}
+                />
+                <button
+                  style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "4px 2px", flexShrink: 0 }}
+                  onClick={() => { setTrainSearchOpen(false); setTrainSearch(""); }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           ) : (
             <div style={styles.topBarRow}>
@@ -2359,7 +2382,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   setCoachLoading(true);
                   setCoachError(null);
                   const refreshExNames = progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
-                  const refreshCatalog = EXERCISE_CATALOG.filter((e) => exerciseFitsEquipment(e, equipment));
+                  const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
                   fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true }, catalog: refreshCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
                     .then(({ insights }) => {
                       if (coachReqIdRef.current !== reqId) return;
@@ -2423,7 +2446,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* MANAGE TAB */}
           {tab === "plan" ? (
             <div key="plan" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
-              <ExerciseCatalogSection styles={styles} colors={colors} onOpen={() => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: null } })} />
+              <ExerciseCatalogSection styles={styles} colors={colors} catalogCount={fullCatalog.length} onOpen={() => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: null } })} />
 
               <div className="card-hover" style={styles.card}>
                 <div style={collapsedManage.has("plans") ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader}>
@@ -3684,11 +3707,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
           dispatchModal({ type: "OPEN_CUSTOM_EXERCISE", payload: { workoutId: wId } });
         }}
+        catalog={fullCatalog}
       />
 
       {/* Custom Exercise Modal (AI-enriched) */}
       <CustomExerciseModal
         open={modals.customExercise.isOpen}
+        catalog={fullCatalog}
         modalState={modals.customExercise}
         onUpdate={(payload) => dispatchModal({ type: "UPDATE_CUSTOM_EXERCISE", payload })}
         onClose={() => dispatchModal({ type: "CLOSE_CUSTOM_EXERCISE" })}
@@ -3698,6 +3723,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         colors={colors}
         onSave={(exercise, workoutIds) => {
           updateState((st) => {
+            // Add exercise to selected workout(s)
             for (const wId of workoutIds) {
               const w = st.program.workouts.find((x) => x.id === wId);
               if (!w) continue;
@@ -3709,6 +3735,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               if (exercise.tags) newEx.tags = exercise.tags;
               if (exercise.movement) newEx.movement = exercise.movement;
               w.exercises.push(newEx);
+            }
+            // Save to custom exercises catalog (avoid duplicates by name)
+            if (!st.customExercises) st.customExercises = [];
+            const nameLower = exercise.name.trim().toLowerCase();
+            const exists = st.customExercises.some((e) => e.name.toLowerCase() === nameLower);
+            if (!exists) {
+              st.customExercises.push({
+                id: "custom_" + uid("ex"),
+                name: exercise.name.trim(),
+                defaultUnit: exercise.unit,
+                muscles: exercise.muscles || { primary: [] },
+                equipment: exercise.equipment || [],
+                tags: exercise.tags || [],
+                movement: exercise.movement || "",
+                aliases: [],
+                custom: true,
+              });
             }
             return st;
           });
@@ -4089,7 +4132,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           dispatchModal({ type: "CLOSE_GENERATE_WIZARD" });
           dispatchModal({ type: "OPEN_WELCOME_CHOICE" });
         }}
-        catalog={EXERCISE_CATALOG}
+        catalog={fullCatalog}
         profile={profile}
         state={state}
         styles={styles}

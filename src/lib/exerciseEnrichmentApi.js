@@ -1,20 +1,43 @@
 import { supabase } from "./supabase";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 /**
  * Calls the ai-exercise-enrichment edge function to classify a custom exercise.
+ * Uses direct fetch (not supabase.functions.invoke) for reliability.
  * Returns { muscles, equipment, tags, movement, defaultUnit } or throws.
  */
 export async function enrichExercise(name) {
-  // Ensure fresh auth session before calling edge function
-  await supabase.auth.getSession();
+  // Get fresh session for the auth token
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token;
 
-  const { data, error } = await supabase.functions.invoke(
-    "ai-exercise-enrichment",
-    { body: { name } }
+  const res = await fetch(
+    `${SUPABASE_URL}/functions/v1/ai-exercise-enrichment`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ name }),
+    }
   );
 
-  if (error) throw new Error(error.message || "Enrichment failed");
-  if (!data || data.error) throw new Error(data?.error || "No data returned");
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error("Enrichment HTTP error:", res.status, text);
+    throw new Error(`Enrichment failed (${res.status})`);
+  }
+
+  const data = await res.json();
+
+  if (data.error) {
+    console.error("Enrichment API error:", data.error);
+    throw new Error(data.error);
+  }
 
   return {
     muscles: data.muscles || { primary: [] },
