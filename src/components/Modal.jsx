@@ -1,7 +1,7 @@
 import React from "react";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
-export function Modal({ open, title, headerContent, children, footer, onClose, styles, fullScreen }) {
+export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen }) {
   const kbInset = useKeyboardInset();
 
   if (!open) return null;
@@ -35,9 +35,15 @@ export function Modal({ open, title, headerContent, children, footer, onClose, s
       >
         <div style={styles.modalHeader}>
           {headerContent || <div style={styles.modalTitle}>{title}</div>}
-          <button onClick={onClose} style={styles.iconBtn} aria-label="Close">
-            ×
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {headerActions}
+            <button onClick={onClose} style={styles.iconBtn} aria-label="Close">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
         </div>
         <div
           style={bodyStyle}

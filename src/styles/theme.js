@@ -325,9 +325,10 @@ export function getStyles(colors) {
     },
 
     collapseToggle: {
-      fontSize: 12,
-      opacity: 0.5,
+      opacity: 0.4,
       marginLeft: "auto",
+      display: "flex",
+      alignItems: "center",
     },
 
     collapseAllRow: {
@@ -631,19 +632,17 @@ export function getStyles(colors) {
     modalFooter: { display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 },
 
     iconBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
+      width: 36,
+      height: 36,
+      borderRadius: 10,
       border: `1px solid ${colors.border}`,
       background: colors.cardAltBg,
       color: colors.text,
-      fontWeight: 900,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       padding: 0,
-      lineHeight: "40px",
-      fontSize: 20,
+      cursor: "pointer",
     },
 
     setRow: {

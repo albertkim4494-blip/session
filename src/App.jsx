@@ -71,6 +71,7 @@ function ensureAnimations() {
 @keyframes restBarSlideUp { from{transform:translateY(100%);opacity:0} to{transform:translateY(0);opacity:1} }
 @keyframes restBarSlideDown { from{transform:translateY(0);opacity:1} to{transform:translateY(100%);opacity:0} }
 @keyframes timerPulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
+@keyframes setBreathe { 0%{box-shadow:0 0 0 0 rgba(46,204,113,0.35)} 50%{box-shadow:0 0 0 4px rgba(46,204,113,0.15)} 100%{box-shadow:0 0 0 0 rgba(46,204,113,0)} }
 .btn-press { transition: transform 0.15s ease, opacity 0.15s ease; }
 .btn-press:active { transform: scale(0.97); opacity: 0.85; }
 @media (hover: hover) {
@@ -1195,14 +1196,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setToast(null), isWorkoutComplete ? 3500 : 2000);
 
-      // Start rest timer if enabled, workout isn't complete, and there are more uncompleted sets
-      const hasMoreSets = updatedSets.some((s, idx) => idx !== setIndex && !isSetCompleted(s));
-      if (state.preferences?.restTimerEnabled !== false && !isWorkoutComplete && hasMoreSets) {
-        const exerciseObj = exercises.find((e) => e.id === exerciseId);
+      // Start rest timer if enabled for this workout, workout isn't complete, and there are more sets to do
+      const completedSetsCount = updatedSets.filter((s) => isSetCompleted(s)).length;
+      const hasMoreSets = completedSetsCount < totalSets;
+      const exerciseObj = exercises.find((e) => e.id === exerciseId);
+      const exRestEnabled = exerciseObj?.restTimer !== undefined
+        ? exerciseObj.restTimer
+        : state.preferences?.restTimerEnabled !== false;
+      if (exRestEnabled && !isWorkoutComplete && hasMoreSets) {
         const exName = exerciseObj?.name || "";
         const learnedKey = exName.toLowerCase().trim();
         const learnedRest = state.preferences?.exerciseRestTimes?.[learnedKey];
-        const restSec = learnedRest || state.preferences?.defaultRestSec || 90;
+        const restSec = learnedRest || exerciseObj?.restSec || state.preferences?.defaultRestSec || 90;
         setRestTimer({ active: true, exerciseId, exerciseName: exName, restSec, completedSetIndex: setIndex });
       } else {
         setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
@@ -1225,6 +1230,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         entry.sets[setIndex] = { ...entry.sets[setIndex], completed: false };
         return st;
       });
+      setRestTimer((prev) =>
+        prev.active && prev.exerciseId === exerciseId && prev.completedSetIndex === setIndex
+          ? { ...prev, active: false }
+          : prev
+      );
     },
     [dateKey]
   );
@@ -1265,6 +1275,57 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           for (const wk of st.dailyWorkouts[key]) {
             for (const ex of wk.exercises || []) toggle(ex);
           }
+        }
+        return st;
+      });
+    },
+    []
+  );
+
+  const toggleExerciseRestTimer = useCallback(
+    (exerciseId) => {
+      updateState((st) => {
+        const globalEnabled = st.preferences?.restTimerEnabled !== false;
+        const toggle = (ex) => {
+          if (ex.id !== exerciseId) return;
+          const current = ex.restTimer !== undefined ? ex.restTimer : globalEnabled;
+          ex.restTimer = !current;
+        };
+        for (const wk of st.program.workouts) {
+          for (const ex of wk.exercises) toggle(ex);
+        }
+        for (const key of Object.keys(st.dailyWorkouts || {})) {
+          for (const wk of st.dailyWorkouts[key]) {
+            for (const ex of wk.exercises || []) toggle(ex);
+          }
+        }
+        return st;
+      });
+    },
+    []
+  );
+
+  const toggleWorkoutRestTimer = useCallback(
+    (workoutId) => {
+      updateState((st) => {
+        const globalEnabled = st.preferences?.restTimerEnabled !== false;
+        const findWk = (wk) => wk.id === workoutId;
+        const wk = st.program.workouts.find(findWk)
+          || Object.values(st.dailyWorkouts || {}).flat().find(findWk);
+        if (!wk) return st;
+        // Compute current state: are any exercises enabled?
+        const anyOn = wk.exercises.some((ex) =>
+          ex.restTimer !== undefined ? ex.restTimer : globalEnabled
+        );
+        // If any are on → turn all off. If all off → turn all on.
+        const newVal = !anyOn;
+        const setAll = (w) => {
+          if (w.id !== workoutId) return;
+          for (const ex of w.exercises) ex.restTimer = newVal;
+        };
+        for (const w of st.program.workouts) setAll(w);
+        for (const key of Object.keys(st.dailyWorkouts || {})) {
+          for (const w of st.dailyWorkouts[key]) setAll(w);
         }
         return st;
       });
@@ -1848,34 +1909,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {(tab === "train" || tab === "progress") && workouts.length > 0 && (
-                  <button
-                    style={{ ...styles.navArrow, opacity: 0.45 }}
-                    onClick={() => {
-                      const setter = tab === "train" ? setCollapsedToday : setCollapsedSummary;
-                      const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                      const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
-                      const allCollapsed = allCards.every((w) => collapsed.has(w.id));
-                      allCollapsed ? expandAll(setter) : collapseAll(setter, allCards.map((w) => w.id));
-                    }}
-                    title={(() => {
-                      const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                      const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
-                      return allCards.every((w) => collapsed.has(w.id)) ? "Expand all" : "Collapse all";
-                    })()}
-                    type="button"
-                  >
-                    {(() => {
-                      const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                      const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
-                      return allCards.every((w) => collapsed.has(w.id)) ? (
-                        <svg width="16" height="20" viewBox="0 0 24 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 7l5-5 5 5" /><path d="M7 21l5 5 5-5" /></svg>
+                {(tab === "train" || tab === "progress") && workouts.length > 0 && (() => {
+                  const setter = tab === "train" ? setCollapsedToday : setCollapsedSummary;
+                  const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
+                  const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
+                  const allCollapsed = allCards.every((w) => collapsed.has(w.id));
+                  return (
+                    <button
+                      style={{ ...styles.navArrow, opacity: 0.45 }}
+                      onClick={() => allCollapsed ? expandAll(setter) : collapseAll(setter, allCards.map((w) => w.id))}
+                      title={allCollapsed ? "Expand all" : "Collapse all"}
+                      type="button"
+                    >
+                      {allCollapsed ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
                       ) : (
-                        <svg width="16" height="20" viewBox="0 0 24 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4l5 5 5-5" /><path d="M7 24l5-5 5 5" /></svg>
-                      );
-                    })()}
-                  </button>
-                )}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6" /></svg>
+                      )}
+                    </button>
+                  );
+                })()}
                 <button
                   style={{ ...styles.navArrow, opacity: 0.45 }}
                   onClick={() => { setTrainSearchOpen(true); }}
@@ -2060,6 +2113,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       deleteLogForExercise={deleteLogForExercise}
                       styles={styles}
                       findPrior={findPriorForExercise}
+                      colors={colors}
+                      onToggleRestTimer={toggleWorkoutRestTimer}
+                      globalRestEnabled={state.preferences?.restTimerEnabled !== false}
+                      weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
                     />
                   ))}
                   {dailyWorkoutsToday.map((w) => (
@@ -2077,6 +2134,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onDeleteExercise={(exId) => deleteDailyExercise(w.id, exId)}
                       findPrior={findPriorForExercise}
                       colors={colors}
+                      onToggleRestTimer={toggleWorkoutRestTimer}
+                      globalRestEnabled={state.preferences?.restTimerEnabled !== false}
+                      weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
                     />
                   ))}
                   <button
@@ -2091,8 +2151,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     }}
                     onClick={openGenerateToday}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                      <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                      <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
                     </svg>
                     Generate Workout for Today
                   </button>
@@ -2492,8 +2553,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   }}
                   onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                    <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                    <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
                   </svg>
                   Generate Plan
                 </button>
@@ -2621,7 +2683,43 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} footer={modals.log.isOpen ? (() => {
+      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} headerActions={modals.log.isOpen ? (() => {
+        const hEx = modals.log.context?.exerciseId;
+        let hExObj = null;
+        if (hEx) {
+          for (const wk of state.program.workouts) {
+            hExObj = wk.exercises.find((e) => e.id === hEx);
+            if (hExObj) break;
+          }
+          if (!hExObj) {
+            for (const wk of Object.values(state.dailyWorkouts || {}).flat()) {
+              hExObj = (wk.exercises || []).find((e) => e.id === hEx);
+              if (hExObj) break;
+            }
+          }
+        }
+        const hRestOn = hExObj?.restTimer !== undefined ? hExObj.restTimer : state.preferences?.restTimerEnabled !== false;
+        return (
+          <button
+            onClick={() => toggleExerciseRestTimer(hEx)}
+            style={{
+              ...styles.iconBtn,
+              color: hRestOn ? (colors.accent || "#4fc3f7") : colors.text,
+              opacity: hRestOn ? 0.9 : 0.35,
+            }}
+            aria-label={`Rest timer: ${hRestOn ? "on" : "off"}`}
+            title={hRestOn ? "Rest timer on" : "Rest timer off"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="13" r="8" />
+              <path d="M12 9v4l2 2" />
+              <path d="M5 3l2 2" />
+              <path d="M19 3l-2 2" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+            </svg>
+          </button>
+        );
+      })() : null} footer={modals.log.isOpen ? (() => {
         const fCtx = modals.log.context;
         const fExList = fCtx?.workoutExercises || [];
         const fExIdx = fExList.findIndex((e) => e.id === fCtx?.exerciseId);
@@ -2767,23 +2865,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   display: "flex", flexDirection: "column", gap: 6,
                 }}>
                   {logUnit.key === "reps" && (
-                    <>
-                      <label style={{
-                        display: "flex", alignItems: "center", gap: 8,
-                        fontSize: 13, color: colors.text, cursor: "pointer",
-                        whiteSpace: "nowrap",
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={!!logExercise?.bodyweight}
-                          onChange={() => toggleExerciseBodyweight(logCtx?.exerciseId)}
-                          style={{ accentColor: colors.primaryBg }}
-                        />
-                        Bodyweight
-                      </label>
-                      <div style={{ borderBottom: `1px solid ${colors.border}`, margin: "2px 0" }} />
-                    </>
+                    <label style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      fontSize: 13, color: colors.text, cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={!!logExercise?.bodyweight}
+                        onChange={() => toggleExerciseBodyweight(logCtx?.exerciseId)}
+                        style={{ accentColor: colors.primaryBg }}
+                      />
+                      Bodyweight
+                    </label>
                   )}
+                  <div style={{ borderBottom: `1px solid ${colors.border}`, margin: "2px 0" }} />
                   {[
                     { key: "rpe", label: "RPE (1–10)" },
                     { key: "pace", label: "Pace (MM:SS)" },
@@ -2809,10 +2905,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {modals.log.sets.map((s, i) => {
+            {(() => {
+              const ss = state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets;
+              const firstUncompleted = modals.log.sets.findIndex((_, idx) => !(ss && idx < ss.length && isSetCompleted(ss[idx])));
+              return modals.log.sets.map((s, i) => {
               const isBW = String(s.weight).toUpperCase() === "BW";
-              const savedSets = state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets;
+              const savedSets = ss;
               const isSetSaved = savedSets && i < savedSets.length && isSetCompleted(savedSets[i]);
+              const isNextSet = i === firstUncompleted;
               const showRestAfter = restTimer.active && restTimer.exerciseId === logCtx?.exerciseId && restTimer.completedSetIndex === i;
               return (
                 <React.Fragment key={i}>
@@ -2833,14 +2933,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <button
                     style={{
                       width: 26, height: 26, borderRadius: 999, padding: 0,
-                      border: isSetSaved ? "2px solid #2ecc71" : `2px solid ${colors.border}`,
+                      border: isSetSaved ? "2px solid #2ecc71" : isNextSet ? "2px solid rgba(46,204,113,0.5)" : `2px solid ${colors.border}`,
                       background: isSetSaved ? "#2ecc71" : "transparent",
                       cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      color: isSetSaved ? "#fff" : colors.text,
+                      color: isSetSaved ? "#fff" : isNextSet ? "rgba(46,204,113,0.6)" : colors.text,
                       fontWeight: 700, fontSize: 12,
                       transition: "all 0.2s",
                       ...(isSetSaved ? { animation: "chipPop 0.3s ease-out" } : {}),
+                      ...(isNextSet ? { animation: "setBreathe 2s ease-in-out infinite" } : {}),
                       WebkitTapHighlightColor: "transparent",
                     }}
                     onClick={() => {
@@ -2865,7 +2966,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         <polyline points="20 6 9 17 4 12" style={{ strokeDasharray: 24, animation: "checkDraw 0.3s ease-out forwards" }} />
                       </svg>
                     ) : (
-                      i + 1
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: isNextSet ? 0.7 : 0.3 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
                     )}
                   </button>
 
@@ -3221,7 +3324,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 )}
                 </React.Fragment>
               );
-            })}
+            });
+            })()}
           </div>
 
           <button
@@ -3999,7 +4103,7 @@ function MoodPicker({ value, onChange, colors }) {
 // SUB-COMPONENTS - Extracted from render to avoid re-creation per render
 // ============================================================================
 
-function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme }) {
+function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme, weightLabel }) {
   const exLog = logsForDate[exercise.id] ?? null;
   const hasAnySets = !!exLog && Array.isArray(exLog.sets) && exLog.sets.length > 0;
   const exUnit = getUnit(exercise.unit, exercise);
@@ -4013,22 +4117,32 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   const completedCount = completedSets.length;
   const allDone = totalSets > 0 && completedCount >= totalSets;
 
+  const wLabel = weightLabel || "lb";
+
   const setsText = hasLog
-    ? exLog.sets
-        .filter((s) => isSetCompleted(s))
-        .map((s) => {
+    ? (() => {
+        const done = exLog.sets.filter((s) => isSetCompleted(s));
+        // Build display strings per set
+        const perSet = done.map((s) => {
           const isBW = String(s.weight).toUpperCase() === "BW";
           const w = isBW ? "BW" : s.weight;
+          const noWeight = !w || w === "BW" || w === "" || w === "0";
           if (exUnit.key === "reps") {
-            if (exercise.bodyweight && (!w || w === "BW" || w === "" || w === "0")) {
-              return `${s.reps}`;
-            }
-            return `${s.reps}x${w}`;
+            if (exercise.bodyweight && noWeight) return { key: `${s.reps}`, display: `${s.reps} reps` };
+            if (noWeight) return { key: `${s.reps}`, display: `${s.reps} reps` };
+            return { key: `${s.reps}x${w}`, display: `${s.reps} reps x ${w} ${isBW ? "" : wLabel}`.trim() };
           }
-          const hasWeight = w && w !== "BW" && w !== "" && w !== "0";
-          return hasWeight ? `${s.reps}${exUnit.abbr} @ ${w}` : `${s.reps}${exUnit.abbr}`;
-        })
-        .join(", ")
+          return { key: `${s.reps}${exUnit.abbr}@${w}`, display: noWeight ? `${s.reps} ${exUnit.label}` : `${s.reps} ${exUnit.label} @ ${w} ${wLabel}` };
+        });
+        // Group consecutive identical sets
+        const groups = [];
+        for (const s of perSet) {
+          const last = groups[groups.length - 1];
+          if (last && last.key === s.key) last.count++;
+          else groups.push({ key: s.key, display: s.display, count: 1 });
+        }
+        return groups.map((g) => `${g.count} x ${g.display}`).join(", ");
+      })()
     : "";
 
   return (
@@ -4041,7 +4155,6 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, flex: 1 }}>
           <div style={{ ...styles.exerciseName, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exercise.name}</div>
-          <span style={styles.unitPill}>{exUnit.abbr}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {totalSets > 0 ? (
@@ -4082,16 +4195,24 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel }) {
   const cat = (workout.category || "Workout").trim();
-  const totalEx = workout.exercises.length;
-  const loggedEx = totalEx > 0
-    ? workout.exercises.filter((ex) => {
-        const log = logsForDate[ex.id];
-        return log && Array.isArray(log.sets) && log.sets.some((s) => isSetCompleted(s));
-      }).length
-    : 0;
-  const allDone = totalEx > 0 && loggedEx === totalEx;
+
+  // Compute rest timer state from exercises: all on, all off, or mixed
+  const exStates = workout.exercises.map((ex) =>
+    ex.restTimer !== undefined ? ex.restTimer : globalRestEnabled
+  );
+  const allOn = exStates.length > 0 && exStates.every(Boolean);
+  const allOff = exStates.length === 0 || exStates.every((v) => !v);
+  const mixed = !allOn && !allOff;
+
+  // Timer icon color
+  const timerColor = allOn
+    ? (colors?.accent || "#4fc3f7")
+    : mixed
+      ? (colors?.accent || "#4fc3f7")
+      : undefined;
+  const timerOpacity = allOn ? 0.8 : mixed ? 0.45 : 0.25;
 
   return (
     <div className="card-hover" style={styles.card}>
@@ -4100,20 +4221,6 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
         </div>
-        {totalEx > 0 && (
-          <span style={{
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "2px 8px",
-            borderRadius: 999,
-            background: allDone ? "rgba(46, 204, 113, 0.18)" : "transparent",
-            color: allDone ? "#2ecc71" : "inherit",
-            opacity: allDone ? 1 : 0.45,
-            whiteSpace: "nowrap",
-          }}>
-            {allDone ? "Complete" : `${loggedEx}/${totalEx}`}
-          </span>
-        )}
         {daily && onDelete && (
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -4135,7 +4242,48 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
             </svg>
           </button>
         )}
-        <span style={styles.collapseToggle}>{collapsed ? "\u25B6" : "\u25BC"}</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleRestTimer?.(workout.id); }}
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: 4,
+            color: timerColor || "inherit",
+            opacity: timerOpacity,
+            display: "flex",
+            alignItems: "center",
+            position: "relative",
+          }}
+          aria-label={`Rest timer: ${allOn ? "on" : allOff ? "off" : "mixed"}`}
+          title={allOn ? "Rest timer on (all exercises)" : allOff ? "Rest timer off" : "Rest timer on (some exercises)"}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="13" r="8" />
+            <path d="M12 9v4l2 2" />
+            <path d="M5 3l2 2" />
+            <path d="M19 3l-2 2" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+          </svg>
+          {mixed && (
+            <span style={{
+              position: "absolute",
+              top: 1,
+              right: 1,
+              width: 5,
+              height: 5,
+              borderRadius: "50%",
+              background: colors?.accent || "#4fc3f7",
+            }} />
+          )}
+        </button>
+        <span style={styles.collapseToggle}>
+            {collapsed ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+            )}
+          </span>
       </div>
 
       {!collapsed && workout.note && (
@@ -4166,6 +4314,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
                 findPrior={findPrior}
                 onDeleteExercise={onDeleteExercise ? (exId) => onDeleteExercise(exId) : undefined}
                 workoutScheme={workout.scheme}
+                weightLabel={weightLabel}
               />
             ))}
           </div>
@@ -4199,7 +4348,13 @@ function SummaryBlock({ workout, collapsed, onToggle, summaryRange, computeExerc
             {active.length}/{exSummaries.length}
           </span>
         )}
-        <span style={styles.collapseToggle}>{collapsed ? "\u25B6" : "\u25BC"}</span>
+        <span style={styles.collapseToggle}>
+            {collapsed ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+            )}
+          </span>
       </div>
 
       {!collapsed && (
