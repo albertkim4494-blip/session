@@ -1660,9 +1660,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (addedNames.length === 0) {
       showToast(`"${exerciseName}" already exists in selected workouts`);
     } else if (addedNames.length === 1) {
-      showToast(`Added "${exerciseName}" to ${addedNames[0]}`);
+      showToast(`Exercise added to workout`);
     } else {
-      showToast(`Added "${exerciseName}" to ${addedNames.length} workouts`);
+      showToast(`Exercise added to workouts`);
     }
   }, [workoutById, dateKey]);
 
@@ -1897,7 +1897,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 <input
                   value={trainSearch}
                   onChange={(e) => setTrainSearch(e.target.value)}
-                  placeholder={tab === "train" ? "Search exercises..." : tab === "progress" ? "Search progress..." : "Search plan..."}
+                  placeholder={tab === "train" ? "Search for exercise to log..." : tab === "progress" ? "Search for exercise progress..." : "Search exercises in programs..."}
                   autoFocus
                   style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1, minWidth: 0 }}
                 />
