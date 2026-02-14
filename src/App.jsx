@@ -29,7 +29,9 @@ import { useSwipe } from "./hooks/useSwipe";
 import { Modal, ConfirmModal, InputModal } from "./components/Modal";
 import { PillTabs } from "./components/PillTabs";
 import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
-import { ProfileModal, ChangeUsernameModal, ChangePasswordModal } from "./components/ProfileModal";
+import { ProfileModal } from "./components/ProfileModal";
+import { ChangeUsernameModal } from "./components/profile/ChangeUsernameModal";
+import { ChangePasswordModal } from "./components/profile/ChangePasswordModal";
 import { CoachInsightsCard, CoachNudge, AddSuggestedExerciseModal } from "./components/CoachInsights";
 import { CatalogBrowseModal } from "./components/CatalogBrowseModal";
 import { GenerateWizardModal } from "./components/GenerateWizardModal";
@@ -126,8 +128,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [summaryOffset, setSummaryOffset] = useState(0);
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
-  const [theme, setTheme] = useState(() => localStorage.getItem("wt_theme") || "dark");
-  const [equipment, setEquipment] = useState(() => localStorage.getItem("wt_equipment") || "gym");
+  const theme = state.preferences?.theme || "dark";
+  const equipment = state.preferences?.equipment || "gym";
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
   const [trainSearch, setTrainSearch] = useState("");
@@ -516,10 +518,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [workouts, state.dailyWorkouts, summaryRange]);
 
   const summaryStats = useMemo(() => {
-    // Build exercise ID → name map from all workout sources
+    // Build exercise ID → name/unit maps from all workout sources
     const exNameMap = {};
+    const exUnitMap = {};
     for (const w of progressWorkouts) {
-      for (const ex of w.exercises || []) exNameMap[ex.id] = ex.name;
+      for (const ex of w.exercises || []) {
+        exNameMap[ex.id] = ex.name;
+        exUnitMap[ex.id] = getUnit(ex.unit, ex);
+      }
     }
 
     let logged = 0;
@@ -585,7 +591,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       for (const [id, val] of Object.entries(map)) {
         if (val > bestVal) { bestVal = val; bestId = id; }
       }
-      return bestId ? { value: bestVal, name: exNameMap[bestId] || "Unknown" } : null;
+      return bestId ? { value: bestVal, name: exNameMap[bestId] || "Unknown", unit: exUnitMap[bestId] || null } : null;
     };
 
     return {
@@ -729,27 +735,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }, [dateKey]);
 
-  useEffect(() => {
-    localStorage.setItem("wt_theme", theme);
-  }, [theme]);
 
-  useEffect(() => {
-    localStorage.setItem("wt_equipment", equipment);
-  }, [equipment]);
-
-  // Load onboarding measurement system choice (one-time)
-  useEffect(() => {
-    const onboardingMs = localStorage.getItem("wt_measurement_system");
-    if (onboardingMs && !state.preferences?.measurementSystem) {
-      updateState((st) => {
-        if (!st.preferences) st.preferences = {};
-        if (!st.preferences.measurementSystem) {
-          st.preferences.measurementSystem = onboardingMs;
-        }
-        return st;
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     sessionStorage.setItem("wt_tab", tab);
@@ -1840,9 +1826,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
                       const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
                       return allCards.every((w) => collapsed.has(w.id)) ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10l5-5 5 5" /><path d="M7 14l5 5 5-5" /></svg>
+                        <svg width="16" height="20" viewBox="0 0 24 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 7l5-5 5 5" /><path d="M7 21l5 5 5-5" /></svg>
                       ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8l5 5 5-5" /><path d="M7 16l5-5 5 5" /></svg>
+                        <svg width="16" height="20" viewBox="0 0 24 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4l5 5 5-5" /><path d="M7 24l5-5 5 5" /></svg>
                       );
                     })()}
                   </button>
@@ -2075,6 +2061,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* SUMMARY TAB */}
           {tab === "progress" ? (
             <div key="progress" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
+              <div style={{ position: "sticky", top: -14, zIndex: 10, background: colors.appBg, marginTop: -14, paddingTop: 14, paddingBottom: 6, marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16 }}>
+                <PillTabs
+                  styles={styles}
+                  value={summaryMode}
+                  onChange={(v) => { setSummaryMode(v); setSummaryOffset(0); }}
+                  tabs={[
+                    { value: "week", label: "Week" },
+                    { value: "month", label: "Month" },
+                    { value: "year", label: "Year" },
+                    { value: "all", label: "All" },
+                  ]}
+                />
+              </div>
               {(() => {
                 const pctLogged = summaryStats.total > 0 ? Math.round((summaryStats.logged / summaryStats.total) * 100) : 0;
                 const navBtnStyle = { background: "transparent", border: "none", color: colors.text, cursor: "pointer", padding: "4px 8px", fontSize: 18, fontWeight: 700, lineHeight: 1 };
@@ -2094,11 +2093,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
                 const statBadges = [];
                 if (selectedStats.includes("totalReps") && summaryStats.bestReps) {
+                  const bestUnit = summaryStats.bestReps.unit;
+                  const unitLabel = bestUnit ? bestUnit.label : "Reps";
                   statBadges.push(
                     <div key="reps" style={badgeStyle}>
                       <div style={exStyle}>{summaryStats.bestReps.name}</div>
                       <div style={{ ...valStyle, color: "#7dd3fc" }}>{formatNum(summaryStats.bestReps.value)}</div>
-                      <div style={subStyle}>Total Reps</div>
+                      <div style={subStyle}>Total {unitLabel}</div>
                     </div>
                   );
                 }
@@ -2124,17 +2125,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 const topRowCols = statBadges.length === 1 ? "1fr 1fr 1fr" : "1fr 1fr";
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <PillTabs
-                      styles={styles}
-                      value={summaryMode}
-                      onChange={(v) => { setSummaryMode(v); setSummaryOffset(0); }}
-                      tabs={[
-                        { value: "week", label: "Week" },
-                        { value: "month", label: "Month" },
-                        { value: "year", label: "Year" },
-                        { value: "all", label: "All" },
-                      ]}
-                    />
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, position: "relative" }}>
                       {summaryMode !== "all" && (
                         <button style={{ ...navBtnStyle, opacity: 0.5 }} onClick={() => setSummaryOffset((o) => o - 1)} aria-label="Previous period">‹</button>
@@ -2171,7 +2161,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           }}>
                             <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 2 }}>Show Highlights</div>
                             {[
-                              { key: "totalReps", label: "Total Reps" },
+                              { key: "totalReps", label: "Top Exercise" },
                               { key: "volume", label: `Volume (${weightUnit})` },
                               { key: "topLift", label: `Top Lift (${weightUnit})` },
                             ].map((opt) => (
@@ -3650,10 +3640,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         dispatch={dispatchModal}
         profile={profile}
         session={session}
-        theme={theme}
-        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-        equipment={equipment}
-        onSetEquipment={setEquipment}
         onLogout={onLogout}
         onSave={saveProfile}
         styles={styles}

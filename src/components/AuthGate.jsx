@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { LS_KEY, LS_BACKUP_KEY } from "../lib/constants";
+import { loadState, persistState } from "../lib/stateUtils";
 import AuthScreen from "./AuthScreen";
 import OnboardingScreen from "./OnboardingScreen";
 import App from "../App";
@@ -93,6 +94,14 @@ export default function AuthGate() {
 
   const [showGenerateWizard, setShowGenerateWizard] = useState(false);
 
+  // Patch a preference directly into persisted state so App picks it up on mount
+  const onboardingUpdatePreference = useCallback((key, value) => {
+    const st = loadState();
+    if (!st.preferences) st.preferences = {};
+    st.preferences[key] = value;
+    persistState(st);
+  }, []);
+
   const handleOnboardingComplete = () => {
     setNeedsOnboarding(false);
     setProfileReady(true);
@@ -121,7 +130,7 @@ export default function AuthGate() {
 
   // 4. Needs onboarding
   if (needsOnboarding) {
-    return <OnboardingScreen session={session} onComplete={handleOnboardingComplete} />;
+    return <OnboardingScreen session={session} onComplete={handleOnboardingComplete} onUpdatePreference={onboardingUpdatePreference} />;
   }
 
   // 5. Ready

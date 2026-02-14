@@ -139,6 +139,7 @@ export function getStyles(colors) {
       background: colors.inputBg,
       color: colors.text,
       fontSize: 14,
+      fontFamily: "inherit",
       width: "100%",
       boxSizing: "border-box",
     },
@@ -601,7 +602,10 @@ export function getStyles(colors) {
       background: colors.inputBg,
       color: colors.text,
       fontSize: 14,
+      fontFamily: "inherit",
       resize: "vertical",
+      width: "100%",
+      boxSizing: "border-box",
     },
 
     calendarSwipeArea: {

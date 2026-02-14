@@ -84,6 +84,8 @@ export function makeDefaultState() {
       timerSound: true,
       restTimerEnabled: true,
       measurementSystem: "imperial",
+      equipment: "gym",
+      theme: "dark",
       exerciseRestTimes: {},
     },
     meta: {
@@ -117,6 +119,24 @@ export function normalizeState(st) {
   next.preferences = { ...defaultPrefs, ...(next.preferences || {}) };
   if (!next.preferences.exerciseRestTimes || typeof next.preferences.exerciseRestTimes !== "object") {
     next.preferences.exerciseRestTimes = {};
+  }
+
+  // One-time migration: read equipment/theme/measurementSystem from old standalone localStorage keys
+  try {
+    if (!next.preferences.equipment || next.preferences.equipment === "gym") {
+      const oldEquip = localStorage.getItem("wt_equipment");
+      if (oldEquip) next.preferences.equipment = oldEquip;
+    }
+    if (!next.preferences.theme || next.preferences.theme === "dark") {
+      const oldTheme = localStorage.getItem("wt_theme");
+      if (oldTheme) next.preferences.theme = oldTheme;
+    }
+    if (!next.preferences.measurementSystem || next.preferences.measurementSystem === "imperial") {
+      const oldMs = localStorage.getItem("wt_measurement_system");
+      if (oldMs) next.preferences.measurementSystem = oldMs;
+    }
+  } catch {
+    // localStorage may be unavailable (SSR, private browsing)
   }
 
   migrateCompletedFlag(next);

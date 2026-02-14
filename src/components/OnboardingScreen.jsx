@@ -9,7 +9,7 @@ const EQUIPMENT_OPTIONS = [
   { key: "gym", label: "Full Gym", desc: "All equipment available" },
 ];
 
-export default function OnboardingScreen({ session, onComplete }) {
+export default function OnboardingScreen({ session, onComplete, onUpdatePreference }) {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [birthdate, setBirthdate] = useState("");
@@ -67,9 +67,11 @@ export default function OnboardingScreen({ session, onComplete }) {
       return;
     }
 
-    // Save equipment and measurement system to localStorage so App picks it up
-    try { localStorage.setItem("wt_equipment", equipment); } catch {}
-    try { localStorage.setItem("wt_measurement_system", measurementSystem); } catch {}
+    // Save equipment and measurement system to state preferences (cloud-synced)
+    if (onUpdatePreference) {
+      onUpdatePreference("equipment", equipment);
+      onUpdatePreference("measurementSystem", measurementSystem);
+    }
 
     setLoading(true);
     try {
