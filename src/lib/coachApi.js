@@ -309,6 +309,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     body: {
       profile: {
         age: profile?.age,
+        gender: profile?.gender,
         weight_lbs: profile?.weight_lbs,
         goal: profile?.goal,
         about: profile?.about,

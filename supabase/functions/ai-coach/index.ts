@@ -111,6 +111,7 @@ Deno.serve(async (req) => {
     // Build profile context
     const profileParts: string[] = [];
     if (profile?.age) profileParts.push(`Age: ${profile.age}`);
+    if (profile?.gender) profileParts.push(`Gender: ${profile.gender}`);
     if (profile?.weight_lbs) profileParts.push(`Weight: ${profile.weight_lbs} ${wUnit}`);
     if (profile?.goal) profileParts.push(`Goal: ${profile.goal}`);
     if (profile?.sports) profileParts.push(`Sports/Activities: ${profile.sports}`);
@@ -235,6 +236,25 @@ BODY-RELATIVE STRENGTH AWARENESS:
 - If someone is well below beginner ratios and the weight has been flat for 3+ weeks, gently suggest progressive overload with specific increments (e.g., "Try adding ${wUnit === "kg" ? "2.5 kg" : "5 lb"} next session").
 - For bodyweight exercises (pushups, pull-ups, dips), evaluate volume and rep quality rather than added weight. High-rep bodyweight work is legitimate training.
 - If profile data is missing (no weight, no age), don't guess — just evaluate based on the trend data you have.
+
+ISOLATION EXERCISE AWARENESS:
+- Isolation exercises (curls, lateral raises, tricep extensions, leg curls, etc.) use MUCH less weight than compounds. Do NOT apply compound-lift expectations.
+- For isolation exercises, "stalling" is often just the user still building mind-muscle connection, improving form, or developing tendon strength. This is normal and healthy — don't treat it as a problem.
+- Typical isolation weight ranges vary hugely by gender and size:
+  * Women commonly use 5-15 ${wUnit} dumbbells for curls, lateral raises, and tricep work — this is completely normal and effective.
+  * Men commonly use 15-35 ${wUnit} dumbbells for the same movements.
+- Staying at the same isolation weight for weeks is NOT the same as a compound lift stall. Suggest increasing reps or adding a set before suggesting heavier weight.
+- Never frame light weights negatively. A 10 ${wUnit} curl done with control and full range of motion is more effective than a 25 ${wUnit} curl with bad form.
+
+BEGINNER-SPECIFIC GUIDANCE:
+- Beginners (people with fewer than ~3 months of training, or whose About field indicates they're new to exercise):
+  * Celebrate showing up. Consistency IS the achievement at this stage.
+  * Focus on form, habit-building, and enjoying the process — not progressive overload.
+  * Do NOT suggest heavier weight unless they've been at the same weight for 4+ weeks AND are completing all reps comfortably (not struggling).
+  * "Your weights haven't gone up" is NOT useful feedback for a beginner. Instead, notice things like "You're hitting all your sets consistently" or "Your form is building a great foundation."
+  * If their goal is General Fitness or Lose Fat, progressive overload is even LESS of a priority — consistency, volume, and enjoyment matter more.
+  * Suggest technique cues or rep quality before ever suggesting heavier loads.
+- Intermediate/Advanced lifters: progressive overload advice IS appropriate when you see clear stalls with good volume.
 
 ANTI-REPETITION:
 - If previous recommendations are listed below, do NOT repeat those topics. Find new angles each time.

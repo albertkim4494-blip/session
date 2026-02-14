@@ -109,7 +109,9 @@ UNDERSTANDING THE USER:
 - Read the "About" field carefully. It tells you who this person is — health conditions, experience level, injuries, limitations.
 - A D1 athlete needs high-intensity programming with sport-specific periodization. Someone managing an autoimmune condition or chronic illness needs lower volume, more recovery built in, and careful exercise selection.
 - If injuries or conditions are mentioned, avoid aggravating exercises entirely — don't just reduce sets, pick different movements.
-- Beginners need simpler programs with fewer exercises. Advanced lifters benefit from more variety and periodization.
+- Beginners need simpler programs with fewer exercises and approachable volume. Advanced lifters benefit from more variety and periodization.
+- Consider gender and body weight when selecting exercises. Lighter individuals and women may benefit from dumbbell variations over barbell for many movements, and typically start with lower absolute loads.
+- For General Fitness or Lose Fat goals, prioritize enjoyable, sustainable exercise selection over maximum intensity. The best program is the one they'll actually do.
 
 RULES:
 1. Pick exercises ONLY from the catalog above, using exact catalogId values.
@@ -120,10 +122,10 @@ RULES:
    - Tailor schemes to the user's goal:
      * Build Muscle: 3-4 sets of 8-12 reps, emphasize hypertrophy
      * Get Stronger: 4-5 sets of 3-5 reps, heavy compounds
-     * Lose Fat: 3 sets of 15-20 reps, keep rest short
+     * Lose Fat: 3 sets of 12-15 reps, keep rest short, include some cardio-style movements
      * General Fitness: 3 sets of 10-12 reps, balanced
      * Sport Performance: 3-4 sets of 6-8 reps, explosive movements
-   - If the user has health conditions or is a beginner, lean toward FEWER sets (2-3) with moderate intensity. Don't overwhelm them.
+   - If the user has health conditions or is a beginner, lean toward FEWER sets (2-3) with moderate reps (8-12). Don't overwhelm them — they can always add volume later.
 3. No duplicate exercises within a single day.
 4. Vary exercises across days — don't repeat the same exercise on multiple days unless necessary.
 5. Order: compounds first, then isolation, then accessories/core.
@@ -228,6 +230,7 @@ UNDERSTANDING THE USER:
 - Read the "About" field carefully. Health conditions, experience level, injuries — all of it matters for today's workout.
 - Someone with chronic fatigue or an autoimmune condition needs a lighter session than a collegiate athlete. Fewer exercises, lower volume, more recovery-friendly movements.
 - If injuries are mentioned, avoid those areas entirely — pick alternatives, not modifications.
+- Consider gender, body weight, and experience level when selecting exercises and prescribing volume. Beginners benefit from approachable volume (2-3 sets) and movements they can do with confidence.
 ${(() => {
   const sections: string[] = [];
   if (fatigue) {
