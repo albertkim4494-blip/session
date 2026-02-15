@@ -94,23 +94,6 @@ export function ExerciseCatalogModal({
     return () => { backOverrideRef.current = null; };
   }, [open, !!detailEntry, backOverrideRef]);
 
-  // Swipe between exercises in detail view
-  const navigateDetail = useCallback((dir) => {
-    if (!detailEntry) return;
-    const idx = catalogResults.findIndex((e) => e.id === detailEntry.id);
-    if (idx < 0) return;
-    const next = idx + dir;
-    if (next >= 0 && next < catalogResults.length) {
-      setDetailEntry(catalogResults[next]);
-    }
-  }, [detailEntry, catalogResults]);
-
-  const swipeHandlers = useSwipe({
-    onSwipeLeft: () => navigateDetail(1),
-    onSwipeRight: () => navigateDetail(-1),
-    thresholdPx: 50,
-  });
-
   const catalogResults = useMemo(
     () => catalogSearch(catalog || EXERCISE_CATALOG, query, { movement: movementFilter, limit: 50 }),
     [query, movementFilter, catalog]
@@ -137,6 +120,23 @@ export function ExerciseCatalogModal({
       return ex.name.toLowerCase().includes(q);
     }).slice(0, 8);
   }, [query, movementFilter, workouts, logsByDate, catalogNameSet, targetWorkoutId]);
+
+  // Swipe between exercises in detail view
+  const navigateDetail = useCallback((dir) => {
+    if (!detailEntry) return;
+    const idx = catalogResults.findIndex((e) => e.id === detailEntry.id);
+    if (idx < 0) return;
+    const next = idx + dir;
+    if (next >= 0 && next < catalogResults.length) {
+      setDetailEntry(catalogResults[next]);
+    }
+  }, [detailEntry, catalogResults]);
+
+  const swipeHandlers = useSwipe({
+    onSwipeLeft: () => navigateDetail(1),
+    onSwipeRight: () => navigateDetail(-1),
+    thresholdPx: 50,
+  });
 
   if (!open) return null;
 
