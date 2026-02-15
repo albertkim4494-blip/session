@@ -21,7 +21,7 @@ function formatMuscleName(muscle) {
  * Both modes always render a footer so Modal uses fixed height (95dvh).
  */
 export function ExerciseDetailModal({
-  open, entry, onClose, onAddExercise,
+  open, entry, onBack, onClose, onAddExercise,
   workouts, styles, colors, targetWorkoutId,
   swipeHandlers,
 }) {
@@ -299,7 +299,7 @@ export function ExerciseDetailModal({
       footer={footer}
       headerContent={
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={onClose} style={{ ...styles.iconBtn, padding: 4 }} aria-label="Back">
+          <button onClick={onBack} style={{ ...styles.iconBtn, padding: 4 }} aria-label="Back">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
             </svg>
@@ -307,7 +307,6 @@ export function ExerciseDetailModal({
           <div style={styles.modalTitle}>{entry.name}</div>
         </div>
       }
-      hideClose
     >
       <div
         style={{ display: "flex", flexDirection: "column", gap: 14 }}

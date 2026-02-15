@@ -298,7 +298,8 @@ export function ExerciseCatalogModal({
       <ExerciseDetailModal
         open={!!detailEntry}
         entry={detailEntry}
-        onClose={() => setDetailEntry(null)}
+        onBack={() => setDetailEntry(null)}
+        onClose={() => { setDetailEntry(null); onClose(); }}
         onAddExercise={onAddExercise ? (entry, workoutId) => onAddExercise(entry, workoutId) : undefined}
         workouts={workouts}
         styles={styles}
