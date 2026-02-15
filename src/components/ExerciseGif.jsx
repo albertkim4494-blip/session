@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { getExerciseGif } from "../lib/exerciseGifApi";
 
-export function ExerciseGif({ exerciseName, colors }) {
+export function ExerciseGif({ exerciseName, catalogId, colors }) {
   const [gifUrl, setGifUrl] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -10,7 +10,7 @@ export function ExerciseGif({ exerciseName, colors }) {
     setLoading(true);
     setGifUrl(null);
 
-    getExerciseGif(exerciseName).then((result) => {
+    getExerciseGif(exerciseName, catalogId).then((result) => {
       if (cancelled) return;
       setGifUrl(result?.gifUrl || null);
       setLoading(false);
@@ -19,7 +19,7 @@ export function ExerciseGif({ exerciseName, colors }) {
     return () => {
       cancelled = true;
     };
-  }, [exerciseName]);
+  }, [exerciseName, catalogId]);
 
   // Loading skeleton
   if (loading) {

@@ -1,14 +1,16 @@
 /**
- * Exercise GIF API — fetches exercise demonstration GIFs from the
- * open-source ExerciseDB v1 API (no API key needed).
- * Results are cached in localStorage so each exercise only needs one lookup ever.
+ * Exercise GIF API — resolves exercise demonstration GIFs.
+ *
+ * 1. Static map (exerciseGifMap.js) — pre-matched catalog exercises, instant
+ * 2. API search fallback — for custom/unmapped exercises, cached in localStorage
  *
  * API: https://exercisedb-api.vercel.app
  * GIF CDN: https://static.exercisedb.dev/media/{id}.gif
  */
+import { EXERCISE_GIF_MAP } from "./exerciseGifMap";
 
 const API_BASE = "https://exercisedb-api.vercel.app/api/v1/exercises";
-const CACHE_KEY = "wt_exercise_gifs_v2";
+const CACHE_KEY = "wt_exercise_gifs_v3";
 
 function getCache() {
   try {
@@ -25,18 +27,25 @@ function setCache(cache) {
 }
 
 /**
- * Get exercise GIF URL by name.
+ * Get exercise GIF URL.
+ * @param {string} exerciseName - display name of the exercise
+ * @param {string} [catalogId] - optional catalog ID for static map lookup
  * Returns { gifUrl, name } or null if not found.
  */
-export async function getExerciseGif(exerciseName) {
+export async function getExerciseGif(exerciseName, catalogId) {
   if (!exerciseName) return null;
 
+  // 1. Static map lookup by catalogId (instant, most accurate)
+  if (catalogId && EXERCISE_GIF_MAP[catalogId]) {
+    return { gifUrl: EXERCISE_GIF_MAP[catalogId], name: exerciseName };
+  }
+
+  // 2. Check localStorage cache for custom exercises
   const key = exerciseName.toLowerCase().trim();
   const cache = getCache();
-
-  // Return cached result (including null = "not found" sentinel)
   if (key in cache) return cache[key];
 
+  // 3. API search fallback
   try {
     const encoded = encodeURIComponent(key);
     const res = await fetch(`${API_BASE}?search=${encoded}&limit=5`);

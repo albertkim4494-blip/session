@@ -322,7 +322,7 @@ export function ExerciseDetailModal({
         </div>
 
         {/* Exercise demonstration GIF */}
-        <ExerciseGif exerciseName={entry.name} colors={colors} />
+        <ExerciseGif exerciseName={entry.name} catalogId={entry.id} colors={colors} />
 
         {/* Body diagram + muscle chips */}
         {hasMuscles ? (
