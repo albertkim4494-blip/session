@@ -49,7 +49,7 @@ console.log("\nbuildCatalogMap:");
 const catalogMap = buildCatalogMap(EXERCISE_CATALOG);
 assert(catalogMap instanceof Map, "returns a Map");
 assert(catalogMap.size === EXERCISE_CATALOG.length, "map size matches catalog length");
-assert(catalogMap.get("c-bench-flat-bb").name === "Barbell Bench Press", "lookup by id works");
+assert(catalogMap.get("edb-EIeI8Vf").name === "Barbell Bench Press", "lookup by id works");
 assert(catalogMap.get("nonexistent") === undefined, "missing id returns undefined");
 
 // --- catalogSearch ---
@@ -65,10 +65,10 @@ assert(benchResults.some((r) => r.name.toLowerCase().includes("bench")), "bench 
 const pullResults = catalogSearch(EXERCISE_CATALOG, "pull");
 assert(pullResults[0].name.toLowerCase().startsWith("pull"), "pull — name prefix ranked first");
 
-// Alias match
+// Name match for "bent over row"
 const bbRowResults = catalogSearch(EXERCISE_CATALOG, "bent over row");
-assert(bbRowResults.length > 0, "alias 'bent over row' finds results");
-assert(bbRowResults[0].name === "Barbell Row", "alias match returns Barbell Row");
+assert(bbRowResults.length > 0, "'bent over row' finds results");
+assert(bbRowResults[0].name.toLowerCase().includes("bent over row"), "first result contains 'bent over row'");
 
 // Muscle group match
 const chestResults = catalogSearch(EXERCISE_CATALOG, "chest");
@@ -141,7 +141,7 @@ assertEqual(freq[1].count, 3, "ex2 has count=3");
 // --- resolveExerciseDisplay ---
 console.log("\nresolveExerciseDisplay:");
 
-const exWithCatalog = { id: "ex1", name: "Bench Press", unit: "reps", catalogId: "c-bench-flat-bb" };
+const exWithCatalog = { id: "ex1", name: "Bench Press", unit: "reps", catalogId: "edb-EIeI8Vf" };
 const exWithout = { id: "ex2", name: "Custom Exercise", unit: "reps" };
 
 const resolved = resolveExerciseDisplay(exWithCatalog, catalogMap);

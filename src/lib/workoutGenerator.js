@@ -142,6 +142,7 @@ function pickExercisesForWorkout(muscles, equipment, goal, catalog, duration) {
   const coveredMuscles = new Set();
   for (const e of picked) {
     for (const m of e.muscles.primary) coveredMuscles.add(m);
+    for (const m of (e.muscles.secondary || [])) coveredMuscles.add(m);
   }
   for (const muscle of muscles) {
     if (picked.length >= targetCount) break;
@@ -278,13 +279,11 @@ export function analyzeMuscleRecency(state, catalog) {
     for (const exerciseId of Object.keys(dayLogs)) {
       const entry = exerciseMap.get(exerciseId);
       if (!entry) continue;
-      for (const muscle of entry.muscles.primary) {
-        if (recency[muscle] === null || dateKey > recency[muscle]) {
-          // Actually we want the most recent, and we're iterating newest first,
-          // so only set if null (first occurrence = most recent)
-          if (recency[muscle] === null) {
-            recency[muscle] = dateKey;
-          }
+      // Track both primary and secondary muscles for recency
+      const allMuscles = [...entry.muscles.primary, ...(entry.muscles.secondary || [])];
+      for (const muscle of allMuscles) {
+        if (recency[muscle] !== undefined && recency[muscle] === null) {
+          recency[muscle] = dateKey;
         }
       }
     }

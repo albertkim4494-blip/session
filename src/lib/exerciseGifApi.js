@@ -1,13 +1,11 @@
 /**
- * Exercise GIF API — resolves exercise demonstration GIFs.
+ * Exercise GIF API — fallback search for custom/user exercises not in the catalog.
  *
- * 1. Static map (exerciseGifMap.js) — pre-matched catalog exercises, instant
- * 2. API search fallback — for custom/unmapped exercises, cached in localStorage
+ * Catalog exercises now have gifUrl directly on their entries.
+ * This module is only used for custom exercises typed by users.
  *
  * API: https://exercisedb-api.vercel.app
- * GIF CDN: https://static.exercisedb.dev/media/{id}.gif
  */
-import { EXERCISE_GIF_MAP } from "./exerciseGifMap";
 
 const API_BASE = "https://exercisedb-api.vercel.app/api/v1/exercises";
 const CACHE_KEY = "wt_exercise_gifs_v3";
@@ -27,25 +25,16 @@ function setCache(cache) {
 }
 
 /**
- * Get exercise GIF URL.
- * @param {string} exerciseName - display name of the exercise
- * @param {string} [catalogId] - optional catalog ID for static map lookup
+ * Search for a GIF for a custom exercise by name.
  * Returns { gifUrl, name } or null if not found.
  */
-export async function getExerciseGif(exerciseName, catalogId) {
+export async function getExerciseGif(exerciseName) {
   if (!exerciseName) return null;
 
-  // 1. Static map lookup by catalogId (instant, most accurate)
-  if (catalogId && EXERCISE_GIF_MAP[catalogId]) {
-    return { gifUrl: EXERCISE_GIF_MAP[catalogId], name: exerciseName };
-  }
-
-  // 2. Check localStorage cache for custom exercises
   const key = exerciseName.toLowerCase().trim();
   const cache = getCache();
   if (key in cache) return cache[key];
 
-  // 3. API search fallback
   try {
     const encoded = encodeURIComponent(key);
     const res = await fetch(`${API_BASE}?search=${encoded}&limit=5`);
@@ -65,7 +54,6 @@ export async function getExerciseGif(exerciseName, catalogId) {
       return null;
     }
 
-    // Prefer exact name match, fall back to first result
     const exact = exercises.find((e) => e.name?.toLowerCase() === key);
     const best = exact || exercises[0];
 
@@ -74,12 +62,11 @@ export async function getExerciseGif(exerciseName, catalogId) {
     setCache(cache);
     return result;
   } catch {
-    // Network error — don't cache, allow retry
     return null;
   }
 }
 
-/** Clear the GIF cache (useful if data updates). */
+/** Clear the GIF cache. */
 export function clearGifCache() {
   try {
     localStorage.removeItem(CACHE_KEY);

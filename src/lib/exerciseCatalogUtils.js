@@ -216,7 +216,9 @@ export function getMuscleGroups(exercise, catalogMap, keywordFallback) {
   if (exercise?.catalogId && catalogMap) {
     const entry = catalogMap.get(exercise.catalogId);
     if (entry?.muscles?.primary?.length > 0) {
-      return entry.muscles.primary;
+      // Return combined primary + secondary for full muscle coverage
+      const all = [...entry.muscles.primary, ...(entry.muscles.secondary || [])];
+      return [...new Set(all)];
     }
   }
   // Fall back to keyword-based classification

@@ -90,10 +90,11 @@ function getSuggestionsForMuscleGroup(group, catalog, userExerciseNames) {
   );
 
   const matches = catalog
-    .filter((entry) =>
-      entry.muscles?.primary?.includes(group) &&
-      !userNamesLower.has(entry.name.toLowerCase())
-    )
+    .filter((entry) => {
+      const hasMuscle = entry.muscles?.primary?.includes(group) ||
+        entry.muscles?.secondary?.includes(group);
+      return hasMuscle && !userNamesLower.has(entry.name.toLowerCase());
+    })
     .slice(0, 3)
     .map((entry) => ({ exercise: entry.name, muscleGroup: group }));
 
@@ -210,18 +211,25 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
       if (activity === "strength") {
         // Strength: accumulate muscle group volume in reps
         // Prefer catalog muscle data when available, fall back to keyword matching
-        let groups;
+        let primaryGroups;
+        let secondaryGroups = [];
         if (info.catalogId && catalogMap) {
           const catalogEntry = catalogMap.get(info.catalogId);
           if (catalogEntry?.muscles?.primary?.length > 0) {
-            groups = catalogEntry.muscles.primary;
+            primaryGroups = catalogEntry.muscles.primary;
+            secondaryGroups = catalogEntry.muscles.secondary || [];
           }
         }
-        if (!groups) {
-          groups = classifyExerciseMuscles(name);
+        if (!primaryGroups) {
+          primaryGroups = classifyExerciseMuscles(name);
         }
-        for (const group of groups) {
+        // Primary muscles get full volume credit
+        for (const group of primaryGroups) {
           muscleGroupVolume[group] = (muscleGroupVolume[group] || 0) + totalValue;
+        }
+        // Secondary muscles get half volume credit
+        for (const group of secondaryGroups) {
+          muscleGroupVolume[group] = (muscleGroupVolume[group] || 0) + Math.round(totalValue * 0.5);
         }
         totalStrengthReps += totalValue;
       } else if (activity === "sport") {

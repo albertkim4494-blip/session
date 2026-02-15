@@ -3,6 +3,7 @@ import { Modal } from "./Modal";
 import { BodyDiagram } from "./BodyDiagram";
 import { ExerciseGif } from "./ExerciseGif";
 
+
 function formatMuscleName(muscle) {
   return muscle
     .split("_")
@@ -90,6 +91,24 @@ export function ExerciseDetailModal({
     opacity: 0.8,
   };
 
+  const secondaryMuscleChip = {
+    ...chipBase,
+    background: colors.subtleBg,
+    border: `1px solid ${colors.border}`,
+    color: colors.accent,
+    opacity: 0.7,
+  };
+
+  const rawChip = {
+    ...chipBase,
+    background: "transparent",
+    border: `1px dashed ${colors.border}`,
+    fontSize: 10,
+    fontWeight: 600,
+    opacity: 0.5,
+    textTransform: "capitalize",
+  };
+
   const tagChip = {
     ...chipBase,
     background: "transparent",
@@ -100,6 +119,8 @@ export function ExerciseDetailModal({
   };
 
   const hasMuscles = entry.muscles?.primary?.length > 0;
+  const hasSecondary = entry.muscles?.secondary?.length > 0;
+  const hasRawNames = entry.muscles?.targetRaw?.length > 0 || entry.muscles?.secondaryRaw?.length > 0;
   const hasWorkouts = workouts && workouts.length > 0;
   const isBrowseMode = !targetWorkoutId;
 
@@ -322,20 +343,47 @@ export function ExerciseDetailModal({
         </div>
 
         {/* Exercise demonstration GIF */}
-        <ExerciseGif exerciseName={entry.name} catalogId={entry.id} colors={colors} />
+        <ExerciseGif gifUrl={entry.gifUrl} exerciseName={entry.name} colors={colors} />
 
         {/* Body diagram + muscle chips */}
         {hasMuscles ? (
           <>
-            <BodyDiagram highlightedMuscles={entry.muscles.primary} colors={colors} />
+            <BodyDiagram
+              highlightedMuscles={entry.muscles.primary}
+              secondaryMuscles={entry.muscles.secondary || []}
+              colors={colors}
+            />
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 6 }}>Muscles</div>
+              <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 6 }}>Primary Muscles</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {entry.muscles.primary.map((m) => (
                   <span key={m} style={muscleChip}>{formatMuscleName(m)}</span>
                 ))}
               </div>
             </div>
+            {hasSecondary && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 6 }}>Secondary Muscles</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {entry.muscles.secondary.map((m) => (
+                    <span key={m} style={secondaryMuscleChip}>{formatMuscleName(m)}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {hasRawNames && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 6 }}>Detailed Muscles</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {(entry.muscles.targetRaw || []).map((m) => (
+                    <span key={`t-${m}`} style={rawChip}>{m}</span>
+                  ))}
+                  {(entry.muscles.secondaryRaw || []).map((m) => (
+                    <span key={`s-${m}`} style={{ ...rawChip, opacity: 0.35 }}>{m}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div style={{

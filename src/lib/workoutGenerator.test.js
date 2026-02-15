@@ -137,8 +137,8 @@ const testState = {
       {
         id: "w1",
         exercises: [
-          { id: "ex1", name: "Barbell Bench Press", unit: "reps", catalogId: "c-bench-flat-bb" },
-          { id: "ex2", name: "Barbell Squat", unit: "reps", catalogId: "l-squat-bb" },
+          { id: "ex1", name: "Barbell Bench Press", unit: "reps", catalogId: "edb-EIeI8Vf" },
+          { id: "ex2", name: "Barbell Full Squat", unit: "reps", catalogId: "edb-qXTaZnJ" },
         ],
       },
     ],
@@ -171,8 +171,11 @@ assert(todayWorkout.name, "today workout has name");
 assert(todayWorkout.exercises.length >= 3, `today workout has >= 3 exercises (got ${todayWorkout.exercises.length})`);
 assert(todayWorkout.targetMuscles.length > 0, "today workout has target muscles");
 
+// With the squat covering QUADS/GLUTES/HAMSTRINGS/CALVES/ABS, stale muscles include
+// BICEPS, FOREARMS, OBLIQUES, LATERAL_DELT, POSTERIOR_DELT, etc.
+const staleMuscles = ["BICEPS", "FOREARMS", "OBLIQUES", "LATERAL_DELT", "POSTERIOR_DELT"];
 assert(
-  todayWorkout.targetMuscles.includes("BICEPS") || todayWorkout.targetMuscles.includes("CALVES") || todayWorkout.targetMuscles.includes("ABS"),
+  todayWorkout.targetMuscles.some((m) => staleMuscles.includes(m)),
   "today workout targets stale muscles"
 );
 

@@ -140,8 +140,8 @@ OUTPUT FORMAT:
     {
       "name": "Day Name",
       "exercises": [
-        { "catalogId": "c-bench-flat-bb", "name": "Barbell Bench Press", "scheme": "4x8-12" },
-        { "catalogId": "x-plank", "name": "Plank", "scheme": "1x60s" }
+        { "catalogId": "edb-EIeI8Vf", "name": "Barbell Bench Press", "scheme": "4x8-12" },
+        { "catalogId": "edb-VBAWRPG", "name": "Weighted Front Plank", "scheme": "1x60s" }
       ]
     }
   ]
@@ -292,8 +292,8 @@ OUTPUT FORMAT:
   "targetMuscles": ["BACK", "BICEPS"],
   "note": "Brief explanation of why these muscles/exercises were chosen and any adjustments made for fatigue or recovery.",
   "exercises": [
-    { "catalogId": "b-row-bb", "name": "Barbell Row", "scheme": "3x10-12" },
-    { "catalogId": "x-plank", "name": "Plank", "scheme": "1x60s" }
+    { "catalogId": "edb-eZyBC3j", "name": "Barbell Bent Over Row", "scheme": "3x10-12" },
+    { "catalogId": "edb-VBAWRPG", "name": "Weighted Front Plank", "scheme": "1x60s" }
   ]
 }`;
 

@@ -68,15 +68,24 @@ function boostColor(hex) {
   return `#${ro.toString(16).padStart(2, "0")}${go.toString(16).padStart(2, "0")}${bo.toString(16).padStart(2, "0")}`;
 }
 
-export function BodyDiagram({ highlightedMuscles = [], colors }) {
+export function BodyDiagram({ highlightedMuscles = [], secondaryMuscles = [], colors }) {
   // Use a boosted accent for highlighted muscles — more vivid than UI accent
   const highlightColor = boostColor(colors.accent);
+  // Secondary muscles get a softer tint
+  const secondaryColor = colors.accent + "55"; // ~33% opacity via hex alpha
 
-  // Build data array for highlighted muscles (deduplicate slugs)
-  const activeSlugs = new Set();
+  // Build data array for primary muscles (deduplicate slugs)
+  const primarySlugs = new Set();
   for (const muscle of highlightedMuscles) {
     const slugs = MUSCLE_TO_SLUGS[muscle];
-    if (slugs) slugs.forEach((s) => activeSlugs.add(s));
+    if (slugs) slugs.forEach((s) => primarySlugs.add(s));
+  }
+
+  // Build secondary slugs (exclude any that are already primary)
+  const secondarySlugs = new Set();
+  for (const muscle of secondaryMuscles) {
+    const slugs = MUSCLE_TO_SLUGS[muscle];
+    if (slugs) slugs.forEach((s) => { if (!primarySlugs.has(s)) secondarySlugs.add(s); });
   }
 
   // Very faint body fill so highlighted muscles pop across all themes
@@ -84,7 +93,8 @@ export function BodyDiagram({ highlightedMuscles = [], colors }) {
   const headFill = bodyFill;
 
   const data = [
-    ...Array.from(activeSlugs).map((slug) => ({ slug, color: highlightColor })),
+    ...Array.from(secondarySlugs).map((slug) => ({ slug, color: secondaryColor })),
+    ...Array.from(primarySlugs).map((slug) => ({ slug, color: highlightColor })),
     // Paint head to match default body fill so it looks bald
     { slug: "head", color: headFill },
   ];
