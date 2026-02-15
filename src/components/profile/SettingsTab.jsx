@@ -227,51 +227,6 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
 
           </div>
 
-          <div>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Voice Input</span>
-            <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>Enable microphone for voice-to-text on training fields</span>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              {[
-                { key: false, label: "Off" },
-                { key: true, label: "On" },
-              ].map((opt) => {
-                const isActive = (!!preferences?.voiceInput) === opt.key;
-                return (
-                  <button
-                    key={String(opt.key)}
-                    type="button"
-                    onClick={async () => {
-                      if (opt.key && navigator.mediaDevices) {
-                        try {
-                          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                          stream.getTracks().forEach((t) => t.stop());
-                          onUpdatePreference?.("voiceInput", true);
-                        } catch (_) {
-                          // Permission denied — don't enable
-                        }
-                      } else {
-                        onUpdatePreference?.("voiceInput", opt.key);
-                      }
-                    }}
-                    style={{
-                      padding: "5px 12px",
-                      fontSize: 12,
-                      fontWeight: isActive ? 700 : 500,
-                      borderRadius: 999,
-                      border: `1.5px solid ${isActive ? (colors?.accent || "#7dd3fc") : (colors?.border || "rgba(255,255,255,0.10)")}`,
-                      background: isActive ? (colors?.accent || "#7dd3fc") + "22" : "transparent",
-                      color: isActive ? (colors?.accent || "#7dd3fc") : (colors?.text || "#e8eef7"),
-                      cursor: "pointer",
-                      WebkitTapHighlightColor: "transparent",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -421,6 +376,16 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </div>
           </div>
 
+        </div>
+      </div>
+
+      {/* Privacy */}
+      <div style={{ borderTop: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`, paddingTop: 14 }}>
+        <div style={{ ...sectionHeaderStyle, marginBottom: 10 }}>
+          Privacy
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Discoverable in Search</span>
             <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>Allow other users to find you by username</span>
@@ -457,17 +422,63 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
               })}
             </div>
           </div>
+
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Voice Input</span>
+            <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>Enable microphone for voice-to-text on training fields</span>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              {[
+                { key: false, label: "Off" },
+                { key: true, label: "On" },
+              ].map((opt) => {
+                const isActive = (!!preferences?.voiceInput) === opt.key;
+                return (
+                  <button
+                    key={String(opt.key)}
+                    type="button"
+                    onClick={async () => {
+                      if (opt.key && navigator.mediaDevices) {
+                        try {
+                          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                          stream.getTracks().forEach((t) => t.stop());
+                          onUpdatePreference?.("voiceInput", true);
+                        } catch (_) {
+                          // Permission denied — don't enable
+                        }
+                      } else {
+                        onUpdatePreference?.("voiceInput", opt.key);
+                      }
+                    }}
+                    style={{
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: isActive ? 700 : 500,
+                      borderRadius: 999,
+                      border: `1.5px solid ${isActive ? (colors?.accent || "#7dd3fc") : (colors?.border || "rgba(255,255,255,0.10)")}`,
+                      background: isActive ? (colors?.accent || "#7dd3fc") + "22" : "transparent",
+                      color: isActive ? (colors?.accent || "#7dd3fc") : (colors?.text || "#e8eef7"),
+                      cursor: "pointer",
+                      WebkitTapHighlightColor: "transparent",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", opacity: 0.4 }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Notifications</span>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>Coming soon</span>
+          </div>
         </div>
       </div>
 
       {/* Coming Soon */}
       <div style={{ borderTop: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`, paddingTop: 14 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", opacity: 0.4 }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Notifications</span>
-            <span style={{ fontSize: 12, fontWeight: 600 }}>Coming soon</span>
-          </div>
-
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", opacity: 0.4 }}>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Refer Friends</span>
             <span style={{ fontSize: 12, fontWeight: 600 }}>Coming soon</span>
