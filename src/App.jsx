@@ -908,15 +908,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const anyModalOpenRef = useRef(false);
   anyModalOpenRef.current = anyModalOpen;
 
-  // Use useLayoutEffect so history entry is pushed BEFORE browser paints
-  // (prevents back-button from exiting app before pushState runs)
+  // Push a base history entry on mount so back-button never immediately exits PWA
+  useEffect(() => {
+    history.pushState({ app: true }, "");
+  }, []);
+
+  // Push/pop history entries when modals open/close
   useLayoutEffect(() => {
     if (anyModalOpen && !modalHistoryRef.current) {
-      // Modal just opened — push history entry so back button pops it
       history.pushState({ modal: true }, "");
       modalHistoryRef.current = true;
     } else if (!anyModalOpen && modalHistoryRef.current) {
-      // Modal closed programmatically (X button / save) — pop the history entry
       modalHistoryRef.current = false;
       closingViaCodeRef.current = true;
       history.back();
@@ -926,28 +928,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   useEffect(() => {
     const handlePopState = () => {
       if (closingViaCodeRef.current) {
-        // Ignore the popstate triggered by our own history.back()
         closingViaCodeRef.current = false;
         return;
       }
-      if (modalHistoryRef.current) {
+      // If any modal is open, close it instead of navigating away
+      if (anyModalOpenRef.current) {
         // Check for sub-view override (e.g. detail view inside catalog)
         if (backOverrideRef.current) {
           const handled = backOverrideRef.current();
           if (handled) {
-            // Re-push history entry — the modal itself is still open
             history.pushState({ modal: true }, "");
             return;
           }
         }
         modalHistoryRef.current = false;
         dispatchModal({ type: "CLOSE_ALL" });
-      } else if (anyModalOpenRef.current) {
-        // Safety net: modal is open but ref was missed — close modal
-        // and re-push to prevent app exit
-        dispatchModal({ type: "CLOSE_ALL" });
+        // Re-push base entry so another back doesn't exit
         history.pushState({ app: true }, "");
+        return;
       }
+      // No modal open — re-push base entry to prevent app exit
+      // (users close PWAs via home button / swipe, not back)
+      history.pushState({ app: true }, "");
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
