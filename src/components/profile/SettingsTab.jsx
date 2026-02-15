@@ -436,17 +436,29 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
                   <button
                     key={String(opt.key)}
                     type="button"
-                    onClick={async () => {
-                      if (opt.key && navigator.mediaDevices) {
-                        try {
-                          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                          stream.getTracks().forEach((t) => t.stop());
-                          onUpdatePreference?.("voiceInput", true);
-                        } catch (_) {
-                          // Permission denied — don't enable
-                        }
+                    onClick={() => {
+                      if (opt.key) {
+                        dispatch({
+                          type: "OPEN_CONFIRM",
+                          payload: {
+                            title: "Enable microphone?",
+                            message: "Voice input uses your microphone to convert speech to text when logging sets. Your browser will ask for permission.",
+                            confirmText: "Enable",
+                            onConfirm: async () => {
+                              if (navigator.mediaDevices) {
+                                try {
+                                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                                  stream.getTracks().forEach((t) => t.stop());
+                                  onUpdatePreference?.("voiceInput", true);
+                                } catch (_) {
+                                  // Permission denied — don't enable
+                                }
+                              }
+                            },
+                          },
+                        });
                       } else {
-                        onUpdatePreference?.("voiceInput", opt.key);
+                        onUpdatePreference?.("voiceInput", false);
                       }
                     }}
                     style={{
