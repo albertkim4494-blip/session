@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
 import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
 import { supabase } from "./lib/supabase";
 import { fetchCoachInsights } from "./lib/coachApi";
@@ -905,8 +905,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const modalHistoryRef = useRef(false);
   const closingViaCodeRef = useRef(false);
   const backOverrideRef = useRef(null);
+  const anyModalOpenRef = useRef(false);
+  anyModalOpenRef.current = anyModalOpen;
 
-  useEffect(() => {
+  // Use useLayoutEffect so history entry is pushed BEFORE browser paints
+  // (prevents back-button from exiting app before pushState runs)
+  useLayoutEffect(() => {
     if (anyModalOpen && !modalHistoryRef.current) {
       // Modal just opened — push history entry so back button pops it
       history.pushState({ modal: true }, "");
@@ -938,6 +942,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }
         modalHistoryRef.current = false;
         dispatchModal({ type: "CLOSE_ALL" });
+      } else if (anyModalOpenRef.current) {
+        // Safety net: modal is open but ref was missed — close modal
+        // and re-push to prevent app exit
+        dispatchModal({ type: "CLOSE_ALL" });
+        history.pushState({ app: true }, "");
       }
     };
     window.addEventListener("popstate", handlePopState);
