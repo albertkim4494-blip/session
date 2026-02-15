@@ -370,10 +370,10 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={styles.fieldCol}>
-            <label style={styles.label}>Username</label>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Username</span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.7 }}>
                 @{profile?.username || "\u2014"}
               </span>
               <button
@@ -387,10 +387,10 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </div>
           </div>
 
-          <div style={styles.fieldCol}>
-            <label style={styles.label}>Password</label>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Password</span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.7 }}>
                 ••••••••
               </span>
               <button
@@ -404,10 +404,10 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </div>
           </div>
 
-          <div style={styles.fieldCol}>
-            <label style={styles.label}>Billing</label>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Billing</span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.7 }}>
                 Free plan
               </span>
               <button
@@ -423,10 +423,7 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
 
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <span style={{ fontSize: 14, fontWeight: 700 }}>Discoverable in Search</span>
-                <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>Allow other users to find you by username</span>
-              </div>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Discoverable</span>
               <div style={{ display: "flex", gap: 8 }}>
                 {[
                   { key: true, label: "On" },
@@ -460,6 +457,7 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
                 })}
               </div>
             </div>
+            <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 4 }}>Allow other users to find you by username</span>
           </div>
         </div>
       </div>
