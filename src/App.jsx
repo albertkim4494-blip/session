@@ -1954,7 +1954,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 <input
                   value={trainSearch}
                   onChange={(e) => setTrainSearch(e.target.value)}
-                  placeholder="Search exercises..."
+                  placeholder={tab === "social" ? "Search friends" : "Search exercises"}
                   autoFocus
                   style={{ ...styles.textInput, padding: "6px 10px", fontSize: 13, flex: 1, minWidth: 0 }}
                 />
@@ -2005,26 +2005,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     </button>
                   );
                 })()}
-                {tab !== "social" && (
                 <button
                   style={{ ...styles.navArrow, opacity: 0.45 }}
                   onClick={() => { setTrainSearchOpen(true); }}
-                  title="Search exercises"
+                  title={tab === "social" ? "Search friends" : "Search exercises"}
                   type="button"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                 </button>
-                )}
-                {tab === "social" && (
-                <button
-                  style={{ ...styles.navArrow, opacity: 0.45 }}
-                  onClick={() => dispatchModal({ type: "OPEN_FRIEND_SEARCH" })}
-                  title="Search friends"
-                  type="button"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                </button>
-                )}
                 <button
                   onClick={() => dispatchModal({
                     type: "OPEN_PROFILE_MODAL",
@@ -2055,7 +2043,52 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             </div>
 
           {/* Search results (tab-aware) */}
-          {trainSearchOpen && trainSearch.trim() && (() => {
+          {trainSearchOpen && trainSearch.trim() && tab === "social" && (() => {
+            const q = trainSearch.trim().toLowerCase();
+            const matches = socialFriends.filter((f) =>
+              (f.username || "").toLowerCase().includes(q) ||
+              (f.display_name || "").toLowerCase().includes(q)
+            );
+            if (matches.length === 0) {
+              return <div style={{ padding: "8px 4px", opacity: 0.5, fontSize: 12 }}>No friends found</div>;
+            }
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 6 }}>
+                {matches.map((f) => (
+                  <button key={f.id} style={{
+                    textAlign: "left", padding: "8px 10px", borderRadius: 8,
+                    border: `1px solid ${colors.border}`, background: colors.cardAltBg,
+                    color: colors.text, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 8,
+                    fontFamily: "inherit",
+                  }}
+                    onClick={() => {
+                      dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { selectedFriendId: f.id } });
+                      setTrainSearchOpen(false); setTrainSearch("");
+                    }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 999,
+                      background: colors.accent + "22", color: colors.accent,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 12, fontWeight: 700, flexShrink: 0,
+                      overflow: "hidden",
+                    }}>
+                      {f.avatar_url ? (
+                        <img src={f.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover" }} />
+                      ) : (
+                        (f.username || "?")[0].toUpperCase()
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>@{f.username}</span>
+                      {f.display_name && <span style={{ fontSize: 11, opacity: 0.5, marginLeft: 6 }}>{f.display_name}</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+          {trainSearchOpen && trainSearch.trim() && tab !== "social" && (() => {
             const q = trainSearch.trim().toLowerCase();
             const results = [];
             for (const w of [...workouts, ...dailyWorkoutsToday]) {
