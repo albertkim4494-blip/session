@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Modal } from "./Modal";
 import { EXERCISE_CATALOG } from "../lib/exerciseCatalog";
 import { catalogSearch, normalizeQuery } from "../lib/exerciseCatalogUtils";
 import { ExerciseDetailModal } from "./ExerciseDetailModal";
+import { useSwipe } from "../hooks/useSwipe";
 
 const MOVEMENT_FILTERS = [
   { key: null, label: "All" },
@@ -65,7 +66,7 @@ function getRecentUserExercises(workouts, logsByDate, limit) {
 export function ExerciseCatalogModal({
   open, onClose, onAddExercise, onCustomExercise,
   styles, colors, workouts, logsByDate,
-  targetWorkoutId, catalog,
+  targetWorkoutId, catalog, backOverrideRef,
 }) {
   const [query, setQuery] = useState("");
   const [movementFilter, setMovementFilter] = useState(null);
@@ -78,6 +79,37 @@ export function ExerciseCatalogModal({
       setDetailEntry(null);
     }
   }, [open]);
+
+  // Register back-button override: when detail is open, back closes detail only
+  useEffect(() => {
+    if (!backOverrideRef) return;
+    if (open && detailEntry) {
+      backOverrideRef.current = () => {
+        setDetailEntry(null);
+        return true;
+      };
+    } else {
+      backOverrideRef.current = null;
+    }
+    return () => { backOverrideRef.current = null; };
+  }, [open, !!detailEntry, backOverrideRef]);
+
+  // Swipe between exercises in detail view
+  const navigateDetail = useCallback((dir) => {
+    if (!detailEntry) return;
+    const idx = catalogResults.findIndex((e) => e.id === detailEntry.id);
+    if (idx < 0) return;
+    const next = idx + dir;
+    if (next >= 0 && next < catalogResults.length) {
+      setDetailEntry(catalogResults[next]);
+    }
+  }, [detailEntry, catalogResults]);
+
+  const swipeHandlers = useSwipe({
+    onSwipeLeft: () => navigateDetail(1),
+    onSwipeRight: () => navigateDetail(-1),
+    thresholdPx: 50,
+  });
 
   const catalogResults = useMemo(
     () => catalogSearch(catalog || EXERCISE_CATALOG, query, { movement: movementFilter, limit: 50 }),
@@ -272,6 +304,7 @@ export function ExerciseCatalogModal({
         styles={styles}
         colors={colors}
         targetWorkoutId={targetWorkoutId}
+        swipeHandlers={swipeHandlers}
       />
     </>
   );

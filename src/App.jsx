@@ -902,6 +902,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const modalHistoryRef = useRef(false);
   const closingViaCodeRef = useRef(false);
+  const backOverrideRef = useRef(null);
 
   useEffect(() => {
     if (anyModalOpen && !modalHistoryRef.current) {
@@ -924,6 +925,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         return;
       }
       if (modalHistoryRef.current) {
+        // Check for sub-view override (e.g. detail view inside catalog)
+        if (backOverrideRef.current) {
+          const handled = backOverrideRef.current();
+          if (handled) {
+            // Re-push history entry — the modal itself is still open
+            history.pushState({ modal: true }, "");
+            return;
+          }
+        }
         modalHistoryRef.current = false;
         dispatchModal({ type: "CLOSE_ALL" });
       }
@@ -4015,6 +4025,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         workouts={workouts}
         logsByDate={state.logsByDate}
         targetWorkoutId={modals.catalogBrowse.workoutId}
+        backOverrideRef={backOverrideRef}
         onAddExercise={(entry, workoutIdOrIds, userEx) => {
           if (!workoutIdOrIds) return;
           const ids = Array.isArray(workoutIdOrIds) ? workoutIdOrIds : [workoutIdOrIds];

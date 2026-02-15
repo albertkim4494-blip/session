@@ -23,6 +23,7 @@ function formatMuscleName(muscle) {
 export function ExerciseDetailModal({
   open, entry, onClose, onAddExercise,
   workouts, styles, colors, targetWorkoutId,
+  swipeHandlers,
 }) {
   const [checked, setChecked] = useState(new Set());
   const [added, setAdded] = useState(false);
@@ -298,7 +299,10 @@ export function ExerciseDetailModal({
       styles={styles}
       footer={footer}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: 14 }}
+        {...(swipeHandlers || {})}
+      >
         {/* Movement + Equipment */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           {entry.movement && <span style={movementChip}>{entry.movement}</span>}
