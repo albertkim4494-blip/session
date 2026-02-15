@@ -138,6 +138,23 @@ export function ExerciseCatalogModal({
     thresholdPx: 50,
   });
 
+  // Adjacent entries for 3D animation preloading
+  const adjacentEntries = useMemo(() => {
+    if (!detailEntry) return null;
+    const idx = catalogResults.findIndex((e) => e.id === detailEntry.id);
+    if (idx < 0) return null;
+    const entries = [];
+    if (idx > 0) {
+      const prev = catalogResults[idx - 1];
+      entries.push({ id: prev.id, name: prev.name, meta: { muscles: prev.muscles, equipment: prev.equipment, movement: prev.movement } });
+    }
+    if (idx < catalogResults.length - 1) {
+      const next = catalogResults[idx + 1];
+      entries.push({ id: next.id, name: next.name, meta: { muscles: next.muscles, equipment: next.equipment, movement: next.movement } });
+    }
+    return entries.length > 0 ? entries : null;
+  }, [detailEntry, catalogResults]);
+
   if (!open) return null;
 
   const chipStyle = (active) => ({
@@ -306,6 +323,7 @@ export function ExerciseCatalogModal({
         colors={colors}
         targetWorkoutId={targetWorkoutId}
         swipeHandlers={swipeHandlers}
+        adjacentEntries={adjacentEntries}
       />
     </>
   );

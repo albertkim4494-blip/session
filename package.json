@@ -11,10 +11,13 @@
     "test": "node src/lib/coachNormalize.test.js && node src/lib/userIdentity.test.js && node src/lib/exerciseCatalogUtils.test.js && node src/lib/workoutGenerator.test.js"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "@supabase/supabase-js": "^2.93.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-muscle-highlighter": "^1.2.0"
+    "react-muscle-highlighter": "^1.2.0",
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

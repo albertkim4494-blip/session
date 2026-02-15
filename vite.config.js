@@ -30,6 +30,29 @@ export default defineConfig({
           },
         ],
       },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,glb}"],
+        runtimeCaching: [
+          {
+            urlPattern: /\.glb$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "glb-models",
+              expiration: { maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+        ],
+      },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ["three"],
+          "react-three": ["@react-three/fiber", "@react-three/drei"],
+        },
+      },
+    },
+  },
 });
