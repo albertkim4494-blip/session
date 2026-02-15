@@ -370,10 +370,10 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Username</span>
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Username</label>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.7 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
                 @{profile?.username || "\u2014"}
               </span>
               <button
@@ -387,10 +387,10 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Password</span>
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Password</label>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.7 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
                 ••••••••
               </span>
               <button
@@ -404,10 +404,10 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Billing</span>
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Billing</label>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.7 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
                 Free plan
               </span>
               <button
@@ -422,42 +422,40 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
           </div>
 
           <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 14, fontWeight: 700 }}>Discoverable</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                {[
-                  { key: true, label: "On" },
-                  { key: false, label: "Off" },
-                ].map((opt) => {
-                  const isActive = isSearchable === opt.key;
-                  return (
-                    <button
-                      key={String(opt.key)}
-                      type="button"
-                      onClick={async () => {
-                        setIsSearchable(opt.key);
-                        await updateSearchable(opt.key);
-                      }}
-                      style={{
-                        padding: "5px 12px",
-                        fontSize: 12,
-                        fontWeight: isActive ? 700 : 500,
-                        borderRadius: 999,
-                        border: `1.5px solid ${isActive ? (colors?.accent || "#7dd3fc") : (colors?.border || "rgba(255,255,255,0.10)")}`,
-                        background: isActive ? (colors?.accent || "#7dd3fc") + "22" : "transparent",
-                        color: isActive ? (colors?.accent || "#7dd3fc") : (colors?.text || "#e8eef7"),
-                        cursor: "pointer",
-                        WebkitTapHighlightColor: "transparent",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Discoverable in Search</span>
+            <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>Allow other users to find you by username</span>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              {[
+                { key: true, label: "On" },
+                { key: false, label: "Off" },
+              ].map((opt) => {
+                const isActive = isSearchable === opt.key;
+                return (
+                  <button
+                    key={String(opt.key)}
+                    type="button"
+                    onClick={async () => {
+                      setIsSearchable(opt.key);
+                      await updateSearchable(opt.key);
+                    }}
+                    style={{
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: isActive ? 700 : 500,
+                      borderRadius: 999,
+                      border: `1.5px solid ${isActive ? (colors?.accent || "#7dd3fc") : (colors?.border || "rgba(255,255,255,0.10)")}`,
+                      background: isActive ? (colors?.accent || "#7dd3fc") + "22" : "transparent",
+                      color: isActive ? (colors?.accent || "#7dd3fc") : (colors?.text || "#e8eef7"),
+                      cursor: "pointer",
+                      WebkitTapHighlightColor: "transparent",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
-            <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 4 }}>Allow other users to find you by username</span>
           </div>
         </div>
       </div>
