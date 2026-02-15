@@ -34,10 +34,14 @@ export function BodyDiagram({ highlightedMuscles = [], colors }) {
     if (slugs) slugs.forEach((s) => activeSlugs.add(s));
   }
 
+  // Very faint body fill so highlighted muscles pop across all themes
+  const bodyFill = "rgba(128,128,128,0.08)";
+  const headFill = bodyFill;
+
   const data = [
     ...Array.from(activeSlugs).map((slug) => ({ slug, color: accentColor })),
     // Paint head to match default body fill so it looks bald
-    { slug: "head", color: colors.subtleBg },
+    { slug: "head", color: headFill },
   ];
 
   return (
@@ -52,7 +56,7 @@ export function BodyDiagram({ highlightedMuscles = [], colors }) {
           side="front"
           scale={0.8}
           border={colors.border}
-          defaultFill={colors.subtleBg}
+          defaultFill={bodyFill}
           hiddenParts={HIDDEN}
         />
       </div>
@@ -67,7 +71,7 @@ export function BodyDiagram({ highlightedMuscles = [], colors }) {
           side="back"
           scale={0.8}
           border={colors.border}
-          defaultFill={colors.subtleBg}
+          defaultFill={bodyFill}
           hiddenParts={HIDDEN}
         />
       </div>
