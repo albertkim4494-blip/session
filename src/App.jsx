@@ -898,7 +898,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     modals.addSuggestion.isOpen || modals.profile.isOpen || modals.changeUsername.isOpen ||
     modals.changePassword.isOpen || modals.welcomeChoice.isOpen || modals.editWorkout?.isOpen ||
     modals.editExercise?.isOpen || modals.catalogBrowse.isOpen || modals.generateWizard.isOpen ||
-    modals.generateToday.isOpen;
+    modals.generateToday.isOpen || modals.customExercise?.isOpen || modals.billing?.isOpen ||
+    modals.social?.isOpen || modals.friendSearch?.isOpen || modals.shareWorkout?.isOpen ||
+    modals.workoutPreview?.isOpen;
 
   const modalHistoryRef = useRef(false);
   const closingViaCodeRef = useRef(false);
