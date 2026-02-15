@@ -1,10 +1,7 @@
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal } from "./Modal";
 import { BodyDiagram } from "./BodyDiagram";
-
-const ExerciseViewer3DLazy = React.lazy(() =>
-  import("./ExerciseViewer3D").then((m) => ({ default: m.ExerciseViewer3D }))
-);
+import { ExerciseGif } from "./ExerciseGif";
 
 function formatMuscleName(muscle) {
   return muscle
@@ -24,23 +21,16 @@ function formatMuscleName(muscle) {
  *
  * Both modes always render a footer so Modal uses fixed height (95dvh).
  */
-// View mode preference (persisted in localStorage)
-const VIEW_MODE_KEY = "wt_exercise_view_mode";
-function getInitialViewMode() {
-  try { return localStorage.getItem(VIEW_MODE_KEY) || "3d"; } catch { return "3d"; }
-}
 
 export function ExerciseDetailModal({
   open, entry, onBack, onClose, onAddExercise,
   workouts, styles, colors, targetWorkoutId,
-  swipeHandlers, adjacentEntries,
+  swipeHandlers,
 }) {
   const [checked, setChecked] = useState(new Set());
   const [added, setAdded] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [addedWorkouts, setAddedWorkouts] = useState(new Set());
-  const [viewMode, setViewMode] = useState(getInitialViewMode);
-
   // Build set of workout IDs that already contain this exercise
   const alreadyInWorkouts = React.useMemo(() => {
     if (!entry || !workouts) return new Set();
@@ -331,53 +321,8 @@ export function ExerciseDetailModal({
           ))}
         </div>
 
-        {/* 3D/2D view toggle */}
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <div style={{
-            display: "inline-flex",
-            background: colors.subtleBg,
-            borderRadius: 999,
-            padding: 2,
-            gap: 2,
-          }}>
-            {[{ key: "3d", label: "3D" }, { key: "2d", label: "2D" }].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => {
-                  setViewMode(key);
-                  try { localStorage.setItem(VIEW_MODE_KEY, key); } catch {}
-                }}
-                style={{
-                  border: "none",
-                  background: viewMode === key ? colors.accent : "transparent",
-                  color: viewMode === key ? "#fff" : colors.text,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: "3px 10px",
-                  borderRadius: 999,
-                  cursor: "pointer",
-                  opacity: viewMode === key ? 1 : 0.5,
-                  transition: "all 0.15s",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 3D exercise animation (lazy, silent fallback) */}
-        {viewMode === "3d" && (
-          <Suspense fallback={null}>
-            <ExerciseViewer3DLazy
-              exerciseId={entry.id}
-              exerciseName={entry.name}
-              exerciseMeta={{ muscles: entry.muscles, equipment: entry.equipment, movement: entry.movement }}
-              colors={colors}
-              adjacentIds={adjacentEntries}
-            />
-          </Suspense>
-        )}
+        {/* Exercise demonstration GIF */}
+        <ExerciseGif exerciseName={entry.name} colors={colors} />
 
         {/* Body diagram + muscle chips */}
         {hasMuscles ? (
