@@ -298,13 +298,13 @@ export function ExerciseDetailModal({
       styles={styles}
       footer={footer}
       headerContent={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={onBack} style={{ ...styles.iconBtn, padding: 4 }} aria-label="Back">
+        <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+          <button onClick={onBack} style={{ ...styles.iconBtn, padding: 4, flexShrink: 0 }} aria-label="Back">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
-          <div style={styles.modalTitle}>{entry.name}</div>
+          <div style={{ ...styles.modalTitle, flex: 1, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.name}</div>
         </div>
       }
     >
