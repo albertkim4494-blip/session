@@ -193,6 +193,22 @@ export function ExerciseCatalogModal({
     thresholdPx: 50,
   });
 
+  // Exercise count for the browse button (filtered by hovered muscles)
+  const browseCount = useMemo(() => {
+    if (hoveredMuscles.size === 0) return src.length;
+    return filterCatalog(src, { muscles: [...hoveredMuscles] }).length;
+  }, [src, hoveredMuscles]);
+
+  // Collect sub-muscles for all active groups that have >1 muscle
+  const subMuscles = useMemo(() => {
+    const muscles = [];
+    for (const g of activeGroups) {
+      const cfg = UI_GROUP_CONFIG[g];
+      if (cfg.muscles.length > 1) muscles.push(...cfg.muscles);
+    }
+    return muscles;
+  }, [activeGroups]);
+
   if (!open) return null;
 
   // --- Shared styles ---
@@ -358,22 +374,6 @@ export function ExerciseCatalogModal({
 
   // --- HOME VIEW ---
   const homeHasQuery = query.trim().length > 0;
-
-  // Exercise count for the browse button (filtered by hovered muscles)
-  const browseCount = useMemo(() => {
-    if (hoveredMuscles.size === 0) return src.length;
-    return filterCatalog(src, { muscles: [...hoveredMuscles] }).length;
-  }, [src, hoveredMuscles]);
-
-  // Collect sub-muscles for all active groups that have >1 muscle
-  const subMuscles = useMemo(() => {
-    const muscles = [];
-    for (const g of activeGroups) {
-      const cfg = UI_GROUP_CONFIG[g];
-      if (cfg.muscles.length > 1) muscles.push(...cfg.muscles);
-    }
-    return muscles;
-  }, [activeGroups]);
 
   const renderHomeView = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
