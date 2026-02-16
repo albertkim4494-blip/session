@@ -94,13 +94,33 @@ button:focus-visible {
 }
 
 @keyframes cardSlideLeft {
-  0% { opacity: 0; transform: translateX(60px); }
-  100% { opacity: 1; transform: translateX(0); }
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateX(30px) rotate(2deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.98) translateX(-4px) rotate(-0.3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateX(0) rotate(0);
+  }
 }
 
 @keyframes cardSlideRight {
-  0% { opacity: 0; transform: translateX(-60px); }
-  100% { opacity: 1; transform: translateX(0); }
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateX(-30px) rotate(-2deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.98) translateX(4px) rotate(0.3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateX(0) rotate(0);
+  }
 }
 
 @media (prefers-color-scheme: light) {

@@ -40,6 +40,7 @@ import { GenerateTodayModal } from "./components/GenerateTodayModal";
 import { CustomExerciseModal } from "./components/CustomExerciseModal";
 import { ExerciseDetailModal } from "./components/ExerciseDetailModal";
 import { EditExerciseModal } from "./components/EditExerciseModal";
+import { getSportIconUrl } from "./lib/sportIcons";
 import { enrichExercise } from "./lib/exerciseEnrichmentApi";
 import { FriendSearchModal } from "./components/FriendSearchModal";
 import { ShareWorkoutModal } from "./components/ShareWorkoutModal";
@@ -4597,7 +4598,7 @@ function MoodPicker({ value, onChange, colors }) {
 // SUB-COMPONENTS - Extracted from render to avoid re-creation per render
 // ============================================================================
 
-function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme, weightLabel }) {
+function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme, weightLabel, colors }) {
   const exLog = logsForDate[exercise.id] ?? null;
   const hasAnySets = !!exLog && Array.isArray(exLog.sets) && exLog.sets.length > 0;
   const exUnit = getUnit(exercise.unit, exercise);
@@ -4647,7 +4648,18 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
       aria-label={`Log ${exercise.name}`}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
+          {getSportIconUrl(exercise.name) && (
+            <img
+              src={getSportIconUrl(exercise.name)}
+              alt=""
+              style={{
+                width: 18, height: 18, objectFit: "contain", flexShrink: 0,
+                filter: colors?.appBg?.startsWith("#0") || colors?.appBg?.startsWith("#1") ? "invert(1)" : "none",
+                opacity: 0.7,
+              }}
+            />
+          )}
           <div style={{ ...styles.exerciseName, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exercise.name}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -4809,7 +4821,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
                 onDeleteExercise={onDeleteExercise ? (exId) => onDeleteExercise(exId) : undefined}
                 workoutScheme={workout.scheme}
                 weightLabel={weightLabel}
-
+                colors={colors}
               />
             ))}
           </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Modal } from "./Modal";
 import { BodyDiagram } from "./BodyDiagram";
 import { ExerciseGif } from "./ExerciseGif";
-import { getSportIconUrl } from "../lib/sportIcons";
 
 
 function formatMuscleName(muscle) {
@@ -340,7 +339,8 @@ export function ExerciseDetailModal({
         key={entry.id}
         style={{
           display: "flex", flexDirection: "column", gap: 14,
-          animation: slideDir ? `cardSlide${slideDir === "left" ? "Left" : "Right"} 0.25s ease-out` : undefined,
+          animation: slideDir ? `cardSlide${slideDir === "left" ? "Left" : "Right"} 0.3s cubic-bezier(0.22, 0.68, 0.35, 1.0)` : undefined,
+          transformOrigin: "center bottom",
         }}
         {...(swipeHandlers || {})}
       >
@@ -352,22 +352,8 @@ export function ExerciseDetailModal({
           ))}
         </div>
 
-        {/* Exercise demonstration GIF or sport pictogram */}
-        {entry.gifUrl ? (
-          <ExerciseGif gifUrl={entry.gifUrl} exerciseName={entry.name} colors={colors} />
-        ) : getSportIconUrl(entry.name) ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: "12px 0" }}>
-            <img
-              src={getSportIconUrl(entry.name)}
-              alt={entry.name}
-              style={{
-                width: 140, height: 140, objectFit: "contain",
-                filter: colors.appBg.startsWith("#0") || colors.appBg.startsWith("#1") ? "invert(1)" : "none",
-                opacity: 0.85,
-              }}
-            />
-          </div>
-        ) : null}
+        {/* Exercise demonstration GIF */}
+        <ExerciseGif gifUrl={entry.gifUrl} exerciseName={entry.name} colors={colors} />
 
         {/* Body diagram + muscle chips */}
         {hasMuscles ? (
