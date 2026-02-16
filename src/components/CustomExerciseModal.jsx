@@ -138,7 +138,7 @@ export function CustomExerciseModal({
   };
 
   const hasMuscles = muscles?.primary?.length > 0;
-  const canSave = name.trim().length > 0 && (workoutId || checked.size > 0);
+  const canSave = name.trim().length > 0;
 
   const selectSuggestion = (entry) => {
     setShowSuggestions(false);
@@ -195,7 +195,7 @@ export function CustomExerciseModal({
         <line x1="12" y1="5" x2="12" y2="19" />
         <line x1="5" y1="12" x2="19" y2="12" />
       </svg>
-      Add to Workout{isBrowseMode && checked.size > 0 ? ` (${checked.size})` : ""}
+      {isBrowseMode && checked.size === 0 ? "Save Exercise" : `Add to Workout${isBrowseMode && checked.size > 0 ? ` (${checked.size})` : ""}`}
     </button>
   );
 

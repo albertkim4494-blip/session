@@ -4220,7 +4220,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             return st;
           });
           dispatchModal({ type: "CLOSE_CUSTOM_EXERCISE" });
-          showToast(`Exercise added to workout${workoutIds.length > 1 ? "s" : ""}`);
+          showToast(workoutIds.length > 0 ? `Exercise added to workout${workoutIds.length > 1 ? "s" : ""}` : "Exercise saved");
         }}
       />
 

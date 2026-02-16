@@ -328,6 +328,7 @@ export function getStyles(colors) {
     navBtnActive: {
       opacity: 1,
       color: colors.accent,
+      background: colors.accentBg,
     },
 
     card: {
