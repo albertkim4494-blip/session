@@ -23,24 +23,25 @@ const MUSCLE_TO_SLUGS = {
 };
 
 /**
- * Reverse map: slug → UI muscle group for tap-to-browse.
- * Maps each body part slug to the most relevant UI group.
+ * Reverse map: slug → individual muscle enum(s) for tap-to-browse.
+ * Most slugs map to a single muscle; "deltoids" maps to all 3 delt heads
+ * since the diagram doesn't distinguish front/side/rear.
  */
-const SLUG_TO_UI_GROUP = {
-  chest: "CHEST",
-  triceps: "ARMS",
-  biceps: "ARMS",
-  forearm: "ARMS",
-  deltoids: "SHOULDERS",
-  "upper-back": "BACK",
-  trapezius: "BACK",
-  "lower-back": "BACK",
-  quadriceps: "LEGS",
-  hamstring: "LEGS",
-  gluteal: "LEGS",
-  calves: "LEGS",
-  abs: "CORE",
-  obliques: "CORE",
+const SLUG_TO_MUSCLES = {
+  chest: ["CHEST"],
+  triceps: ["TRICEPS"],
+  biceps: ["BICEPS"],
+  forearm: ["FOREARMS"],
+  deltoids: ["ANTERIOR_DELT", "LATERAL_DELT", "POSTERIOR_DELT"],
+  "upper-back": ["BACK"],
+  trapezius: ["BACK"],
+  "lower-back": ["BACK"],
+  quadriceps: ["QUADS"],
+  hamstring: ["HAMSTRINGS"],
+  gluteal: ["GLUTES"],
+  calves: ["CALVES"],
+  abs: ["ABS"],
+  obliques: ["OBLIQUES"],
 };
 
 const HIDDEN = ["hair"];
@@ -89,7 +90,7 @@ function boostColor(hex) {
   return `#${ro.toString(16).padStart(2, "0")}${go.toString(16).padStart(2, "0")}${bo.toString(16).padStart(2, "0")}`;
 }
 
-export { SLUG_TO_UI_GROUP };
+export { SLUG_TO_MUSCLES };
 
 export function BodyDiagram({ highlightedMuscles = [], secondaryMuscles = [], colors, onBodyPartPress }) {
   // Use a boosted accent for highlighted muscles — more vivid than UI accent

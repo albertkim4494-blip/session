@@ -295,10 +295,12 @@ export function resolveExerciseDisplay(exercise, catalogMap) {
  * @param {string} [filters.sportId] - specific catalog entry id for a sport
  * @returns {Array} filtered catalog entries
  */
-export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, equipment, typeFilter, sportId } = {}) {
-  // Build combined target muscle set from single group or array of groups
+export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, muscles, equipment, typeFilter, sportId } = {}) {
+  // Build combined target muscle set from individual muscles, UI groups, or single group
   let targetMuscles = null;
-  if (uiMuscleGroups?.length > 0) {
+  if (muscles?.length > 0) {
+    targetMuscles = new Set(muscles);
+  } else if (uiMuscleGroups?.length > 0) {
     targetMuscles = new Set();
     for (const g of uiMuscleGroups) for (const m of getMusclesForUiGroup(g)) targetMuscles.add(m);
   } else if (uiMuscleGroup) {

@@ -21,6 +21,33 @@
 /** @type {UiMuscleGroup[]} */
 export const UI_MUSCLE_GROUPS = ["CORE", "SHOULDERS", "ARMS", "LEGS", "CHEST", "BACK"];
 
+/** Granular individual muscles in display order */
+export const INDIVIDUAL_MUSCLES = [
+  "CHEST", "BACK",
+  "ANTERIOR_DELT", "LATERAL_DELT", "POSTERIOR_DELT",
+  "BICEPS", "TRICEPS", "FOREARMS",
+  "QUADS", "HAMSTRINGS", "GLUTES", "CALVES",
+  "ABS", "OBLIQUES",
+];
+
+/** Display labels for individual muscles */
+export const MUSCLE_LABELS = {
+  CHEST: "Chest",
+  BACK: "Back",
+  ANTERIOR_DELT: "Front Delts",
+  LATERAL_DELT: "Side Delts",
+  POSTERIOR_DELT: "Rear Delts",
+  BICEPS: "Biceps",
+  TRICEPS: "Triceps",
+  FOREARMS: "Forearms",
+  QUADS: "Quads",
+  HAMSTRINGS: "Hamstrings",
+  GLUTES: "Glutes",
+  CALVES: "Calves",
+  ABS: "Abs",
+  OBLIQUES: "Obliques",
+};
+
 /** @type {Record<UiMuscleGroup, { label: string, muscles: MuscleEnum[] }>} */
 export const UI_GROUP_CONFIG = {
   CORE:      { label: "Core",      muscles: ["ABS", "OBLIQUES"] },

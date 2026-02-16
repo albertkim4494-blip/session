@@ -249,6 +249,7 @@ const CUSTOM_EXERCISES = [
   { id: "custom-sled-pull", name: "Sled Pull", defaultUnit: "sec", muscles: { primary: ["BACK", "HAMSTRINGS", "GLUTES"] }, equipment: ["machine"], aliases: ["prowler pull", "sled drag"], tags: ["compound", "legs", "cardio"], movement: "legs" },
   { id: "custom-tire-flip", name: "Tire Flip", defaultUnit: "reps", muscles: { primary: ["BACK", "QUADS", "GLUTES"] }, equipment: ["bodyweight"], aliases: ["tire flips"], tags: ["compound"], movement: "legs" },
   { id: "custom-battle-rope", name: "Battle Ropes", defaultUnit: "sec", muscles: { primary: ["ANTERIOR_DELT", "ABS"] }, equipment: ["bodyweight"], aliases: ["battle rope", "rope slams", "rope waves"], tags: ["cardio", "compound"], movement: "cardio" },
+  { id: "custom-cable-face-pull", name: "Cable Face Pull", defaultUnit: "reps", muscles: { primary: ["POSTERIOR_DELT"], secondary: ["BACK", "BICEPS"] }, equipment: ["cable"], aliases: ["face pull", "rope face pull", "cable rope face pull"], tags: ["compound", "pull"], movement: "pull", gifUrl: "https://static.exercisedb.dev/media/ZfyAGhK.gif" },
 
   // CARDIO
   { id: "custom-run", name: "Running", defaultUnit: "min", muscles: { primary: ["QUADS", "HAMSTRINGS", "CALVES", "GLUTES"] }, equipment: [], aliases: ["run", "jog", "jogging", "treadmill run"], tags: ["cardio"], movement: "cardio" },

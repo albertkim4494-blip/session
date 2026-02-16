@@ -7575,6 +7575,30 @@ export const EXERCISE_CATALOG = [
     "gifUrl": "https://static.exercisedb.dev/media/wqNPGCg.gif"
   },
   {
+    "id": "custom-cable-face-pull",
+    "name": "Cable Face Pull",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "POSTERIOR_DELT"
+      ],
+      "secondary": [
+        "BACK",
+        "BICEPS"
+      ]
+    },
+    "equipment": [
+      "cable"
+    ],
+    "aliases": ["face pull", "rope face pull", "cable rope face pull"],
+    "tags": [
+      "compound",
+      "pull"
+    ],
+    "movement": "pull",
+    "gifUrl": "https://static.exercisedb.dev/media/ZfyAGhK.gif"
+  },
+  {
     "id": "edb-PzQanLE",
     "name": "Cable Shoulder Press",
     "defaultUnit": "reps",

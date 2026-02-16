@@ -5,8 +5,8 @@ import { catalogSearch, normalizeQuery, filterCatalog } from "../lib/exerciseCat
 import { ExerciseDetailModal } from "./ExerciseDetailModal";
 import { useSwipe } from "../hooks/useSwipe";
 import { getSportIconUrl } from "../lib/sportIcons";
-import { BodyDiagram, SLUG_TO_UI_GROUP } from "./BodyDiagram";
-import { UI_MUSCLE_GROUPS, UI_GROUP_CONFIG, getMusclesForUiGroup } from "../lib/muscleGroups";
+import { BodyDiagram, SLUG_TO_MUSCLES } from "./BodyDiagram";
+import { INDIVIDUAL_MUSCLES, MUSCLE_LABELS } from "../lib/muscleGroups";
 
 const TYPE_CHIPS = [
   { key: "exercise", label: "Exercise" },
@@ -76,9 +76,9 @@ export function ExerciseCatalogModal({
 }) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState("home"); // "home" | "list"
-  const [selectedUiGroups, setSelectedUiGroups] = useState(new Set());
+  const [selectedMuscles, setSelectedMuscles] = useState(new Set());
   const [typeFilter, setTypeFilter] = useState("exercise"); // "exercise" | "stretch" | "sport"
-  const [hoveredGroups, setHoveredGroups] = useState(new Set());
+  const [hoveredMuscles, setHoveredMuscles] = useState(new Set());
   const [detailEntry, setDetailEntry] = useState(null);
   const [slideDir, setSlideDir] = useState(null);
 
@@ -89,26 +89,26 @@ export function ExerciseCatalogModal({
     if (open) {
       setQuery("");
       setView("home");
-      setSelectedUiGroups(new Set());
+      setSelectedMuscles(new Set());
       setTypeFilter("exercise");
-      setHoveredGroups(new Set());
+      setHoveredMuscles(new Set());
       setDetailEntry(null);
       setSlideDir(null);
     }
   }, [open]);
 
   // Navigation helpers
-  const goToList = useCallback(({ uiGroups } = {}) => {
-    if (uiGroups) setSelectedUiGroups(uiGroups);
+  const goToList = useCallback(({ muscles } = {}) => {
+    if (muscles) setSelectedMuscles(muscles);
     setView("list");
   }, []);
 
   const goHome = useCallback(() => {
     setView("home");
     setQuery("");
-    setSelectedUiGroups(new Set());
+    setSelectedMuscles(new Set());
     setTypeFilter("exercise");
-    setHoveredGroups(new Set());
+    setHoveredMuscles(new Set());
   }, []);
 
   // Back button override: detail → list → home → close
@@ -134,10 +134,10 @@ export function ExerciseCatalogModal({
   // Two-step filter pipeline: structural filters → text search
   const filteredCatalog = useMemo(() => {
     const filters = {};
-    if (selectedUiGroups.size > 0) filters.uiMuscleGroups = [...selectedUiGroups];
+    if (selectedMuscles.size > 0) filters.muscles = [...selectedMuscles];
     if (typeFilter) filters.typeFilter = typeFilter;
     return filterCatalog(src, filters);
-  }, [src, selectedUiGroups, typeFilter]);
+  }, [src, selectedMuscles, typeFilter]);
 
   const catalogResults = useMemo(() => {
     return catalogSearch(filteredCatalog, query, { limit: Infinity });
@@ -157,7 +157,7 @@ export function ExerciseCatalogModal({
   const userResults = useMemo(() => {
     if (!targetWorkoutId || view === "home") return [];
     const q = normalizeQuery(query);
-    if (selectedUiGroups.size > 0) return [];
+    if (selectedMuscles.size > 0) return [];
 
     if (!q) {
       return getRecentUserExercises(workouts, logsByDate, 5)
@@ -169,7 +169,7 @@ export function ExerciseCatalogModal({
       if (catalogNameSet.has(ex.name.toLowerCase())) return false;
       return ex.name.toLowerCase().includes(q);
     }).slice(0, 8);
-  }, [query, selectedUiGroups, workouts, logsByDate, catalogNameSet, targetWorkoutId, view]);
+  }, [query, selectedMuscles, workouts, logsByDate, catalogNameSet, targetWorkoutId, view]);
 
   // Swipe between exercises in detail view
   const navigateDetail = useCallback((dir) => {
@@ -250,8 +250,8 @@ export function ExerciseCatalogModal({
   const invertFilter = colors.appBg.startsWith("#0") || colors.appBg.startsWith("#1") ? "invert(1)" : "none";
 
   // --- List title ---
-  const listTitle = selectedUiGroups.size > 0
-    ? [...selectedUiGroups].map((g) => UI_GROUP_CONFIG[g]?.label).filter(Boolean).join(" + ")
+  const listTitle = selectedMuscles.size > 0
+    ? [...selectedMuscles].map((m) => MUSCLE_LABELS[m]).filter(Boolean).join(" + ")
     : "All Exercises";
 
   const isAddMode = !!targetWorkoutId;
@@ -385,40 +385,42 @@ export function ExerciseCatalogModal({
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {/* Body diagram — tap a muscle to toggle selection */}
             <BodyDiagram
-              highlightedMuscles={hoveredGroups.size > 0
-                ? [...hoveredGroups].flatMap((g) => getMusclesForUiGroup(g))
-                : []}
+              highlightedMuscles={[...hoveredMuscles]}
               secondaryMuscles={[]}
               colors={colors}
               onBodyPartPress={(part) => {
-                const group = SLUG_TO_UI_GROUP[part.slug];
-                if (group) {
-                  setHoveredGroups((prev) => {
+                const muscles = SLUG_TO_MUSCLES[part.slug];
+                if (muscles) {
+                  setHoveredMuscles((prev) => {
                     const next = new Set(prev);
-                    if (next.has(group)) next.delete(group); else next.add(group);
+                    // If ALL muscles for this slug are selected, deselect them; otherwise select them
+                    const allSelected = muscles.every((m) => next.has(m));
+                    for (const m of muscles) {
+                      if (allSelected) next.delete(m); else next.add(m);
+                    }
                     return next;
                   });
                 }
               }}
             />
 
-            {/* Muscle group chips — small, wrap, multi-select */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-              {UI_MUSCLE_GROUPS.map((group) => (
+            {/* Individual muscle chips — small, wrap, multi-select */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, justifyContent: "center" }}>
+              {INDIVIDUAL_MUSCLES.map((muscle) => (
                 <button
-                  key={group}
+                  key={muscle}
                   className="btn-press"
-                  style={chipStyle(hoveredGroups.has(group))}
-                  aria-pressed={hoveredGroups.has(group)}
+                  style={chipStyle(hoveredMuscles.has(muscle))}
+                  aria-pressed={hoveredMuscles.has(muscle)}
                   onClick={() => {
-                    setHoveredGroups((prev) => {
+                    setHoveredMuscles((prev) => {
                       const next = new Set(prev);
-                      if (next.has(group)) next.delete(group); else next.add(group);
+                      if (next.has(muscle)) next.delete(muscle); else next.add(muscle);
                       return next;
                     });
                   }}
                 >
-                  {UI_GROUP_CONFIG[group].label}
+                  {MUSCLE_LABELS[muscle]}
                 </button>
               ))}
             </div>
@@ -432,16 +434,16 @@ export function ExerciseCatalogModal({
                 width: "100%",
               }}
               onClick={() => {
-                if (hoveredGroups.size > 0) {
-                  goToList({ uiGroups: new Set(hoveredGroups) });
+                if (hoveredMuscles.size > 0) {
+                  goToList({ muscles: new Set(hoveredMuscles) });
                 } else {
-                  setSelectedUiGroups(new Set());
+                  setSelectedMuscles(new Set());
                   setView("list");
                 }
               }}
             >
-              {hoveredGroups.size > 0
-                ? `Browse ${[...hoveredGroups].map((g) => UI_GROUP_CONFIG[g].label).join(" + ")}`
+              {hoveredMuscles.size > 0
+                ? `Browse ${[...hoveredMuscles].map((m) => MUSCLE_LABELS[m]).join(" + ")}`
                 : "Browse All Exercises"}
             </button>
           </div>
