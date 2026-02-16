@@ -425,8 +425,8 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
         ) : (
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              display: "flex",
+              flexDirection: "column",
               gap: 8,
               padding: "10px 12px",
               borderRadius: 12,
@@ -434,34 +434,38 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
               border: `1px solid ${colors?.border}`,
             }}
           >
-            <div>
-              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Name</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{displayName || notSet}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Birthdate</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>
-                {birthdate && isValidBirthdateString(birthdate)
-                  ? <>{new Date(birthdate + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}{age !== null && <span style={{ opacity: 0.5, fontWeight: 500 }}> ({age})</span>}</>
-                  : notSet}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Name</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{displayName || notSet}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Birthdate</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  {birthdate && isValidBirthdateString(birthdate)
+                    ? <>{new Date(birthdate + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}{age !== null && <span style={{ opacity: 0.5, fontWeight: 500 }}> ({age})</span>}</>
+                    : notSet}
+                </div>
               </div>
             </div>
-            <div>
-              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Gender</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{gender ? GENDER_LABELS[gender] || gender : notSet}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Weight</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{weightLbs ? `${weightLbs} ${weightUnit}` : notSet}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Height</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>
-                {heightInches ? (
-                  isMetric
-                    ? `${Math.round(Number(heightInches) * 2.54)} cm`
-                    : `${Math.floor(Number(heightInches) / 12)}'${Number(heightInches) % 12}"`
-                ) : notSet}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Gender</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{gender ? GENDER_LABELS[gender] || gender : notSet}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Height</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  {heightInches ? (
+                    isMetric
+                      ? `${Math.round(Number(heightInches) * 2.54)} cm`
+                      : `${Math.floor(Number(heightInches) / 12)}'${Number(heightInches) % 12}"`
+                  ) : notSet}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Weight</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{weightLbs ? `${weightLbs} ${weightUnit}` : notSet}</div>
               </div>
             </div>
           </div>

@@ -285,9 +285,9 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Default Rest</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8 }}>
               <input
                 type="number"
                 inputMode="numeric"
