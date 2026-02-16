@@ -6,7 +6,7 @@ import { ExerciseDetailModal } from "./ExerciseDetailModal";
 import { useSwipe } from "../hooks/useSwipe";
 import { getSportIconUrl } from "../lib/sportIcons";
 import { BodyDiagram, SLUG_TO_MUSCLES } from "./BodyDiagram";
-import { INDIVIDUAL_MUSCLES, MUSCLE_LABELS } from "../lib/muscleGroups";
+import { INDIVIDUAL_MUSCLES, MUSCLE_LABELS, UI_MUSCLE_GROUPS, UI_GROUP_CONFIG, muscleToUiGroup } from "../lib/muscleGroups";
 
 const TYPE_CHIPS = [
   { key: "exercise", label: "Exercise" },
@@ -79,6 +79,7 @@ export function ExerciseCatalogModal({
   const [selectedMuscles, setSelectedMuscles] = useState(new Set());
   const [typeFilter, setTypeFilter] = useState("exercise"); // "exercise" | "stretch" | "sport"
   const [hoveredMuscles, setHoveredMuscles] = useState(new Set());
+  const [activeGroup, setActiveGroup] = useState(null); // which UI group is expanded for sub-muscles
   const [detailEntry, setDetailEntry] = useState(null);
   const [slideDir, setSlideDir] = useState(null);
 
@@ -92,6 +93,7 @@ export function ExerciseCatalogModal({
       setSelectedMuscles(new Set());
       setTypeFilter("exercise");
       setHoveredMuscles(new Set());
+      setActiveGroup(null);
       setDetailEntry(null);
       setSlideDir(null);
     }
@@ -109,6 +111,7 @@ export function ExerciseCatalogModal({
     setSelectedMuscles(new Set());
     setTypeFilter("exercise");
     setHoveredMuscles(new Set());
+    setActiveGroup(null);
   }, []);
 
   // Back button override: detail → list → home → close
@@ -383,47 +386,135 @@ export function ExerciseCatalogModal({
         /* Browse by muscle group */
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* Body diagram — tap a muscle to toggle selection */}
+            {/* Body diagram — tap a muscle to select its group */}
             <BodyDiagram
               highlightedMuscles={[...hoveredMuscles]}
-              secondaryMuscles={[]}
+              secondaryMuscles={activeGroup && !hoveredMuscles.size
+                ? UI_GROUP_CONFIG[activeGroup].muscles
+                : []}
               colors={colors}
               onBodyPartPress={(part) => {
                 const muscles = SLUG_TO_MUSCLES[part.slug];
-                if (muscles) {
+                if (!muscles?.length) return;
+                // Find which UI group this body part belongs to
+                const group = muscleToUiGroup[muscles[0]];
+                if (!group) return;
+                const cfg = UI_GROUP_CONFIG[group];
+                if (cfg.muscles.length === 1) {
+                  // Single-muscle group (Chest, Back) — toggle directly
+                  const m = cfg.muscles[0];
                   setHoveredMuscles((prev) => {
                     const next = new Set(prev);
-                    // If ALL muscles for this slug are selected, deselect them; otherwise select them
-                    const allSelected = muscles.every((m) => next.has(m));
-                    for (const m of muscles) {
-                      if (allSelected) next.delete(m); else next.add(m);
-                    }
+                    if (next.has(m)) { next.delete(m); setActiveGroup(null); }
+                    else { next.add(m); setActiveGroup(group); }
                     return next;
                   });
+                } else {
+                  // Multi-muscle group — expand it for fine-tuning
+                  if (activeGroup === group) {
+                    // Toggle the specific tapped muscle within active group
+                    setHoveredMuscles((prev) => {
+                      const next = new Set(prev);
+                      for (const m of muscles) {
+                        if (next.has(m)) next.delete(m); else next.add(m);
+                      }
+                      // If no muscles left from this group, deselect the group
+                      if (!cfg.muscles.some((m) => next.has(m))) setActiveGroup(null);
+                      return next;
+                    });
+                  } else {
+                    // Select the whole group and expand sub-muscles
+                    setActiveGroup(group);
+                    setHoveredMuscles(new Set(cfg.muscles));
+                  }
                 }
               }}
             />
 
-            {/* Individual muscle chips — small, wrap, multi-select */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, justifyContent: "center" }}>
-              {INDIVIDUAL_MUSCLES.map((muscle) => (
-                <button
-                  key={muscle}
-                  className="btn-press"
-                  style={chipStyle(hoveredMuscles.has(muscle))}
-                  aria-pressed={hoveredMuscles.has(muscle)}
-                  onClick={() => {
-                    setHoveredMuscles((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(muscle)) next.delete(muscle); else next.add(muscle);
-                      return next;
-                    });
-                  }}
-                >
-                  {MUSCLE_LABELS[muscle]}
-                </button>
-              ))}
+            {/* High-level muscle group chips */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+              {UI_MUSCLE_GROUPS.map((group) => {
+                const cfg = UI_GROUP_CONFIG[group];
+                const isActive = activeGroup === group || (cfg.muscles.length === 1 && hoveredMuscles.has(cfg.muscles[0]));
+                return (
+                  <button
+                    key={group}
+                    className="btn-press"
+                    style={chipStyle(isActive)}
+                    aria-pressed={isActive}
+                    onClick={() => {
+                      if (cfg.muscles.length === 1) {
+                        // Single-muscle group — toggle directly
+                        const m = cfg.muscles[0];
+                        setHoveredMuscles((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(m)) next.delete(m); else next.add(m);
+                          return next;
+                        });
+                        setActiveGroup(isActive ? null : group);
+                      } else if (activeGroup === group) {
+                        // Deselect group
+                        setActiveGroup(null);
+                        setHoveredMuscles((prev) => {
+                          const next = new Set(prev);
+                          for (const m of cfg.muscles) next.delete(m);
+                          return next;
+                        });
+                      } else {
+                        // Select all muscles in group and expand sub-chips
+                        setActiveGroup(group);
+                        setHoveredMuscles((prev) => {
+                          const next = new Set(prev);
+                          for (const m of cfg.muscles) next.add(m);
+                          return next;
+                        });
+                      }
+                    }}
+                  >
+                    {cfg.label}
+                  </button>
+                );
+              })}
             </div>
+
+            {/* Sub-muscle chips — only when a multi-muscle group is active */}
+            {activeGroup && UI_GROUP_CONFIG[activeGroup].muscles.length > 1 && (
+              <div style={{
+                display: "flex", flexWrap: "wrap", gap: 5, justifyContent: "center",
+                padding: "8px 10px", borderRadius: 12,
+                background: colors.subtleBg,
+                border: `1px solid ${colors.border}`,
+              }}>
+                <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, width: "100%", textAlign: "center", marginBottom: 2 }}>
+                  Fine-tune {UI_GROUP_CONFIG[activeGroup].label}
+                </span>
+                {UI_GROUP_CONFIG[activeGroup].muscles.map((muscle) => (
+                  <button
+                    key={muscle}
+                    className="btn-press"
+                    style={{
+                      ...chipStyle(hoveredMuscles.has(muscle)),
+                      fontSize: 11,
+                      padding: "4px 10px",
+                    }}
+                    aria-pressed={hoveredMuscles.has(muscle)}
+                    onClick={() => {
+                      setHoveredMuscles((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(muscle)) next.delete(muscle); else next.add(muscle);
+                        // If no muscles left from this group, deselect the group
+                        if (!UI_GROUP_CONFIG[activeGroup].muscles.some((m) => next.has(m))) {
+                          setActiveGroup(null);
+                        }
+                        return next;
+                      });
+                    }}
+                  >
+                    {MUSCLE_LABELS[muscle]}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Browse button */}
             <button
