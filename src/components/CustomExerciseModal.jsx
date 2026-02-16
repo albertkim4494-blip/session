@@ -28,7 +28,8 @@ export function CustomExerciseModal({
     enriching, enriched, enrichError, muscles, equipment, tags, movement,
   } = modalState;
 
-  const isBrowseMode = !workoutId;
+  const isEditMode = !!modalState.editExerciseId;
+  const isBrowseMode = !workoutId && !isEditMode;
   const hasWorkouts = workouts && workouts.length > 0;
 
   // Catalog search suggestions based on name input
@@ -195,14 +196,14 @@ export function CustomExerciseModal({
         <line x1="12" y1="5" x2="12" y2="19" />
         <line x1="5" y1="12" x2="19" y2="12" />
       </svg>
-      {isBrowseMode && checked.size === 0 ? "Save Exercise" : `Add to Workout${isBrowseMode && checked.size > 0 ? ` (${checked.size})` : ""}`}
+      {isEditMode ? "Save Changes" : isBrowseMode && checked.size === 0 ? "Save Exercise" : `Add to Workout${isBrowseMode && checked.size > 0 ? ` (${checked.size})` : ""}`}
     </button>
   );
 
   return (
     <Modal
       open={open}
-      title="Custom Exercise"
+      title={isEditMode ? "Classify Exercise" : "Custom Exercise"}
       onClose={onClose}
       styles={styles}
       footer={footer}

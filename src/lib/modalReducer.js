@@ -133,7 +133,7 @@ export const initialModalState = {
     catalogId: null,
     gifUrl: null,
   },
-  exerciseDetail: { isOpen: false, entry: null },
+  exerciseDetail: { isOpen: false, entry: null, entries: [] },
   social: { isOpen: false, tab: "friends" },
   friendSearch: { isOpen: false, query: "", results: [], searching: false },
   shareWorkout: {
@@ -541,6 +541,12 @@ export function modalReducer(state, action) {
           ...initialModalState.customExercise,
           isOpen: true,
           workoutId: action.payload?.workoutId || null,
+          name: action.payload?.name || "",
+          unit: action.payload?.unit || "reps",
+          customUnitAbbr: action.payload?.customUnitAbbr || "",
+          customUnitAllowDecimal: action.payload?.customUnitAllowDecimal || false,
+          editExerciseId: action.payload?.editExerciseId || null,
+          editWorkoutId: action.payload?.editWorkoutId || null,
         },
       };
 
@@ -563,6 +569,7 @@ export function modalReducer(state, action) {
         exerciseDetail: {
           isOpen: true,
           entry: action.payload.entry,
+          entries: action.payload.entries || [],
         },
       };
 

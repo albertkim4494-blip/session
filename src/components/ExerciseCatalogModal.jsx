@@ -70,7 +70,7 @@ function BackArrow() {
 }
 
 export function ExerciseCatalogModal({
-  open, onClose, onAddExercise, onCustomExercise,
+  open, onClose, onAddExercise, onCustomExercise, onDeleteCustomExercise,
   styles, colors, workouts, logsByDate,
   targetWorkoutId, catalog, backOverrideRef,
 }) {
@@ -529,6 +529,11 @@ export function ExerciseCatalogModal({
         onBack={() => { setSlideDir(null); setDetailEntry(null); }}
         onClose={() => { setSlideDir(null); setDetailEntry(null); onClose(); }}
         onAddExercise={onAddExercise ? (entry, workoutId) => onAddExercise(entry, workoutId) : undefined}
+        onDeleteCustomExercise={onDeleteCustomExercise ? (entry) => {
+          onDeleteCustomExercise(entry);
+          setSlideDir(null);
+          setDetailEntry(null);
+        } : undefined}
         workouts={workouts}
         styles={styles}
         colors={colors}

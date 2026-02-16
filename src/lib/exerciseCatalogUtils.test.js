@@ -99,6 +99,34 @@ const dbOnly = catalogSearch(EXERCISE_CATALOG, "", { equipment: "dumbbell", limi
 assert(dbOnly.length > 0, "equipment=dumbbell returns results");
 assert(dbOnly.every((r) => r.equipment.includes("dumbbell")), "all dumbbell results have dumbbell equipment");
 
+// --- catalogSearch — multi-word queries ---
+console.log("\ncatalogSearch — multi-word queries:");
+
+const tricepExtResults = catalogSearch(EXERCISE_CATALOG, "tricep extension");
+assert(tricepExtResults.length > 0, "'tricep extension' returns results");
+assert(
+  tricepExtResults.some((r) => r.name.toLowerCase().includes("triceps extension")),
+  "'tricep extension' finds an exercise with 'triceps extension' in name"
+);
+
+const flyResults = catalogSearch(EXERCISE_CATALOG, "fly");
+assert(flyResults.length > 0, "'fly' returns results");
+assert(flyResults.some((r) => r.name.toLowerCase().includes("fly")), "'fly' finds Dumbbell Fly or similar");
+
+const cableFaceResults = catalogSearch(EXERCISE_CATALOG, "cable face");
+assert(cableFaceResults.length > 0, "'cable face' returns results");
+assert(
+  cableFaceResults.some((r) => r.name.toLowerCase().includes("cable face pull")),
+  "'cable face' finds Cable Face Pull"
+);
+
+const seatedTricepResults = catalogSearch(EXERCISE_CATALOG, "seated tricep");
+assert(seatedTricepResults.length > 0, "'seated tricep' returns results");
+assert(
+  seatedTricepResults.some((r) => r.name.toLowerCase().includes("seated") && r.name.toLowerCase().includes("tricep")),
+  "'seated tricep' finds exercise with both words"
+);
+
 // --- getRecentExercises ---
 console.log("\ngetRecentExercises:");
 

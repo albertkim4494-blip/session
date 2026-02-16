@@ -60,13 +60,25 @@ export function buildCatalogMap(catalog) {
 }
 
 /**
+ * Check if all query words (or their stems) appear in a target string.
+ * Order-independent, per-word stemming.
+ */
+function allWordsMatch(queryWords, stemmedWords, target) {
+  const targetLower = target.toLowerCase().replace(/[-_]/g, " ");
+  return queryWords.every((word, i) => {
+    const stem = stemmedWords[i];
+    return targetLower.includes(word) || (stem !== word && targetLower.includes(stem));
+  });
+}
+
+/**
  * Ranked search across name, aliases, muscles, equipment, and tags.
  *
  * Ranking tiers (lower = better):
  *   1. Name starts with query
- *   2. Name contains query
+ *   2. Name contains query (includes all-words-match for multi-word queries)
  *   3. Alias starts with query
- *   4. Alias contains query
+ *   4. Alias contains query (includes all-words-match for multi-word queries)
  *   5. Muscle group match
  *   6. Equipment / tag match
  *
@@ -96,6 +108,10 @@ export function catalogSearch(catalog, query, opts = {}) {
   // Compact form (spaces removed) for matching "pushup" ↔ "push up"
   const qCompact = q.replace(/\s+/g, "");
   const stemCompact = hasStem ? stemmed.replace(/\s+/g, "") : "";
+  // Per-word stemming for multi-word queries
+  const queryWords = q.split(/\s+/).filter(Boolean);
+  const stemmedWords = queryWords.map(stemQuery);
+  const isMultiWord = queryWords.length > 1;
   const scored = [];
 
   for (const entry of catalog) {
@@ -117,8 +133,12 @@ export function catalogSearch(catalog, query, opts = {}) {
              (hasStem && (nameLower.includes(stemmed) || nameCompact.includes(stemCompact)))) {
       rank = 2;
     }
+    // Tier 2 (multi-word): all query words found in name (order-independent, per-word stemming)
+    if (rank > 2 && isMultiWord && allWordsMatch(queryWords, stemmedWords, nameLower)) {
+      rank = 2;
+    }
     // Tier 3/4: alias match (spaced or compact)
-    else if (entry.aliases) {
+    if (rank > 3 && entry.aliases) {
       for (const alias of entry.aliases) {
         const a = alias.toLowerCase().replace(/[-_]/g, " ");
         const ac = a.replace(/\s+/g, "");
@@ -128,6 +148,15 @@ export function catalogSearch(catalog, query, opts = {}) {
           break;
         } else if (a.includes(q) || ac.includes(qCompact) ||
                    (hasStem && (a.includes(stemmed) || ac.includes(stemCompact)))) {
+          rank = Math.min(rank, 4);
+          break;
+        }
+      }
+    }
+    // Tier 4 (multi-word): all query words found in an alias
+    if (rank > 4 && isMultiWord && entry.aliases) {
+      for (const alias of entry.aliases) {
+        if (allWordsMatch(queryWords, stemmedWords, alias)) {
           rank = 4;
           break;
         }

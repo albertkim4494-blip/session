@@ -1616,6 +1616,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       showToast("Please enter a custom unit abbreviation");
       return;
     }
+
+    // No catalog match — route through AI enrichment flow
+    if (!catalogId) {
+      dispatchModal({ type: "CLOSE_EDIT_EXERCISE" });
+      dispatchModal({
+        type: "OPEN_CUSTOM_EXERCISE",
+        payload: {
+          name: name.trim(),
+          unit,
+          customUnitAbbr: unit === "custom" ? customUnitAbbr : "",
+          customUnitAllowDecimal: unit === "custom" ? customUnitAllowDecimal : false,
+          editExerciseId: exerciseId,
+          editWorkoutId: workoutId,
+        },
+      });
+      return;
+    }
+
     updateState((st) => {
       const ww = st.program.workouts.find((x) => x.id === workoutId);
       const ex = ww?.exercises?.find((e) => e.id === exerciseId);
@@ -3190,13 +3208,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             const ctx = modals.log.context;
             if (!ctx?.catalogId) return;
             const entry = catalogMap.get(ctx.catalogId);
-            if (entry) dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry } });
+            if (!entry) return;
+            // Build entries list from workout exercises that have catalog data
+            const entries = (ctx.workoutExercises || [])
+              .map((ex) => ex.catalogId ? catalogMap.get(ex.catalogId) : null)
+              .filter(Boolean);
+            dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry, entries } });
           }}
         >
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{modals.log.context?.exerciseName || "Log"}</span>
           {modals.log.context?.catalogId && (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35, flexShrink: 0 }}>
-              <polyline points="9 18 15 12 9 6" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35, flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
           )}
         </div>
@@ -4134,6 +4159,41 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         logsByDate={state.logsByDate}
         targetWorkoutId={modals.catalogBrowse.workoutId}
         backOverrideRef={backOverrideRef}
+        onDeleteCustomExercise={(entry) => {
+          // Count usages across program workouts and daily workouts
+          let usages = 0;
+          for (const w of state.program?.workouts || []) {
+            for (const ex of w.exercises || []) {
+              if (ex.catalogId === entry.id) usages++;
+            }
+          }
+          for (const dayWorkouts of Object.values(state.dailyWorkouts || {})) {
+            for (const w of dayWorkouts || []) {
+              for (const ex of w.exercises || []) {
+                if (ex.catalogId === entry.id) usages++;
+              }
+            }
+          }
+          const msg = usages > 0
+            ? `"${entry.name}" is used in ${usages} exercise(s). Deleting it removes its catalog data (muscles, equipment, gif). The exercise name stays in your workouts.`
+            : `Delete "${entry.name}"?`;
+          dispatchModal({
+            type: "OPEN_CONFIRM",
+            payload: {
+              title: "Delete custom exercise?",
+              message: msg,
+              confirmText: "Delete",
+              onConfirm: () => {
+                updateState((st) => {
+                  st.customExercises = (st.customExercises || []).filter((e) => e.id !== entry.id);
+                  return st;
+                });
+                showToast(`"${entry.name}" deleted`);
+                dispatchModal({ type: "CLOSE_CONFIRM" });
+              },
+            },
+          });
+        }}
         onAddExercise={(entry, workoutIdOrIds, userEx) => {
           if (!workoutIdOrIds) return;
           const ids = Array.isArray(workoutIdOrIds) ? workoutIdOrIds : [workoutIdOrIds];
@@ -4181,6 +4241,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         styles={styles}
         colors={colors}
         onSave={(exercise, workoutIds) => {
+          const editExerciseId = modals.customExercise.editExerciseId;
+          const editWorkoutId = modals.customExercise.editWorkoutId;
           updateState((st) => {
             // Determine catalogId: use existing if user selected a catalog suggestion, else create custom entry
             let catalogId = exercise.catalogId || null;
@@ -4209,28 +4271,45 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               }
             }
 
-            // Add exercise to selected workout(s)
-            for (const wId of workoutIds) {
-              const w = st.program.workouts.find((x) => x.id === wId);
-              if (!w) continue;
-              const newEx = { id: uid("ex"), name: exercise.name, unit: exercise.unit, catalogId };
-              if (exercise.customUnitAbbr) newEx.customUnitAbbr = exercise.customUnitAbbr;
-              if (exercise.customUnitAllowDecimal) newEx.customUnitAllowDecimal = exercise.customUnitAllowDecimal;
-              w.exercises.push(newEx);
+            // Edit mode: update existing exercise in-place
+            if (editExerciseId && editWorkoutId) {
+              const ww = st.program.workouts.find((x) => x.id === editWorkoutId);
+              const ex = ww?.exercises?.find((e) => e.id === editExerciseId);
+              if (ex) {
+                ex.name = exercise.name.trim();
+                ex.unit = exercise.unit;
+                ex.catalogId = catalogId;
+                if (exercise.customUnitAbbr) ex.customUnitAbbr = exercise.customUnitAbbr;
+                else delete ex.customUnitAbbr;
+                if (exercise.customUnitAllowDecimal) ex.customUnitAllowDecimal = exercise.customUnitAllowDecimal;
+                else delete ex.customUnitAllowDecimal;
+              }
+            } else {
+              // Add exercise to selected workout(s)
+              for (const wId of workoutIds) {
+                const w = st.program.workouts.find((x) => x.id === wId);
+                if (!w) continue;
+                const newEx = { id: uid("ex"), name: exercise.name, unit: exercise.unit, catalogId };
+                if (exercise.customUnitAbbr) newEx.customUnitAbbr = exercise.customUnitAbbr;
+                if (exercise.customUnitAllowDecimal) newEx.customUnitAllowDecimal = exercise.customUnitAllowDecimal;
+                w.exercises.push(newEx);
+              }
             }
             return st;
           });
           dispatchModal({ type: "CLOSE_CUSTOM_EXERCISE" });
-          showToast(workoutIds.length > 0 ? `Exercise added to workout${workoutIds.length > 1 ? "s" : ""}` : "Exercise saved");
+          if (editExerciseId) {
+            showToast("Exercise updated");
+          } else {
+            showToast(workoutIds.length > 0 ? `Exercise added to workout${workoutIds.length > 1 ? "s" : ""}` : "Exercise saved");
+          }
         }}
       />
 
       {/* Exercise Detail Modal (view-only, from Train tab) */}
-      <ExerciseDetailModal
-        open={modals.exerciseDetail.isOpen}
-        entry={modals.exerciseDetail.entry}
-        onBack={() => dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" })}
-        onClose={() => dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" })}
+      <ExerciseDetailView
+        modals={modals}
+        dispatchModal={dispatchModal}
         styles={styles}
         colors={colors}
       />
@@ -4592,6 +4671,55 @@ function MoodPicker({ value, onChange, colors }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// ExerciseDetailView — wraps ExerciseDetailModal with swipe navigation
+// for the train-tab "view detail" flow (entries list from workout exercises)
+// ============================================================================
+
+function ExerciseDetailView({ modals, dispatchModal, styles, colors }) {
+  const { isOpen, entry, entries } = modals.exerciseDetail;
+  const [slideDir, setSlideDir] = React.useState(null);
+
+  const navigateDetail = React.useCallback((dir) => {
+    if (!entry || !entries.length) return;
+    const idx = entries.findIndex((e) => e.id === entry.id);
+    if (idx < 0) return;
+    const next = idx + dir;
+    if (next >= 0 && next < entries.length) {
+      setSlideDir(dir > 0 ? "left" : "right");
+      dispatchModal({
+        type: "OPEN_EXERCISE_DETAIL",
+        payload: { entry: entries[next], entries },
+      });
+    }
+  }, [entry, entries, dispatchModal]);
+
+  const swipeHandlers = useSwipe({
+    onSwipeLeft: () => navigateDetail(1),
+    onSwipeRight: () => navigateDetail(-1),
+    thresholdPx: 50,
+  });
+
+  const position = entry && entries.length > 1
+    ? entries.findIndex((e) => e.id === entry.id) + 1
+    : 0;
+
+  return (
+    <ExerciseDetailModal
+      open={isOpen}
+      entry={entry}
+      onBack={() => { setSlideDir(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); }}
+      onClose={() => { setSlideDir(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); }}
+      styles={styles}
+      colors={colors}
+      swipeHandlers={entries.length > 1 ? swipeHandlers : undefined}
+      slideDir={slideDir}
+      position={position}
+      total={entries.length}
+    />
   );
 }
 
