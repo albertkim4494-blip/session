@@ -3,6 +3,8 @@
  * Pure functions, no React dependency.
  */
 
+import { getMusclesForUiGroup } from "./muscleGroups.js";
+
 /**
  * Normalize a search query — lowercase, trim, collapse whitespace.
  */
@@ -268,6 +270,50 @@ export function isBodyweightOnly(entry) {
 export function resolveExerciseDisplay(exercise, catalogMap) {
   if (!exercise?.catalogId || !catalogMap) return null;
   return catalogMap.get(exercise.catalogId) || null;
+}
+
+/**
+ * Pre-filter catalog by structured criteria (muscle group, equipment, type, sport).
+ * Separated from `catalogSearch` which handles text matching.
+ *
+ * @param {Array} catalog - EXERCISE_CATALOG array
+ * @param {object} [filters]
+ * @param {string} [filters.uiMuscleGroup] - single UI muscle group key ("CHEST", "LEGS", etc.)
+ * @param {string[]} [filters.uiMuscleGroups] - multiple UI muscle group keys (union / OR)
+ * @param {Set} [filters.equipment] - equipment strings to require (entry must have at least one)
+ * @param {"exercise"|"stretch"|"sport"} [filters.typeFilter] - filter by exercise type
+ * @param {boolean} [filters.stretchOnly] - if true, only return stretch exercises (legacy)
+ * @param {string} [filters.sportId] - specific catalog entry id for a sport
+ * @param {boolean} [filters.allSports] - if true, only return sport exercises (legacy)
+ * @returns {Array} filtered catalog entries
+ */
+export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, equipment, typeFilter, stretchOnly, sportId, allSports } = {}) {
+  // Build combined target muscle set from single group or array of groups
+  let targetMuscles = null;
+  if (uiMuscleGroups?.length > 0) {
+    targetMuscles = new Set();
+    for (const g of uiMuscleGroups) for (const m of getMusclesForUiGroup(g)) targetMuscles.add(m);
+  } else if (uiMuscleGroup) {
+    targetMuscles = new Set(getMusclesForUiGroup(uiMuscleGroup));
+  }
+  return catalog.filter((entry) => {
+    if (sportId && entry.id !== sportId) return false;
+    if (allSports && entry.movement !== "sport") return false;
+    // Type filter: "exercise" excludes sport+stretch, "stretch" only stretch, "sport" only sport
+    if (typeFilter === "exercise" && (entry.movement === "sport" || entry.movement === "stretch")) return false;
+    if (typeFilter === "stretch" && entry.movement !== "stretch") return false;
+    if (typeFilter === "sport" && entry.movement !== "sport") return false;
+    if (targetMuscles) {
+      // Sport entries have no muscles — let them through when typeFilter=sport
+      if (typeFilter !== "sport") {
+        const all = [...(entry.muscles?.primary || []), ...(entry.muscles?.secondary || [])];
+        if (!all.some(m => targetMuscles.has(m))) return false;
+      }
+    }
+    if (equipment?.size > 0 && !(entry.equipment || []).some(e => equipment.has(e))) return false;
+    if (stretchOnly && entry.movement !== "stretch") return false;
+    return true;
+  });
 }
 
 /**

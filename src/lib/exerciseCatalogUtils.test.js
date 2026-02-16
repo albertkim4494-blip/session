@@ -8,6 +8,7 @@ import {
   normalizeQuery,
   buildCatalogMap,
   catalogSearch,
+  filterCatalog,
   getRecentExercises,
   getFrequentExercises,
   resolveExerciseDisplay,
@@ -174,6 +175,144 @@ assert(musclesFromFallback.includes("QUADS"), "fallback identifies QUADS for squ
 // Without catalogId and no fallback
 const musclesNoFallback = getMuscleGroups(squatEx, catalogMap, null);
 assert(musclesNoFallback.includes("UNCLASSIFIED"), "no fallback returns UNCLASSIFIED");
+
+// --- filterCatalog ---
+console.log("\nfilterCatalog:");
+
+// No filters returns full catalog
+const noFilter = filterCatalog(EXERCISE_CATALOG);
+assertEqual(noFilter.length, EXERCISE_CATALOG.length, "no filters returns full catalog");
+
+// Muscle group filter — CHEST
+const chestFiltered = filterCatalog(EXERCISE_CATALOG, { uiMuscleGroup: "CHEST" });
+assert(chestFiltered.length > 0, "CHEST filter returns results");
+assert(
+  chestFiltered.every((e) => {
+    const all = [...(e.muscles?.primary || []), ...(e.muscles?.secondary || [])];
+    return all.includes("CHEST");
+  }),
+  "all CHEST results have CHEST muscle"
+);
+
+// Muscle group filter — LEGS (should include QUADS, HAMSTRINGS, GLUTES, CALVES)
+const legsFiltered = filterCatalog(EXERCISE_CATALOG, { uiMuscleGroup: "LEGS" });
+assert(legsFiltered.length > 0, "LEGS filter returns results");
+assert(
+  legsFiltered.every((e) => {
+    const all = [...(e.muscles?.primary || []), ...(e.muscles?.secondary || [])];
+    return all.some(m => ["QUADS", "HAMSTRINGS", "GLUTES", "CALVES"].includes(m));
+  }),
+  "all LEGS results have a leg muscle"
+);
+
+// Equipment filter — single
+const dbFiltered = filterCatalog(EXERCISE_CATALOG, { equipment: new Set(["dumbbell"]) });
+assert(dbFiltered.length > 0, "dumbbell equipment filter returns results");
+assert(
+  dbFiltered.every((e) => (e.equipment || []).includes("dumbbell")),
+  "all dumbbell-filtered results have dumbbell"
+);
+
+// Equipment filter — multi
+const multiEquip = filterCatalog(EXERCISE_CATALOG, { equipment: new Set(["dumbbell", "barbell"]) });
+assert(multiEquip.length > 0, "multi-equipment filter returns results");
+assert(
+  multiEquip.every((e) => (e.equipment || []).some(eq => eq === "dumbbell" || eq === "barbell")),
+  "multi-equipment results have dumbbell or barbell"
+);
+
+// Stretch filter
+const stretchFiltered = filterCatalog(EXERCISE_CATALOG, { stretchOnly: true });
+assert(stretchFiltered.length > 0, "stretch filter returns results");
+assert(
+  stretchFiltered.every((e) => e.movement === "stretch"),
+  "all stretch-filtered results are stretches"
+);
+
+// All sports filter
+const allSportsFiltered = filterCatalog(EXERCISE_CATALOG, { allSports: true });
+assert(allSportsFiltered.length > 0, "allSports filter returns results");
+assert(
+  allSportsFiltered.every((e) => e.movement === "sport"),
+  "all allSports results are sports"
+);
+
+// Sport ID filter
+const firstSport = allSportsFiltered[0];
+const sportIdFiltered = filterCatalog(EXERCISE_CATALOG, { sportId: firstSport.id });
+assertEqual(sportIdFiltered.length, 1, "sportId filter returns exactly 1 result");
+assertEqual(sportIdFiltered[0].id, firstSport.id, "sportId filter returns correct sport");
+
+// Combined: muscle group + equipment
+const chestDb = filterCatalog(EXERCISE_CATALOG, { uiMuscleGroup: "CHEST", equipment: new Set(["dumbbell"]) });
+assert(chestDb.length > 0, "CHEST + dumbbell combined returns results");
+assert(
+  chestDb.every((e) => {
+    const all = [...(e.muscles?.primary || []), ...(e.muscles?.secondary || [])];
+    return all.includes("CHEST") && (e.equipment || []).includes("dumbbell");
+  }),
+  "combined CHEST+dumbbell results satisfy both filters"
+);
+
+// Empty equipment set returns all (same as no filter)
+const emptyEquip = filterCatalog(EXERCISE_CATALOG, { equipment: new Set() });
+assertEqual(emptyEquip.length, EXERCISE_CATALOG.length, "empty equipment set returns full catalog");
+
+// Multi muscle group filter (uiMuscleGroups array)
+const chestAndArms = filterCatalog(EXERCISE_CATALOG, { uiMuscleGroups: ["CHEST", "ARMS"] });
+assert(chestAndArms.length > 0, "CHEST+ARMS multi-group returns results");
+assert(chestAndArms.length > chestFiltered.length, "CHEST+ARMS returns more than CHEST alone");
+assert(
+  chestAndArms.every((e) => {
+    const all = [...(e.muscles?.primary || []), ...(e.muscles?.secondary || [])];
+    return all.some(m => ["CHEST", "BICEPS", "TRICEPS", "FOREARMS"].includes(m));
+  }),
+  "all CHEST+ARMS results have a chest or arm muscle"
+);
+
+// Empty uiMuscleGroups array returns full catalog
+const emptyGroups = filterCatalog(EXERCISE_CATALOG, { uiMuscleGroups: [] });
+assertEqual(emptyGroups.length, EXERCISE_CATALOG.length, "empty uiMuscleGroups returns full catalog");
+
+// typeFilter — exercise (excludes sport + stretch)
+const exerciseOnly = filterCatalog(EXERCISE_CATALOG, { typeFilter: "exercise" });
+assert(exerciseOnly.length > 0, "typeFilter=exercise returns results");
+assert(
+  exerciseOnly.every((e) => e.movement !== "sport" && e.movement !== "stretch"),
+  "typeFilter=exercise excludes sport and stretch"
+);
+
+// typeFilter — stretch
+const stretchType = filterCatalog(EXERCISE_CATALOG, { typeFilter: "stretch" });
+assert(stretchType.length > 0, "typeFilter=stretch returns results");
+assert(
+  stretchType.every((e) => e.movement === "stretch"),
+  "typeFilter=stretch only returns stretches"
+);
+
+// typeFilter — sport
+const sportType = filterCatalog(EXERCISE_CATALOG, { typeFilter: "sport" });
+assert(sportType.length > 0, "typeFilter=sport returns results");
+assert(
+  sportType.every((e) => e.movement === "sport"),
+  "typeFilter=sport only returns sports"
+);
+
+// typeFilter + muscle group: exercise + CHEST
+const chestExercises = filterCatalog(EXERCISE_CATALOG, { typeFilter: "exercise", uiMuscleGroup: "CHEST" });
+assert(chestExercises.length > 0, "CHEST + typeFilter=exercise returns results");
+assert(
+  chestExercises.every((e) => e.movement !== "sport" && e.movement !== "stretch"),
+  "CHEST exercises exclude sport and stretch"
+);
+
+// typeFilter=sport + muscle group: sports have no muscles, should pass through
+const sportWithMuscle = filterCatalog(EXERCISE_CATALOG, { typeFilter: "sport", uiMuscleGroup: "CHEST" });
+assert(sportWithMuscle.length > 0, "sport + CHEST muscle filter still returns sports");
+assert(
+  sportWithMuscle.every((e) => e.movement === "sport"),
+  "sport + muscle filter only returns sports"
+);
 
 // --- Summary ---
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);

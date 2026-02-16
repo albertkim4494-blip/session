@@ -22,6 +22,27 @@ const MUSCLE_TO_SLUGS = {
   FOREARMS: ["forearm"],
 };
 
+/**
+ * Reverse map: slug → UI muscle group for tap-to-browse.
+ * Maps each body part slug to the most relevant UI group.
+ */
+const SLUG_TO_UI_GROUP = {
+  chest: "CHEST",
+  triceps: "ARMS",
+  biceps: "ARMS",
+  forearm: "ARMS",
+  deltoids: "SHOULDERS",
+  "upper-back": "BACK",
+  trapezius: "BACK",
+  "lower-back": "BACK",
+  quadriceps: "LEGS",
+  hamstring: "LEGS",
+  gluteal: "LEGS",
+  calves: "LEGS",
+  abs: "CORE",
+  obliques: "CORE",
+};
+
 const HIDDEN = ["hair"];
 
 /**
@@ -68,7 +89,9 @@ function boostColor(hex) {
   return `#${ro.toString(16).padStart(2, "0")}${go.toString(16).padStart(2, "0")}${bo.toString(16).padStart(2, "0")}`;
 }
 
-export function BodyDiagram({ highlightedMuscles = [], secondaryMuscles = [], colors }) {
+export { SLUG_TO_UI_GROUP };
+
+export function BodyDiagram({ highlightedMuscles = [], secondaryMuscles = [], colors, onBodyPartPress }) {
   // Use a boosted accent for highlighted muscles — more vivid than UI accent
   const highlightColor = boostColor(colors.accent);
   // Secondary muscles get a softer tint
@@ -113,6 +136,7 @@ export function BodyDiagram({ highlightedMuscles = [], secondaryMuscles = [], co
           border={colors.border}
           defaultFill={bodyFill}
           hiddenParts={HIDDEN}
+          onBodyPartPress={onBodyPartPress}
         />
       </div>
 
@@ -128,6 +152,7 @@ export function BodyDiagram({ highlightedMuscles = [], secondaryMuscles = [], co
           border={colors.border}
           defaultFill={bodyFill}
           hiddenParts={HIDDEN}
+          onBodyPartPress={onBodyPartPress}
         />
       </div>
     </div>
