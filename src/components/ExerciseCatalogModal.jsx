@@ -16,7 +16,6 @@ const MOVEMENT_FILTERS = [
   { key: "core", label: "Core" },
   { key: "cardio", label: "Cardio" },
   { key: "sport", label: "Sport" },
-  { key: "mobility", label: "Mobility" },
   { key: "stretch", label: "Stretch" },
   { key: "__custom__", label: "Custom" },
 ];

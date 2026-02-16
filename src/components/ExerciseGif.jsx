@@ -62,6 +62,7 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
             mixBlendMode: isDark ? "screen" : "multiply",
             // Use opacity instead of display:none — display:none prevents onLoad from firing in some browsers
             opacity: status === "loaded" ? 1 : 0,
+            transition: "opacity 0.25s ease-out",
             position: status === "loaded" ? "static" : "absolute",
           }}
           onLoad={() => setStatus("loaded")}
