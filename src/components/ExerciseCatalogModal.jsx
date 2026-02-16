@@ -140,7 +140,7 @@ export function ExerciseCatalogModal({
   }, [src, selectedUiGroups, typeFilter]);
 
   const catalogResults = useMemo(() => {
-    return catalogSearch(filteredCatalog, query, { limit: 100 });
+    return catalogSearch(filteredCatalog, query, { limit: Infinity });
   }, [filteredCatalog, query]);
 
   // Home search: filter full catalog (no muscle/type filters) when typing on home screen
