@@ -302,13 +302,13 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   const adherence = computeAdherenceStats(state?.logsByDate);
   const previousInsights = loadPreviousInsights();
 
-  // Compute muscle volume summary for the AI
-  let muscleVolumeSummary = null;
+  // Compute muscle set counts for the AI (primary-only, no secondary inflation)
+  let muscleSetsSummary = null;
   if (catalog?.length > 0) {
     const catalogMap = buildCatalogMap(catalog);
     const analysis = buildNormalizedAnalysis(allWorkouts, recentLogs, { start: dateRange.start, end: dateRange.end }, catalogMap);
-    if (analysis.muscleGroupVolume && Object.keys(analysis.muscleGroupVolume).length > 0) {
-      muscleVolumeSummary = analysis.muscleGroupVolume;
+    if (analysis.muscleGroupSets && Object.keys(analysis.muscleGroupSets).length > 0) {
+      muscleSetsSummary = analysis.muscleGroupSets;
     }
   }
 
@@ -341,7 +341,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       progressionTrends,
       adherence,
       previousInsights,
-      muscleVolumeSummary,
+      muscleSetsSummary,
     },
   });
 

@@ -34,7 +34,8 @@ Deno.serve(async (req) => {
       progressionTrends,
       adherence,
       previousInsights,
-      muscleVolumeSummary,
+      muscleSetsSummary,
+      muscleVolumeSummary, // legacy, ignored if muscleSetsSummary present
     } = await req.json();
 
     const wUnit = weightUnit || "lb";
@@ -180,14 +181,21 @@ Deno.serve(async (req) => {
       antiRepetitionSection = `\nPREVIOUS RECOMMENDATIONS (do NOT repeat these topics):\n${previousInsights.titles.map((t: string) => `  - ${t}`).join("\n")}\n`;
     }
 
-    // Build muscle volume section
+    // Build muscle sets section (primary-only working set counts — the standard volume metric)
     let muscleVolumeSection = "";
-    if (muscleVolumeSummary && typeof muscleVolumeSummary === "object") {
-      const lines = Object.entries(muscleVolumeSummary)
+    const setsData = muscleSetsSummary || muscleVolumeSummary; // prefer sets, fall back to legacy reps
+    const setsLabel = muscleSetsSummary ? "sets" : "reps";
+    if (setsData && typeof setsData === "object") {
+      const entries = Object.entries(setsData)
         .filter(([, v]) => typeof v === "number" && v > 0)
-        .map(([g, v]) => `  ${(g as string).replace(/_/g, " ").toLowerCase()}: ${v} reps`);
-      if (lines.length > 0) {
-        muscleVolumeSection = `\nMUSCLE GROUP VOLUME (reps, primary + 0.5x secondary):\n${lines.join("\n")}\n`;
+        .sort(([, a], [, b]) => (b as number) - (a as number));
+      const totalSets = entries.reduce((sum, [, v]) => sum + (v as number), 0);
+      if (entries.length > 0) {
+        const lines = entries.map(([g, v]) => {
+          const pct = totalSets > 0 ? Math.round(((v as number) / totalSets) * 100) : 0;
+          return `  ${(g as string).replace(/_/g, " ").toLowerCase()}: ${v} ${setsLabel} (${pct}%)`;
+        });
+        muscleVolumeSection = `\nMUSCLE GROUP VOLUME (working ${setsLabel}, primary muscles only — ${totalSets} total):\n${lines.join("\n")}\n`;
       }
     }
 
@@ -242,7 +250,8 @@ RECOVERY & REST:
 - Use type "RECOVERY" for these insights.
 
 ANALYSIS RULES:
-- Look at actual logged volume (reps, weights, frequency), not just exercise names.
+- MUSCLE GROUP VOLUME is measured in WORKING SETS per primary muscle group. This is the standard training science metric. Use set counts, not rep counts, when discussing volume balance.
+- A muscle group with 0 sets means it was NOT directly trained — do not claim it was trained with indirect/secondary work.
 - Duration/sport activities measured in minutes are NOT strength volume.
 - Repeated sport activities (e.g. Water Polo 3x/week) are normal — don't flag as low variety.
 - Only compare strength exercises for muscle-group balance.

@@ -171,9 +171,11 @@ export function getUnitAbbr(unitKey, customAbbr) {
  */
 export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalogMap) {
   const muscleGroupVolume = {};
+  const muscleGroupSets = {};   // Primary-only working set counts
   const durationByActivity = {};
   const sportFrequency = {};
   let totalStrengthReps = 0;
+  let totalStrengthSets = 0;
 
   // Build exercise ID → info map
   const exerciseIdToInfo = new Map();
@@ -232,6 +234,13 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
           muscleGroupVolume[group] = (muscleGroupVolume[group] || 0) + Math.round(totalValue * 0.5);
         }
         totalStrengthReps += totalValue;
+
+        // Track working sets per PRIMARY muscle only (no secondary inflation)
+        const workingSets = log.sets.filter(s => (Number(s.reps) || 0) > 0).length;
+        totalStrengthSets += workingSets;
+        for (const group of primaryGroups) {
+          muscleGroupSets[group] = (muscleGroupSets[group] || 0) + workingSets;
+        }
       } else if (activity === "sport") {
         // Sport: convert to minutes, track frequency
         const minutes = normalizeToMinutes(totalValue, unit) || totalValue;
@@ -248,7 +257,7 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
     }
   }
 
-  return { muscleGroupVolume, durationByActivity, sportFrequency, totalStrengthReps };
+  return { muscleGroupVolume, muscleGroupSets, durationByActivity, sportFrequency, totalStrengthReps, totalStrengthSets };
 }
 
 /**
@@ -264,31 +273,31 @@ export function detectImbalancesNormalized(analysis, opts) {
   const catalog = opts?.catalog;
   const userExerciseNames = opts?.userExerciseNames;
   const insights = [];
-  const muscleGroupVolume = analysis?.muscleGroupVolume ?? {};
+  const sets = analysis?.muscleGroupSets ?? {};
   const sportFrequency = analysis?.sportFrequency ?? {};
-  const totalStrengthReps = analysis?.totalStrengthReps ?? 0;
+  const totalSets = analysis?.totalStrengthSets ?? 0;
 
-  // Only use strength reps for threshold
-  if (totalStrengthReps < 50) return [];
+  // Need enough training data to analyze (roughly 2+ sessions)
+  if (totalSets < 6) return [];
 
-  // Check push/pull ratio
-  const pushVolume =
-    (muscleGroupVolume.CHEST || 0) +
-    (muscleGroupVolume.ANTERIOR_DELT || 0) +
-    (muscleGroupVolume.TRICEPS || 0);
+  // Check push/pull ratio using primary-only sets
+  const pushSets =
+    (sets.CHEST || 0) +
+    (sets.ANTERIOR_DELT || 0) +
+    (sets.TRICEPS || 0);
 
-  const pullVolume =
-    (muscleGroupVolume.BACK || 0) +
-    (muscleGroupVolume.POSTERIOR_DELT || 0) +
-    (muscleGroupVolume.BICEPS || 0);
+  const pullSets =
+    (sets.BACK || 0) +
+    (sets.POSTERIOR_DELT || 0) +
+    (sets.BICEPS || 0);
 
-  if (pushVolume > pullVolume * 1.5 && pullVolume > 0) {
-    const ratio = (pushVolume / pullVolume).toFixed(1);
+  if (pushSets > pullSets * 1.5 && pullSets > 0) {
+    const ratio = (pushSets / pullSets).toFixed(1);
     insights.push({
       type: 'IMBALANCE',
       severity: 'HIGH',
       title: '⚠️ Push/Pull Imbalance Detected',
-      message: `You're doing ${ratio}x more pushing than pulling. This can lead to shoulder issues and poor posture.`,
+      message: `You've done ${pushSets} push sets vs ${pullSets} pull sets (${ratio}:1 ratio). Adding more pulling work helps balance shoulders and posture.`,
       suggestions: [
         ...getSuggestionsForMuscleGroup('BACK', catalog, userExerciseNames).slice(0, 2),
         ...getSuggestionsForMuscleGroup('POSTERIOR_DELT', catalog, userExerciseNames).slice(0, 1),
@@ -297,15 +306,15 @@ export function detectImbalancesNormalized(analysis, opts) {
   }
 
   // Check posterior delt neglect
-  const anteriorDelt = muscleGroupVolume.ANTERIOR_DELT || 0;
-  const posteriorDelt = muscleGroupVolume.POSTERIOR_DELT || 0;
+  const anteriorDeltSets = sets.ANTERIOR_DELT || 0;
+  const posteriorDeltSets = sets.POSTERIOR_DELT || 0;
 
-  if (anteriorDelt > posteriorDelt * 2 && anteriorDelt > 30) {
+  if (anteriorDeltSets > posteriorDeltSets * 2 && anteriorDeltSets > 4) {
     insights.push({
       type: 'IMBALANCE',
       severity: 'MEDIUM',
       title: '💡 Rear Delt Neglect',
-      message: 'Your front delts are getting way more work than rear delts. Add rear delt work for balanced shoulders.',
+      message: `${anteriorDeltSets} sets of front delt work but ${posteriorDeltSets || 'zero'} for rear delts. Add rear delt work for balanced shoulders.`,
       suggestions: getSuggestionsForMuscleGroup('POSTERIOR_DELT', catalog, userExerciseNames)
     });
   }
@@ -315,30 +324,32 @@ export function detectImbalancesNormalized(analysis, opts) {
   const importantGroups = ['BACK', 'HAMSTRINGS', 'POSTERIOR_DELT'];
 
   for (const group of importantGroups) {
-    const volume = muscleGroupVolume[group] || 0;
-    const percentage = (volume / totalStrengthReps) * 100;
+    const groupSets = sets[group] || 0;
+    const percentage = totalSets > 0 ? (groupSets / totalSets) * 100 : 0;
 
-    if (percentage < 5 && totalStrengthReps > 100 && insights.length < 2) {
+    if (percentage < 5 && totalSets > 12 && insights.length < 2) {
       const groupName = group.replace(/_/g, ' ').toLowerCase();
       // Skip if this group name appears in a sport name
       if (sportNamesLower.some((sn) => sn.includes(groupName))) continue;
       insights.push({
         type: 'NEGLECTED',
         severity: 'LOW',
-        title: `📊 ${groupName} volume is low`,
-        message: `You've barely trained ${groupName} recently. Consider adding some direct work.`,
+        title: `📊 ${groupName} needs attention`,
+        message: groupSets === 0
+          ? `No direct ${groupName} sets logged this period. Consider adding some targeted work.`
+          : `Only ${groupSets} direct ${groupName} set${groupSets !== 1 ? 's' : ''} out of ${totalSets} total — that's ${Math.round(percentage)}%. Consider adding more.`,
         suggestions: getSuggestionsForMuscleGroup(group, catalog, userExerciseNames)
       });
     }
   }
 
   // Positive feedback
-  if (insights.length === 0 && totalStrengthReps > 100) {
+  if (insights.length === 0 && totalSets > 12) {
     insights.push({
       type: 'POSITIVE',
       severity: 'INFO',
       title: '✅ Training looks balanced!',
-      message: 'Your workout volume is well-distributed. Keep up the great work!',
+      message: `${totalSets} sets well-distributed across muscle groups. Keep it up!`,
       suggestions: []
     });
   }

@@ -112,48 +112,63 @@ assert(analysis.sportFrequency["Water Polo"] === 1, "water polo has 1 session in
 assert(analysis.durationByActivity["Running"] === 3.5, "running → 3.5 in durationByActivity (original units)");
 assertEqual(analysis.totalStrengthReps, 36, "totalStrengthReps = 10+8+10+8 = 36");
 
+// muscleGroupSets: primary-only set counts
+assert(analysis.muscleGroupSets.CHEST === 2, "bench press → 2 sets for CHEST (primary)");
+assert(analysis.muscleGroupSets.BACK === 2, "pull ups → 2 sets for BACK (primary)");
+assertEqual(analysis.totalStrengthSets, 4, "totalStrengthSets = 2 (bench) + 2 (pull ups) = 4");
+
 // --- detectImbalancesNormalized ---
 console.log("\ndetectImbalancesNormalized:");
 
-// With small strength volume, should return empty
+// With small set count, should return empty
 const smallAnalysis = buildNormalizedAnalysis(workouts, {
   "2025-01-15": { ex3: { sets: [{ reps: 2 }] } },
 }, dateRange);
 assertEqual(detectImbalancesNormalized(smallAnalysis).length, 0,
-  "low strength reps → no insights (sport duration doesn't inflate threshold)");
+  "low sets → no insights (sport duration doesn't inflate threshold)");
 
-// Sport duration shouldn't inflate totalVolume thresholds
+// Sport duration shouldn't inflate thresholds
 const sportHeavy = {
-  muscleGroupVolume: { CHEST: 60, BACK: 60, QUADS: 40, HAMSTRINGS: 40 },
+  muscleGroupSets: { CHEST: 12, BACK: 12, QUADS: 8, HAMSTRINGS: 8 },
   durationByActivity: { "Water Polo": 500 },
   sportFrequency: { "Water Polo": 5 },
-  totalStrengthReps: 200,
+  totalStrengthSets: 40,
 };
 const sportInsights = detectImbalancesNormalized(sportHeavy);
-assert(!sportInsights.some((i) => i.message && i.message.includes("1.5 reps")),
-  "no output says '1.5 reps' for water polo");
 assert(!sportInsights.some((i) => i.type === "NEGLECTED" && i.message.includes("water polo")),
   "sport frequency doesn't trigger neglect warning");
 
 // Balanced strength → positive
 const balanced = {
-  muscleGroupVolume: { CHEST: 50, BACK: 50, ANTERIOR_DELT: 20, POSTERIOR_DELT: 20, QUADS: 30, HAMSTRINGS: 30 },
+  muscleGroupSets: { CHEST: 10, BACK: 10, ANTERIOR_DELT: 4, POSTERIOR_DELT: 4, QUADS: 6, HAMSTRINGS: 6 },
   durationByActivity: {},
   sportFrequency: {},
-  totalStrengthReps: 200,
+  totalStrengthSets: 40,
 };
 const balancedInsights = detectImbalancesNormalized(balanced);
 assert(balancedInsights.some((i) => i.type === "POSITIVE"), "balanced training → POSITIVE insight");
 
-// Push/pull imbalance
+// Push/pull imbalance (sets-based)
 const imbalanced = {
-  muscleGroupVolume: { CHEST: 100, ANTERIOR_DELT: 50, TRICEPS: 50, BACK: 20, POSTERIOR_DELT: 0, BICEPS: 10 },
+  muscleGroupSets: { CHEST: 15, ANTERIOR_DELT: 8, TRICEPS: 6, BACK: 3, POSTERIOR_DELT: 0, BICEPS: 2 },
   durationByActivity: {},
   sportFrequency: {},
-  totalStrengthReps: 230,
+  totalStrengthSets: 34,
 };
 const imbInsights = detectImbalancesNormalized(imbalanced);
 assert(imbInsights.some((i) => i.type === "IMBALANCE"), "push-heavy → IMBALANCE insight");
+assert(imbInsights[0].message.includes("push sets"), "imbalance message references sets");
+
+// Neglected group with 0 sets shows correct message (balanced push/pull so imbalance doesn't fire first)
+const neglected = {
+  muscleGroupSets: { CHEST: 8, BACK: 0, ANTERIOR_DELT: 4, POSTERIOR_DELT: 4, BICEPS: 6, TRICEPS: 4, QUADS: 8, GLUTES: 4 },
+  durationByActivity: {},
+  sportFrequency: {},
+  totalStrengthSets: 38,
+};
+const neglInsights = detectImbalancesNormalized(neglected);
+assert(neglInsights.some((i) => i.type === "NEGLECTED"), "missing back → NEGLECTED insight");
+assert(neglInsights.some((i) => i.message.includes("No direct back")), "0 sets → 'No direct' message");
 
 // --- Summary ---
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
