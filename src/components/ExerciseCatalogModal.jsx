@@ -8,7 +8,6 @@ import { getSportIconUrl } from "../lib/sportIcons";
 import { BodyDiagram, SLUG_TO_UI_GROUP } from "./BodyDiagram";
 import { UI_MUSCLE_GROUPS, UI_GROUP_CONFIG, getMusclesForUiGroup } from "../lib/muscleGroups";
 
-const EQUIPMENT_CHIPS = ["bodyweight", "barbell", "dumbbell", "cable", "kettlebell", "machine", "ab wheel"];
 const TYPE_CHIPS = [
   { key: "exercise", label: "Exercise" },
   { key: "stretch", label: "Stretch" },
@@ -76,7 +75,6 @@ export function ExerciseCatalogModal({
   const [query, setQuery] = useState("");
   const [view, setView] = useState("home"); // "home" | "list"
   const [selectedUiGroups, setSelectedUiGroups] = useState(new Set());
-  const [selectedEquipment, setSelectedEquipment] = useState(new Set());
   const [typeFilter, setTypeFilter] = useState("exercise"); // "exercise" | "stretch" | "sport"
   const [hoveredGroups, setHoveredGroups] = useState(new Set());
   const [detailEntry, setDetailEntry] = useState(null);
@@ -90,7 +88,6 @@ export function ExerciseCatalogModal({
       setQuery("");
       setView("home");
       setSelectedUiGroups(new Set());
-      setSelectedEquipment(new Set());
       setTypeFilter("exercise");
       setHoveredGroups(new Set());
       setDetailEntry(null);
@@ -108,7 +105,6 @@ export function ExerciseCatalogModal({
     setView("home");
     setQuery("");
     setSelectedUiGroups(new Set());
-    setSelectedEquipment(new Set());
     setTypeFilter("exercise");
     setHoveredGroups(new Set());
   }, []);
@@ -137,10 +133,9 @@ export function ExerciseCatalogModal({
   const filteredCatalog = useMemo(() => {
     const filters = {};
     if (selectedUiGroups.size > 0) filters.uiMuscleGroups = [...selectedUiGroups];
-    if (selectedEquipment.size > 0) filters.equipment = selectedEquipment;
     if (typeFilter) filters.typeFilter = typeFilter;
     return filterCatalog(src, filters);
-  }, [src, selectedUiGroups, selectedEquipment, typeFilter]);
+  }, [src, selectedUiGroups, typeFilter]);
 
   const catalogResults = useMemo(() => {
     return catalogSearch(filteredCatalog, query, { limit: 100 });
@@ -475,29 +470,6 @@ export function ExerciseCatalogModal({
             {t.label}
           </button>
         ))}
-      </div>
-
-      {/* Row 2: Equipment filter chips (multi-select) */}
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, WebkitOverflowScrolling: "touch", flexShrink: 0 }}>
-        {EQUIPMENT_CHIPS.map((eq) => {
-          const active = selectedEquipment.has(eq);
-          return (
-            <button
-              key={eq}
-              style={chipStyle(active)}
-              onClick={() => {
-                setSelectedEquipment((prev) => {
-                  const next = new Set(prev);
-                  if (active) next.delete(eq);
-                  else next.add(eq);
-                  return next;
-                });
-              }}
-            >
-              {eq}
-            </button>
-          );
-        })}
       </div>
 
       {/* Results */}

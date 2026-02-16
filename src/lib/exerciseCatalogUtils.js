@@ -93,6 +93,9 @@ export function catalogSearch(catalog, query, opts = {}) {
 
   const stemmed = stemQuery(q);
   const hasStem = stemmed !== q;
+  // Compact form (spaces removed) for matching "pushup" ↔ "push up"
+  const qCompact = q.replace(/\s+/g, "");
+  const stemCompact = hasStem ? stemmed.replace(/\s+/g, "") : "";
   const scored = [];
 
   for (const entry of catalog) {
@@ -101,24 +104,30 @@ export function catalogSearch(catalog, query, opts = {}) {
     if (opts.movement && entry.movement !== opts.movement) continue;
 
     const nameLower = entry.name.toLowerCase().replace(/[-_]/g, " ");
+    const nameCompact = nameLower.replace(/\s+/g, "");
     let rank = Infinity;
 
-    // Tier 1: name prefix
-    if (nameLower.startsWith(q) || (hasStem && nameLower.startsWith(stemmed))) {
+    // Tier 1: name prefix (spaced or compact)
+    if (nameLower.startsWith(q) || nameCompact.startsWith(qCompact) ||
+        (hasStem && (nameLower.startsWith(stemmed) || nameCompact.startsWith(stemCompact)))) {
       rank = 1;
     }
-    // Tier 2: name contains
-    else if (nameLower.includes(q) || (hasStem && nameLower.includes(stemmed))) {
+    // Tier 2: name contains (spaced or compact)
+    else if (nameLower.includes(q) || nameCompact.includes(qCompact) ||
+             (hasStem && (nameLower.includes(stemmed) || nameCompact.includes(stemCompact)))) {
       rank = 2;
     }
-    // Tier 3/4: alias match
+    // Tier 3/4: alias match (spaced or compact)
     else if (entry.aliases) {
       for (const alias of entry.aliases) {
         const a = alias.toLowerCase().replace(/[-_]/g, " ");
-        if (a.startsWith(q) || (hasStem && a.startsWith(stemmed))) {
+        const ac = a.replace(/\s+/g, "");
+        if (a.startsWith(q) || ac.startsWith(qCompact) ||
+            (hasStem && (a.startsWith(stemmed) || ac.startsWith(stemCompact)))) {
           rank = Math.min(rank, 3);
           break;
-        } else if (a.includes(q) || (hasStem && a.includes(stemmed))) {
+        } else if (a.includes(q) || ac.includes(qCompact) ||
+                   (hasStem && (a.includes(stemmed) || ac.includes(stemCompact)))) {
           rank = Math.min(rank, 4);
         }
       }
