@@ -79,7 +79,7 @@ export function ExerciseCatalogModal({
   const [selectedMuscles, setSelectedMuscles] = useState(new Set());
   const [typeFilter, setTypeFilter] = useState("exercise"); // "exercise" | "stretch" | "sport"
   const [hoveredMuscles, setHoveredMuscles] = useState(new Set());
-  const [activeGroup, setActiveGroup] = useState(null); // which UI group is expanded for sub-muscles
+  const [activeGroups, setActiveGroups] = useState(new Set()); // which UI groups are expanded
   const [detailEntry, setDetailEntry] = useState(null);
   const [slideDir, setSlideDir] = useState(null);
 
@@ -93,7 +93,7 @@ export function ExerciseCatalogModal({
       setSelectedMuscles(new Set());
       setTypeFilter("exercise");
       setHoveredMuscles(new Set());
-      setActiveGroup(null);
+      setActiveGroups(new Set());
       setDetailEntry(null);
       setSlideDir(null);
     }
@@ -111,7 +111,7 @@ export function ExerciseCatalogModal({
     setSelectedMuscles(new Set());
     setTypeFilter("exercise");
     setHoveredMuscles(new Set());
-    setActiveGroup(null);
+    setActiveGroups(new Set());
   }, []);
 
   // Back button override: detail → list → home → close
@@ -359,6 +359,22 @@ export function ExerciseCatalogModal({
   // --- HOME VIEW ---
   const homeHasQuery = query.trim().length > 0;
 
+  // Exercise count for the browse button (filtered by hovered muscles)
+  const browseCount = useMemo(() => {
+    if (hoveredMuscles.size === 0) return src.length;
+    return filterCatalog(src, { muscles: [...hoveredMuscles] }).length;
+  }, [src, hoveredMuscles]);
+
+  // Collect sub-muscles for all active groups that have >1 muscle
+  const subMuscles = useMemo(() => {
+    const muscles = [];
+    for (const g of activeGroups) {
+      const cfg = UI_GROUP_CONFIG[g];
+      if (cfg.muscles.length > 1) muscles.push(...cfg.muscles);
+    }
+    return muscles;
+  }, [activeGroups]);
+
   const renderHomeView = () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
       {/* Search bar */}
@@ -386,48 +402,35 @@ export function ExerciseCatalogModal({
         /* Browse by muscle group */
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* Body diagram — tap a muscle to select its group */}
+            {/* Body diagram — tap a muscle to toggle its group */}
             <BodyDiagram
               highlightedMuscles={[...hoveredMuscles]}
-              secondaryMuscles={activeGroup && !hoveredMuscles.size
-                ? UI_GROUP_CONFIG[activeGroup].muscles
-                : []}
+              secondaryMuscles={[]}
               colors={colors}
               onBodyPartPress={(part) => {
                 const muscles = SLUG_TO_MUSCLES[part.slug];
                 if (!muscles?.length) return;
-                // Find which UI group this body part belongs to
                 const group = muscleToUiGroup[muscles[0]];
                 if (!group) return;
                 const cfg = UI_GROUP_CONFIG[group];
-                if (cfg.muscles.length === 1) {
-                  // Single-muscle group (Chest, Back) — toggle directly
-                  const m = cfg.muscles[0];
-                  setHoveredMuscles((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(m)) { next.delete(m); setActiveGroup(null); }
-                    else { next.add(m); setActiveGroup(group); }
-                    return next;
-                  });
-                } else {
-                  // Multi-muscle group — expand it for fine-tuning
-                  if (activeGroup === group) {
-                    // Toggle the specific tapped muscle within active group
-                    setHoveredMuscles((prev) => {
-                      const next = new Set(prev);
-                      for (const m of muscles) {
-                        if (next.has(m)) next.delete(m); else next.add(m);
-                      }
-                      // If no muscles left from this group, deselect the group
-                      if (!cfg.muscles.some((m) => next.has(m))) setActiveGroup(null);
-                      return next;
-                    });
+                setActiveGroups((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(group)) {
+                    // Deselect the group
+                    next.delete(group);
                   } else {
-                    // Select the whole group and expand sub-muscles
-                    setActiveGroup(group);
-                    setHoveredMuscles(new Set(cfg.muscles));
+                    next.add(group);
                   }
-                }
+                  return next;
+                });
+                setHoveredMuscles((prev) => {
+                  const next = new Set(prev);
+                  const allSelected = cfg.muscles.every((m) => next.has(m));
+                  for (const m of cfg.muscles) {
+                    if (allSelected) next.delete(m); else next.add(m);
+                  }
+                  return next;
+                });
               }}
             />
 
@@ -435,39 +438,40 @@ export function ExerciseCatalogModal({
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
               {UI_MUSCLE_GROUPS.map((group) => {
                 const cfg = UI_GROUP_CONFIG[group];
-                const isActive = activeGroup === group || (cfg.muscles.length === 1 && hoveredMuscles.has(cfg.muscles[0]));
+                const groupHasAny = cfg.muscles.some((m) => hoveredMuscles.has(m));
                 return (
                   <button
                     key={group}
                     className="btn-press"
-                    style={chipStyle(isActive)}
-                    aria-pressed={isActive}
+                    style={chipStyle(groupHasAny)}
+                    aria-pressed={groupHasAny}
                     onClick={() => {
-                      if (cfg.muscles.length === 1) {
-                        // Single-muscle group — toggle directly
-                        const m = cfg.muscles[0];
-                        setHoveredMuscles((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(m)) next.delete(m); else next.add(m);
-                          return next;
-                        });
-                        setActiveGroup(isActive ? null : group);
-                      } else if (activeGroup === group) {
-                        // Deselect group
-                        setActiveGroup(null);
+                      if (groupHasAny) {
+                        // Deselect all muscles in group
                         setHoveredMuscles((prev) => {
                           const next = new Set(prev);
                           for (const m of cfg.muscles) next.delete(m);
                           return next;
                         });
+                        setActiveGroups((prev) => {
+                          const next = new Set(prev);
+                          next.delete(group);
+                          return next;
+                        });
                       } else {
-                        // Select all muscles in group and expand sub-chips
-                        setActiveGroup(group);
+                        // Select all muscles in group
                         setHoveredMuscles((prev) => {
                           const next = new Set(prev);
                           for (const m of cfg.muscles) next.add(m);
                           return next;
                         });
+                        if (cfg.muscles.length > 1) {
+                          setActiveGroups((prev) => {
+                            const next = new Set(prev);
+                            next.add(group);
+                            return next;
+                          });
+                        }
                       }
                     }}
                   >
@@ -477,8 +481,8 @@ export function ExerciseCatalogModal({
               })}
             </div>
 
-            {/* Sub-muscle chips — only when a multi-muscle group is active */}
-            {activeGroup && UI_GROUP_CONFIG[activeGroup].muscles.length > 1 && (
+            {/* Sub-muscle fine-tuning — shown for all active groups with >1 muscle */}
+            {subMuscles.length > 0 && (
               <div style={{
                 display: "flex", flexWrap: "wrap", gap: 5, justifyContent: "center",
                 padding: "8px 10px", borderRadius: 12,
@@ -486,9 +490,9 @@ export function ExerciseCatalogModal({
                 border: `1px solid ${colors.border}`,
               }}>
                 <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.4, width: "100%", textAlign: "center", marginBottom: 2 }}>
-                  Fine-tune {UI_GROUP_CONFIG[activeGroup].label}
+                  Fine-tune
                 </span>
-                {UI_GROUP_CONFIG[activeGroup].muscles.map((muscle) => (
+                {subMuscles.map((muscle) => (
                   <button
                     key={muscle}
                     className="btn-press"
@@ -499,12 +503,20 @@ export function ExerciseCatalogModal({
                     }}
                     aria-pressed={hoveredMuscles.has(muscle)}
                     onClick={() => {
+                      const group = muscleToUiGroup[muscle];
                       setHoveredMuscles((prev) => {
                         const next = new Set(prev);
                         if (next.has(muscle)) next.delete(muscle); else next.add(muscle);
-                        // If no muscles left from this group, deselect the group
-                        if (!UI_GROUP_CONFIG[activeGroup].muscles.some((m) => next.has(m))) {
-                          setActiveGroup(null);
+                        // If no muscles left from this group, collapse it
+                        if (group) {
+                          const cfg = UI_GROUP_CONFIG[group];
+                          if (!cfg.muscles.some((m) => next.has(m))) {
+                            setActiveGroups((ag) => {
+                              const nag = new Set(ag);
+                              nag.delete(group);
+                              return nag;
+                            });
+                          }
                         }
                         return next;
                       });
@@ -534,8 +546,8 @@ export function ExerciseCatalogModal({
               }}
             >
               {hoveredMuscles.size > 0
-                ? `Browse ${[...hoveredMuscles].map((m) => MUSCLE_LABELS[m]).join(" + ")}`
-                : "Browse All Exercises"}
+                ? `Browse Exercises (${browseCount})`
+                : `Browse All Exercises (${browseCount})`}
             </button>
           </div>
         </div>
