@@ -12,6 +12,7 @@ const TYPE_CHIPS = [
   { key: "exercise", label: "Exercise" },
   { key: "stretch", label: "Stretch" },
   { key: "sport", label: "Sport" },
+  { key: "custom", label: "Custom" },
 ];
 
 function collectUserExercises(workouts) {

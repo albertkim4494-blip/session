@@ -306,10 +306,11 @@ export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, equipmen
   }
   return catalog.filter((entry) => {
     if (sportId && entry.id !== sportId) return false;
-    // Type filter: "exercise" excludes sport+stretch, "stretch" only stretch, "sport" only sport
-    if (typeFilter === "exercise" && (entry.movement === "sport" || entry.movement === "stretch")) return false;
+    // Type filter: "exercise" excludes sport+stretch+custom, "stretch" only stretch, "sport" only sport, "custom" only custom
+    if (typeFilter === "exercise" && (entry.movement === "sport" || entry.movement === "stretch" || entry.custom)) return false;
     if (typeFilter === "stretch" && entry.movement !== "stretch") return false;
     if (typeFilter === "sport" && entry.movement !== "sport") return false;
+    if (typeFilter === "custom" && !entry.custom) return false;
     if (targetMuscles) {
       // Sport entries have no muscles — let them through when typeFilter=sport
       if (typeFilter !== "sport") {
