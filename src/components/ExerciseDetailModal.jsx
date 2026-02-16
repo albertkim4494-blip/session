@@ -310,14 +310,7 @@ export function ExerciseDetailModal({
         key={entry.id}
         style={{
           display: "flex", flexDirection: "column", gap: 14,
-          background: colors.cardBg,
-          borderRadius: 16,
-          padding: "14px 14px 18px",
-          border: `1px solid ${colors.border}`,
-          boxShadow: slideDir ? "0 8px 32px rgba(0,0,0,0.12)" : "0 2px 8px rgba(0,0,0,0.06)",
           animation: slideDir ? `cardSlide${slideDir === "left" ? "Left" : "Right"} 0.35s cubic-bezier(0.22, 0.68, 0.35, 1.0)` : undefined,
-          transformOrigin: "center center",
-          transition: "box-shadow 0.3s ease",
         }}
         {...(swipeHandlers || {})}
       >
