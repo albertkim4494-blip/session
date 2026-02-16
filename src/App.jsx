@@ -38,6 +38,8 @@ import { ExerciseCatalogModal } from "./components/ExerciseCatalogModal";
 import { GenerateWizardModal } from "./components/GenerateWizardModal";
 import { GenerateTodayModal } from "./components/GenerateTodayModal";
 import { CustomExerciseModal } from "./components/CustomExerciseModal";
+import { ExerciseDetailModal } from "./components/ExerciseDetailModal";
+import { EditExerciseModal } from "./components/EditExerciseModal";
 import { enrichExercise } from "./lib/exerciseEnrichmentApi";
 import { FriendSearchModal } from "./components/FriendSearchModal";
 import { ShareWorkoutModal } from "./components/ShareWorkoutModal";
@@ -890,17 +892,60 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [session.user.id, dataReady]);
 
   // ---------------------------------------------------------------------------
+  // CATALOG-ID BACKFILL MIGRATION (one-time)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!dataReady) return;
+    // Check if migration is needed
+    const allExercises = state.program.workouts.flatMap((w) => w.exercises || []);
+    const dailyExercises = Object.values(state.dailyWorkouts || {}).flatMap(
+      (dayArr) => (dayArr || []).flatMap((w) => w.exercises || [])
+    );
+    const missing = [...allExercises, ...dailyExercises].some((ex) => !ex.catalogId);
+    if (!missing) return;
+
+    updateState((st) => {
+      // Build name→id map from full catalog (built-in + custom)
+      const nameMap = new Map();
+      for (const entry of fullCatalog) {
+        nameMap.set(entry.name.toLowerCase(), entry.id);
+      }
+      // Backfill program workouts
+      for (const w of st.program.workouts) {
+        for (const ex of w.exercises || []) {
+          if (!ex.catalogId) {
+            const match = nameMap.get(ex.name.toLowerCase());
+            if (match) ex.catalogId = match;
+          }
+        }
+      }
+      // Backfill daily workouts
+      for (const dayArr of Object.values(st.dailyWorkouts || {})) {
+        for (const w of dayArr || []) {
+          for (const ex of w.exercises || []) {
+            if (!ex.catalogId) {
+              const match = nameMap.get(ex.name.toLowerCase());
+              if (match) ex.catalogId = match;
+            }
+          }
+        }
+      }
+      return st;
+    });
+  }, [dataReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---------------------------------------------------------------------------
   // BACK-BUTTON CLOSES MODALS (Android / PWA)
   // ---------------------------------------------------------------------------
 
   const anyModalOpen = modals.log.isOpen || modals.confirm.isOpen || modals.input.isOpen ||
-    modals.datePicker.isOpen || modals.addWorkout.isOpen || modals.addExercise.isOpen ||
+    modals.datePicker.isOpen || modals.addWorkout.isOpen ||
     modals.addSuggestion.isOpen || modals.profile.isOpen || modals.changeUsername.isOpen ||
     modals.changePassword.isOpen || modals.welcomeChoice.isOpen || modals.editWorkout?.isOpen ||
     modals.editExercise?.isOpen || modals.catalogBrowse.isOpen || modals.generateWizard.isOpen ||
     modals.generateToday.isOpen || modals.customExercise?.isOpen || modals.billing?.isOpen ||
-    modals.social?.isOpen || modals.friendSearch?.isOpen || modals.shareWorkout?.isOpen ||
-    modals.workoutPreview?.isOpen;
+    modals.exerciseDetail?.isOpen || modals.social?.isOpen || modals.friendSearch?.isOpen ||
+    modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen;
 
   const modalHistoryRef = useRef(false);
   const closingViaCodeRef = useRef(false);
@@ -1095,6 +1140,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             workoutId,
             exerciseId,
             exerciseName: exercise.name,
+            catalogId: exercise.catalogId || null,
             unit: exercise.unit || "reps",
             customUnitAbbr: exercise.customUnitAbbr || "",
             customUnitAllowDecimal: exercise.customUnitAllowDecimal ?? false,
@@ -1548,6 +1594,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           unit: ex.unit || "reps",
           customUnitAbbr: ex.customUnitAbbr || "",
           customUnitAllowDecimal: ex.customUnitAllowDecimal ?? false,
+          catalogId: ex.catalogId || null,
         },
       });
     },
@@ -1556,7 +1603,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const saveEditExercise = useCallback(() => {
     if (!modals.editExercise) return;
-    const { workoutId, exerciseId, name, unit, customUnitAbbr, customUnitAllowDecimal } = modals.editExercise;
+    const { workoutId, exerciseId, name, unit, customUnitAbbr, customUnitAllowDecimal, catalogId } = modals.editExercise;
     const w = workoutById.get(workoutId);
     const otherExercises = w?.exercises?.filter((e) => e.id !== exerciseId) || [];
     const validation = validateExerciseName(name, otherExercises);
@@ -1574,6 +1621,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (!ex) return st;
       ex.name = name.trim();
       ex.unit = unit;
+      if (catalogId) ex.catalogId = catalogId;
       if (unit === "custom") {
         ex.customUnitAbbr = customUnitAbbr.trim();
         ex.customUnitAllowDecimal = customUnitAllowDecimal ?? false;
@@ -1696,6 +1744,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }
 
+  const handleViewExerciseDetail = useCallback((exercise) => {
+    if (!exercise?.catalogId) {
+      showToast("Exercise detail unavailable");
+      return;
+    }
+    const entry = catalogMap.get(exercise.catalogId);
+    if (!entry) {
+      showToast("Exercise detail unavailable");
+      return;
+    }
+    dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry } });
+  }, [catalogMap]);
+
   function handleAddSuggestion(exerciseName) {
     dispatchModal({
       type: "OPEN_ADD_SUGGESTION",
@@ -1704,6 +1765,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }
 
   const confirmAddSuggestion = useCallback((workoutIdOrIds, exerciseName) => {
+    // Look up catalogId by name
+    const nameLower = exerciseName.toLowerCase();
+    let matchedCatalogId = null;
+    for (const entry of fullCatalog) {
+      if (entry.name.toLowerCase() === nameLower) {
+        matchedCatalogId = entry.id;
+        break;
+      }
+    }
+
     if (workoutIdOrIds === "__today__") {
       updateState((st) => {
         if (!st.dailyWorkouts) st.dailyWorkouts = {};
@@ -1713,7 +1784,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           coachWorkout = { id: uid("w"), name: "Coach Suggestions", category: "Coach", source: "coach", exercises: [] };
           st.dailyWorkouts[dateKey].push(coachWorkout);
         }
-        coachWorkout.exercises.push({ id: uid("ex"), name: exerciseName, unit: "reps" });
+        const newEx = { id: uid("ex"), name: exerciseName, unit: "reps" };
+        if (matchedCatalogId) newEx.catalogId = matchedCatalogId;
+        coachWorkout.exercises.push(newEx);
         return st;
       });
       dispatchModal({ type: "CLOSE_ADD_SUGGESTION" });
@@ -1730,7 +1803,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (!w) continue;
         const exists = w.exercises.some(ex => ex.name.toLowerCase() === exerciseName.toLowerCase());
         if (exists) continue;
-        w.exercises.push({ id: uid("ex"), name: exerciseName, unit: "reps" });
+        const newEx = { id: uid("ex"), name: exerciseName, unit: "reps" };
+        if (matchedCatalogId) newEx.catalogId = matchedCatalogId;
+        w.exercises.push(newEx);
         addedNames.push(w.name);
       }
       return st;
@@ -1744,7 +1819,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     } else {
       showToast(`Exercise added to workouts`);
     }
-  }, [workoutById, dateKey]);
+  }, [workoutById, dateKey, fullCatalog]);
 
   function handleAcceptGeneratedProgram(workouts, prefs) {
     updateState((st) => {
@@ -2261,6 +2336,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onToggleRestTimer={toggleWorkoutRestTimer}
                       globalRestEnabled={state.preferences?.restTimerEnabled !== false}
                       weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
+
                     />
                   ))}
                   {dailyWorkoutsToday.map((w) => (
@@ -2281,6 +2357,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onToggleRestTimer={toggleWorkoutRestTimer}
                       globalRestEnabled={state.preferences?.restTimerEnabled !== false}
                       weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
+
                     />
                   ))}
                   <button
@@ -3105,7 +3182,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} title={modals.log.context?.exerciseName || "Log"} onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} headerActions={modals.log.isOpen ? (() => {
+      <Modal open={modals.log.isOpen} headerContent={
+        <div style={{ ...styles.modalTitle, cursor: modals.log.context?.catalogId ? "pointer" : "default", display: "flex", alignItems: "center", gap: 4 }}
+          onClick={() => {
+            const ctx = modals.log.context;
+            if (!ctx?.catalogId) return;
+            const entry = catalogMap.get(ctx.catalogId);
+            if (entry) dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry } });
+          }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{modals.log.context?.exerciseName || "Log"}</span>
+          {modals.log.context?.catalogId && (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35, flexShrink: 0 }}>
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          )}
+        </div>
+      } onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} headerActions={modals.log.isOpen ? (() => {
         const hEx = modals.log.context?.exerciseId;
         let hExObj = null;
         if (hEx) {
@@ -4087,35 +4180,41 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         colors={colors}
         onSave={(exercise, workoutIds) => {
           updateState((st) => {
+            // Determine catalogId: use existing if user selected a catalog suggestion, else create custom entry
+            let catalogId = exercise.catalogId || null;
+
+            if (!catalogId) {
+              // Create a custom catalog entry
+              if (!st.customExercises) st.customExercises = [];
+              const nameLower = exercise.name.trim().toLowerCase();
+              const existing = st.customExercises.find((e) => e.name.toLowerCase() === nameLower);
+              if (existing) {
+                catalogId = existing.id;
+              } else {
+                catalogId = "custom_" + uid("ex");
+                st.customExercises.push({
+                  id: catalogId,
+                  name: exercise.name.trim(),
+                  defaultUnit: exercise.unit,
+                  muscles: exercise.muscles || { primary: [] },
+                  equipment: exercise.equipment || [],
+                  tags: exercise.tags || [],
+                  movement: exercise.movement || "",
+                  gifUrl: exercise.gifUrl || null,
+                  aliases: [],
+                  custom: true,
+                });
+              }
+            }
+
             // Add exercise to selected workout(s)
             for (const wId of workoutIds) {
               const w = st.program.workouts.find((x) => x.id === wId);
               if (!w) continue;
-              const newEx = { id: uid("ex"), name: exercise.name, unit: exercise.unit };
+              const newEx = { id: uid("ex"), name: exercise.name, unit: exercise.unit, catalogId };
               if (exercise.customUnitAbbr) newEx.customUnitAbbr = exercise.customUnitAbbr;
               if (exercise.customUnitAllowDecimal) newEx.customUnitAllowDecimal = exercise.customUnitAllowDecimal;
-              if (exercise.muscles) newEx.muscles = exercise.muscles;
-              if (exercise.equipment) newEx.equipment = exercise.equipment;
-              if (exercise.tags) newEx.tags = exercise.tags;
-              if (exercise.movement) newEx.movement = exercise.movement;
               w.exercises.push(newEx);
-            }
-            // Save to custom exercises catalog (avoid duplicates by name)
-            if (!st.customExercises) st.customExercises = [];
-            const nameLower = exercise.name.trim().toLowerCase();
-            const exists = st.customExercises.some((e) => e.name.toLowerCase() === nameLower);
-            if (!exists) {
-              st.customExercises.push({
-                id: "custom_" + uid("ex"),
-                name: exercise.name.trim(),
-                defaultUnit: exercise.unit,
-                muscles: exercise.muscles || { primary: [] },
-                equipment: exercise.equipment || [],
-                tags: exercise.tags || [],
-                movement: exercise.movement || "",
-                aliases: [],
-                custom: true,
-              });
             }
             return st;
           });
@@ -4124,128 +4223,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }}
       />
 
-      {/* Add Exercise Modal (custom / free-text fallback) */}
-      <Modal
-        open={modals.addExercise.isOpen}
-        title="Add Exercise"
-        onClose={() => dispatchModal({ type: "CLOSE_ADD_EXERCISE" })}
+      {/* Exercise Detail Modal (view-only, from Train tab) */}
+      <ExerciseDetailModal
+        open={modals.exerciseDetail.isOpen}
+        entry={modals.exerciseDetail.entry}
+        onBack={() => dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" })}
+        onClose={() => dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" })}
         styles={styles}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={styles.fieldCol}>
-            <label style={styles.label}>Exercise name</label>
-            <input
-              value={modals.addExercise.name}
-              onChange={(e) =>
-                dispatchModal({
-                  type: "UPDATE_ADD_EXERCISE",
-                  payload: { name: e.target.value },
-                })
-              }
-              style={styles.textInput}
-              placeholder="e.g. Bench Press"
-              autoFocus
-            />
-          </div>
-
-          <div style={styles.fieldCol}>
-            <label style={styles.label}>Unit</label>
-            <select
-              value={modals.addExercise.unit}
-              onChange={(e) =>
-                dispatchModal({
-                  type: "UPDATE_ADD_EXERCISE",
-                  payload: { unit: e.target.value },
-                })
-              }
-              style={styles.textInput}
-            >
-              {REP_UNITS.map((u) => (
-                <option key={u.key} value={u.key}>
-                  {u.label} ({u.abbr})
-                </option>
-              ))}
-              <option value="custom">Custom...</option>
-            </select>
-          </div>
-
-          {modals.addExercise.unit === "custom" && (
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-              <div style={{ ...styles.fieldCol, flex: 1 }}>
-                <label style={styles.label}>Abbreviation</label>
-                <input
-                  value={modals.addExercise.customUnitAbbr || ""}
-                  onChange={(e) =>
-                    dispatchModal({
-                      type: "UPDATE_ADD_EXERCISE",
-                      payload: { customUnitAbbr: e.target.value.slice(0, 10) },
-                    })
-                  }
-                  style={styles.textInput}
-                  placeholder="e.g. cal"
-                />
-              </div>
-              <div style={{ ...styles.fieldCol, alignItems: "center" }}>
-                <label style={styles.label}>Decimals</label>
-                <input
-                  type="checkbox"
-                  checked={modals.addExercise.customUnitAllowDecimal || false}
-                  onChange={(e) =>
-                    dispatchModal({
-                      type: "UPDATE_ADD_EXERCISE",
-                      payload: { customUnitAllowDecimal: e.target.checked },
-                    })
-                  }
-                  style={styles.checkbox}
-                />
-              </div>
-            </div>
-          )}
-
-          <div style={styles.modalFooter}>
-            <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_ADD_EXERCISE" })}>
-              Cancel
-            </button>
-            <button
-              className="btn-press"
-              style={styles.primaryBtn}
-              onClick={() => {
-                const workout = workoutById.get(modals.addExercise.workoutId);
-                if (!workout) return;
-
-                const validation = validateExerciseName(modals.addExercise.name, workout.exercises);
-                if (!validation.valid) {
-                  showToast(validation.error);
-                  return;
-                }
-
-                if (modals.addExercise.unit === "custom" && !modals.addExercise.customUnitAbbr?.trim()) {
-                  showToast("Please enter a custom unit abbreviation");
-                  return;
-                }
-
-                const name = modals.addExercise.name.trim();
-                const unit = modals.addExercise.unit;
-                const wId = modals.addExercise.workoutId;
-                updateState((st) => {
-                  const w = st.program.workouts.find((x) => x.id === wId);
-                  if (!w) return st;
-                  const newEx = { id: uid("ex"), name, unit };
-                  if (unit === "custom") {
-                    newEx.customUnitAbbr = modals.addExercise.customUnitAbbr.trim();
-                    newEx.customUnitAllowDecimal = modals.addExercise.customUnitAllowDecimal ?? false;
-                  }
-                  w.exercises.push(newEx);
-                  return st;
-                });
-                dispatchModal({ type: "CLOSE_ADD_EXERCISE" });
-              }}
-            >
-              Add
-            </button>
-          </div>
-        </div>
-      </Modal>
+        colors={colors}
+      />
 
       {/* Profile Modal */}
       <ProfileModal
@@ -4371,78 +4357,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       {/* Edit Exercise Modal */}
       {modals.editExercise && (
-        <Modal
+        <EditExerciseModal
           open={modals.editExercise.isOpen}
-          title="Edit Exercise"
+          modalState={modals.editExercise}
+          onUpdate={(payload) => dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload })}
           onClose={() => dispatchModal({ type: "CLOSE_EDIT_EXERCISE" })}
+          onSave={saveEditExercise}
           styles={styles}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={styles.fieldCol}>
-              <label style={styles.label}>Exercise name</label>
-              <input
-                value={modals.editExercise.name}
-                onChange={(e) =>
-                  dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload: { name: e.target.value } })
-                }
-                style={styles.textInput}
-                placeholder="e.g. Bench Press"
-                autoFocus
-              />
-            </div>
-            <div style={styles.fieldCol}>
-              <label style={styles.label}>Unit</label>
-              <select
-                value={modals.editExercise.unit}
-                onChange={(e) =>
-                  dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload: { unit: e.target.value } })
-                }
-                style={styles.textInput}
-              >
-                {REP_UNITS.map((u) => (
-                  <option key={u.key} value={u.key}>
-                    {u.label} ({u.abbr})
-                  </option>
-                ))}
-                <option value="custom">Custom...</option>
-              </select>
-            </div>
-            {modals.editExercise.unit === "custom" && (
-              <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-                <div style={{ ...styles.fieldCol, flex: 1 }}>
-                  <label style={styles.label}>Abbreviation</label>
-                  <input
-                    value={modals.editExercise.customUnitAbbr || ""}
-                    onChange={(e) =>
-                      dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload: { customUnitAbbr: e.target.value.slice(0, 10) } })
-                    }
-                    style={styles.textInput}
-                    placeholder="e.g. cal"
-                  />
-                </div>
-                <div style={{ ...styles.fieldCol, alignItems: "center" }}>
-                  <label style={styles.label}>Decimals</label>
-                  <input
-                    type="checkbox"
-                    checked={modals.editExercise.customUnitAllowDecimal || false}
-                    onChange={(e) =>
-                      dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload: { customUnitAllowDecimal: e.target.checked } })
-                    }
-                    style={styles.checkbox}
-                  />
-                </div>
-              </div>
-            )}
-            <div style={styles.modalFooter}>
-              <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_EXERCISE" })}>
-                Cancel
-              </button>
-              <button className="btn-press" style={styles.primaryBtn} onClick={saveEditExercise}>
-                Save
-              </button>
-            </div>
-          </div>
-        </Modal>
+          colors={colors}
+          catalog={fullCatalog}
+        />
       )}
 
       {/* Welcome Choice Modal (post-onboarding) */}
@@ -4885,6 +4809,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
                 onDeleteExercise={onDeleteExercise ? (exId) => onDeleteExercise(exId) : undefined}
                 workoutScheme={workout.scheme}
                 weightLabel={weightLabel}
+
               />
             ))}
           </div>

@@ -47732,6 +47732,201 @@ export const EXERCISE_CATALOG = [
     "movement": "sport"
   },
   {
+    "id": "sp-swimming",
+    "name": "Swimming",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["BACK", "ANTERIOR_DELT", "ABS", "QUADS", "HAMSTRINGS"],
+      "secondary": ["TRICEPS", "BICEPS", "CALVES", "GLUTES"]
+    },
+    "equipment": [],
+    "aliases": ["swim", "laps", "freestyle", "backstroke", "breaststroke", "butterfly", "open water"],
+    "tags": ["sport", "cardio"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-cycling",
+    "name": "Cycling",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["QUADS", "HAMSTRINGS", "GLUTES", "CALVES"],
+      "secondary": ["ABS", "BACK"]
+    },
+    "equipment": [],
+    "aliases": ["biking", "road cycling", "mountain biking", "mtb", "bike ride", "spinning", "indoor cycling", "bmx"],
+    "tags": ["sport", "cardio"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-triathlon",
+    "name": "Triathlon",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["QUADS", "HAMSTRINGS", "GLUTES", "BACK", "ANTERIOR_DELT"],
+      "secondary": ["CALVES", "ABS", "TRICEPS", "BICEPS"]
+    },
+    "equipment": [],
+    "aliases": ["tri", "ironman", "sprint triathlon", "olympic triathlon", "swim bike run"],
+    "tags": ["sport", "cardio"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-ice-hockey",
+    "name": "Ice Hockey",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["QUADS", "GLUTES", "HAMSTRINGS", "ABS", "ANTERIOR_DELT"],
+      "secondary": ["CALVES", "BACK", "FOREARMS"]
+    },
+    "equipment": [],
+    "aliases": ["hockey on ice", "pond hockey", "shinny"],
+    "tags": ["sport"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-beach-volleyball",
+    "name": "Beach Volleyball",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["QUADS", "GLUTES", "ANTERIOR_DELT", "ABS", "CALVES"],
+      "secondary": ["HAMSTRINGS", "BACK", "FOREARMS"]
+    },
+    "equipment": [],
+    "aliases": ["sand volleyball", "beach volley"],
+    "tags": ["sport"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-figure-skating",
+    "name": "Figure Skating",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["QUADS", "GLUTES", "HAMSTRINGS", "ABS", "CALVES"],
+      "secondary": ["BACK", "ANTERIOR_DELT"]
+    },
+    "equipment": [],
+    "aliases": ["ice skating", "skating"],
+    "tags": ["sport"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-speed-skating",
+    "name": "Speed Skating",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["QUADS", "GLUTES", "HAMSTRINGS", "CALVES", "ABS"],
+      "secondary": ["BACK"]
+    },
+    "equipment": [],
+    "aliases": ["short track", "long track", "inline skating"],
+    "tags": ["sport", "cardio"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-curling",
+    "name": "Curling",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["QUADS", "GLUTES", "HAMSTRINGS", "ABS"],
+      "secondary": ["ANTERIOR_DELT", "BACK"]
+    },
+    "equipment": [],
+    "aliases": ["curling match"],
+    "tags": ["sport"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-sailing",
+    "name": "Sailing",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["ABS", "BACK", "ANTERIOR_DELT", "FOREARMS"],
+      "secondary": ["QUADS", "BICEPS"]
+    },
+    "equipment": [],
+    "aliases": ["sail", "yachting", "dinghy sailing"],
+    "tags": ["sport"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-weightlifting",
+    "name": "Weightlifting (Olympic)",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["QUADS", "GLUTES", "BACK", "ANTERIOR_DELT", "HAMSTRINGS"],
+      "secondary": ["ABS", "TRICEPS", "CALVES", "FOREARMS"]
+    },
+    "equipment": [],
+    "aliases": ["olympic lifting", "oly lifting", "snatch practice", "clean and jerk practice"],
+    "tags": ["sport"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-archery",
+    "name": "Archery",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["BACK", "ANTERIOR_DELT", "FOREARMS", "ABS"],
+      "secondary": ["BICEPS", "TRICEPS"]
+    },
+    "equipment": [],
+    "aliases": ["bow", "recurve", "compound bow", "target archery"],
+    "tags": ["sport"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-diving",
+    "name": "Diving",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["ABS", "QUADS", "ANTERIOR_DELT", "BACK", "GLUTES"],
+      "secondary": ["HAMSTRINGS", "CALVES"]
+    },
+    "equipment": [],
+    "aliases": ["springboard diving", "platform diving"],
+    "tags": ["sport"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-biathlon",
+    "name": "Biathlon",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["QUADS", "HAMSTRINGS", "GLUTES", "ABS", "BACK"],
+      "secondary": ["CALVES", "ANTERIOR_DELT", "FOREARMS"]
+    },
+    "equipment": [],
+    "aliases": ["ski and shoot", "cross country shooting"],
+    "tags": ["sport", "cardio"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-kayaking",
+    "name": "Kayaking",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["BACK", "ANTERIOR_DELT", "ABS", "BICEPS", "FOREARMS"],
+      "secondary": ["TRICEPS", "QUADS"]
+    },
+    "equipment": [],
+    "aliases": ["canoeing", "canoe", "kayak", "paddling", "canoe sprint", "kayak slalom"],
+    "tags": ["sport", "cardio"],
+    "movement": "sport"
+  },
+  {
+    "id": "sp-bowling",
+    "name": "Bowling",
+    "defaultUnit": "min",
+    "muscles": {
+      "primary": ["ANTERIOR_DELT", "FOREARMS", "ABS"],
+      "secondary": ["QUADS", "BACK"]
+    },
+    "equipment": [],
+    "aliases": ["ten pin bowling", "bowling league"],
+    "tags": ["sport"],
+    "movement": "sport"
+  },
+  {
     "id": "m-yoga",
     "name": "Yoga",
     "defaultUnit": "min",

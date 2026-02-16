@@ -7,7 +7,43 @@
  * Normalize a search query — lowercase, trim, collapse whitespace.
  */
 export function normalizeQuery(str) {
-  return (str || "").toLowerCase().trim().replace(/\s+/g, " ");
+  return (str || "").toLowerCase().trim().replace(/[-_]/g, " ").replace(/\s+/g, " ");
+}
+
+/**
+ * Stem a query by stripping common English suffixes.
+ * planks→plank, curling→curl, presses→press
+ */
+export function stemQuery(q) {
+  if (q.length > 5 && q.endsWith("ing")) return q.slice(0, -3);
+  if (q.length > 4 && q.endsWith("es")) return q.slice(0, -2);
+  if (q.length > 3 && q.endsWith("s")) return q.slice(0, -1);
+  return q;
+}
+
+/**
+ * Levenshtein distance with early bail when distance exceeds maxDist.
+ * Only useful for short words (3–10 chars).
+ */
+export function levenshtein(a, b, maxDist = 2) {
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > maxDist) return maxDist + 1;
+
+  const prev = Array.from({ length: lb + 1 }, (_, i) => i);
+  const curr = new Array(lb + 1);
+
+  for (let i = 1; i <= la; i++) {
+    curr[0] = i;
+    let rowMin = i;
+    for (let j = 1; j <= lb; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+      if (curr[j] < rowMin) rowMin = curr[j];
+    }
+    if (rowMin > maxDist) return maxDist + 1;
+    for (let j = 0; j <= lb; j++) prev[j] = curr[j];
+  }
+  return prev[lb];
 }
 
 /**
@@ -45,13 +81,16 @@ export function catalogSearch(catalog, query, opts = {}) {
   const limit = opts.limit ?? 20;
 
   if (!q) {
-    // No query — return all (filtered), up to limit
-    let results = catalog;
+    // No query — return all (filtered), sorted alphabetically, up to limit
+    let results = [...catalog];
     if (opts.equipment) results = results.filter((e) => e.equipment.includes(opts.equipment));
     if (opts.movement) results = results.filter((e) => e.movement === opts.movement);
+    results.sort((a, b) => a.name.localeCompare(b.name));
     return results.slice(0, limit);
   }
 
+  const stemmed = stemQuery(q);
+  const hasStem = stemmed !== q;
   const scored = [];
 
   for (const entry of catalog) {
@@ -59,25 +98,25 @@ export function catalogSearch(catalog, query, opts = {}) {
     if (opts.equipment && !entry.equipment.includes(opts.equipment)) continue;
     if (opts.movement && entry.movement !== opts.movement) continue;
 
-    const nameLower = entry.name.toLowerCase();
+    const nameLower = entry.name.toLowerCase().replace(/[-_]/g, " ");
     let rank = Infinity;
 
     // Tier 1: name prefix
-    if (nameLower.startsWith(q)) {
+    if (nameLower.startsWith(q) || (hasStem && nameLower.startsWith(stemmed))) {
       rank = 1;
     }
     // Tier 2: name contains
-    else if (nameLower.includes(q)) {
+    else if (nameLower.includes(q) || (hasStem && nameLower.includes(stemmed))) {
       rank = 2;
     }
     // Tier 3/4: alias match
     else if (entry.aliases) {
       for (const alias of entry.aliases) {
-        const a = alias.toLowerCase();
-        if (a.startsWith(q)) {
+        const a = alias.toLowerCase().replace(/[-_]/g, " ");
+        if (a.startsWith(q) || (hasStem && a.startsWith(stemmed))) {
           rank = Math.min(rank, 3);
           break;
-        } else if (a.includes(q)) {
+        } else if (a.includes(q) || (hasStem && a.includes(stemmed))) {
           rank = Math.min(rank, 4);
         }
       }
@@ -98,6 +137,29 @@ export function catalogSearch(catalog, query, opts = {}) {
       const haystack = [...(entry.equipment || []), ...(entry.tags || [])].join(" ").toLowerCase();
       if (haystack.includes(q)) {
         rank = 6;
+      }
+    }
+
+    // Tier 7: Levenshtein fuzzy match
+    if (rank === Infinity && q.length >= 3 && q.length <= 10) {
+      const threshold = q.length <= 5 ? 1 : 2;
+      const nameWords = nameLower.split(/\s+/);
+      for (const w of nameWords) {
+        if (levenshtein(q, w, threshold) <= threshold) {
+          rank = 7;
+          break;
+        }
+      }
+      if (rank === Infinity && entry.aliases) {
+        outer: for (const alias of entry.aliases) {
+          const aliasWords = alias.toLowerCase().split(/\s+/);
+          for (const w of aliasWords) {
+            if (levenshtein(q, w, threshold) <= threshold) {
+              rank = 7;
+              break outer;
+            }
+          }
+        }
       }
     }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Modal } from "./Modal";
 import { BodyDiagram } from "./BodyDiagram";
 import { ExerciseGif } from "./ExerciseGif";
+import { getSportIconUrl } from "../lib/sportIcons";
 
 
 function formatMuscleName(muscle) {
@@ -26,7 +27,7 @@ function formatMuscleName(muscle) {
 export function ExerciseDetailModal({
   open, entry, onBack, onClose, onAddExercise,
   workouts, styles, colors, targetWorkoutId,
-  swipeHandlers,
+  swipeHandlers, slideDir, position, total,
 }) {
   const [checked, setChecked] = useState(new Set());
   const [added, setAdded] = useState(false);
@@ -326,12 +327,21 @@ export function ExerciseDetailModal({
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
-          <div style={{ ...styles.modalTitle, flex: 1, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.name}</div>
+          <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
+            <div style={{ ...styles.modalTitle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.name}</div>
+            {position > 0 && total > 1 && (
+              <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.35, marginTop: -2 }}>{position} of {total}</div>
+            )}
+          </div>
         </div>
       }
     >
       <div
-        style={{ display: "flex", flexDirection: "column", gap: 14 }}
+        key={entry.id}
+        style={{
+          display: "flex", flexDirection: "column", gap: 14,
+          animation: slideDir ? `cardSlide${slideDir === "left" ? "Left" : "Right"} 0.25s ease-out` : undefined,
+        }}
         {...(swipeHandlers || {})}
       >
         {/* Movement + Equipment */}
@@ -342,8 +352,22 @@ export function ExerciseDetailModal({
           ))}
         </div>
 
-        {/* Exercise demonstration GIF */}
-        <ExerciseGif gifUrl={entry.gifUrl} exerciseName={entry.name} colors={colors} />
+        {/* Exercise demonstration GIF or sport pictogram */}
+        {entry.gifUrl ? (
+          <ExerciseGif gifUrl={entry.gifUrl} exerciseName={entry.name} colors={colors} />
+        ) : getSportIconUrl(entry.name) ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: "12px 0" }}>
+            <img
+              src={getSportIconUrl(entry.name)}
+              alt={entry.name}
+              style={{
+                width: 140, height: 140, objectFit: "contain",
+                filter: colors.appBg.startsWith("#0") || colors.appBg.startsWith("#1") ? "invert(1)" : "none",
+                opacity: 0.85,
+              }}
+            />
+          </div>
+        ) : null}
 
         {/* Body diagram + muscle chips */}
         {hasMuscles ? (

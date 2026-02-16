@@ -31,14 +31,6 @@ export const initialModalState = {
     name: "",
     category: "Workout",
   },
-  addExercise: {
-    isOpen: false,
-    workoutId: null,
-    name: "",
-    unit: "reps",
-    customUnitAbbr: "",
-    customUnitAllowDecimal: false,
-  },
   addSuggestion: {
     isOpen: false,
     exerciseName: "",
@@ -88,6 +80,9 @@ export const initialModalState = {
     unit: "reps",
     customUnitAbbr: "",
     customUnitAllowDecimal: false,
+    catalogId: null,
+    originalName: "",
+    originalUnit: "",
   },
   catalogBrowse: {
     isOpen: false,
@@ -135,7 +130,10 @@ export const initialModalState = {
     equipment: [],
     tags: [],
     movement: "",
+    catalogId: null,
+    gifUrl: null,
   },
+  exerciseDetail: { isOpen: false, entry: null },
   social: { isOpen: false, tab: "friends" },
   friendSearch: { isOpen: false, query: "", results: [], searching: false },
   shareWorkout: {
@@ -275,32 +273,6 @@ export function modalReducer(state, action) {
         addWorkout: initialModalState.addWorkout,
       };
 
-    // ===== ADD EXERCISE MODAL =====
-    case "OPEN_ADD_EXERCISE":
-      return {
-        ...state,
-        addExercise: {
-          isOpen: true,
-          workoutId: action.payload.workoutId,
-          name: "",
-          unit: "reps",
-          customUnitAbbr: "",
-          customUnitAllowDecimal: false,
-        },
-      };
-
-    case "UPDATE_ADD_EXERCISE":
-      return {
-        ...state,
-        addExercise: { ...state.addExercise, ...action.payload },
-      };
-
-    case "CLOSE_ADD_EXERCISE":
-      return {
-        ...state,
-        addExercise: initialModalState.addExercise,
-      };
-
     // ===== ADD SUGGESTION =====
     case "OPEN_ADD_SUGGESTION":
       return {
@@ -376,6 +348,9 @@ export function modalReducer(state, action) {
           unit: action.payload.unit,
           customUnitAbbr: action.payload.customUnitAbbr || "",
           customUnitAllowDecimal: action.payload.customUnitAllowDecimal ?? false,
+          catalogId: action.payload.catalogId || null,
+          originalName: action.payload.name,
+          originalUnit: action.payload.unit,
         },
       };
 
@@ -578,6 +553,22 @@ export function modalReducer(state, action) {
       return {
         ...state,
         customExercise: initialModalState.customExercise,
+      };
+
+    // ===== EXERCISE DETAIL MODAL =====
+    case "OPEN_EXERCISE_DETAIL":
+      return {
+        ...state,
+        exerciseDetail: {
+          isOpen: true,
+          entry: action.payload.entry,
+        },
+      };
+
+    case "CLOSE_EXERCISE_DETAIL":
+      return {
+        ...state,
+        exerciseDetail: initialModalState.exerciseDetail,
       };
 
     // ===== SOCIAL MODAL =====

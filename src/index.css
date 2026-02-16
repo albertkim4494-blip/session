@@ -88,6 +88,21 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes cardSlideLeft {
+  0% { opacity: 0; transform: translateX(60px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes cardSlideRight {
+  0% { opacity: 0; transform: translateX(-60px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

@@ -4,6 +4,7 @@ import { EXERCISE_CATALOG } from "../lib/exerciseCatalog";
 import { catalogSearch, normalizeQuery } from "../lib/exerciseCatalogUtils";
 import { ExerciseDetailModal } from "./ExerciseDetailModal";
 import { useSwipe } from "../hooks/useSwipe";
+import { getSportIconUrl } from "../lib/sportIcons";
 
 const MOVEMENT_FILTERS = [
   { key: null, label: "All" },
@@ -17,6 +18,7 @@ const MOVEMENT_FILTERS = [
   { key: "sport", label: "Sport" },
   { key: "mobility", label: "Mobility" },
   { key: "stretch", label: "Stretch" },
+  { key: "__custom__", label: "Custom" },
 ];
 
 function collectUserExercises(workouts) {
@@ -71,6 +73,7 @@ export function ExerciseCatalogModal({
   const [query, setQuery] = useState("");
   const [movementFilter, setMovementFilter] = useState(null);
   const [detailEntry, setDetailEntry] = useState(null);
+  const [slideDir, setSlideDir] = useState(null); // "left" | "right" | null
 
   useEffect(() => {
     if (open) {
@@ -94,10 +97,14 @@ export function ExerciseCatalogModal({
     return () => { backOverrideRef.current = null; };
   }, [open, !!detailEntry, backOverrideRef]);
 
-  const catalogResults = useMemo(
-    () => catalogSearch(catalog || EXERCISE_CATALOG, query, { movement: movementFilter, limit: 50 }),
-    [query, movementFilter, catalog]
-  );
+  const catalogResults = useMemo(() => {
+    const src = catalog || EXERCISE_CATALOG;
+    if (movementFilter === "__custom__") {
+      const customOnly = src.filter((e) => e.custom);
+      return catalogSearch(customOnly, query, { limit: 50 });
+    }
+    return catalogSearch(src, query, { movement: movementFilter, limit: 50 });
+  }, [query, movementFilter, catalog]);
 
   const catalogNameSet = useMemo(
     () => new Set(catalogResults.map((r) => r.name.toLowerCase())),
@@ -128,6 +135,7 @@ export function ExerciseCatalogModal({
     if (idx < 0) return;
     const next = idx + dir;
     if (next >= 0 && next < catalogResults.length) {
+      setSlideDir(dir > 0 ? "left" : "right");
       setDetailEntry(catalogResults[next]);
     }
   }, [detailEntry, catalogResults]);
@@ -223,8 +231,10 @@ export function ExerciseCatalogModal({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
             style={styles.textInput}
             placeholder="Search exercises..."
+            enterKeyHint="search"
           />
 
           <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, WebkitOverflowScrolling: "touch", flexShrink: 0 }}>
@@ -270,13 +280,26 @@ export function ExerciseCatalogModal({
               <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>Catalog</div>
             )}
 
-            {catalogResults.map((entry) => (
+            {catalogResults.map((entry) => {
+              const sportIcon = !entry.gifUrl ? getSportIconUrl(entry.name) : null;
+              return (
               <button
                 key={entry.id}
                 style={resultBtnStyle}
                 onClick={() => setDetailEntry(entry)}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {sportIcon && (
+                    <img
+                      src={sportIcon}
+                      alt=""
+                      style={{
+                        width: 28, height: 28, objectFit: "contain", flexShrink: 0,
+                        filter: colors.appBg.startsWith("#0") || colors.appBg.startsWith("#1") ? "invert(1)" : "none",
+                        opacity: 0.85,
+                      }}
+                    />
+                  )}
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{entry.name}</div>
                 </div>
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -290,7 +313,8 @@ export function ExerciseCatalogModal({
                   ))}
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       </Modal>
@@ -298,15 +322,17 @@ export function ExerciseCatalogModal({
       <ExerciseDetailModal
         open={!!detailEntry}
         entry={detailEntry}
-        onBack={() => setDetailEntry(null)}
-        onClose={() => { setDetailEntry(null); onClose(); }}
+        onBack={() => { setSlideDir(null); setDetailEntry(null); }}
+        onClose={() => { setSlideDir(null); setDetailEntry(null); onClose(); }}
         onAddExercise={onAddExercise ? (entry, workoutId) => onAddExercise(entry, workoutId) : undefined}
         workouts={workouts}
         styles={styles}
         colors={colors}
         targetWorkoutId={targetWorkoutId}
         swipeHandlers={swipeHandlers}
-
+        slideDir={slideDir}
+        position={detailEntry ? catalogResults.findIndex((e) => e.id === detailEntry.id) + 1 : 0}
+        total={catalogResults.length}
       />
     </>
   );

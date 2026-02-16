@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Modal } from "./Modal";
 import { BodyDiagram } from "./BodyDiagram";
+import { ExerciseGif } from "./ExerciseGif";
 import { REP_UNITS } from "../lib/constants";
 import { EXERCISE_CATALOG } from "../lib/exerciseCatalog";
 import { catalogSearch } from "../lib/exerciseCatalogUtils";
@@ -152,6 +153,8 @@ export function CustomExerciseModal({
       tags: entry.tags || [],
       movement: entry.movement || "",
       unit: entry.defaultUnit || "reps",
+      catalogId: entry.id,
+      gifUrl: entry.gifUrl || null,
     });
   };
 
@@ -167,6 +170,8 @@ export function CustomExerciseModal({
       equipment: enriched ? equipment : undefined,
       tags: enriched ? tags : undefined,
       movement: enriched ? movement : undefined,
+      catalogId: modalState.catalogId || null,
+      gifUrl: modalState.gifUrl || null,
     }, targetIds);
   };
 
@@ -209,7 +214,7 @@ export function CustomExerciseModal({
           <input
             value={name}
             onChange={(e) => {
-              onUpdate({ name: e.target.value, enriched: false, enrichError: null });
+              onUpdate({ name: e.target.value, enriched: false, enrichError: null, catalogId: null, gifUrl: null });
               setShowSuggestions(true);
             }}
             onFocus={() => setShowSuggestions(true)}
@@ -310,6 +315,11 @@ export function CustomExerciseModal({
             </div>
             <div style={{ fontSize: 10, opacity: 0.5, fontFamily: "monospace" }}>{enrichError}</div>
           </div>
+        )}
+
+        {/* GIF preview (only when user selected a catalog suggestion with a GIF) */}
+        {modalState.catalogId && modalState.gifUrl && enriched && !enriching && (
+          <ExerciseGif gifUrl={modalState.gifUrl} exerciseName={name} colors={colors} size={160} />
         )}
 
         {/* AI results — body diagram + chips */}
