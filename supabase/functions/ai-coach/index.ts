@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
       workouts,
       recentLogs,
       dateRange,
-      catalogSummary,
+      catalogEntries,
       equipment,
       weightUnit,
       enrichedLogSummary,
@@ -152,19 +152,14 @@ Deno.serve(async (req) => {
       ? profileParts.join("\n")
       : "No profile info provided.";
 
-    // Build catalog reference (exercises not in user's program, grouped by muscle)
+    // Build catalog reference (exercises not in user's program, with full metadata)
     let catalogSection = "";
-    if (catalogSummary && typeof catalogSummary === "object") {
-      const lines: string[] = [];
-      for (const [muscle, exercises] of Object.entries(catalogSummary)) {
-        if (Array.isArray(exercises) && exercises.length > 0) {
-          const groupName = (muscle as string).replace(/_/g, " ").toLowerCase();
-          lines.push(`  ${groupName}: ${(exercises as string[]).join(", ")}`);
-        }
-      }
-      if (lines.length > 0) {
-        catalogSection = `\nAVAILABLE EXERCISES (not in user's program, by muscle group):\n${lines.join("\n")}\n`;
-      }
+    if (Array.isArray(catalogEntries) && catalogEntries.length > 0) {
+      const catalogLines = catalogEntries.map(
+        (e: { id: string; name: string; muscles: string; tags: string }) =>
+          `${e.id} | ${e.name} | ${e.muscles} | ${e.tags}`
+      );
+      catalogSection = `\nEXERCISE CATALOG (not in user's program — suggest ONLY from these, using exact catalogId):\nid | name | muscles | tags\n${catalogLines.join("\n")}\n`;
     }
 
     // Build progression trends section
@@ -253,8 +248,8 @@ ANALYSIS RULES:
 - Only compare strength exercises for muscle-group balance.
 - Consider the user's goal and sports when making suggestions.
 - Do NOT suggest exercises already in their WORKOUT PROGRAM.
-- When suggesting exercises, prefer ones from the AVAILABLE EXERCISES list (if provided) — use exact names from that list.
-- Available exercises are already filtered to the user's equipment.
+- When suggesting exercises, ONLY use exercises from the EXERCISE CATALOG provided. Use exact catalogId and name from the catalog.
+- The catalog is already filtered to the user's equipment. Do NOT invent exercises outside it.
 ${sportBioSection ? "- Factor sport demands into ALL recommendations.\n" : ""}
 PROGRESSION TRACKING:
 - Celebrate weight increases (type: "PROGRESSION"). Be specific: "Bench went from 175 to 185 — your pressing is clicking."
@@ -313,7 +308,7 @@ RESPONSE FORMAT:
 - severity: one of "HIGH", "MEDIUM", "LOW", "INFO"
 - title: short title with a leading emoji (⚠️, 💡, 📊, ✅, 🔥, 😴, 📈)
 - message: 1-3 sentences. Sound human. Reference specific data.
-- suggestions: array of { "exercise": "<name>", "muscleGroup": "<GROUP>" } — only if actionable. muscleGroup: ANTERIOR_DELT, LATERAL_DELT, POSTERIOR_DELT, CHEST, TRICEPS, BACK, BICEPS, QUADS, HAMSTRINGS, GLUTES, CALVES, ABS.
+- suggestions: array of { "catalogId": "<id>", "exercise": "<name>", "muscleGroup": "<GROUP>" } — only if actionable. Use exact catalogId and name from the EXERCISE CATALOG. muscleGroup: ANTERIOR_DELT, LATERAL_DELT, POSTERIOR_DELT, CHEST, TRICEPS, BACK, BICEPS, QUADS, HAMSTRINGS, GLUTES, CALVES, ABS.
 
 OUTPUT FORMAT:
 { "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...] } ] }`;

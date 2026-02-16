@@ -273,8 +273,8 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     allWorkouts.push({ name: "Daily Workouts", exercises: dailyExercisesInRange });
   }
 
-  // Build catalog summary: exercises grouped by muscle, excluding user's current exercises
-  let catalogSummary = null;
+  // Build compact catalog for the AI (id, name, muscles, tags) excluding user's current exercises
+  let catalogEntries = null;
   if (catalog && catalog.length > 0) {
     const userNames = new Set();
     for (const w of allWorkouts) {
@@ -282,18 +282,17 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
         userNames.add(ex.name.toLowerCase());
       }
     }
-    const byMuscle = {};
-    for (const entry of catalog) {
-      if (userNames.has(entry.name.toLowerCase())) continue;
-      if (!entry.muscles?.primary?.length) continue;
-      for (const muscle of entry.muscles.primary) {
-        if (!byMuscle[muscle]) byMuscle[muscle] = [];
-        if (!byMuscle[muscle].includes(entry.name)) {
-          byMuscle[muscle].push(entry.name);
-        }
-      }
-    }
-    catalogSummary = byMuscle;
+    catalogEntries = catalog
+      .filter((e) => !userNames.has(e.name.toLowerCase()))
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        muscles: [
+          ...(e.muscles?.primary || []),
+          ...(e.muscles?.secondary || []).map((m) => `(${m})`),
+        ].join(", "),
+        tags: (e.tags || []).join(", "),
+      }));
   }
 
   // Build enriched data for the AI
@@ -335,7 +334,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
         end: dateRange.end,
         label: dateRange.label,
       },
-      catalogSummary,
+      catalogEntries,
       equipment: equipment || ["full_gym"],
       weightUnit: weightLabel,
       enrichedLogSummary,

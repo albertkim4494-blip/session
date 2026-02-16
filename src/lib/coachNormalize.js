@@ -96,7 +96,7 @@ function getSuggestionsForMuscleGroup(group, catalog, userExerciseNames) {
       return hasMuscle && !userNamesLower.has(entry.name.toLowerCase());
     })
     .slice(0, 3)
-    .map((entry) => ({ exercise: entry.name, muscleGroup: group }));
+    .map((entry) => ({ catalogId: entry.id, exercise: entry.name, muscleGroup: group }));
 
   return matches.length > 0 ? matches : (FALLBACK_SUGGESTIONS[group] || []);
 }
