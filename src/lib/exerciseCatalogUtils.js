@@ -85,7 +85,7 @@ export function catalogSearch(catalog, query, opts = {}) {
   if (!q) {
     // No query — return all (filtered), sorted alphabetically, up to limit
     let results = [...catalog];
-    if (opts.equipment) results = results.filter((e) => e.equipment.includes(opts.equipment));
+    if (opts.equipment) results = results.filter((e) => (e.equipment || []).includes(opts.equipment));
     if (opts.movement) results = results.filter((e) => e.movement === opts.movement);
     results.sort((a, b) => a.name.localeCompare(b.name));
     return results.slice(0, limit);
@@ -100,7 +100,7 @@ export function catalogSearch(catalog, query, opts = {}) {
 
   for (const entry of catalog) {
     // Apply filters first
-    if (opts.equipment && !entry.equipment.includes(opts.equipment)) continue;
+    if (opts.equipment && !(entry.equipment || []).includes(opts.equipment)) continue;
     if (opts.movement && entry.movement !== opts.movement) continue;
 
     const nameLower = entry.name.toLowerCase().replace(/[-_]/g, " ");
@@ -128,7 +128,8 @@ export function catalogSearch(catalog, query, opts = {}) {
           break;
         } else if (a.includes(q) || ac.includes(qCompact) ||
                    (hasStem && (a.includes(stemmed) || ac.includes(stemCompact)))) {
-          rank = Math.min(rank, 4);
+          rank = 4;
+          break;
         }
       }
     }
@@ -291,12 +292,10 @@ export function resolveExerciseDisplay(exercise, catalogMap) {
  * @param {string[]} [filters.uiMuscleGroups] - multiple UI muscle group keys (union / OR)
  * @param {Set} [filters.equipment] - equipment strings to require (entry must have at least one)
  * @param {"exercise"|"stretch"|"sport"} [filters.typeFilter] - filter by exercise type
- * @param {boolean} [filters.stretchOnly] - if true, only return stretch exercises (legacy)
  * @param {string} [filters.sportId] - specific catalog entry id for a sport
- * @param {boolean} [filters.allSports] - if true, only return sport exercises (legacy)
  * @returns {Array} filtered catalog entries
  */
-export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, equipment, typeFilter, stretchOnly, sportId, allSports } = {}) {
+export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, equipment, typeFilter, sportId } = {}) {
   // Build combined target muscle set from single group or array of groups
   let targetMuscles = null;
   if (uiMuscleGroups?.length > 0) {
@@ -307,7 +306,6 @@ export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, equipmen
   }
   return catalog.filter((entry) => {
     if (sportId && entry.id !== sportId) return false;
-    if (allSports && entry.movement !== "sport") return false;
     // Type filter: "exercise" excludes sport+stretch, "stretch" only stretch, "sport" only sport
     if (typeFilter === "exercise" && (entry.movement === "sport" || entry.movement === "stretch")) return false;
     if (typeFilter === "stretch" && entry.movement !== "stretch") return false;
@@ -320,7 +318,6 @@ export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, equipmen
       }
     }
     if (equipment?.size > 0 && !(entry.equipment || []).some(e => equipment.has(e))) return false;
-    if (stretchOnly && entry.movement !== "stretch") return false;
     return true;
   });
 }

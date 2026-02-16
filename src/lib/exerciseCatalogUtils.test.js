@@ -221,24 +221,9 @@ assert(
   "multi-equipment results have dumbbell or barbell"
 );
 
-// Stretch filter
-const stretchFiltered = filterCatalog(EXERCISE_CATALOG, { stretchOnly: true });
-assert(stretchFiltered.length > 0, "stretch filter returns results");
-assert(
-  stretchFiltered.every((e) => e.movement === "stretch"),
-  "all stretch-filtered results are stretches"
-);
-
-// All sports filter
-const allSportsFiltered = filterCatalog(EXERCISE_CATALOG, { allSports: true });
-assert(allSportsFiltered.length > 0, "allSports filter returns results");
-assert(
-  allSportsFiltered.every((e) => e.movement === "sport"),
-  "all allSports results are sports"
-);
-
-// Sport ID filter
-const firstSport = allSportsFiltered[0];
+// Sport ID filter (uses typeFilter to find a sport first)
+const sportList = filterCatalog(EXERCISE_CATALOG, { typeFilter: "sport" });
+const firstSport = sportList[0];
 const sportIdFiltered = filterCatalog(EXERCISE_CATALOG, { sportId: firstSport.id });
 assertEqual(sportIdFiltered.length, 1, "sportId filter returns exactly 1 result");
 assertEqual(sportIdFiltered[0].id, firstSport.id, "sportId filter returns correct sport");

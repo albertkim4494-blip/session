@@ -18,6 +18,7 @@ function collectUserExercises(workouts) {
   const seen = new Map();
   for (const w of workouts || []) {
     for (const ex of w.exercises || []) {
+      if (!ex?.name) continue;
       const key = ex.name.toLowerCase();
       if (!seen.has(key)) {
         seen.set(key, ex);
@@ -47,7 +48,7 @@ function getRecentUserExercises(workouts, logsByDate, limit) {
     if (!dayLogs || dayLogs === null || typeof dayLogs !== "object") continue;
     for (const exerciseId of Object.keys(dayLogs)) {
       const ex = idToEx.get(exerciseId);
-      if (!ex) continue;
+      if (!ex?.name) continue;
       const key = ex.name.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
@@ -364,6 +365,7 @@ export function ExerciseCatalogModal({
         style={styles.textInput}
         placeholder="Search exercises..."
         enterKeyHint="search"
+        aria-label="Search exercises"
       />
 
       {homeHasQuery ? (
@@ -406,6 +408,7 @@ export function ExerciseCatalogModal({
                   key={group}
                   className="btn-press"
                   style={chipStyle(hoveredGroups.has(group))}
+                  aria-pressed={hoveredGroups.has(group)}
                   onClick={() => {
                     setHoveredGroups((prev) => {
                       const next = new Set(prev);
@@ -457,6 +460,7 @@ export function ExerciseCatalogModal({
         style={styles.textInput}
         placeholder="Search exercises..."
         enterKeyHint="search"
+        aria-label="Search exercises"
       />
 
       {/* Row 1: Type filter chips (single-select) */}
@@ -465,6 +469,7 @@ export function ExerciseCatalogModal({
           <button
             key={t.key}
             style={chipStyle(typeFilter === t.key)}
+            aria-pressed={typeFilter === t.key}
             onClick={() => setTypeFilter(typeFilter === t.key ? null : t.key)}
           >
             {t.label}
