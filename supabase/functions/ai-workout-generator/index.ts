@@ -50,11 +50,25 @@ function buildProgramPrompt(payload: {
   if (profile.sports) profileLines.push(`Sports: ${profile.sports}`);
   if (profile.about) profileLines.push(`About/Injuries: ${profile.about}`);
 
-  const equipmentLabels: Record<string, string> = {
-    home: "Home (bodyweight only)",
-    basic: "Basic (dumbbells, bench, pull-up bar, kettlebell)",
-    gym: "Full gym (all equipment)",
-  };
+  function formatEquipmentLabel(eq: unknown): string {
+    if (typeof eq === "string") {
+      const legacy: Record<string, string> = {
+        home: "Home (bodyweight only)",
+        basic: "Basic (dumbbells, bench, pull-up bar, kettlebell)",
+        gym: "Full gym (all equipment)",
+      };
+      return legacy[eq] || eq;
+    }
+    if (!Array.isArray(eq) || eq.length === 0) return "Bodyweight only (no equipment)";
+    if (eq.includes("full_gym")) return "Full gym (all equipment)";
+    const labels: Record<string, string> = {
+      dumbbell: "dumbbells",
+      barbell: "barbell & rack",
+      kettlebell: "kettlebells",
+      bands: "resistance bands",
+    };
+    return "Bodyweight + " + eq.map((e: string) => labels[e] || e).join(", ");
+  }
 
   const catalogText = catalog
     .map((e) => `${e.id} | ${e.name} | ${e.muscles} | ${e.tags} | ${e.unit || "reps"}`)
@@ -92,7 +106,7 @@ Prioritize complementary work, antagonist muscles, and injury prevention.
 USER PROFILE:
 ${profileLines.length > 0 ? profileLines.join("\n") : "No profile info."}
 
-Equipment: ${equipmentLabels[equipment] || "Full gym"}
+Equipment: ${formatEquipmentLabel(equipment)}
 Goal: ${goal}
 Days per week: ${daysPerWeek}
 Session duration: ~${duration} minutes
@@ -175,11 +189,25 @@ function buildTodayPrompt(payload: {
   if (profile.sports) profileLines.push(`Sports: ${profile.sports}`);
   if (profile.about) profileLines.push(`About/Injuries: ${profile.about}`);
 
-  const equipmentLabels: Record<string, string> = {
-    home: "Home (bodyweight only)",
-    basic: "Basic (dumbbells, bench, pull-up bar, kettlebell)",
-    gym: "Full gym (all equipment)",
-  };
+  function formatEquipmentLabelToday(eq: unknown): string {
+    if (typeof eq === "string") {
+      const legacy: Record<string, string> = {
+        home: "Home (bodyweight only)",
+        basic: "Basic (dumbbells, bench, pull-up bar, kettlebell)",
+        gym: "Full gym (all equipment)",
+      };
+      return legacy[eq] || eq;
+    }
+    if (!Array.isArray(eq) || eq.length === 0) return "Bodyweight only (no equipment)";
+    if (eq.includes("full_gym")) return "Full gym (all equipment)";
+    const labels: Record<string, string> = {
+      dumbbell: "dumbbells",
+      barbell: "barbell & rack",
+      kettlebell: "kettlebells",
+      bands: "resistance bands",
+    };
+    return "Bodyweight + " + eq.map((e: string) => labels[e] || e).join(", ");
+  }
 
   const catalogText = catalog
     .map((e) => `${e.id} | ${e.name} | ${e.muscles} | ${e.tags} | ${e.unit || "reps"}`)
@@ -212,7 +240,7 @@ Prioritize complementary work, antagonist muscles, and injury prevention.
 USER PROFILE:
 ${profileLines.length > 0 ? profileLines.join("\n") : "No profile info."}
 
-Equipment: ${equipmentLabels[equipment] || "Full gym"}
+Equipment: ${formatEquipmentLabelToday(equipment)}
 Goal: ${goal}
 Session duration: ~${dur} minutes
 ${sportBioSection}

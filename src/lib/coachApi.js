@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
-import { getUnitAbbr } from "./coachNormalize";
+import { getUnitAbbr, buildNormalizedAnalysis } from "./coachNormalize";
+import { buildCatalogMap } from "./exerciseCatalogUtils";
 
 const CACHE_KEY = "wt_coach_cache";
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
@@ -20,6 +21,7 @@ function buildFingerprint(dateRange, recentLogs, exerciseCount, profile) {
     profile?.goal || "",
     profile?.age || "",
     profile?.weight_lbs || "",
+    profile?.height_inches || "",
     profile?.about || "",
     profile?.sports || "",
   ].join("|");
@@ -301,6 +303,16 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   const adherence = computeAdherenceStats(state?.logsByDate);
   const previousInsights = loadPreviousInsights();
 
+  // Compute muscle volume summary for the AI
+  let muscleVolumeSummary = null;
+  if (catalog?.length > 0) {
+    const catalogMap = buildCatalogMap(catalog);
+    const analysis = buildNormalizedAnalysis(allWorkouts, recentLogs, { start: dateRange.start, end: dateRange.end }, catalogMap);
+    if (analysis.muscleGroupVolume && Object.keys(analysis.muscleGroupVolume).length > 0) {
+      muscleVolumeSummary = analysis.muscleGroupVolume;
+    }
+  }
+
   // Ensure we have a fresh session token before calling the edge function
   await supabase.auth.getSession();
 
@@ -311,6 +323,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
         age: profile?.age,
         gender: profile?.gender,
         weight_lbs: profile?.weight_lbs,
+        height_inches: profile?.height_inches,
         goal: profile?.goal,
         about: profile?.about,
         sports: profile?.sports,
@@ -323,12 +336,13 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
         label: dateRange.label,
       },
       catalogSummary,
-      equipment: equipment || "gym",
+      equipment: equipment || ["full_gym"],
       weightUnit: weightLabel,
       enrichedLogSummary,
       progressionTrends,
       adherence,
       previousInsights,
+      muscleVolumeSummary,
     },
   });
 

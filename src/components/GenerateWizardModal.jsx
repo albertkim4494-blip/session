@@ -6,8 +6,6 @@ import {
 import { generateProgramAI } from "../lib/workoutGeneratorApi";
 import { EXERCISE_CATALOG, EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
 
-const EQUIPMENT_KEYS = ["home", "basic", "gym"];
-
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const DURATION_OPTIONS = [
@@ -269,16 +267,39 @@ export function GenerateWizardModal({
 
         {/* Equipment */}
         {currentContent === "equipment" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {EQUIPMENT_KEYS.map((key) => (
-              <button
-                key={key}
-                style={chipStyle(equipment === key)}
-                onClick={() => update({ equipment: key })}
-              >
-                {EQUIPMENT_LABELS[key]}
-              </button>
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+              {[{ key: "no_equipment", label: "No Equipment" }, ...Object.entries(EQUIPMENT_LABELS).map(([key, label]) => ({ key, label }))].map((opt) => {
+                const eq = Array.isArray(equipment) ? equipment : ["full_gym"];
+                const isActive = opt.key === "no_equipment"
+                  ? eq.length === 0
+                  : eq.includes(opt.key);
+                return (
+                  <button
+                    key={opt.key}
+                    style={smallChipStyle(isActive)}
+                    onClick={() => {
+                      if (opt.key === "no_equipment") {
+                        update({ equipment: [] });
+                      } else if (opt.key === "full_gym") {
+                        update({ equipment: ["full_gym"] });
+                      } else {
+                        const without = eq.filter((k) => k !== "full_gym");
+                        const next = without.includes(opt.key)
+                          ? without.filter((k) => k !== opt.key)
+                          : [...without, opt.key];
+                        update({ equipment: next });
+                      }
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.5, textAlign: "center" }}>
+              {Array.isArray(equipment) && equipment.length === 0 ? "Bodyweight exercises only" : "Bodyweight always included"}
+            </div>
           </div>
         )}
 

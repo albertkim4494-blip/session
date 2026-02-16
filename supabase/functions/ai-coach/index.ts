@@ -34,6 +34,7 @@ Deno.serve(async (req) => {
       progressionTrends,
       adherence,
       previousInsights,
+      muscleVolumeSummary,
     } = await req.json();
 
     const wUnit = weightUnit || "lb";
@@ -114,16 +115,38 @@ Deno.serve(async (req) => {
     if (profile?.gender) profileParts.push(`Gender: ${profile.gender}`);
     if (profile?.weight_lbs) profileParts.push(`Weight: ${profile.weight_lbs} ${wUnit}`);
     if (profile?.goal) profileParts.push(`Goal: ${profile.goal}`);
+    if (profile?.height_inches) {
+      const hFt = Math.floor(profile.height_inches / 12);
+      const hIn = profile.height_inches % 12;
+      const hCm = Math.round(profile.height_inches * 2.54);
+      profileParts.push(`Height: ${hFt}'${hIn}" (${hCm} cm)`);
+      if (profile?.weight_lbs) {
+        const bmi = ((profile.weight_lbs * 0.453592) / (profile.height_inches * 0.0254) ** 2).toFixed(1);
+        profileParts.push(`BMI: ${bmi}`);
+      }
+    }
     if (profile?.sports) profileParts.push(`Sports/Activities: ${profile.sports}`);
     if (profile?.about) profileParts.push(`About: ${profile.about}`);
-    const equipmentLabels: Record<string, string> = {
-      home: "Home (bodyweight only, no equipment)",
-      basic: "Basic home setup (dumbbells, bench, pull-up bar, kettlebell)",
-      gym: "Full gym access (all equipment available)",
-    };
-    if (equipment && equipment !== "gym") {
-      profileParts.push(`Equipment: ${equipmentLabels[equipment] || equipment}`);
+    function formatEquipmentLabel(eq: unknown): string {
+      if (typeof eq === "string") {
+        const legacy: Record<string, string> = {
+          home: "Bodyweight only (no equipment)",
+          basic: "Bodyweight + dumbbells, kettlebells",
+          gym: "Full gym access (all equipment)",
+        };
+        return legacy[eq] || eq;
+      }
+      if (!Array.isArray(eq) || eq.length === 0) return "Bodyweight only (no equipment)";
+      if (eq.includes("full_gym")) return "Full gym access (all equipment)";
+      const labels: Record<string, string> = {
+        dumbbell: "dumbbells",
+        barbell: "barbell & rack",
+        kettlebell: "kettlebells",
+        bands: "resistance bands",
+      };
+      return "Bodyweight + " + eq.map((e: string) => labels[e] || e).join(", ");
     }
+    profileParts.push(`Equipment: ${formatEquipmentLabel(equipment)}`);
 
     const profileContext = profileParts.length > 0
       ? profileParts.join("\n")
@@ -162,12 +185,26 @@ Deno.serve(async (req) => {
       antiRepetitionSection = `\nPREVIOUS RECOMMENDATIONS (do NOT repeat these topics):\n${previousInsights.titles.map((t: string) => `  - ${t}`).join("\n")}\n`;
     }
 
+    // Build muscle volume section
+    let muscleVolumeSection = "";
+    if (muscleVolumeSummary && typeof muscleVolumeSummary === "object") {
+      const lines = Object.entries(muscleVolumeSummary)
+        .filter(([, v]) => typeof v === "number" && v > 0)
+        .map(([g, v]) => `  ${(g as string).replace(/_/g, " ").toLowerCase()}: ${v} reps`);
+      if (lines.length > 0) {
+        muscleVolumeSection = `\nMUSCLE GROUP VOLUME (reps, primary + 0.5x secondary):\n${lines.join("\n")}\n`;
+      }
+    }
+
     // Sport biomechanics section for system prompt
     let sportBioSection = "";
     if (profile?.sports) {
       sportBioSection = `
 SPORT BIOMECHANICS AWARENESS:
 The user participates in: ${profile.sports}. Analyze the muscular and cardiovascular demands of their sport(s).
+Parse any frequency from the text (e.g. "3x/week", "daily").
+Calculate TOTAL weekly load: sport sessions + gym sessions.
+If user trains sport 3x/week AND lifts 3x/week = 6 total sessions — factor total load into recovery.
 Common sport demands — Water polo: heavy shoulders, chest, legs, cardio. Basketball: legs, shoulders, cardio. Soccer: legs, cardio, core. Swimming: shoulders, back, chest, cardio. Tennis: shoulders, forearm, core, legs. Running: legs, cardio. Cycling: quads, hamstrings, cardio. Rowing: back, legs, shoulders, cardio.
 Factor sport demands into ALL recommendations. Prioritize complementary work, antagonist muscles, and injury prevention. Avoid overloading muscles already heavily taxed by the sport.
 `;
@@ -236,6 +273,14 @@ BODY-RELATIVE STRENGTH AWARENESS:
 - If someone is well below beginner ratios and the weight has been flat for 3+ weeks, gently suggest progressive overload with specific increments (e.g., "Try adding ${wUnit === "kg" ? "2.5 kg" : "5 lb"} next session").
 - For bodyweight exercises (pushups, pull-ups, dips), evaluate volume and rep quality rather than added weight. High-rep bodyweight work is legitimate training.
 - If profile data is missing (no weight, no age), don't guess — just evaluate based on the trend data you have.
+- BMI is context, not a primary metric — a muscular BMI 28 differs from a sedentary BMI 28. Never recommend weight loss based solely on BMI.
+
+AGE-SPECIFIC GUIDANCE:
+- Ages 13-17: Form, bodyweight, coordination. Avoid heavy maximal loads. Joints/tendons developing.
+- Ages 18-35: Standard recovery. Progressive overload appropriate.
+- Ages 36-50: Slower recovery. Suggest warm-ups, joint-friendly alternatives. 48-72h between heavy sessions.
+- Ages 50+: Prioritize joint health, mobility, moderate loading. Celebrate consistency over intensity.
+- NEVER use "at your age" — adjust expectations naturally without being condescending.
 
 ISOLATION EXERCISE AWARENESS:
 - Isolation exercises (curls, lateral raises, tricep extensions, leg curls, etc.) use MUCH less weight than compounds. Do NOT apply compound-lift expectations.
@@ -280,7 +325,7 @@ ${programSummary}
 
 RECENT TRAINING LOGS:
 ${logSummary}
-${catalogSection}${progressionSection}${adherenceSection}${antiRepetitionSection}
+${catalogSection}${muscleVolumeSection}${progressionSection}${adherenceSection}${antiRepetitionSection}
 Analyze this data and return JSON insights.`;
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {

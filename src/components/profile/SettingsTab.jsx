@@ -237,26 +237,52 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="1" y="9.5" width="3" height="5" rx="0.75" /><rect x="4" y="7" width="3" height="10" rx="0.75" /><rect x="17" y="7" width="3" height="10" rx="0.75" /><rect x="20" y="9.5" width="3" height="5" rx="0.75" /><rect x="7" y="11" width="10" height="2" rx="0.5" /></svg>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Equipment</span>
-            <select
-              value={preferences?.equipment || "gym"}
-              onChange={(e) => onUpdatePreference?.("equipment", e.target.value)}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 10,
-                border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
-                background: colors?.inputBg || "#161b22",
-                color: colors?.text || "#e8eef7",
-                fontSize: 13,
-                fontFamily: "inherit",
-                fontWeight: 600,
-              }}
-            >
-              {Object.entries(EQUIPMENT_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+              {[{ key: "no_equipment", label: "No Equipment" }, ...Object.entries(EQUIPMENT_LABELS).map(([key, label]) => ({ key, label }))].map((opt) => {
+                const eq = Array.isArray(preferences?.equipment) ? preferences.equipment : ["full_gym"];
+                const isActive = opt.key === "no_equipment"
+                  ? eq.length === 0
+                  : eq.includes(opt.key);
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => {
+                      if (opt.key === "no_equipment") {
+                        onUpdatePreference?.("equipment", []);
+                      } else if (opt.key === "full_gym") {
+                        onUpdatePreference?.("equipment", ["full_gym"]);
+                      } else {
+                        const without = eq.filter((k) => k !== "full_gym");
+                        const next = without.includes(opt.key)
+                          ? without.filter((k) => k !== opt.key)
+                          : [...without, opt.key];
+                        onUpdatePreference?.("equipment", next);
+                      }
+                    }}
+                    style={{
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: isActive ? 700 : 500,
+                      borderRadius: 999,
+                      border: `1.5px solid ${isActive ? (colors?.accent || "#7dd3fc") : (colors?.border || "rgba(255,255,255,0.10)")}`,
+                      background: isActive ? (colors?.accent || "#7dd3fc") + "22" : "transparent",
+                      color: isActive ? (colors?.accent || "#7dd3fc") : (colors?.text || "#e8eef7"),
+                      cursor: "pointer",
+                      WebkitTapHighlightColor: "transparent",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <span style={{ fontSize: 11, opacity: 0.5, marginTop: 4, display: "block" }}>
+              {Array.isArray(preferences?.equipment) && preferences.equipment.length === 0 ? "Bodyweight exercises only" : "Bodyweight always included"}
+            </span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

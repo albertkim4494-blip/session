@@ -150,7 +150,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     } catch { return new Set(["programs", "data"]); }
   });
   const theme = state.preferences?.theme || "dark";
-  const equipment = state.preferences?.equipment || "gym";
+  const equipment = state.preferences?.equipment || ["full_gym"];
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
   const [trainSearch, setTrainSearch] = useState("");
@@ -431,7 +431,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("username, display_name, username_last_changed_at, username_change_count, birthdate, gender, age, weight_lbs, goal, about, sports, avatar_url")
+          .select("username, display_name, username_last_changed_at, username_change_count, birthdate, gender, age, weight_lbs, height_inches, goal, about, sports, avatar_url")
           .eq("id", session.user.id)
           .single();
         if (!cancelled && data && !error) {
@@ -1834,7 +1834,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }
 
   function openGenerateToday() {
-    dispatchModal({ type: "OPEN_GENERATE_TODAY", payload: { equipment: equipment || "gym" } });
+    dispatchModal({ type: "OPEN_GENERATE_TODAY", payload: { equipment: equipment || ["full_gym"] } });
   }
 
   async function handleGenerateToday(opts) {
@@ -2124,6 +2124,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       goal: profile?.goal || "",
                       sports: profile?.sports || "",
                       about: profile?.about || "",
+                      heightInches: profile?.height_inches || "",
                       avatarUrl: profile?.avatar_url || null,
                     },
                   })}

@@ -15,26 +15,45 @@
  * Custom exercises: 60
  */
 
-export const EQUIPMENT_TIERS = {
-  home: new Set(["bodyweight"]),
-  basic: new Set(["bodyweight", "dumbbell", "kettlebell", "pull-up bar", "dip bar", "bench", "ab wheel", "jump rope", "foam roller"]),
-  gym: null, // no filter — all equipment available
+export const EQUIPMENT_CATEGORIES = {
+  dumbbell:   new Set(["dumbbell"]),
+  barbell:    new Set(["barbell"]),
+  kettlebell: new Set(["kettlebell"]),
+  bands:      new Set(["band"]),
+  full_gym:   null, // no filter
 };
 
 export const EQUIPMENT_LABELS = {
-  home: "Home (no equipment)",
-  basic: "Basic (dumbbells, bench, etc.)",
-  gym: "Full Gym",
+  dumbbell: "Dumbbells",
+  barbell: "Barbell & Rack",
+  kettlebell: "Kettlebells",
+  bands: "Bands",
+  full_gym: "Full Gym",
 };
 
+export function buildAllowedEquipment(selected) {
+  if (!Array.isArray(selected) || selected.length === 0) return new Set(["bodyweight"]);
+  if (selected.includes("full_gym")) return null;
+  const allowed = new Set(["bodyweight"]);
+  for (const cat of selected) {
+    const set = EQUIPMENT_CATEGORIES[cat];
+    if (set) for (const eq of set) allowed.add(eq);
+  }
+  return allowed;
+}
+
 /**
- * Check if an exercise is available for a given equipment tier.
- * An exercise matches if ANY of its equipment is in the tier's set,
- * OR if the exercise has no equipment listed (e.g. cardio/sport).
+ * Check if an exercise is available for a given equipment selection.
+ * Accepts both new array format and legacy string format.
  */
-export function exerciseFitsEquipment(entry, tier) {
-  const allowed = EQUIPMENT_TIERS[tier];
-  if (!allowed) return true; // gym = no filter
+export function exerciseFitsEquipment(entry, equipmentSelection) {
+  // Handle legacy string values
+  if (typeof equipmentSelection === "string") {
+    const LEGACY = { home: [], basic: ["dumbbell", "kettlebell"], gym: ["full_gym"] };
+    equipmentSelection = LEGACY[equipmentSelection] || ["full_gym"];
+  }
+  const allowed = buildAllowedEquipment(equipmentSelection);
+  if (!allowed) return true;
   if (!entry.equipment || entry.equipment.length === 0) return true;
   return entry.equipment.some((e) => allowed.has(e));
 }

@@ -4,9 +4,12 @@ import { validateUsernameStrict, sanitizeUsername, validateDisplayName } from ".
 import { isValidBirthdateString, computeAge } from "../lib/validation";
 
 const EQUIPMENT_OPTIONS = [
-  { key: "home", label: "Home", desc: "Bodyweight only" },
-  { key: "basic", label: "Basic", desc: "Dumbbells, bench, pull-up bar" },
-  { key: "gym", label: "Full Gym", desc: "All equipment available" },
+  { key: "no_equipment", label: "No Equipment", desc: "Bodyweight only" },
+  { key: "dumbbell", label: "Dumbbells", desc: "" },
+  { key: "barbell", label: "Barbell & Rack", desc: "" },
+  { key: "kettlebell", label: "Kettlebells", desc: "" },
+  { key: "bands", label: "Bands", desc: "" },
+  { key: "full_gym", label: "Full Gym", desc: "All equipment" },
 ];
 
 export default function OnboardingScreen({ session, onComplete, onUpdatePreference }) {
@@ -18,7 +21,10 @@ export default function OnboardingScreen({ session, onComplete, onUpdatePreferen
   const [goal, setGoal] = useState("");
   const [about, setAbout] = useState("");
   const [sports, setSports] = useState("");
-  const [equipment, setEquipment] = useState("gym");
+  const [heightFt, setHeightFt] = useState("");
+  const [heightIn, setHeightIn] = useState("");
+  const [heightCm, setHeightCm] = useState("");
+  const [equipment, setEquipment] = useState(["full_gym"]);
   const [measurementSystem, setMeasurementSystem] = useState("imperial");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -84,6 +90,9 @@ export default function OnboardingScreen({ session, onComplete, onUpdatePreferen
           birthdate,
           age: ageNum,
           weight_lbs: weightNum,
+          height_inches: measurementSystem === "metric"
+            ? (heightCm ? Math.round(Number(heightCm) / 2.54) : null)
+            : (heightFt || heightIn ? (Number(heightFt) || 0) * 12 + (Number(heightIn) || 0) : null),
           goal,
           about: about || null,
           sports: sports || null,
@@ -200,6 +209,46 @@ export default function OnboardingScreen({ session, onComplete, onUpdatePreferen
             style={styles.input}
           />
 
+          <label style={styles.label}>Height</label>
+          {measurementSystem === "metric" ? (
+            <input
+              type="number"
+              placeholder="e.g. 178"
+              value={heightCm}
+              onChange={(e) => setHeightCm(e.target.value)}
+              min={100}
+              max={275}
+              style={styles.input}
+            />
+          ) : (
+            <div style={{ display: "flex", gap: 8, width: "100%", boxSizing: "border-box" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="number"
+                  placeholder="ft"
+                  value={heightFt}
+                  onChange={(e) => setHeightFt(e.target.value)}
+                  min={3}
+                  max={8}
+                  style={{ ...styles.input, textAlign: "center" }}
+                />
+                <span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 600 }}>ft</span>
+              </div>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="number"
+                  placeholder="in"
+                  value={heightIn}
+                  onChange={(e) => setHeightIn(e.target.value)}
+                  min={0}
+                  max={11}
+                  style={{ ...styles.input, textAlign: "center" }}
+                />
+                <span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 600 }}>in</span>
+              </div>
+            </div>
+          )}
+
           <label style={styles.label}>Fitness Goal *</label>
           <input
             type="text"
@@ -211,34 +260,49 @@ export default function OnboardingScreen({ session, onComplete, onUpdatePreferen
           />
 
           <label style={styles.label}>Equipment Access *</label>
-          <div style={{ display: "flex", gap: 8, width: "100%", boxSizing: "border-box" }}>
-            {EQUIPMENT_OPTIONS.map((opt) => (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() => setEquipment(opt.key)}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  padding: "10px 8px",
-                  borderRadius: 10,
-                  border: `2px solid ${equipment === opt.key ? "#2dd4bf" : "#1e293b"}`,
-                  background: equipment === opt.key ? "rgba(45,212,191,0.12)" : "#1a2332",
-                  color: equipment === opt.key ? "#2dd4bf" : "#94a3b8",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  textAlign: "center",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 2,
-                }}
-              >
-                <span>{opt.label}</span>
-                <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.7 }}>{opt.desc}</span>
-              </button>
-            ))}
+          <div style={{ display: "flex", gap: 8, width: "100%", boxSizing: "border-box", flexWrap: "wrap" }}>
+            {EQUIPMENT_OPTIONS.map((opt) => {
+              const isActive = opt.key === "no_equipment"
+                ? equipment.length === 0
+                : equipment.includes(opt.key);
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => {
+                    if (opt.key === "no_equipment") {
+                      setEquipment([]);
+                    } else if (opt.key === "full_gym") {
+                      setEquipment(["full_gym"]);
+                    } else {
+                      setEquipment((prev) => {
+                        const without = prev.filter((k) => k !== "full_gym");
+                        return without.includes(opt.key)
+                          ? without.filter((k) => k !== opt.key)
+                          : [...without, opt.key];
+                      });
+                    }
+                  }}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 999,
+                    border: `2px solid ${isActive ? "#2dd4bf" : "#1e293b"}`,
+                    background: isActive ? "rgba(45,212,191,0.12)" : "#1a2332",
+                    color: isActive ? "#2dd4bf" : "#94a3b8",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    textAlign: "center",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
+          <span style={styles.helper}>
+            {equipment.length === 0 ? "Bodyweight exercises only" : "Bodyweight always included"}
+          </span>
 
           <label style={styles.label}>About You</label>
           <textarea
@@ -253,7 +317,7 @@ export default function OnboardingScreen({ session, onComplete, onUpdatePreferen
           <label style={styles.label}>Sports / Activities</label>
           <input
             type="text"
-            placeholder="e.g. Running, Basketball"
+            placeholder="e.g. Basketball 3x/week, running 2x/week"
             value={sports}
             onChange={(e) => setSports(e.target.value)}
             style={styles.input}

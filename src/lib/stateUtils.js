@@ -87,7 +87,7 @@ export function makeDefaultState() {
       restTimerEnabled: true,
       restTimerSoundType: "beep",
       measurementSystem: "imperial",
-      equipment: "gym",
+      equipment: ["full_gym"],
       theme: "dark",
       exerciseRestTimes: {},
     },
@@ -136,9 +136,11 @@ export function normalizeState(st) {
 
   // One-time migration: read equipment/theme/measurementSystem from old standalone localStorage keys
   try {
-    if (!next.preferences.equipment || next.preferences.equipment === "gym") {
+    if (typeof next.preferences.equipment === "string" || (!next.preferences.equipment && !Array.isArray(next.preferences.equipment))) {
       const oldEquip = localStorage.getItem("wt_equipment");
-      if (oldEquip) next.preferences.equipment = oldEquip;
+      if (oldEquip && typeof next.preferences.equipment !== "string") {
+        next.preferences.equipment = oldEquip;
+      }
     }
     if (!next.preferences.theme || next.preferences.theme === "dark") {
       const oldTheme = localStorage.getItem("wt_theme");
@@ -150,6 +152,15 @@ export function normalizeState(st) {
     }
   } catch {
     // localStorage may be unavailable (SSR, private browsing)
+  }
+
+  // Migrate equipment from legacy string to array format
+  if (typeof next.preferences.equipment === "string") {
+    const map = { home: [], basic: ["dumbbell", "kettlebell"], gym: ["full_gym"] };
+    next.preferences.equipment = map[next.preferences.equipment] || ["full_gym"];
+  }
+  if (!Array.isArray(next.preferences.equipment)) {
+    next.preferences.equipment = ["full_gym"];
   }
 
   migrateCompletedFlag(next);

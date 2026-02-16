@@ -52,7 +52,7 @@ function MicButton({ field, listeningField, onToggle, colors }) {
 }
 
 export function ProfileTab({ modalState, dispatch, profile, session, styles, colors, summaryStats, preferences, onUpdatePreference }) {
-  const { displayName, birthdate, gender, weightLbs, goal, sports, about, avatarUrl, avatarPreview } = modalState;
+  const { displayName, birthdate, gender, weightLbs, heightInches, goal, sports, about, avatarUrl, avatarPreview } = modalState;
   const age = birthdate && isValidBirthdateString(birthdate) ? computeAge(birthdate) : null;
   const [showStatsConfig, setShowStatsConfig] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
@@ -90,7 +90,8 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     onUpdatePreference?.("profileHighlights", next);
   };
 
-  const weightUnit = preferences?.measurementSystem === "metric" ? "kg" : "lbs";
+  const isMetric = preferences?.measurementSystem === "metric";
+  const weightUnit = isMetric ? "kg" : "lbs";
 
   // Voice input toggle
   const toggleListening = useCallback((field) => {
@@ -371,6 +372,55 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
                 />
               </div>
             </div>
+
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Height {isMetric ? "(cm)" : "(ft / in)"}</label>
+              {isMetric ? (
+                <input
+                  type="number"
+                  value={heightInches ? Math.round(Number(heightInches) * 2.54) : ""}
+                  onChange={(e) => {
+                    const cm = Number(e.target.value);
+                    update("heightInches", cm ? String(Math.round(cm / 2.54)) : "");
+                  }}
+                  style={styles.textInput}
+                  placeholder="e.g. 178"
+                  min={100}
+                  max={275}
+                />
+              ) : (
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input
+                    type="number"
+                    value={heightInches ? Math.floor(Number(heightInches) / 12) : ""}
+                    onChange={(e) => {
+                      const ft = Math.max(0, Number(e.target.value) || 0);
+                      const currentIn = heightInches ? Number(heightInches) % 12 : 0;
+                      update("heightInches", String(ft * 12 + currentIn));
+                    }}
+                    style={{ ...styles.textInput, width: 52, textAlign: "center" }}
+                    placeholder="ft"
+                    min={3}
+                    max={8}
+                  />
+                  <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.5 }}>ft</span>
+                  <input
+                    type="number"
+                    value={heightInches ? Number(heightInches) % 12 : ""}
+                    onChange={(e) => {
+                      const inches = Math.max(0, Math.min(11, Number(e.target.value) || 0));
+                      const currentFt = heightInches ? Math.floor(Number(heightInches) / 12) : 0;
+                      update("heightInches", String(currentFt * 12 + inches));
+                    }}
+                    style={{ ...styles.textInput, width: 52, textAlign: "center" }}
+                    placeholder="in"
+                    min={0}
+                    max={11}
+                  />
+                  <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.5 }}>in</span>
+                </div>
+              )}
+            </div>
           </>
         ) : (
           <div
@@ -403,6 +453,16 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
             <div>
               <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Weight</div>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{weightLbs ? `${weightLbs} ${weightUnit}` : notSet}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 2 }}>Height</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                {heightInches ? (
+                  isMetric
+                    ? `${Math.round(Number(heightInches) * 2.54)} cm`
+                    : `${Math.floor(Number(heightInches) / 12)}'${Number(heightInches) % 12}"`
+                ) : notSet}
+              </div>
             </div>
           </div>
         )}
@@ -487,7 +547,7 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
                 value={sports}
                 onChange={(e) => update("sports", e.target.value)}
                 style={styles.textInput}
-                placeholder="e.g. Basketball 3x/week, running, yoga on rest days"
+                placeholder="e.g. Basketball 3x/week, running 2x/week"
               />
             </div>
 

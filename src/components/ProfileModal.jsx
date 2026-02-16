@@ -15,7 +15,7 @@ const TABS = [
   )},
 ];
 
-const DIRTY_FIELDS = ["displayName", "birthdate", "gender", "weightLbs", "goal", "sports", "about", "avatarUrl"];
+const DIRTY_FIELDS = ["displayName", "birthdate", "gender", "weightLbs", "heightInches", "goal", "sports", "about", "avatarUrl"];
 
 function isDirty(modalState) {
   const init = modalState._initial;
@@ -39,7 +39,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
 
   if (!open) return null;
 
-  const { displayName, birthdate, weightLbs, avatarUrl, saving, error } = modalState;
+  const { displayName, birthdate, weightLbs, heightInches, avatarUrl, saving, error } = modalState;
 
   function handleCancel() {
     if (isDirty(modalState)) {
@@ -72,6 +72,20 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
       dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: `Weight must be ${wMin}-${wMax} ${isMetric ? "kg" : "lbs"}` } });
       return;
     }
+    const hNum = Number(heightInches);
+    if (heightInches) {
+      if (isMetric) {
+        if (hNum < 100 || hNum > 275) {
+          dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: "Height must be 100-275 cm" } });
+          return;
+        }
+      } else {
+        if (hNum < 36 || hNum > 108) {
+          dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { error: "Height must be 36-108 inches (3'-9')" } });
+          return;
+        }
+      }
+    }
 
     dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { saving: true, error: "" } });
 
@@ -80,6 +94,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
       birthdate: modalState.birthdate || null,
       gender: modalState.gender || null,
       weight_lbs: weightLbs ? wNum : null,
+      height_inches: heightInches ? (isMetric ? Math.round(hNum / 2.54) : hNum) : null,
       goal: modalState.goal?.trim() || null,
       sports: modalState.sports?.trim() || null,
       about: modalState.about?.trim() || null,
