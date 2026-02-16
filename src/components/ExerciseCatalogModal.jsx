@@ -6,7 +6,7 @@ import { ExerciseDetailModal } from "./ExerciseDetailModal";
 import { useSwipe } from "../hooks/useSwipe";
 import { getSportIconUrl } from "../lib/sportIcons";
 import { BodyDiagram, SLUG_TO_MUSCLES } from "./BodyDiagram";
-import { INDIVIDUAL_MUSCLES, MUSCLE_LABELS, UI_MUSCLE_GROUPS, UI_GROUP_CONFIG, muscleToUiGroup } from "../lib/muscleGroups";
+import { MUSCLE_LABELS, UI_MUSCLE_GROUPS, UI_GROUP_CONFIG, muscleToUiGroup } from "../lib/muscleGroups";
 
 const TYPE_CHIPS = [
   { key: "exercise", label: "Exercise" },
