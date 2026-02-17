@@ -989,9 +989,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // ---------------------------------------------------------------------------
   // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
+  // Chrome's History Manipulation Intervention skips pushState/hash entries
+  // created without user activation. We push entries during user interactions
+  // (click/touchend) so Android's back button recognizes them.
   // ---------------------------------------------------------------------------
   const handleBackRef = useRef(null);
-  const backCountRef = useRef(0);
   const dbgRef = useRef(null);
 
   const dbg = (msg) => {
@@ -999,8 +1001,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   handleBackRef.current = () => {
-    backCountRef.current++;
-    dbg("v14 b:" + backCountRef.current);
+    dbg("v15 back");
 
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
@@ -1019,43 +1020,58 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   useEffect(() => {
-    // Persistent log — survives app exit, viewable on reopen by tapping indicator
-    const logs = [];
-    const log = (msg) => {
-      logs.push(msg);
-      try { localStorage.setItem("__wt_bk", logs.join("\n")); } catch (_) {}
-      dbg(msg);
+    let seq = 0;
+    let lastHash = "";
+    let initialized = false;
+    let lastPushTime = 0;
+
+    const push = () => {
+      seq++;
+      lastHash = "#wt" + seq;
+      location.hash = lastHash;
     };
 
-    const sa = window.matchMedia("(display-mode: standalone)").matches;
-    log("v14 " + (sa ? "STANDALONE" : "BROWSER") + " h:" + history.length);
+    // Push history entries ONLY during user interaction (not on page load).
+    // Chrome skips entries created without user activation on back press.
+    const ensureEntries = () => {
+      const now = Date.now();
+      if (!initialized) {
+        initialized = true;
+        history.replaceState(null, "", location.pathname + location.search);
+        for (let i = 0; i < 3; i++) push();
+        lastPushTime = now;
+        dbg("v15 h:" + history.length);
+        return;
+      }
+      // Replenish one entry per interaction, at most once every 2s
+      if (now - lastPushTime > 2000) {
+        push();
+        lastPushTime = now;
+      }
+    };
 
-    // Push 5 hash entries (real navigation entries)
-    let seq = 0, lastHash = "";
-    const push = () => { seq++; lastHash = "#wt" + seq; location.hash = lastHash; };
-    history.replaceState(null, "", location.pathname + location.search);
-    for (let i = 0; i < 5; i++) push();
-    log("pushed h:" + history.length + " hash:" + location.hash);
+    document.addEventListener("click", ensureEntries, { passive: true });
+    document.addEventListener("touchend", ensureEntries, { passive: true });
 
-    const isSelf = () => location.hash === lastHash;
+    // Listen to both popstate and hashchange for back press
+    let lastBackTime = 0;
+    const onBack = () => {
+      if (location.hash === lastHash) return; // self-caused by our push
+      const now = Date.now();
+      if (now - lastBackTime < 300) return; // dedup (both events may fire)
+      lastBackTime = now;
+      handleBackRef.current?.();
+    };
 
-    // Register ALL event listeners to see which ones fire
-    window.addEventListener("popstate", () => {
-      log("POPSTATE h:" + history.length + " #:" + location.hash + (isSelf() ? " SELF" : ""));
-      if (!isSelf()) { handleBackRef.current?.(); push(); }
-    });
-    window.addEventListener("hashchange", () => {
-      log("HASHCHG #:" + location.hash + (isSelf() ? " SELF" : ""));
-    });
-    window.addEventListener("pagehide", () => log("PAGEHIDE"));
-    window.addEventListener("visibilitychange", () => log("VIS:" + document.visibilityState));
-    window.addEventListener("beforeunload", () => log("BEFOREUNLOAD"));
-    if (window.navigation) {
-      window.navigation.addEventListener("navigate", (e) =>
-        log("NAV " + e.navigationType + " ci:" + e.canIntercept)
-      );
-    }
-    log("listeners ready");
+    window.addEventListener("popstate", onBack);
+    window.addEventListener("hashchange", onBack);
+
+    return () => {
+      document.removeEventListener("click", ensureEntries);
+      document.removeEventListener("touchend", ensureEntries);
+      window.removeEventListener("popstate", onBack);
+      window.removeEventListener("hashchange", onBack);
+    };
   }, []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
@@ -4947,7 +4963,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div ref={dbgRef} onClick={() => alert(localStorage.getItem("__wt_bk") || "no log")} style={{ position: "fixed", bottom: 2, right: 6, fontSize: 11, opacity: 0.8, zIndex: 99999, color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.7)", padding: "4px 8px", borderRadius: 4 }}>v14</div>
+      <div ref={dbgRef} style={{ position: "fixed", bottom: 2, right: 6, fontSize: 11, opacity: 0.7, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 6px", borderRadius: 3 }}>v15</div>
     </div>
   );
 }
