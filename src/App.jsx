@@ -1000,9 +1000,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     } catch (_) {}
   };
 
-  handleBackRef.current = () => {
+  handleBackRef.current = (source) => {
     backCountRef.current++;
-    dbg("v9 b:" + backCountRef.current);
+    dbg("v11 " + source + " b:" + backCountRef.current);
 
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
@@ -1021,46 +1021,57 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   useEffect(() => {
-    const standalone = window.matchMedia("(display-mode: standalone)").matches;
-    const hasNavApi = !!window.navigation;
     const el = document.getElementById("__wt_back_dbg");
     const show = (msg) => { if (el) el.textContent = msg; };
 
-    show("v10 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " init");
+    // Write diagnostic FIRST (before anything that could crash)
+    show("v11 init");
 
-    // Push buffer entries with pushState (no hash changes)
     try {
       history.replaceState(null, "", location.pathname + location.search);
       for (let i = 0; i < 5; i++) history.pushState({ wt: i }, "");
-    } catch (_) {}
+    } catch (err) {
+      show("v11 err:" + err.message);
+      return;
+    }
 
-    show("v10 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " h:" + history.length + " b:0");
+    const standalone = window.matchMedia("(display-mode: standalone)").matches;
+    show("v11 " + (standalone ? "S" : "B") + " h:" + history.length + " b:0");
 
     const repush = () => {
       try { history.pushState({ wt: "re" }, ""); } catch (_) {}
     };
 
-    // Use ONLY ONE handler to avoid double-fire.
-    // Navigation API is preferred (Chrome 102+); fall back to popstate.
+    // Dedup: both handlers may fire for the same back press
+    let lastBackTime = 0;
+    const fireBack = (source) => {
+      const now = Date.now();
+      if (now - lastBackTime < 300) return;
+      lastBackTime = now;
+      handleBackRef.current?.(source);
+      repush();
+    };
+
+    // popstate: fires on back/forward (the one that actually works for back press)
+    const onPopState = () => fireBack("P");
+    window.addEventListener("popstate", onPopState);
+
+    // Navigation API: intercept traverse to prevent app exit
+    let navCleanup = null;
     if (window.navigation) {
       const navHandler = (e) => {
         if (e.navigationType === "traverse" && e.canIntercept) {
-          e.intercept({ handler: async () => {
-            handleBackRef.current?.();
-            repush();
-          }});
+          e.intercept({ handler: async () => { fireBack("N"); } });
         }
       };
       window.navigation.addEventListener("navigate", navHandler);
-      return () => window.navigation.removeEventListener("navigate", navHandler);
-    } else {
-      const onPopState = () => {
-        handleBackRef.current?.();
-        repush();
-      };
-      window.addEventListener("popstate", onPopState);
-      return () => window.removeEventListener("popstate", onPopState);
+      navCleanup = () => window.navigation.removeEventListener("navigate", navHandler);
     }
+
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      navCleanup?.();
+    };
   }, []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
@@ -4952,7 +4963,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v10 loading</div>
+      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v11 loading</div>
     </div>
   );
 }
