@@ -116,23 +116,34 @@ export function ExerciseCatalogModal({
   }, []);
 
   // Back button override: detail → list → home → close
+  // Uses ownHandlerRef to avoid clobbering ExerciseDetailView's handler.
+  // No cleanup — the effect body handles all null cases, and cleanup
+  // between re-runs causes a race with the popstate handler.
+  const ownHandlerRef = useRef(null);
   useEffect(() => {
     if (!backOverrideRef) return;
     if (open && detailEntry) {
-      backOverrideRef.current = () => {
+      const handler = () => {
         setDetailEntry(null);
         setSlideDir(null);
         return true;
       };
+      backOverrideRef.current = handler;
+      ownHandlerRef.current = handler;
     } else if (open && view === "list") {
-      backOverrideRef.current = () => {
+      const handler = () => {
         goHome();
         return true;
       };
+      backOverrideRef.current = handler;
+      ownHandlerRef.current = handler;
     } else {
-      backOverrideRef.current = null;
+      // Only clear if we still own it — don't clobber other component's handler
+      if (backOverrideRef.current === ownHandlerRef.current) {
+        backOverrideRef.current = null;
+      }
+      ownHandlerRef.current = null;
     }
-    return () => { backOverrideRef.current = null; };
   }, [open, !!detailEntry, view, backOverrideRef, goHome]);
 
   // Two-step filter pipeline: structural filters → text search
@@ -277,11 +288,6 @@ export function ExerciseCatalogModal({
   };
 
   const invertFilter = colors.appBg.startsWith("#0") || colors.appBg.startsWith("#1") ? "invert(1)" : "none";
-
-  // --- List title ---
-  const listTitle = selectedMuscles.size > 0
-    ? [...selectedMuscles].map((m) => MUSCLE_LABELS[m]).filter(Boolean).join(" + ")
-    : "All Exercises";
 
   const isAddMode = !!targetWorkoutId;
   const modalTitle = isAddMode ? "Add Exercise" : "Exercise Catalog";
@@ -599,26 +605,20 @@ export function ExerciseCatalogModal({
     </div>
   );
 
-  // --- List view header with back arrow ---
+  // --- List view header ---
   const listHeaderContent = (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <button
-        onClick={goHome}
-        style={{
-          background: "transparent",
-          border: "none",
-          color: colors.text,
-          padding: 4,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-        }}
-        aria-label="Back"
-      >
-        <BackArrow />
-      </button>
-      <div style={styles.modalTitle}>{listTitle}</div>
+    <div style={{ ...styles.modalTitle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+      Exercises
     </div>
+  );
+  const listHeaderActions = (
+    <button
+      onClick={goHome}
+      style={{ ...styles.iconBtn, padding: 4 }}
+      aria-label="Back"
+    >
+      <BackArrow />
+    </button>
   );
 
   // Detail view: resolve position from the active result set
@@ -630,6 +630,7 @@ export function ExerciseCatalogModal({
         open={open && !detailEntry}
         title={view === "home" ? modalTitle : undefined}
         headerContent={view === "list" ? listHeaderContent : undefined}
+        headerActions={view === "list" ? listHeaderActions : undefined}
         onClose={onClose}
         styles={styles}
         footer={footer}

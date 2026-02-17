@@ -133,7 +133,7 @@ export const initialModalState = {
     catalogId: null,
     gifUrl: null,
   },
-  exerciseDetail: { isOpen: false, entry: null, entries: [] },
+  exerciseDetail: { isOpen: false, entry: null, entries: [], flipDir: "left" },
   social: { isOpen: false, tab: "friends" },
   friendSearch: { isOpen: false, query: "", results: [], searching: false },
   shareWorkout: {
@@ -570,6 +570,7 @@ export function modalReducer(state, action) {
           isOpen: true,
           entry: action.payload.entry,
           entries: action.payload.entries || [],
+          flipDir: action.payload.flipDir || "left",
         },
       };
 

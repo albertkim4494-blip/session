@@ -1254,9 +1254,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     openLog(ctx.workoutId, target);
   }, [modals.log.context, saveLogData, openLog]);
 
+  // Swipe left/right on log → flip to exercise detail; up/down → navigate exercises
+  const openDetailFromLog = useCallback((flipDir) => {
+    const ctx = modals.log.context;
+    if (!ctx?.catalogId) return;
+    const entry = catalogMap.get(ctx.catalogId);
+    if (!entry) return;
+    const exList = ctx.workoutExercises || [];
+    const entries = exList
+      .map((ex) => ex.catalogId ? catalogMap.get(ex.catalogId) : null)
+      .filter(Boolean);
+    dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry, entries, flipDir } });
+  }, [modals.log.context, catalogMap, dispatchModal]);
+
   const logSwipe = useSwipe({
-    onSwipeLeft: () => navLogExercise(1),
-    onSwipeRight: () => navLogExercise(-1),
+    onSwipeLeft: () => openDetailFromLog("left"),
+    onSwipeRight: () => openDetailFromLog("right"),
+    onSwipeUp: () => navLogExercise(1),
+    onSwipeDown: () => navLogExercise(-1),
   });
 
   const completeSet = useCallback(
@@ -4649,25 +4664,26 @@ function MoodPicker({ value, onChange, colors }) {
 // ============================================================================
 
 function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrideRef }) {
-  const { isOpen, entry, entries } = modals.exerciseDetail;
-  const [slideDir, setSlideDir] = React.useState(null);
-  const [flipping, setFlipping] = React.useState("in"); // "in" | "back" | null
+  const { isOpen, entry, entries, flipDir: openFlipDir } = modals.exerciseDetail;
+  const [flipping, setFlipping] = React.useState(null); // "in" | "back" | null
+  const [flipDir, setFlipDir] = React.useState("left"); // "left" | "right"
   const [showAfterFlip, setShowAfterFlip] = React.useState(false);
 
-  // When modal opens, start flip-in; when it closes externally, reset
+  // When modal opens, start flip-in with the requested direction
   React.useEffect(() => {
     if (isOpen) {
+      setFlipDir(openFlipDir || "left");
       setFlipping("in");
       setShowAfterFlip(true);
     } else {
       setShowAfterFlip(false);
       setFlipping(null);
     }
-  }, [isOpen]);
+  }, [isOpen, openFlipDir]);
 
-  // Back handler: play flip-back, then close after animation ends
-  const handleBack = React.useCallback(() => {
-    setSlideDir(null);
+  // Flip back to log — direction matches the swipe that triggered it
+  const handleBack = React.useCallback((dir) => {
+    setFlipDir(dir || "left");
     setFlipping("back");
     setTimeout(() => {
       setShowAfterFlip(false);
@@ -4684,7 +4700,7 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrid
   React.useEffect(() => {
     if (!backOverrideRef) return;
     if (isOpen) {
-      const handler = () => { handleBack(); return true; };
+      const handler = () => { handleBack("left"); return true; };
       backOverrideRef.current = handler;
       ownHandlerRef.current = handler;
     } else if (logIsOpen) {
@@ -4700,50 +4716,29 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrid
     }
   }, [isOpen, logIsOpen, backOverrideRef, handleBack, dispatchModal]);
 
-  const navigateDetail = React.useCallback((dir) => {
-    if (!entry || !entries.length) return;
-    const idx = entries.findIndex((e) => e.id === entry.id);
-    if (idx < 0) return;
-    const next = idx + dir;
-    if (next >= 0 && next < entries.length) {
-      setSlideDir(dir > 0 ? "left" : "right");
-      setFlipping(null); // swipe uses slide, not flip
-      dispatchModal({
-        type: "OPEN_EXERCISE_DETAIL",
-        payload: { entry: entries[next], entries },
-      });
-    }
-  }, [entry, entries, dispatchModal]);
-
+  // Swipe left/right → flip back to log with matching direction
   const swipeHandlers = useSwipe({
-    onSwipeLeft: () => navigateDetail(1),
-    onSwipeRight: () => navigateDetail(-1),
+    onSwipeLeft: () => handleBack("left"),
+    onSwipeRight: () => handleBack("right"),
     thresholdPx: 50,
   });
 
-  const position = entry && entries.length > 1
-    ? entries.findIndex((e) => e.id === entry.id) + 1
-    : 0;
-
-  // Determine sheet animation
+  // Determine sheet animation — direction matches the swipe
   const sheetAnimation = flipping === "in"
-    ? "cardFlipIn 0.4s ease-out"
+    ? `cardFlipIn${flipDir === "right" ? "Right" : "Left"} 0.4s ease-out`
     : flipping === "back"
-    ? "cardFlipBack 0.3s ease-in forwards"
+    ? `cardFlipOut${flipDir === "right" ? "Right" : "Left"} 0.3s ease-in forwards`
     : undefined;
 
   return (
     <ExerciseDetailModal
       open={showAfterFlip}
       entry={entry}
-      onBack={handleBack}
-      onClose={() => { setSlideDir(null); setShowAfterFlip(false); setFlipping(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); dispatchModal({ type: "CLOSE_LOG" }); }}
+      onBack={() => handleBack("left")}
+      onClose={() => { setShowAfterFlip(false); setFlipping(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); dispatchModal({ type: "CLOSE_LOG" }); }}
       styles={styles}
       colors={colors}
-      swipeHandlers={entries.length > 1 ? swipeHandlers : undefined}
-      slideDir={slideDir}
-      position={position}
-      total={entries.length}
+      swipeHandlers={swipeHandlers}
       sheetAnimation={sheetAnimation}
     />
   );
