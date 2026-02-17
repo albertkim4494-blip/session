@@ -1000,29 +1000,31 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // ---------------------------------------------------------------------------
   // BACK BUTTON / HISTORY MANAGEMENT
-  // Uses hash-based history entries (#wt-N) so the hashchange event fires on
-  // back navigation. hashchange is the most reliable event on Android standalone
-  // PWAs — popstate alone is insufficient because the browser can commit to
-  // exiting the PWA before the pushState inside popstate takes effect.
+  // Uses location.hash assignments to create "real" navigation entries that
+  // Chrome on Android reliably fires hashchange for on back-press.
+  // pushState-created hash entries are inconsistently handled by Android PWAs.
   // ---------------------------------------------------------------------------
   const hashCounterRef = useRef(0);
+  const hashSuppressRef = useRef(0);
+
+  // Push a hash entry using location.hash (fires hashchange — must be suppressed)
   const pushWt = () => {
-    try {
-      hashCounterRef.current++;
-      history.pushState({ wt: hashCounterRef.current }, "", "#wt" + hashCounterRef.current);
-    } catch (_) { /* pushState can throw during navigations — safe to ignore */ }
+    hashCounterRef.current++;
+    hashSuppressRef.current++;
+    try { location.hash = "#wt" + hashCounterRef.current; } catch (_) {}
   };
+
+  // Replace current entry (replaceState does NOT fire hashchange — no suppress)
   const replaceWt = () => {
     try {
-      history.replaceState({ wt: hashCounterRef.current }, "", "#wt" + hashCounterRef.current);
+      history.replaceState(null, "", "#wt" + hashCounterRef.current);
     } catch (_) {}
   };
 
-  // Push buffer entries on mount
+  // Push buffer entries on mount (20 entries for robust back-press absorption)
   useEffect(() => {
-    // Clean any stale hash from previous session
     history.replaceState(null, "", location.pathname + location.search);
-    for (let i = 0; i < 5; i++) pushWt();
+    for (let i = 0; i < 20; i++) pushWt();
   }, []);
 
   // When modals open/close, push/replace a hash entry
@@ -1065,27 +1067,31 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
     pushWt();
     pushWt();
+    pushWt();
   };
 
-  // Dedup: prevent hashchange + popstate from double-firing for the same back
-  const backGuardRef = useRef(0);
-  const handleBackOnce = () => {
-    const now = Date.now();
-    if (now - backGuardRef.current < 100) return;
-    backGuardRef.current = now;
-    handleBackRef.current();
-  };
-
-  // hashchange — fires when back navigates through hash-based entries
+  // hashchange — primary handler. Suppresses events we caused ourselves.
   useEffect(() => {
-    window.addEventListener("hashchange", handleBackOnce);
-    return () => window.removeEventListener("hashchange", handleBackOnce);
+    const onHashChange = () => {
+      if (hashSuppressRef.current > 0) {
+        hashSuppressRef.current--;
+        return;
+      }
+      handleBackRef.current();
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-  // popstate — backup for non-hash entries and browsers that fire popstate only
+  // popstate — backup for browsers that fire popstate but not hashchange
   useEffect(() => {
-    window.addEventListener("popstate", handleBackOnce);
-    return () => window.removeEventListener("popstate", handleBackOnce);
+    const onPopState = () => {
+      // Only run if hashchange didn't already handle it (suppress count is 0)
+      if (hashSuppressRef.current > 0) return;
+      handleBackRef.current();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
