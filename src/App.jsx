@@ -989,9 +989,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // ---------------------------------------------------------------------------
   // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
-  // Uses history.pushState to maintain a deep buffer of history entries.
-  // popstate fires on back-press; handler intercepts and replenishes.
-  // pushState does NOT fire popstate — no event cascade issues.
+  //
+  // Uses location.hash to create REAL navigation entries that Android Chrome's
+  // native canGoBack() reliably tracks (pushState-only entries may not count).
+  //
+  // Self-caused hashchange events are identified by comparing location.hash to
+  // the last hash we pushed (lastPushedHash). No counter needed — eliminates
+  // the event-cascade bug from the old suppress-counter approach.
   // ---------------------------------------------------------------------------
   const handleBackRef = useRef(null);
 
@@ -1014,24 +1018,33 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     // If already on train, do nothing (stays in app)
   };
 
-  // Mount: seed history buffer + attach popstate handler
+  // Mount: seed history buffer + attach hashchange handler
   useEffect(() => {
-    // Clear any leftover hash from previous sessions
-    history.replaceState({ wt: 0 }, "", location.pathname + location.search);
-    // Push buffer entries — deep back-button absorption
-    for (let i = 1; i <= 50; i++) {
-      history.pushState({ wt: i }, "");
-    }
+    let seq = 0;
+    let lastPushedHash = "";
 
-    const onPopState = () => {
-      handleBackRef.current?.();
-      // Replenish buffer (pushState does NOT fire popstate — safe here)
-      history.pushState({ wt: Date.now() }, "");
-      history.pushState({ wt: Date.now() + 1 }, "");
+    const pushEntry = () => {
+      seq++;
+      lastPushedHash = "#wt" + seq;
+      location.hash = lastPushedHash;
     };
 
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    // Clear any leftover hash from previous sessions
+    history.replaceState(null, "", location.pathname + location.search);
+
+    // Push buffer entries — real navigation entries Android tracks
+    for (let i = 0; i < 10; i++) pushEntry();
+
+    const onHashChange = () => {
+      // Self-caused: current hash matches what we just pushed — ignore
+      if (location.hash === lastPushedHash) return;
+      // User pressed back — handle and re-push
+      handleBackRef.current?.();
+      pushEntry();
+    };
+
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
