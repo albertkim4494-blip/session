@@ -998,10 +998,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   anyModalOpenRef.current = anyModalOpen;
 
   // Push buffer history entries on mount so rapid back-presses never exit PWA.
-  // Mobile browsers can queue multiple back-navigations before any popstate
-  // handler fires, so we need enough entries to absorb bursts.
   useEffect(() => {
     for (let i = 0; i < 5; i++) history.pushState({ app: true }, "");
+    // DEBUG: show which back-button API is active
+    try { document.getElementById("__back_dbg").textContent = "nav:" + !!window.navigation + " h=" + history.length; } catch(_){}
   }, []);
 
   // When modals open, push a {modal: true} history entry so the back button
@@ -1018,45 +1018,55 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, [anyModalOpen]);
 
-  useEffect(() => {
-    const handlePopState = () => {
-      // DEBUG: diagnostic toast — remove after confirming handler fires
-      const tag = anyModalOpenRef.current ? "modal" : "tab=" + tabRef.current;
-      document.title = "back:" + tag + " h=" + history.length;
-      try { document.getElementById("__back_dbg").textContent = "back:" + tag + " h=" + history.length; } catch(_){}
+  // Shared back-button handler used by both Navigation API and popstate
+  const handleBackRef = useRef(null);
+  handleBackRef.current = () => {
+    const tag = anyModalOpenRef.current ? "modal" : "tab=" + tabRef.current;
+    try { document.getElementById("__back_dbg").textContent = "back:" + tag + " h=" + history.length; } catch(_){}
 
-      // If any modal is open, close it instead of navigating away
-      if (anyModalOpenRef.current) {
-        // Check for sub-view override (e.g. detail view inside catalog)
-        if (backOverrideRef.current) {
-          try {
-            const handled = backOverrideRef.current();
-            if (handled === "close") {
-              // Override closed the modal — push {app} (not {modal})
-              modalHistoryRef.current = false;
-              history.pushState({ app: true }, "");
-              return;
-            }
-            if (handled) {
-              // Override handled it but modal stays open
-              history.pushState({ modal: true }, "");
-              return;
-            }
-          } catch (_) { /* fall through to CLOSE_ALL */ }
-        }
-        modalHistoryRef.current = false;
-        dispatchModal({ type: "CLOSE_ALL" });
-        history.pushState({ app: true }, "");
-        return;
+    if (anyModalOpenRef.current) {
+      if (backOverrideRef.current) {
+        try {
+          const handled = backOverrideRef.current();
+          if (handled === "close") {
+            modalHistoryRef.current = false;
+            history.pushState({ app: true }, "");
+            return;
+          }
+          if (handled) {
+            history.pushState({ modal: true }, "");
+            return;
+          }
+        } catch (_) { /* fall through to CLOSE_ALL */ }
       }
-      // No modal open — navigate to train tab first, then replenish buffer
-      if (tabRef.current !== "train") {
-        popstateNavigatingRef.current = true;
-        setTab("train");
+      modalHistoryRef.current = false;
+      dispatchModal({ type: "CLOSE_ALL" });
+      history.pushState({ app: true }, "");
+      return;
+    }
+    if (tabRef.current !== "train") {
+      popstateNavigatingRef.current = true;
+      setTab("train");
+    }
+    history.pushState({ app: true }, "");
+    history.pushState({ app: true }, "");
+  };
+
+  // Primary: Navigation API (Chrome 102+) — intercepts traverse before commit
+  useEffect(() => {
+    if (!window.navigation) return;
+    const onNavigate = (e) => {
+      if (e.navigationType === "traverse" && e.canIntercept) {
+        e.intercept({ handler() { handleBackRef.current(); } });
       }
-      history.pushState({ app: true }, "");
-      history.pushState({ app: true }, "");
     };
+    navigation.addEventListener("navigate", onNavigate);
+    return () => navigation.removeEventListener("navigate", onNavigate);
+  }, []);
+
+  // Fallback: popstate (Safari, Firefox, older Chrome)
+  useEffect(() => {
+    const handlePopState = () => { handleBackRef.current(); };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
