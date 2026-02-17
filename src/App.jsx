@@ -1046,10 +1046,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (buffer < 5) push();
     };
 
-    // touchstart fires before swipe handlers can stopPropagation
-    document.addEventListener("touchstart", ensureEntries, { passive: true });
+    // pointerdown: fires at start of any touch/mouse, has user activation
+    // (touchstart does NOT trigger user activation — Chrome skips those entries)
+    document.addEventListener("pointerdown", ensureEntries, { passive: true });
     document.addEventListener("click", ensureEntries, { passive: true });
-    document.addEventListener("touchend", ensureEntries, { passive: true });
 
     // Listen to both popstate and hashchange for back press
     let lastBackTime = 0;
@@ -1066,9 +1066,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     window.addEventListener("hashchange", onBack);
 
     return () => {
-      document.removeEventListener("touchstart", ensureEntries);
+      document.removeEventListener("pointerdown", ensureEntries);
       document.removeEventListener("click", ensureEntries);
-      document.removeEventListener("touchend", ensureEntries);
       window.removeEventListener("popstate", onBack);
       window.removeEventListener("hashchange", onBack);
     };
