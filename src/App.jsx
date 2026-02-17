@@ -989,97 +989,95 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // ---------------------------------------------------------------------------
   // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
-  //
-  // Three-layer defense:
-  //   1. Navigation API intercept() — Chrome 102+, handles Android 13+
-  //      predictive back gesture. Only registered if API exists.
-  //   2. hashchange — catches hash-based back navigation.
-  //   3. popstate — fallback for any remaining edge cases.
-  //
-  // Layers 2+3 only registered if Navigation API is unavailable.
-  // Hash buffer entries ensure canGoBack() returns true for all layers.
   // ---------------------------------------------------------------------------
   const handleBackRef = useRef(null);
   const backCountRef = useRef(0);
 
   handleBackRef.current = () => {
-    // Update diagnostic counter
     backCountRef.current++;
     try {
       const el = document.getElementById("__wt_back_dbg");
-      if (el) el.textContent = "v7 b:" + backCountRef.current;
+      if (el) el.textContent = "v8 b:" + backCountRef.current;
     } catch (_) {}
 
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
           const result = backOverrideRef.current();
-          if (result) return; // Override handled it (true = navigated within modal, "close" = closed modal)
-        } catch (_) { /* fall through to CLOSE_ALL */ }
+          if (result) return;
+        } catch (_) {}
       }
       dispatchModal({ type: "CLOSE_ALL" });
       return;
     }
-    // No modal open — navigate to train tab if not already there
     if (tabRef.current !== "train") {
       setTab("train");
       sessionStorage.setItem("wt_tab", "train");
     }
-    // If already on train, do nothing (stays in app)
   };
 
   useEffect(() => {
+    // --- Diagnostics: write status to the indicator ---
+    const standalone = window.matchMedia("(display-mode: standalone)").matches;
+    const hasNavApi = !!window.navigation;
+
     let seq = 0;
     let lastPushedHash = "";
 
-    const pushEntry = () => {
+    const pushHash = () => {
       seq++;
       lastPushedHash = "#wt" + seq;
       location.hash = lastPushedHash;
     };
 
-    // Clear any leftover hash from previous sessions
+    // Clear leftover hash
     history.replaceState(null, "", location.pathname + location.search);
 
-    // Push buffer entries — real navigation entries for canGoBack()
-    for (let i = 0; i < 50; i++) pushEntry();
+    // Push buffer entries
+    for (let i = 0; i < 50; i++) pushHash();
 
-    // ---- Layer 1: Navigation API (Chrome 102+) ----
-    // intercept() on traverse navigations lets us handle back presses.
-    // This is the ONLY reliable method on Android 13+ with predictive back.
+    // Write diagnostics after entries are pushed
+    const hLen = history.length;
+    try {
+      const el = document.getElementById("__wt_back_dbg");
+      if (el) el.textContent = "v8 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " h:" + hLen + " b:0";
+    } catch (_) {}
+
+    // --- Navigation API (Chrome 102+) ---
     if (window.navigation) {
       window.navigation.addEventListener("navigate", (e) => {
         if (e.navigationType === "traverse" && e.canIntercept) {
           e.intercept({
             handler: async () => {
               handleBackRef.current?.();
-              // Replenish buffer after traversal commits
               await new Promise((r) => setTimeout(r, 50));
-              try { pushEntry(); } catch (_) {}
+              try { pushHash(); } catch (_) {}
             },
           });
         }
       });
-      // Navigation API handles everything — no need for hashchange/popstate
-      return;
     }
 
-    // ---- Layers 2+3: hashchange + popstate (older browsers) ----
+    // --- hashchange + popstate (always registered as additional safety) ---
     const isSelfCaused = () => location.hash === lastPushedHash;
-
-    const onBack = () => {
-      handleBackRef.current?.();
-      pushEntry();
-    };
-
+    const onBack = () => { handleBackRef.current?.(); pushHash(); };
     const onHashChange = () => { if (!isSelfCaused()) onBack(); };
     const onPopState = () => { if (!isSelfCaused()) onBack(); };
 
     window.addEventListener("hashchange", onHashChange);
     window.addEventListener("popstate", onPopState);
+
+    // --- beforeunload: signal to Chrome that we care about navigation ---
+    const onBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+
     return () => {
       window.removeEventListener("hashchange", onHashChange);
       window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, []);
 
@@ -4972,7 +4970,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 9, opacity: 0.5, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace" }}>v7 b:0</div>
+      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v8 loading</div>
     </div>
   );
 }
