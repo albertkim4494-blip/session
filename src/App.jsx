@@ -192,7 +192,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logDetailBodyRef = useRef(null);
   const logNavAnimRef = useRef(null);
   const logCardRef = useRef(null);
-  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, scrollSnap: null, verticalMoves: 0 });
+  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, scrollSnap: null });
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -1350,12 +1350,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     d.captured = false;
     d.direction = 0;
     d.isHorizontal = false;
-    d.verticalMoves = 0;
     d.scrollEl = scrollEl;
     d.scrollSnap = scrollEl ? { top: scrollEl.scrollTop, height: scrollEl.scrollHeight, client: scrollEl.clientHeight } : null;
   }, []);
 
-  // Non-passive touchmove on card wrapper (allows preventDefault to stop scroll)
+  // Passive touchmove on card wrapper — passive so it never blocks compositor-
+  // threaded scrolling of child elements.  We prevent scroll during drag capture
+  // by setting overflow:hidden on the scroll element instead of preventDefault().
   useEffect(() => {
     const el = logCardRef.current;
     if (!el) return;
@@ -1379,15 +1380,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       // Vertical drag — check scroll boundary + canNav
       if (!d.captured) {
-        d.verticalMoves++;
-        // Defer capture: let the browser scroll for one cycle first so we can
-        // reliably detect whether the inner content actually scrolled.
-        // Non-passive listeners block the browser from scrolling until we return,
-        // so on the very first vertical move scrollTop is still stale.
-        if (d.verticalMoves < 2) return;
         const snap = d.scrollSnap;
         const scrollEl = d.scrollEl;
         if (!snap) return;
+        // Check if inner content has scrolled since touchstart — if so, user is
+        // scrolling normally, bail out and let the browser handle it.
         const scrollMoved = scrollEl ? Math.abs(scrollEl.scrollTop - snap.top) > 2 : false;
         if (scrollMoved) { d.active = false; return; }
         const direction = dy < 0 ? 1 : -1; // swipe up = next (+1), swipe down = prev (-1)
@@ -1397,16 +1394,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (!atBoundary) { d.active = false; return; }
         const target = canNavLogExercise(direction);
         if (!target) { d.active = false; return; }
-        // Capture the drag
+        // Capture the drag — lock scroll via overflow:hidden (no preventDefault needed)
         d.captured = true;
         d.direction = direction;
-        if (scrollEl) scrollEl.style.overflow = "hidden";
+        if (scrollEl) { scrollEl.style.overflow = "hidden"; scrollEl.style.overscrollBehavior = "none"; }
         const card = logCardRef.current;
         if (card) card.style.willChange = "transform, opacity";
       }
 
       // Drag captured — update card transform
-      e.preventDefault();
       d.currentY = t.clientY;
       const rawDy = t.clientY - d.startY;
       const screenH = window.innerHeight;
@@ -1417,10 +1413,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const card = logCardRef.current;
       if (card) {
         card.style.transform = `translateY(${rawDy}px) rotate(${rotation}deg) scale(${scale})`;
-        card.style.opacity = opacity;
+        card.style.opacity = String(opacity);
       }
     };
-    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchmove", onMove, { passive: true });
     return () => el.removeEventListener("touchmove", onMove);
   }, [canNavLogExercise]);
 
@@ -1433,6 +1429,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     // Restore scroll on captured drags
     if (d.captured && d.scrollEl) {
       d.scrollEl.style.overflow = "";
+      d.scrollEl.style.overscrollBehavior = "";
     }
 
     // Horizontal swipe — trigger flip
@@ -1518,7 +1515,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const logTouchCancel = useCallback(() => {
     const d = logDragRef.current;
-    if (d.captured && d.scrollEl) d.scrollEl.style.overflow = "";
+    if (d.captured && d.scrollEl) { d.scrollEl.style.overflow = ""; d.scrollEl.style.overscrollBehavior = ""; }
     d.active = false;
     d.captured = false;
     const card = logCardRef.current;
