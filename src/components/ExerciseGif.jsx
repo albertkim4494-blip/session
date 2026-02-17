@@ -1,12 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
   const [status, setStatus] = useState("loading"); // "loading" | "loaded" | "error"
+  const imgRef = useRef(null);
 
-  // Reset status whenever gifUrl changes
+  // Reset status whenever gifUrl changes and check if already cached
   useEffect(() => {
-    if (gifUrl) {
-      setStatus("loading");
+    if (!gifUrl) return;
+    setStatus("loading");
+    // If the image is already cached, onLoad may not fire — check complete
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      setStatus("loaded");
     }
   }, [gifUrl]);
 
@@ -31,6 +36,7 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
           borderRadius: 12,
           overflow: "hidden",
           position: "relative",
+          background: "transparent",
         }}
       >
         {/* Loading skeleton */}
@@ -41,7 +47,7 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
               inset: 0,
               background: isDark
                 ? "linear-gradient(110deg, rgba(255,255,255,0.04) 30%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 70%)"
-                : "linear-gradient(110deg, #f0f0f0 30%, #e0e0e0 50%, #f0f0f0 70%)",
+                : "linear-gradient(110deg, rgba(0,0,0,0.04) 30%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 70%)",
               backgroundSize: "200% 100%",
               animation: "shimmer 1.5s infinite",
               borderRadius: 12,
@@ -50,17 +56,16 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
         )}
 
         <img
+          ref={imgRef}
+          key={gifUrl}
           src={gifUrl}
           alt={`${exerciseName} demonstration`}
           style={{
             width: "100%",
             height: "100%",
             objectFit: "contain",
-            // Dark theme: invert the GIF (white bg→black, dark figure→light) then screen (black→transparent)
-            // Light theme: multiply (white→transparent, dark figure stays)
             filter: isDark ? "invert(1)" : "none",
             mixBlendMode: isDark ? "screen" : "multiply",
-            // Use opacity instead of display:none — display:none prevents onLoad from firing in some browsers
             opacity: status === "loaded" ? 1 : 0,
             transition: "opacity 0.25s ease-out",
             position: status === "loaded" ? "static" : "absolute",
