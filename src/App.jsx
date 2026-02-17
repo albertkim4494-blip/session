@@ -1050,6 +1050,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       }
     };
 
+    // touchstart fires before swipe handlers can stopPropagation
+    document.addEventListener("touchstart", ensureEntries, { passive: true });
     document.addEventListener("click", ensureEntries, { passive: true });
     document.addEventListener("touchend", ensureEntries, { passive: true });
 
@@ -1067,6 +1069,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     window.addEventListener("hashchange", onBack);
 
     return () => {
+      document.removeEventListener("touchstart", ensureEntries);
       document.removeEventListener("click", ensureEntries);
       document.removeEventListener("touchend", ensureEntries);
       window.removeEventListener("popstate", onBack);
