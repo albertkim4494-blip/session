@@ -193,7 +193,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logNavAnimRef = useRef(null);
   const logCardRef = useRef(null);
   const logFooterRef = useRef(null);
-  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, captureY: 0, inSwipeZone: false });
+  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, captureY: 0, swipeZone: null });
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -1334,9 +1334,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, []);
 
   // --- Real-time drag-to-navigate touch system ---
-  // Navigation swipes only work from the Save/Cancel footer area.
-  // Scroll area is completely untouched — no scroll detection needed.
-  // Horizontal swipe (flip) works from anywhere on the card.
+  // Swipe DOWN (prev): works from anywhere — header, footer, or scroll body when at top
+  // Swipe UP (next): footer only — avoids bottom-boundary scroll conflicts
+  // Horizontal swipe (flip): works from anywhere on the card
   const logTouchStart = useCallback((e) => {
     if (logNavAnimRef.current) return;
     const angle = logFlipAngleRef.current;
@@ -1353,12 +1353,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     d.direction = 0;
     d.isHorizontal = false;
     d.captureY = 0;
-    // Only enable vertical nav swipe from footer area (not when flipped)
-    d.inSwipeZone = !isFlipped && !!logFooterRef.current?.contains(e.target);
+    // Determine swipe zone (disabled when flipped)
+    if (isFlipped) {
+      d.swipeZone = null;
+    } else if (logFooterRef.current?.contains(e.target)) {
+      d.swipeZone = "footer"; // allows both up and down
+    } else {
+      d.swipeZone = "body"; // allows down (prev) only, when at scroll top
+    }
   }, []);
 
-  // Touchmove — simple: if touch started in footer swipe zone, track vertical drag.
-  // No scroll boundary detection needed since footer is not scrollable.
+  // Touchmove handler:
+  // - Footer zone: capture immediately for either direction
+  // - Body zone: only capture swipe-down when scrollTop ≈ 0 (trivially reliable)
   useEffect(() => {
     const el = logCardRef.current;
     if (!el) return;
@@ -1380,11 +1387,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       }
       if (d.isHorizontal) return;
 
-      // Vertical — only if touch started in footer swipe zone
-      if (!d.inSwipeZone) { d.active = false; return; }
+      if (!d.swipeZone) { d.active = false; return; }
 
       if (!d.captured) {
-        const direction = dy < 0 ? 1 : -1; // finger up = next, finger down = prev
+        const direction = dy < 0 ? 1 : -1; // finger up = next(1), finger down = prev(-1)
+
+        if (d.swipeZone === "body") {
+          // Body zone: only allow swipe down (prev) when at scroll top
+          if (direction !== -1) { d.active = false; return; }
+          const scrollEl = logBodyRef.current;
+          if (!scrollEl || scrollEl.scrollTop > 5) { d.active = false; return; }
+        }
+
         const target = canNavLogExercise(direction);
         if (!target) { d.active = false; return; }
         d.captured = true;
