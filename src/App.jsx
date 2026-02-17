@@ -1023,47 +1023,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   useEffect(() => {
     const standalone = window.matchMedia("(display-mode: standalone)").matches;
     const hasNavApi = !!window.navigation;
+    const el = document.getElementById("__wt_back_dbg");
+    const show = (msg) => { if (el) el.textContent = msg; };
 
-    // Write diagnostics IMMEDIATELY (before any history manipulation)
-    dbg("v9 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " init");
+    show("v10 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " init");
 
-    // Use pushState (NOT location.hash) to avoid crash from rapid hash changes
-    // and to avoid false hashchange events on user interaction
-    let pushCount = 0;
+    // Push buffer entries with pushState (no hash changes)
     try {
-      // Clear any leftover hash
       history.replaceState(null, "", location.pathname + location.search);
-      // Push buffer entries — pushState creates history entries without hash changes
-      for (let i = 0; i < 5; i++) {
-        history.pushState({ wt: i }, "");
-        pushCount++;
-      }
-    } catch (err) {
-      dbg("v9 push-err:" + err.message);
-    }
+      for (let i = 0; i < 5; i++) history.pushState({ wt: i }, "");
+    } catch (_) {}
 
-    dbg("v9 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " h:" + history.length + " p:" + pushCount);
+    show("v10 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " h:" + history.length + " b:0");
 
-    // Track whether we're pushing (to ignore self-caused popstate)
-    let pushing = false;
     const repush = () => {
-      pushing = true;
       try { history.pushState({ wt: "re" }, ""); } catch (_) {}
-      pushing = false;
     };
 
-    // --- popstate: fires when user navigates back ---
-    const onPopState = () => {
-      if (pushing) return;
-      handleBackRef.current?.();
-      repush();
-    };
-    window.addEventListener("popstate", onPopState);
-
-    // --- Navigation API (Chrome 102+) ---
-    let navHandler = null;
+    // Use ONLY ONE handler to avoid double-fire.
+    // Navigation API is preferred (Chrome 102+); fall back to popstate.
     if (window.navigation) {
-      navHandler = (e) => {
+      const navHandler = (e) => {
         if (e.navigationType === "traverse" && e.canIntercept) {
           e.intercept({ handler: async () => {
             handleBackRef.current?.();
@@ -1072,14 +1052,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }
       };
       window.navigation.addEventListener("navigate", navHandler);
+      return () => window.navigation.removeEventListener("navigate", navHandler);
+    } else {
+      const onPopState = () => {
+        handleBackRef.current?.();
+        repush();
+      };
+      window.addEventListener("popstate", onPopState);
+      return () => window.removeEventListener("popstate", onPopState);
     }
-
-    return () => {
-      window.removeEventListener("popstate", onPopState);
-      if (window.navigation && navHandler) {
-        window.navigation.removeEventListener("navigate", navHandler);
-      }
-    };
   }, []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
@@ -4971,7 +4952,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v9 loading</div>
+      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v10 loading</div>
     </div>
   );
 }
