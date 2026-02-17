@@ -4560,7 +4560,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         logsByDate={state.logsByDate}
         targetWorkoutId={modals.catalogBrowse.workoutId}
         backOverrideRef={backOverrideRef}
-        onDeleteCustomExercise={(entry) => {
+        onDeleteCustomExercise={(entry, onDeleted) => {
           // Count usages across program workouts and daily workouts
           let usages = 0;
           for (const w of state.program?.workouts || []) {
@@ -4591,6 +4591,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 });
                 showToast(`"${entry.name}" deleted`);
                 dispatchModal({ type: "CLOSE_CONFIRM" });
+                onDeleted?.();
               },
             },
           });
