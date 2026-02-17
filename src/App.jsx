@@ -192,7 +192,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logDetailBodyRef = useRef(null);
   const logNavAnimRef = useRef(null);
   const logCardRef = useRef(null);
-  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, lastY: 0, lastScrollTop: 0, captureY: 0 });
+  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, lastScrollTop: 0, captureY: 0, boundaryAnchorY: 0 });
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -1347,11 +1347,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     d.startY = t.clientY;
     d.startX = t.clientX;
     d.currentY = t.clientY;
-    d.lastY = t.clientY;
     d.captured = false;
     d.direction = 0;
     d.isHorizontal = false;
     d.captureY = 0;
+    d.boundaryAnchorY = 0;
     d.scrollEl = scrollEl;
     d.lastScrollTop = scrollEl ? scrollEl.scrollTop : 0;
   }, []);
@@ -1371,41 +1371,42 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const dy = t.clientY - d.startY;
 
       // Axis detection: first 10px decides horizontal vs vertical
-      if (!d.captured && !d.isHorizontal && Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-        d.lastY = t.clientY;
-        return;
-      }
+      if (!d.captured && !d.isHorizontal && Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
       if (!d.captured && !d.isHorizontal) {
         if (Math.abs(dx) > Math.abs(dy)) {
           d.isHorizontal = true;
-          d.lastY = t.clientY;
           return;
         }
       }
-      if (d.isHorizontal) { d.lastY = t.clientY; return; }
+      if (d.isHorizontal) return;
 
-      // Vertical — use LIVE scroll position to detect boundaries
+      // Vertical — use LIVE scroll position + anchor-based capture
       if (!d.captured) {
         const scrollEl = d.scrollEl;
-        if (!scrollEl) { d.lastY = t.clientY; return; }
+        if (!scrollEl) return;
         const currentTop = scrollEl.scrollTop;
-        // If content is actively scrolling, don't capture — keep monitoring
+        // If content scrolled since last frame, user is scrolling — reset anchor
         const scrolling = Math.abs(currentTop - d.lastScrollTop) > 1;
         d.lastScrollTop = currentTop;
-        if (scrolling) { d.lastY = t.clientY; return; }
+        if (scrolling) { d.boundaryAnchorY = 0; return; }
 
-        // Content not scrolling — check if at a boundary
+        // Scroll has stopped — check if at a boundary
         const atTop = currentTop <= 5;
         const atBottom = currentTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 5;
-        // Direction from recent finger movement (not from touchstart)
-        const recentDy = t.clientY - d.lastY;
-        d.lastY = t.clientY;
-        const direction = recentDy > 3 ? -1 : recentDy < -3 ? 1 : 0;
-        if (direction === 0) return; // jitter, keep watching
+        if (!atTop && !atBottom) { d.boundaryAnchorY = 0; return; }
+
+        // At a boundary — set anchor on first stopped frame
+        if (!d.boundaryAnchorY) { d.boundaryAnchorY = t.clientY; return; }
+
+        // Accumulate movement from anchor (tolerates slow swipes)
+        const totalDy = t.clientY - d.boundaryAnchorY;
+        if (Math.abs(totalDy) < 10) return; // need 10px of deliberate movement
+
+        const direction = totalDy > 0 ? -1 : 1; // finger down = prev, finger up = next
         const atBoundary = direction > 0 ? atBottom : atTop;
-        if (!atBoundary) return; // not at the right boundary, keep watching
+        if (!atBoundary) { d.boundaryAnchorY = 0; return; }
         const target = canNavLogExercise(direction);
-        if (!target) return; // no target exercise, keep watching
+        if (!target) return;
 
         // Capture — lock scroll and start tracking
         d.captured = true;
@@ -1414,11 +1415,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (scrollEl) { scrollEl.style.overflow = "hidden"; scrollEl.style.overscrollBehavior = "none"; }
         const card = logCardRef.current;
         if (card) card.style.willChange = "transform, opacity";
-        return; // start tracking from next frame
+        return;
       }
 
       // Drag captured — update card transform
-      d.lastY = t.clientY;
       d.currentY = t.clientY;
       const rawDy = t.clientY - d.captureY;
       const screenH = window.innerHeight;
