@@ -4712,7 +4712,7 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors }) {
       open={isOpen}
       entry={entry}
       onBack={() => { setSlideDir(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); }}
-      onClose={() => { setSlideDir(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); }}
+      onClose={() => { setSlideDir(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); dispatchModal({ type: "CLOSE_LOG" }); }}
       styles={styles}
       colors={colors}
       swipeHandlers={entries.length > 1 ? swipeHandlers : undefined}
