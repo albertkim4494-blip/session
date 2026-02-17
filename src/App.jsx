@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
+import { setBackHandler } from "./lib/backHandler";
 import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
 import { supabase } from "./lib/supabase";
 import { fetchCoachInsights } from "./lib/coachApi";
@@ -988,18 +989,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   anyModalOpenRef.current = anyModalOpen;
 
   // ---------------------------------------------------------------------------
-  // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
-  //
-  // Uses location.hash to create REAL navigation entries that Android Chrome's
-  // native canGoBack() reliably tracks (pushState-only entries may not count).
-  //
-  // Self-caused hashchange events are identified by comparing location.hash to
-  // the last hash we pushed (lastPushedHash). No counter needed — eliminates
-  // the event-cascade bug from the old suppress-counter approach.
+  // BACK BUTTON — handler registration (history mgmt is in lib/backHandler.js)
+  // setBackHandler runs on every render to keep closure over current refs.
   // ---------------------------------------------------------------------------
-  const handleBackRef = useRef(null);
-
-  handleBackRef.current = () => {
+  setBackHandler(() => {
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
@@ -1016,36 +1009,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       sessionStorage.setItem("wt_tab", "train");
     }
     // If already on train, do nothing (stays in app)
-  };
+  });
 
-  // Mount: seed history buffer + attach hashchange handler
-  useEffect(() => {
-    let seq = 0;
-    let lastPushedHash = "";
-
-    const pushEntry = () => {
-      seq++;
-      lastPushedHash = "#wt" + seq;
-      location.hash = lastPushedHash;
-    };
-
-    // Clear any leftover hash from previous sessions
-    history.replaceState(null, "", location.pathname + location.search);
-
-    // Push buffer entries — real navigation entries Android tracks
-    for (let i = 0; i < 10; i++) pushEntry();
-
-    const onHashChange = () => {
-      // Self-caused: current hash matches what we just pushed — ignore
-      if (location.hash === lastPushedHash) return;
-      // User pressed back — handle and re-push
-      handleBackRef.current?.();
-      pushEntry();
-    };
-
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
+  // Clear back handler on unmount
+  useEffect(() => () => setBackHandler(null), []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
   const logBackHandlerRef = useRef(null);
