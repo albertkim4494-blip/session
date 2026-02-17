@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
 import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
 import { supabase } from "./lib/supabase";
 import { fetchCoachInsights } from "./lib/coachApi";
@@ -876,18 +876,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
 
 
-  const popstateNavigatingRef = useRef(false);
   useEffect(() => {
     sessionStorage.setItem("wt_tab", tab);
-    // Push a hash entry for UI-initiated tab switches (button click, swipe)
-    // so the back button has something to consume instead of exiting the PWA.
-    // Skip when the tab change was triggered by the back handler itself.
-    if (popstateNavigatingRef.current) {
-      popstateNavigatingRef.current = false;
-    } else if (hashCounterRef.current > 0) {
-      // Only push after mount (hashCounterRef > 0 means buffer entries exist)
-      pushWt();
-    }
   }, [tab]);
 
   useEffect(() => {
@@ -993,103 +983,53 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     modals.social?.isOpen || modals.friendSearch?.isOpen ||
     modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen;
 
-  const modalHistoryRef = useRef(false);
   const backOverrideRef = useRef(null);
   const anyModalOpenRef = useRef(false);
   anyModalOpenRef.current = anyModalOpen;
 
   // ---------------------------------------------------------------------------
-  // BACK BUTTON / HISTORY MANAGEMENT
-  // Uses location.hash assignments to create "real" navigation entries that
-  // Chrome on Android reliably fires hashchange for on back-press.
-  // pushState-created hash entries are inconsistently handled by Android PWAs.
+  // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
+  // Uses history.pushState to maintain a deep buffer of history entries.
+  // popstate fires on back-press; handler intercepts and replenishes.
+  // pushState does NOT fire popstate — no event cascade issues.
   // ---------------------------------------------------------------------------
-  const hashCounterRef = useRef(0);
-  const hashSuppressRef = useRef(0);
-
-  // Push a hash entry using location.hash (fires hashchange — must be suppressed)
-  const pushWt = () => {
-    hashCounterRef.current++;
-    hashSuppressRef.current++;
-    try { location.hash = "#wt" + hashCounterRef.current; } catch (_) {}
-  };
-
-  // Replace current entry (replaceState does NOT fire hashchange — no suppress)
-  const replaceWt = () => {
-    try {
-      history.replaceState(null, "", "#wt" + hashCounterRef.current);
-    } catch (_) {}
-  };
-
-  // Push buffer entries on mount (20 entries for robust back-press absorption)
-  useEffect(() => {
-    history.replaceState(null, "", location.pathname + location.search);
-    for (let i = 0; i < 20; i++) pushWt();
-  }, []);
-
-  // When modals open/close, push/replace a hash entry
-  useLayoutEffect(() => {
-    if (anyModalOpen && !modalHistoryRef.current) {
-      pushWt();
-      modalHistoryRef.current = true;
-    } else if (!anyModalOpen && modalHistoryRef.current) {
-      modalHistoryRef.current = false;
-      replaceWt();
-    }
-  }, [anyModalOpen]);
-
-  // Shared back-button handler
   const handleBackRef = useRef(null);
+
   handleBackRef.current = () => {
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
-          const handled = backOverrideRef.current();
-          if (handled === "close") {
-            modalHistoryRef.current = false;
-            pushWt();
-            return;
-          }
-          if (handled) {
-            pushWt();
-            return;
-          }
+          const result = backOverrideRef.current();
+          if (result) return; // Override handled it (true = navigated within modal, "close" = closed modal)
         } catch (_) { /* fall through to CLOSE_ALL */ }
       }
-      modalHistoryRef.current = false;
       dispatchModal({ type: "CLOSE_ALL" });
-      pushWt();
       return;
     }
+    // No modal open — navigate to train tab if not already there
     if (tabRef.current !== "train") {
-      popstateNavigatingRef.current = true;
       setTab("train");
+      sessionStorage.setItem("wt_tab", "train");
     }
-    pushWt();
-    pushWt();
-    pushWt();
+    // If already on train, do nothing (stays in app)
   };
 
-  // hashchange — primary handler. Suppresses events we caused ourselves.
+  // Mount: seed history buffer + attach popstate handler
   useEffect(() => {
-    const onHashChange = () => {
-      if (hashSuppressRef.current > 0) {
-        hashSuppressRef.current--;
-        return;
-      }
-      handleBackRef.current();
-    };
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
+    // Clear any leftover hash from previous sessions
+    history.replaceState({ wt: 0 }, "", location.pathname + location.search);
+    // Push buffer entries — deep back-button absorption
+    for (let i = 1; i <= 50; i++) {
+      history.pushState({ wt: i }, "");
+    }
 
-  // popstate — backup for browsers that fire popstate but not hashchange
-  useEffect(() => {
     const onPopState = () => {
-      // Only run if hashchange didn't already handle it (suppress count is 0)
-      if (hashSuppressRef.current > 0) return;
-      handleBackRef.current();
+      handleBackRef.current?.();
+      // Replenish buffer (pushState does NOT fire popstate — safe here)
+      history.pushState({ wt: Date.now() }, "");
+      history.pushState({ wt: Date.now() + 1 }, "");
     };
+
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
