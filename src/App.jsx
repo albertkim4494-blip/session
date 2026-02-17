@@ -192,7 +192,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logDetailBodyRef = useRef(null);
   const logNavAnimRef = useRef(null);
   const logCardRef = useRef(null);
-  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, scrollSnap: null });
+  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, scrollSnap: null, verticalMoves: 0 });
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -1350,6 +1350,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     d.captured = false;
     d.direction = 0;
     d.isHorizontal = false;
+    d.verticalMoves = 0;
     d.scrollEl = scrollEl;
     d.scrollSnap = scrollEl ? { top: scrollEl.scrollTop, height: scrollEl.scrollHeight, client: scrollEl.clientHeight } : null;
   }, []);
@@ -1378,10 +1379,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       // Vertical drag — check scroll boundary + canNav
       if (!d.captured) {
+        d.verticalMoves++;
+        // Defer capture: let the browser scroll for one cycle first so we can
+        // reliably detect whether the inner content actually scrolled.
+        // Non-passive listeners block the browser from scrolling until we return,
+        // so on the very first vertical move scrollTop is still stale.
+        if (d.verticalMoves < 2) return;
         const snap = d.scrollSnap;
         const scrollEl = d.scrollEl;
         if (!snap) return;
-        const scrollMoved = scrollEl ? Math.abs(scrollEl.scrollTop - snap.top) > 5 : false;
+        const scrollMoved = scrollEl ? Math.abs(scrollEl.scrollTop - snap.top) > 2 : false;
         if (scrollMoved) { d.active = false; return; }
         const direction = dy < 0 ? 1 : -1; // swipe up = next (+1), swipe down = prev (-1)
         const atBoundary = direction > 0
@@ -1508,6 +1515,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       }, 450);
     }
   }, [canNavLogExercise, swapLogExercise, flipLogToDetail, flipLogToFront]);
+
+  const logTouchCancel = useCallback(() => {
+    const d = logDragRef.current;
+    if (d.captured && d.scrollEl) d.scrollEl.style.overflow = "";
+    d.active = false;
+    d.captured = false;
+    const card = logCardRef.current;
+    if (card) { card.style.transform = ""; card.style.opacity = ""; card.style.transition = ""; card.style.willChange = ""; }
+    logNavAnimRef.current = null;
+  }, []);
 
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId) => {
@@ -3525,6 +3542,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           ref={logCardRef}
           onTouchStart={logTouchStart}
           onTouchEnd={logTouchEnd}
+          onTouchCancel={logTouchCancel}
           style={{ perspective: 1200, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
         >
           <div style={{
