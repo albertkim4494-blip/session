@@ -1311,15 +1311,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logSwipe = useSwipe({
     onSwipeLeft: () => flipLogToDetail("left"),
     onSwipeRight: () => flipLogToDetail("right"),
-    onSwipeUp: () => navLogExercise(1),
-    onSwipeDown: () => navLogExercise(-1),
   });
 
   const logDetailSwipe = useSwipe({
     onSwipeLeft: () => flipLogToFront(),
     onSwipeRight: () => flipLogToFront(),
-    onSwipeUp: () => {},
-    onSwipeDown: () => {},
     thresholdPx: 50,
   });
 
@@ -3253,97 +3249,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* MODALS */}
 
       {/* Log Modal */}
-      <Modal open={modals.log.isOpen} headerContent={(() => {
-        const hCtx = modals.log.context;
-        if (logFlipped) {
-          return (
-            <div style={{ ...styles.modalTitle, display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hCtx?.exerciseName || "Detail"}</span>
-            </div>
-          );
-        }
-        return (
-        <div style={{ ...styles.modalTitle, cursor: hCtx?.catalogId ? "pointer" : "default", display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}
-          onClick={() => flipLogToDetail("left")}
-        >
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hCtx?.exerciseName || "Log"}</span>
-          {hCtx?.catalogId && (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35, flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-          )}
-        </div>
-        );
-      })()
-      } onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); setLogFlipped(false); setLogFlipAngle(0); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} headerActions={modals.log.isOpen ? (() => {
-        if (logFlipped) {
-          return (
-            <button
-              onClick={() => flipLogToFront()}
-              style={{ ...styles.iconBtn, padding: 4 }}
-              aria-label="Back to log"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-          );
-        }
-        const hEx = modals.log.context?.exerciseId;
-        let hExObj = null;
-        if (hEx) {
-          for (const wk of state.program.workouts) {
-            hExObj = wk.exercises.find((e) => e.id === hEx);
-            if (hExObj) break;
-          }
-          if (!hExObj) {
-            for (const wk of Object.values(state.dailyWorkouts || {}).flat()) {
-              hExObj = (wk.exercises || []).find((e) => e.id === hEx);
-              if (hExObj) break;
-            }
-          }
-        }
-        const hRestOn = hExObj?.restTimer !== undefined ? hExObj.restTimer : state.preferences?.restTimerEnabled !== false;
-        return (
-          <button
-            onClick={() => toggleExerciseRestTimer(hEx)}
-            style={{
-              ...styles.iconBtn,
-              color: hRestOn ? (colors.accent || "#4fc3f7") : colors.text,
-              opacity: hRestOn ? 0.9 : 0.35,
-            }}
-            aria-label={`Rest timer: ${hRestOn ? "on" : "off"}`}
-            title={hRestOn ? "Rest timer on" : "Rest timer off"}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="13" r="8" />
-              <path d="M12 9v4l2 2" />
-              <path d="M5 3l2 2" />
-              <path d="M19 3l-2 2" />
-              <line x1="12" y1="1" x2="12" y2="3" />
-            </svg>
-          </button>
-        );
-      })() : null} footer={modals.log.isOpen ? (() => {
-        if (logFlipped) return <div style={{ height: 1 }} />;
-        return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button className="btn-press" style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
-            Save
-          </button>
-          <button
-            style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 0" }}
-            onClick={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }}
-          >
-            Cancel
-          </button>
-        </div>
-        );
-      })() : null}>
+      <Modal open={modals.log.isOpen} noChrome
+        onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); setLogFlipped(false); setLogFlipAngle(0); dispatchModal({ type: "CLOSE_LOG" }); }}
+        styles={styles}
+      >
         {modals.log.isOpen && (() => {
           const logCtx = modals.log.context;
+          const closeLog = () => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); setLogFlipped(false); setLogFlipAngle(0); dispatchModal({ type: "CLOSE_LOG" }); };
           let logExercise = null;
           for (const wk of state.program.workouts) {
             const found = wk.exercises.find((e) => e.id === logCtx?.exerciseId);
@@ -3382,23 +3294,98 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 .join(", ")
             : null;
 
+          // Rest timer toggle state for front header
+          const hEx = logCtx?.exerciseId;
+          let hExObj = null;
+          if (hEx) {
+            for (const wk of state.program.workouts) {
+              hExObj = wk.exercises.find((e) => e.id === hEx);
+              if (hExObj) break;
+            }
+            if (!hExObj) {
+              for (const wk of Object.values(state.dailyWorkouts || {}).flat()) {
+                hExObj = (wk.exercises || []).find((e) => e.id === hEx);
+                if (hExObj) break;
+              }
+            }
+          }
+          const hRestOn = hExObj?.restTimer !== undefined ? hExObj.restTimer : state.preferences?.restTimerEnabled !== false;
+
+          // Close button SVG (shared)
+          const closeBtn = (onClick) => (
+            <button onClick={onClick} style={styles.iconBtn} aria-label="Close">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          );
+
+          const handleFocusCapture = (e) => {
+            const el = e.target;
+            if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") {
+              setTimeout(() => {
+                el.scrollIntoView({ block: "center", behavior: "smooth" });
+              }, 120);
+            }
+          };
+
           return (
-        <div style={{ perspective: 1200, width: "100%", flex: 1, minHeight: 0 }}>
+        <div style={{ perspective: 1200, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           <div style={{
-            width: "100%", height: "100%",
+            flex: 1, minHeight: 0,
             transition: "transform 0.45s cubic-bezier(.4,.0,.2,1)",
             transformStyle: "preserve-3d",
             transform: `rotateY(${logFlipAngle}deg)`,
             position: "relative",
           }}>
-            {/* Front face: Log content */}
-            <div style={{
+            {/* ===== FRONT FACE: Log ===== */}
+            <div {...logSwipe} style={{
               position: "absolute", inset: 0,
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
-              overflowY: "auto",
+              display: "flex", flexDirection: "column",
             }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1 }} {...logSwipe}>
+              {/* Front header */}
+              <div style={styles.modalHeader}>
+                <div style={{ ...styles.modalTitle, cursor: logCtx?.catalogId ? "pointer" : "default", display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}
+                  onClick={() => flipLogToDetail("left")}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{logCtx?.exerciseName || "Log"}</span>
+                  {logCtx?.catalogId && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35, flexShrink: 0 }}>
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <button
+                    onClick={() => toggleExerciseRestTimer(hEx)}
+                    style={{
+                      ...styles.iconBtn,
+                      color: hRestOn ? (colors.accent || "#4fc3f7") : colors.text,
+                      opacity: hRestOn ? 0.9 : 0.35,
+                    }}
+                    aria-label={`Rest timer: ${hRestOn ? "on" : "off"}`}
+                    title={hRestOn ? "Rest timer on" : "Rest timer off"}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="13" r="8" />
+                      <path d="M12 9v4l2 2" />
+                      <path d="M5 3l2 2" />
+                      <path d="M19 3l-2 2" />
+                      <line x1="12" y1="1" x2="12" y2="3" />
+                    </svg>
+                  </button>
+                  {closeBtn(closeLog)}
+                </div>
+              </div>
+
+              {/* Front body */}
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }} onFocusCapture={handleFocusCapture}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {logScheme && (
             <div style={{
               fontSize: 13, padding: "8px 12px", borderRadius: 8,
@@ -3967,44 +3954,81 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               placeholder="Quick notes..."
             />
           </div>
+                </div>
+              </div>
 
-        </div>
+              {/* Front footer */}
+              <div style={{ padding: "8px 12px 12px", flexShrink: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <button className="btn-press" style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
+                    Save
+                  </button>
+                  <button
+                    style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.5, fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "8px 0" }}
+                    onClick={closeLog}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
-            {/* Back face: Exercise detail */}
+
+            {/* ===== BACK FACE: Exercise detail ===== */}
             {logDetailEntry && (
-              <div style={{
+              <div {...logDetailSwipe} style={{
                 position: "absolute", inset: 0,
                 backfaceVisibility: "hidden",
                 WebkitBackfaceVisibility: "hidden",
                 transform: "rotateY(180deg)",
-                overflowY: "auto",
-                padding: "4px 0",
-              }} {...logDetailSwipe}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                    {logDetailEntry.movement && (
-                      <span style={{
-                        display: "inline-block", padding: "3px 8px", borderRadius: 999,
-                        fontSize: 11, fontWeight: 700, background: colors.primaryBg,
-                        color: colors.primaryText, textTransform: "capitalize",
-                      }}>{logDetailEntry.movement}</span>
-                    )}
-                    {(logDetailEntry.equipment || []).map((e) => (
-                      <span key={e} style={{
-                        display: "inline-block", padding: "3px 8px", borderRadius: 999,
-                        fontSize: 10, fontWeight: 600, background: colors.subtleBg,
-                        border: `1px solid ${colors.border}`, opacity: 0.8,
-                      }}>{e}</span>
-                    ))}
+                display: "flex", flexDirection: "column",
+              }}>
+                {/* Back header */}
+                <div style={styles.modalHeader}>
+                  <div style={{ ...styles.modalTitle, display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{logCtx?.exerciseName || "Detail"}</span>
                   </div>
-                  <ExerciseGif gifUrl={logDetailEntry.gifUrl} exerciseName={logDetailEntry.name} colors={colors} />
-                  {logDetailEntry.muscles?.primary?.length > 0 && (
-                    <BodyDiagram
-                      highlightedMuscles={logDetailEntry.muscles.primary}
-                      secondaryMuscles={logDetailEntry.muscles.secondary || []}
-                      colors={colors}
-                    />
-                  )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button
+                      onClick={() => flipLogToFront()}
+                      style={{ ...styles.iconBtn, padding: 4 }}
+                      aria-label="Back to log"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 18 9 12 15 6" />
+                      </svg>
+                    </button>
+                    {closeBtn(closeLog)}
+                  </div>
+                </div>
+
+                {/* Back body */}
+                <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      {logDetailEntry.movement && (
+                        <span style={{
+                          display: "inline-block", padding: "3px 8px", borderRadius: 999,
+                          fontSize: 11, fontWeight: 700, background: colors.primaryBg,
+                          color: colors.primaryText, textTransform: "capitalize",
+                        }}>{logDetailEntry.movement}</span>
+                      )}
+                      {(logDetailEntry.equipment || []).map((e) => (
+                        <span key={e} style={{
+                          display: "inline-block", padding: "3px 8px", borderRadius: 999,
+                          fontSize: 10, fontWeight: 600, background: colors.subtleBg,
+                          border: `1px solid ${colors.border}`, opacity: 0.8,
+                        }}>{e}</span>
+                      ))}
+                    </div>
+                    <ExerciseGif gifUrl={logDetailEntry.gifUrl} exerciseName={logDetailEntry.name} colors={colors} />
+                    {logDetailEntry.muscles?.primary?.length > 0 && (
+                      <BodyDiagram
+                        highlightedMuscles={logDetailEntry.muscles.primary}
+                        secondaryMuscles={logDetailEntry.muscles.secondary || []}
+                        colors={colors}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             )}
