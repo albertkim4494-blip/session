@@ -95,11 +95,11 @@ button:focus-visible {
 
 /* Directional card flip — "Left" / "Right" = swipe direction */
 @keyframes cardFlipInLeft {
-  from { transform: perspective(1200px) rotateY(-180deg); }
+  from { transform: perspective(1200px) rotateY(180deg); }
   to   { transform: perspective(1200px) rotateY(0deg); }
 }
 @keyframes cardFlipInRight {
-  from { transform: perspective(1200px) rotateY(180deg); }
+  from { transform: perspective(1200px) rotateY(-180deg); }
   to   { transform: perspective(1200px) rotateY(0deg); }
 }
 @keyframes cardFlipOutLeft {
