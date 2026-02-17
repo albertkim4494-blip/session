@@ -192,9 +192,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logDetailBodyRef = useRef(null);
   const logNavAnimRef = useRef(null);
   const logCardRef = useRef(null);
-  const logHeaderRef = useRef(null);
   const logFooterRef = useRef(null);
-  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, captureY: 0, swipeZone: null });
+  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, captureY: 0, inSwipeZone: false });
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -1354,17 +1353,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     d.direction = 0;
     d.isHorizontal = false;
     d.captureY = 0;
-    // Swipe zones: header (swipe down → prev), footer (swipe up → next)
-    // Disabled when flipped to detail face
-    if (isFlipped) {
-      d.swipeZone = null;
-    } else if (logHeaderRef.current?.contains(e.target)) {
-      d.swipeZone = "header";
-    } else if (logFooterRef.current?.contains(e.target)) {
-      d.swipeZone = "footer";
-    } else {
-      d.swipeZone = null;
-    }
+    // Only enable vertical nav swipe from footer area (not when flipped)
+    d.inSwipeZone = !isFlipped && !!logFooterRef.current?.contains(e.target);
   }, []);
 
   // Touchmove — simple: if touch started in footer swipe zone, track vertical drag.
@@ -1390,14 +1380,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       }
       if (d.isHorizontal) return;
 
-      // Vertical — only from header or footer swipe zones
-      if (!d.swipeZone) { d.active = false; return; }
+      // Vertical — only if touch started in footer swipe zone
+      if (!d.inSwipeZone) { d.active = false; return; }
 
       if (!d.captured) {
-        // Header: only swipe down (prev), Footer: only swipe up (next)
-        const direction = dy < 0 ? 1 : -1; // finger up = next(1), finger down = prev(-1)
-        if (d.swipeZone === "header" && direction !== -1) { d.active = false; return; }
-        if (d.swipeZone === "footer" && direction !== 1) { d.active = false; return; }
+        const direction = dy < 0 ? 1 : -1; // finger up = next, finger down = prev
         const target = canNavLogExercise(direction);
         if (!target) { d.active = false; return; }
         d.captured = true;
@@ -3559,8 +3546,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
               overflow: "hidden",
             }}>
-              {/* Front header — swipe zone for prev exercise navigation */}
-              <div ref={logHeaderRef} style={styles.modalHeader}>
+              {/* Front header */}
+              <div style={styles.modalHeader}>
                 <div style={{ ...styles.modalTitle, cursor: logCtx?.catalogId ? "pointer" : "default", display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}
                   onClick={() => flipLogToDetail("left")}
                 >
