@@ -1002,7 +1002,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   handleBackRef.current = (source) => {
     backCountRef.current++;
-    dbg("v11 " + source + " b:" + backCountRef.current);
+    dbg("v12" + source + " b:" + backCountRef.current);
 
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
@@ -1025,43 +1025,49 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const show = (msg) => { if (el) el.textContent = msg; };
 
     // Write diagnostic FIRST (before anything that could crash)
-    show("v11 init");
+    show("v12init");
 
     try {
       history.replaceState(null, "", location.pathname + location.search);
       for (let i = 0; i < 5; i++) history.pushState({ wt: i }, "");
     } catch (err) {
-      show("v11 err:" + err.message);
+      show("v12err:" + err.message);
       return;
     }
 
     const standalone = window.matchMedia("(display-mode: standalone)").matches;
-    show("v11 " + (standalone ? "S" : "B") + " h:" + history.length + " b:0");
+    show("v12" + (standalone ? "S" : "B") + " h:" + history.length + " b:0");
 
     const repush = () => {
       try { history.pushState({ wt: "re" }, ""); } catch (_) {}
     };
 
-    // Dedup: both handlers may fire for the same back press
+    // Dedup: only skip handleBack for double-fire, but ALWAYS repush.
+    // The synchronous repush from popstate is what prevents app exit.
     let lastBackTime = 0;
-    const fireBack = (source) => {
-      const now = Date.now();
-      if (now - lastBackTime < 300) return;
-      lastBackTime = now;
-      handleBackRef.current?.(source);
-      repush();
-    };
 
-    // popstate: fires on back/forward (the one that actually works for back press)
-    const onPopState = () => fireBack("P");
+    // popstate: fires AFTER history entry is consumed. Synchronous repush is critical.
+    const onPopState = () => {
+      repush(); // ALWAYS repush synchronously — this prevents app exit
+      const now = Date.now();
+      if (now - lastBackTime < 300) return; // skip handleBack if Nav API already ran it
+      lastBackTime = now;
+      handleBackRef.current?.("P");
+    };
     window.addEventListener("popstate", onPopState);
 
-    // Navigation API: intercept traverse to prevent app exit
+    // Navigation API: intercept traverse (runs before popstate)
     let navCleanup = null;
     if (window.navigation) {
       const navHandler = (e) => {
         if (e.navigationType === "traverse" && e.canIntercept) {
-          e.intercept({ handler: async () => { fireBack("N"); } });
+          e.intercept({ handler: async () => {
+            const now = Date.now();
+            if (now - lastBackTime < 300) return;
+            lastBackTime = now;
+            handleBackRef.current?.("N");
+            repush();
+          }});
         }
       };
       window.navigation.addEventListener("navigate", navHandler);
@@ -4963,7 +4969,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v11 loading</div>
+      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v12</div>
     </div>
   );
 }
