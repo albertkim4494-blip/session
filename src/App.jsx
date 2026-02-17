@@ -989,9 +989,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // ---------------------------------------------------------------------------
   // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
-  // Chrome's History Manipulation Intervention skips pushState/hash entries
-  // created without user activation. We push entries during user interactions
-  // (click/touchend) so Android's back button recognizes them.
+  // Primary: CloseWatcher API (Chrome 126+) — directly intercepts back button.
+  // Fallback: history entries pushed during user activation.
   // ---------------------------------------------------------------------------
   const handleBackRef = useRef(null);
   const dbgRef = useRef(null);
@@ -1001,8 +1000,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   handleBackRef.current = () => {
-    dbg("v16 back");
-
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
@@ -1020,11 +1017,32 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   useEffect(() => {
-    let seq = 0;
-    let lastHash = "";
-    let initialized = false;
-    let buffer = 0;
+    const hasCW = typeof CloseWatcher !== "undefined";
+    dbg("v17 CW:" + (hasCW ? "Y" : "N"));
 
+    // --- PRIMARY: CloseWatcher API (Chrome 126+, Samsung Internet 28+) ---
+    // Directly intercepts Android back button without needing history entries.
+    let watcher = null;
+    let cwWorking = false;
+
+    const setupWatcher = () => {
+      if (!hasCW) return;
+      try {
+        watcher = new CloseWatcher();
+        watcher.addEventListener("close", () => {
+          watcher = null;
+          handleBackRef.current?.();
+          setupWatcher(); // chain for next back press
+        });
+        cwWorking = true;
+      } catch (_) {
+        cwWorking = false;
+      }
+    };
+    setupWatcher();
+
+    // --- FALLBACK: History entries during user activation ---
+    let seq = 0, lastHash = "", initialized = false, buffer = 0;
     const push = () => {
       seq++;
       lastHash = "#wt" + seq;
@@ -1032,40 +1050,35 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       buffer++;
     };
 
-    // Push history entries ONLY during user interaction (not on page load).
-    // Chrome's History Manipulation Intervention skips entries without user activation.
-    // No debounce — replenish on EVERY interaction to keep buffer full.
     const ensureEntries = () => {
       if (!initialized) {
         initialized = true;
         history.replaceState(null, "", location.pathname + location.search);
         while (buffer < 5) push();
-        dbg("v16 h:" + history.length);
         return;
       }
       if (buffer < 5) push();
     };
 
-    // pointerdown: fires at start of any touch/mouse, has user activation
-    // (touchstart does NOT trigger user activation — Chrome skips those entries)
     document.addEventListener("pointerdown", ensureEntries, { passive: true });
     document.addEventListener("click", ensureEntries, { passive: true });
 
-    // Listen to both popstate and hashchange for back press
     let lastBackTime = 0;
     const onBack = () => {
-      if (location.hash === lastHash) return; // self-caused by our push
+      if (location.hash === lastHash) return;
       const now = Date.now();
-      if (now - lastBackTime < 300) return; // dedup (both events may fire)
+      if (now - lastBackTime < 300) return;
       lastBackTime = now;
       buffer = Math.max(0, buffer - 1);
-      handleBackRef.current?.();
+      // Only handle via history if CloseWatcher is NOT active
+      if (!cwWorking) handleBackRef.current?.();
     };
 
     window.addEventListener("popstate", onBack);
     window.addEventListener("hashchange", onBack);
 
     return () => {
+      watcher?.destroy();
       document.removeEventListener("pointerdown", ensureEntries);
       document.removeEventListener("click", ensureEntries);
       window.removeEventListener("popstate", onBack);
@@ -4962,7 +4975,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div ref={dbgRef} style={{ position: "fixed", bottom: 2, right: 6, fontSize: 11, opacity: 0.7, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 6px", borderRadius: 3 }}>v16</div>
+      <div ref={dbgRef} style={{ position: "fixed", bottom: 2, right: 6, fontSize: 11, opacity: 0.7, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 6px", borderRadius: 3 }}>v17</div>
     </div>
   );
 }
