@@ -192,7 +192,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logDetailBodyRef = useRef(null);
   const logNavAnimRef = useRef(null);
   const logCardRef = useRef(null);
-  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, scrollSnap: null });
+  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, lastY: 0, lastScrollTop: 0, captureY: 0 });
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -1347,16 +1347,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     d.startY = t.clientY;
     d.startX = t.clientX;
     d.currentY = t.clientY;
+    d.lastY = t.clientY;
     d.captured = false;
     d.direction = 0;
     d.isHorizontal = false;
+    d.captureY = 0;
     d.scrollEl = scrollEl;
-    d.scrollSnap = scrollEl ? { top: scrollEl.scrollTop, height: scrollEl.scrollHeight, client: scrollEl.clientHeight } : null;
+    d.lastScrollTop = scrollEl ? scrollEl.scrollTop : 0;
   }, []);
 
-  // Passive touchmove on card wrapper — passive so it never blocks compositor-
-  // threaded scrolling of child elements.  We prevent scroll during drag capture
-  // by setting overflow:hidden on the scroll element instead of preventDefault().
+  // Passive touchmove — uses LIVE scroll position (not a snapshot) so we can
+  // detect boundaries even when the user scrolled there during this same touch.
+  // Passive so it never blocks compositor-threaded scrolling of child elements.
   useEffect(() => {
     const el = logCardRef.current;
     if (!el) return;
@@ -1369,42 +1371,56 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const dy = t.clientY - d.startY;
 
       // Axis detection: first 10px decides horizontal vs vertical
-      if (!d.captured && !d.isHorizontal && Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (!d.captured && !d.isHorizontal && Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+        d.lastY = t.clientY;
+        return;
+      }
       if (!d.captured && !d.isHorizontal) {
         if (Math.abs(dx) > Math.abs(dy)) {
           d.isHorizontal = true;
+          d.lastY = t.clientY;
           return;
         }
       }
-      if (d.isHorizontal) return;
+      if (d.isHorizontal) { d.lastY = t.clientY; return; }
 
-      // Vertical drag — check scroll boundary + canNav
+      // Vertical — use LIVE scroll position to detect boundaries
       if (!d.captured) {
-        const snap = d.scrollSnap;
         const scrollEl = d.scrollEl;
-        if (!snap) return;
-        // Check if inner content has scrolled since touchstart — if so, user is
-        // scrolling normally, bail out and let the browser handle it.
-        const scrollMoved = scrollEl ? Math.abs(scrollEl.scrollTop - snap.top) > 2 : false;
-        if (scrollMoved) { d.active = false; return; }
-        const direction = dy < 0 ? 1 : -1; // swipe up = next (+1), swipe down = prev (-1)
-        const atBoundary = direction > 0
-          ? (snap.top + snap.client >= snap.height - 5) // at bottom
-          : (snap.top <= 5); // at top
-        if (!atBoundary) { d.active = false; return; }
+        if (!scrollEl) { d.lastY = t.clientY; return; }
+        const currentTop = scrollEl.scrollTop;
+        // If content is actively scrolling, don't capture — keep monitoring
+        const scrolling = Math.abs(currentTop - d.lastScrollTop) > 1;
+        d.lastScrollTop = currentTop;
+        if (scrolling) { d.lastY = t.clientY; return; }
+
+        // Content not scrolling — check if at a boundary
+        const atTop = currentTop <= 5;
+        const atBottom = currentTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 5;
+        // Direction from recent finger movement (not from touchstart)
+        const recentDy = t.clientY - d.lastY;
+        d.lastY = t.clientY;
+        const direction = recentDy > 3 ? -1 : recentDy < -3 ? 1 : 0;
+        if (direction === 0) return; // jitter, keep watching
+        const atBoundary = direction > 0 ? atBottom : atTop;
+        if (!atBoundary) return; // not at the right boundary, keep watching
         const target = canNavLogExercise(direction);
-        if (!target) { d.active = false; return; }
-        // Capture the drag — lock scroll via overflow:hidden (no preventDefault needed)
+        if (!target) return; // no target exercise, keep watching
+
+        // Capture — lock scroll and start tracking
         d.captured = true;
         d.direction = direction;
+        d.captureY = t.clientY;
         if (scrollEl) { scrollEl.style.overflow = "hidden"; scrollEl.style.overscrollBehavior = "none"; }
         const card = logCardRef.current;
         if (card) card.style.willChange = "transform, opacity";
+        return; // start tracking from next frame
       }
 
       // Drag captured — update card transform
+      d.lastY = t.clientY;
       d.currentY = t.clientY;
-      const rawDy = t.clientY - d.startY;
+      const rawDy = t.clientY - d.captureY;
       const screenH = window.innerHeight;
       const progress = Math.min(Math.abs(rawDy) / screenH, 1);
       const rotation = (rawDy / screenH) * 8;
@@ -1451,7 +1467,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     if (!d.captured || !card) return;
 
-    const rawDy = (e.changedTouches?.[0]?.clientY ?? d.currentY) - d.startY;
+    const rawDy = (e.changedTouches?.[0]?.clientY ?? d.currentY) - d.captureY;
     const screenH = window.innerHeight;
     const progress = Math.abs(rawDy) / screenH;
     const threshold = 0.15; // 15% of screen height
