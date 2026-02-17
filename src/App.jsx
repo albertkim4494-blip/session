@@ -4677,25 +4677,27 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrid
   }, [dispatchModal]);
 
   // System back button: exercise detail open → flip back to log;
-  // exercise detail closed but log open → close log modal
+  // exercise detail closed but log open → close log modal.
+  // Uses handler identity to avoid clobbering catalog's backOverrideRef.
   const logIsOpen = modals.log.isOpen;
+  const ownHandlerRef = React.useRef(null);
   React.useEffect(() => {
     if (!backOverrideRef) return;
     if (isOpen) {
-      backOverrideRef.current = () => {
-        handleBack();
-        return true;
-      };
-      return () => { backOverrideRef.current = null; };
+      const handler = () => { handleBack(); return true; };
+      backOverrideRef.current = handler;
+      ownHandlerRef.current = handler;
     } else if (logIsOpen) {
-      // Exercise detail just closed, log modal still visible — back should close it
-      backOverrideRef.current = () => {
-        dispatchModal({ type: "CLOSE_LOG" });
-        return true;
-      };
-      return () => { backOverrideRef.current = null; };
+      const handler = () => { dispatchModal({ type: "CLOSE_LOG" }); return true; };
+      backOverrideRef.current = handler;
+      ownHandlerRef.current = handler;
+    } else {
+      // Only clear if we still own it — don't clobber catalog's handler
+      if (backOverrideRef.current === ownHandlerRef.current) {
+        backOverrideRef.current = null;
+      }
+      ownHandlerRef.current = null;
     }
-    // When neither is open, don't touch the ref — other modals (catalog) may own it
   }, [isOpen, logIsOpen, backOverrideRef, handleBack, dispatchModal]);
 
   const navigateDetail = React.useCallback((dir) => {

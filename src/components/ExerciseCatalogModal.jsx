@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Modal } from "./Modal";
 import { EXERCISE_CATALOG } from "../lib/exerciseCatalog";
 import { catalogSearch, normalizeQuery, filterCatalog } from "../lib/exerciseCatalogUtils";
@@ -82,6 +82,7 @@ export function ExerciseCatalogModal({
   const [activeGroups, setActiveGroups] = useState(new Set()); // which UI groups are expanded
   const [detailEntry, setDetailEntry] = useState(null);
   const [slideDir, setSlideDir] = useState(null);
+  const browseRef = useRef(null);
 
   const src = catalog || EXERCISE_CATALOG;
 
@@ -208,6 +209,15 @@ export function ExerciseCatalogModal({
     }
     return muscles;
   }, [activeGroups]);
+
+  // Auto-scroll browse button into view when fine-tune section appears
+  useEffect(() => {
+    if (subMuscles.length > 0 && browseRef.current) {
+      setTimeout(() => {
+        browseRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      }, 50);
+    }
+  }, [subMuscles.length]);
 
   if (!open) return null;
 
@@ -434,8 +444,8 @@ export function ExerciseCatalogModal({
               }}
             />
 
-            {/* High-level muscle group chips */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+            {/* High-level muscle group chips — 3x2 grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
               {UI_MUSCLE_GROUPS.map((group) => {
                 const cfg = UI_GROUP_CONFIG[group];
                 const groupHasAny = cfg.muscles.some((m) => hoveredMuscles.has(m));
@@ -443,7 +453,7 @@ export function ExerciseCatalogModal({
                   <button
                     key={group}
                     className="btn-press"
-                    style={chipStyle(groupHasAny)}
+                    style={{ ...chipStyle(groupHasAny), textAlign: "center" }}
                     aria-pressed={groupHasAny}
                     onClick={() => {
                       if (groupHasAny) {
@@ -530,6 +540,7 @@ export function ExerciseCatalogModal({
 
             {/* Browse button */}
             <button
+              ref={browseRef}
               className="btn-press"
               style={{
                 ...styles.primaryBtn,
