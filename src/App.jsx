@@ -3262,43 +3262,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </button>
         );
       })() : null} footer={modals.log.isOpen ? (() => {
-        const fCtx = modals.log.context;
-        const fExList = fCtx?.workoutExercises || [];
-        const fExIdx = fExList.findIndex((e) => e.id === fCtx?.exerciseId);
-        const fPrevEx = fExIdx > 0 ? fExList[fExIdx - 1] : null;
-        const fNextEx = fExIdx < fExList.length - 1 ? fExList[fExIdx + 1] : null;
         return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {fExList.length > 1 && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button
-                type="button"
-                disabled={!fPrevEx}
-                onClick={() => navLogExercise(-1)}
-                style={{
-                  ...styles.secondaryBtn, flex: 1, opacity: fPrevEx ? 1 : 0.3,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  fontSize: 12, padding: "8px 6px", overflow: "hidden", whiteSpace: "nowrap",
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{fPrevEx?.name || "Prev"}</span>
-              </button>
-              <button
-                type="button"
-                disabled={!fNextEx}
-                onClick={() => navLogExercise(1)}
-                style={{
-                  ...styles.secondaryBtn, flex: 1, opacity: fNextEx ? 1 : 0.3,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  fontSize: 12, padding: "8px 6px", overflow: "hidden", whiteSpace: "nowrap",
-                }}
-              >
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{fNextEx?.name || "Next"}</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-              </button>
-            </div>
-          )}
           <button className="btn-press" style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
             Save
           </button>
