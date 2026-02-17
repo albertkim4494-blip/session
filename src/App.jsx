@@ -4312,6 +4312,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         dispatchModal={dispatchModal}
         styles={styles}
         colors={colors}
+        backOverrideRef={backOverrideRef}
       />
 
       {/* Profile Modal */}
@@ -4679,9 +4680,24 @@ function MoodPicker({ value, onChange, colors }) {
 // for the train-tab "view detail" flow (entries list from workout exercises)
 // ============================================================================
 
-function ExerciseDetailView({ modals, dispatchModal, styles, colors }) {
+function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrideRef }) {
   const { isOpen, entry, entries } = modals.exerciseDetail;
   const [slideDir, setSlideDir] = React.useState(null);
+
+  // System back button: close detail → return to log modal
+  React.useEffect(() => {
+    if (!backOverrideRef) return;
+    if (isOpen) {
+      backOverrideRef.current = () => {
+        setSlideDir(null);
+        dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" });
+        return true;
+      };
+    }
+    return () => {
+      if (backOverrideRef.current) backOverrideRef.current = null;
+    };
+  }, [isOpen, backOverrideRef, dispatchModal]);
 
   const navigateDetail = React.useCallback((dir) => {
     if (!entry || !entries.length) return;
