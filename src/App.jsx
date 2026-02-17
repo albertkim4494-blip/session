@@ -1314,8 +1314,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   });
 
   const logDetailSwipe = useSwipe({
-    onSwipeLeft: () => flipLogToFront(),
-    onSwipeRight: () => flipLogToFront(),
+    onSwipeLeft: () => { if (logFlipAngle < 0) flipLogToFront(); },
+    onSwipeRight: () => { if (logFlipAngle > 0) flipLogToFront(); },
     thresholdPx: 50,
   });
 
@@ -3345,6 +3345,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
               display: "flex", flexDirection: "column",
+              background: colors.cardBg, borderRadius: 18,
             }}>
               {/* Front header */}
               <div style={styles.modalHeader}>
@@ -3981,6 +3982,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 WebkitBackfaceVisibility: "hidden",
                 transform: "rotateY(180deg)",
                 display: "flex", flexDirection: "column",
+                background: colors.cardBg, borderRadius: 18,
               }}>
                 {/* Back header */}
                 <div style={styles.modalHeader}>
