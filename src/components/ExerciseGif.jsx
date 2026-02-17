@@ -50,8 +50,8 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
           borderRadius: 12,
           overflow: "hidden",
           position: "relative",
-          // Match theme bg so blend mode has the right backdrop
-          background: isDark ? (colors?.appBg || "#111") : (colors?.appBg || "#fff"),
+          // Match modal card bg so blend mode has the right backdrop
+          background: colors?.cardBg || (isDark ? "#161b22" : "#ffffff"),
         }}
       >
         {/* Loading skeleton */}
