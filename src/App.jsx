@@ -876,8 +876,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
 
 
+  const popstateNavigatingRef = useRef(false);
   useEffect(() => {
     sessionStorage.setItem("wt_tab", tab);
+    // Push a history entry for UI-initiated tab switches (button click, swipe)
+    // so the back button has something to consume instead of exiting the PWA.
+    // Skip when the tab change was triggered by the popstate handler itself.
+    if (popstateNavigatingRef.current) {
+      popstateNavigatingRef.current = false;
+    } else {
+      history.pushState({ app: true }, "");
+    }
   }, [tab]);
 
   useEffect(() => {
@@ -1037,8 +1046,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       }
       // No modal open — navigate to train tab first, then replenish buffer
       if (tabRef.current !== "train") {
+        popstateNavigatingRef.current = true;
         setTab("train");
-        sessionStorage.setItem("wt_tab", "train");
       }
       history.pushState({ app: true }, "");
       history.pushState({ app: true }, "");
