@@ -1001,7 +1001,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   handleBackRef.current = () => {
-    dbg("v15 back");
+    dbg("v16 back");
 
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
@@ -1023,31 +1023,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let seq = 0;
     let lastHash = "";
     let initialized = false;
-    let lastPushTime = 0;
+    let buffer = 0;
 
     const push = () => {
       seq++;
       lastHash = "#wt" + seq;
       location.hash = lastHash;
+      buffer++;
     };
 
     // Push history entries ONLY during user interaction (not on page load).
-    // Chrome skips entries created without user activation on back press.
+    // Chrome's History Manipulation Intervention skips entries without user activation.
+    // No debounce — replenish on EVERY interaction to keep buffer full.
     const ensureEntries = () => {
-      const now = Date.now();
       if (!initialized) {
         initialized = true;
         history.replaceState(null, "", location.pathname + location.search);
-        for (let i = 0; i < 3; i++) push();
-        lastPushTime = now;
-        dbg("v15 h:" + history.length);
+        while (buffer < 5) push();
+        dbg("v16 h:" + history.length);
         return;
       }
-      // Replenish one entry per interaction, at most once every 2s
-      if (now - lastPushTime > 2000) {
-        push();
-        lastPushTime = now;
-      }
+      if (buffer < 5) push();
     };
 
     // touchstart fires before swipe handlers can stopPropagation
@@ -1062,6 +1058,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const now = Date.now();
       if (now - lastBackTime < 300) return; // dedup (both events may fire)
       lastBackTime = now;
+      buffer = Math.max(0, buffer - 1);
       handleBackRef.current?.();
     };
 
@@ -4966,7 +4963,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div ref={dbgRef} style={{ position: "fixed", bottom: 2, right: 6, fontSize: 11, opacity: 0.7, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 6px", borderRadius: 3 }}>v15</div>
+      <div ref={dbgRef} style={{ position: "fixed", bottom: 2, right: 6, fontSize: 11, opacity: 0.7, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 6px", borderRadius: 3 }}>v16</div>
     </div>
   );
 }
