@@ -140,6 +140,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [dataReady, setDataReady] = useState(false);
   const cloudSaver = useRef(null);
   const [tab, setTab] = useState(() => sessionStorage.getItem("wt_tab") || "train");
+  const tabRef = useRef("train");
+  tabRef.current = tab;
   const [summaryMode, setSummaryMode] = useState("week");
   const [summaryOffset, setSummaryOffset] = useState(0);
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
@@ -1025,7 +1027,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         history.pushState({ app: true }, "");
         return;
       }
-      // No modal open — re-push base entry to prevent app exit
+      // No modal open — navigate to train tab first, then re-push
+      if (tabRef.current !== "train") {
+        setTab("train");
+        sessionStorage.setItem("wt_tab", "train");
+      }
       history.pushState({ app: true }, "");
     };
     window.addEventListener("popstate", handlePopState);
@@ -1036,7 +1042,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logBackHandlerRef = useRef(null);
   useEffect(() => {
     if (modals.log.isOpen && logFlipped) {
-      const handler = () => { flipLogToFront(); return true; };
+      const handler = () => {
+        if (logFlipAngleRef.current === 0) {
+          // Already flipping back — close the log instead
+          clearTimeout(logFlipTimeoutRef.current);
+          setLogFlipped(false);
+          setShowTargetConfig(false);
+          setPacePopoverIdx(null);
+          setRpePopoverIdx(null);
+          dispatchModal({ type: "CLOSE_LOG" });
+        } else {
+          flipLogToFront();
+        }
+        return true;
+      };
       backOverrideRef.current = handler;
       logBackHandlerRef.current = handler;
     } else if (modals.log.isOpen) {
