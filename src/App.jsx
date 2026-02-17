@@ -188,6 +188,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [logFlipAngle, setLogFlipAngle] = useState(0); // 0 | 180 | -180
   const logFlipAngleRef = useRef(0);
   const logFlipTimeoutRef = useRef(null);
+  const logBodyRef = useRef(null);
+  const logScrollSnapRef = useRef(null);
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -1317,10 +1319,34 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     logFlipTimeoutRef.current = setTimeout(() => setLogFlipped(false), 450);
   }, []);
 
-  const logSwipe = useSwipe({
+  const logSwipeBase = useSwipe({
     onSwipeLeft: () => flipLogToDetail("left"),
     onSwipeRight: () => flipLogToDetail("right"),
+    onSwipeUp: () => {
+      const snap = logScrollSnapRef.current;
+      const el = logBodyRef.current;
+      if (!snap || !el) return;
+      const wasAtBottom = snap.top + snap.client >= snap.height - 5;
+      const scrollMoved = Math.abs(el.scrollTop - snap.top) > 5;
+      if (wasAtBottom && !scrollMoved) navLogExercise(1);
+    },
+    onSwipeDown: () => {
+      const snap = logScrollSnapRef.current;
+      const el = logBodyRef.current;
+      if (!snap || !el) return;
+      const wasAtTop = snap.top <= 5;
+      const scrollMoved = Math.abs(el.scrollTop - snap.top) > 5;
+      if (wasAtTop && !scrollMoved) navLogExercise(-1);
+    },
   });
+  const logSwipe = {
+    onTouchStart: (e) => {
+      const el = logBodyRef.current;
+      logScrollSnapRef.current = el ? { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight } : null;
+      logSwipeBase.onTouchStart(e);
+    },
+    onTouchEnd: logSwipeBase.onTouchEnd,
+  };
 
   const logDetailSwipe = useSwipe({
     onSwipeLeft: () => flipLogToFront(),
@@ -3397,7 +3423,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </div>
 
               {/* Front body */}
-              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }} onFocusCapture={handleFocusCapture}>
+              <div ref={logBodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }} onFocusCapture={handleFocusCapture}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {logScheme && (
             <div style={{
