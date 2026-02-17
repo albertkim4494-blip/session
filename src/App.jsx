@@ -993,12 +993,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const handleBackRef = useRef(null);
   const backCountRef = useRef(0);
 
-  handleBackRef.current = () => {
-    backCountRef.current++;
+  const dbg = (msg) => {
     try {
       const el = document.getElementById("__wt_back_dbg");
-      if (el) el.textContent = "v8 b:" + backCountRef.current;
+      if (el) el.textContent = msg;
     } catch (_) {}
+  };
+
+  handleBackRef.current = () => {
+    backCountRef.current++;
+    dbg("v9 b:" + backCountRef.current);
 
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
@@ -1017,67 +1021,64 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   useEffect(() => {
-    // --- Diagnostics: write status to the indicator ---
     const standalone = window.matchMedia("(display-mode: standalone)").matches;
     const hasNavApi = !!window.navigation;
 
-    let seq = 0;
-    let lastPushedHash = "";
+    // Write diagnostics IMMEDIATELY (before any history manipulation)
+    dbg("v9 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " init");
 
-    const pushHash = () => {
-      seq++;
-      lastPushedHash = "#wt" + seq;
-      location.hash = lastPushedHash;
-    };
-
-    // Clear leftover hash
-    history.replaceState(null, "", location.pathname + location.search);
-
-    // Push buffer entries
-    for (let i = 0; i < 50; i++) pushHash();
-
-    // Write diagnostics after entries are pushed
-    const hLen = history.length;
+    // Use pushState (NOT location.hash) to avoid crash from rapid hash changes
+    // and to avoid false hashchange events on user interaction
+    let pushCount = 0;
     try {
-      const el = document.getElementById("__wt_back_dbg");
-      if (el) el.textContent = "v8 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " h:" + hLen + " b:0";
-    } catch (_) {}
-
-    // --- Navigation API (Chrome 102+) ---
-    if (window.navigation) {
-      window.navigation.addEventListener("navigate", (e) => {
-        if (e.navigationType === "traverse" && e.canIntercept) {
-          e.intercept({
-            handler: async () => {
-              handleBackRef.current?.();
-              await new Promise((r) => setTimeout(r, 50));
-              try { pushHash(); } catch (_) {}
-            },
-          });
-        }
-      });
+      // Clear any leftover hash
+      history.replaceState(null, "", location.pathname + location.search);
+      // Push buffer entries — pushState creates history entries without hash changes
+      for (let i = 0; i < 5; i++) {
+        history.pushState({ wt: i }, "");
+        pushCount++;
+      }
+    } catch (err) {
+      dbg("v9 push-err:" + err.message);
     }
 
-    // --- hashchange + popstate (always registered as additional safety) ---
-    const isSelfCaused = () => location.hash === lastPushedHash;
-    const onBack = () => { handleBackRef.current?.(); pushHash(); };
-    const onHashChange = () => { if (!isSelfCaused()) onBack(); };
-    const onPopState = () => { if (!isSelfCaused()) onBack(); };
+    dbg("v9 " + (standalone ? "S" : "B") + " " + (hasNavApi ? "N" : "_") + " h:" + history.length + " p:" + pushCount);
 
-    window.addEventListener("hashchange", onHashChange);
+    // Track whether we're pushing (to ignore self-caused popstate)
+    let pushing = false;
+    const repush = () => {
+      pushing = true;
+      try { history.pushState({ wt: "re" }, ""); } catch (_) {}
+      pushing = false;
+    };
+
+    // --- popstate: fires when user navigates back ---
+    const onPopState = () => {
+      if (pushing) return;
+      handleBackRef.current?.();
+      repush();
+    };
     window.addEventListener("popstate", onPopState);
 
-    // --- beforeunload: signal to Chrome that we care about navigation ---
-    const onBeforeUnload = (e) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
+    // --- Navigation API (Chrome 102+) ---
+    let navHandler = null;
+    if (window.navigation) {
+      navHandler = (e) => {
+        if (e.navigationType === "traverse" && e.canIntercept) {
+          e.intercept({ handler: async () => {
+            handleBackRef.current?.();
+            repush();
+          }});
+        }
+      };
+      window.navigation.addEventListener("navigate", navHandler);
+    }
 
     return () => {
-      window.removeEventListener("hashchange", onHashChange);
       window.removeEventListener("popstate", onPopState);
-      window.removeEventListener("beforeunload", onBeforeUnload);
+      if (window.navigation && navHandler) {
+        window.navigation.removeEventListener("navigate", navHandler);
+      }
     };
   }, []);
 
@@ -4970,7 +4971,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v8 loading</div>
+      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v9 loading</div>
     </div>
   );
 }
