@@ -990,13 +990,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // ---------------------------------------------------------------------------
   // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
   //
-  // Uses location.hash for real navigation entries that Android's native
-  // canGoBack() tracks. Self-caused events identified by hash comparison
-  // (not a counter). Both hashchange + popstate listened as defense-in-depth.
+  // Three-layer defense:
+  //   1. Navigation API intercept() — Chrome 102+, handles Android 13+
+  //      predictive back gesture. Only registered if API exists.
+  //   2. hashchange — catches hash-based back navigation.
+  //   3. popstate — fallback for any remaining edge cases.
+  //
+  // Layers 2+3 only registered if Navigation API is unavailable.
+  // Hash buffer entries ensure canGoBack() returns true for all layers.
   // ---------------------------------------------------------------------------
   const handleBackRef = useRef(null);
+  const backCountRef = useRef(0);
 
   handleBackRef.current = () => {
+    // Update diagnostic counter
+    backCountRef.current++;
+    try {
+      const el = document.getElementById("__wt_back_dbg");
+      if (el) el.textContent = "v7 b:" + backCountRef.current;
+    } catch (_) {}
+
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
@@ -1028,9 +1041,30 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     // Clear any leftover hash from previous sessions
     history.replaceState(null, "", location.pathname + location.search);
 
-    // Push buffer entries — real navigation entries Android tracks
-    for (let i = 0; i < 10; i++) pushEntry();
+    // Push buffer entries — real navigation entries for canGoBack()
+    for (let i = 0; i < 50; i++) pushEntry();
 
+    // ---- Layer 1: Navigation API (Chrome 102+) ----
+    // intercept() on traverse navigations lets us handle back presses.
+    // This is the ONLY reliable method on Android 13+ with predictive back.
+    if (window.navigation) {
+      window.navigation.addEventListener("navigate", (e) => {
+        if (e.navigationType === "traverse" && e.canIntercept) {
+          e.intercept({
+            handler: async () => {
+              handleBackRef.current?.();
+              // Replenish buffer after traversal commits
+              await new Promise((r) => setTimeout(r, 50));
+              try { pushEntry(); } catch (_) {}
+            },
+          });
+        }
+      });
+      // Navigation API handles everything — no need for hashchange/popstate
+      return;
+    }
+
+    // ---- Layers 2+3: hashchange + popstate (older browsers) ----
     const isSelfCaused = () => location.hash === lastPushedHash;
 
     const onBack = () => {
@@ -1038,9 +1072,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       pushEntry();
     };
 
-    // Primary: hashchange
     const onHashChange = () => { if (!isSelfCaused()) onBack(); };
-    // Fallback: popstate (for edge cases where hashchange doesn't fire)
     const onPopState = () => { if (!isSelfCaused()) onBack(); };
 
     window.addEventListener("hashchange", onHashChange);
@@ -4940,7 +4972,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div style={{ position: "fixed", bottom: 2, right: 2, fontSize: 9, opacity: 0.35, zIndex: 99999, pointerEvents: "none", color: "#888", fontFamily: "monospace" }}>v6</div>
+      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 9, opacity: 0.5, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace" }}>v7 b:0</div>
     </div>
   );
 }
