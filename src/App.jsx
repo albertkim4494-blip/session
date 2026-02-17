@@ -189,7 +189,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logFlipAngleRef = useRef(0);
   const logFlipTimeoutRef = useRef(null);
   const logBodyRef = useRef(null);
+  const logDetailBodyRef = useRef(null);
   const logScrollSnapRef = useRef(null);
+  const [logNavAnim, setLogNavAnim] = useState(null); // null|"exit-up"|"exit-down"|"enter-start"|"enter-end"
+  const logNavAnimRef = useRef(null);
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -536,8 +539,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (!modals.log.isOpen) {
       clearTimeout(logFlipTimeoutRef.current);
       logFlipAngleRef.current = 0;
+      logNavAnimRef.current = null;
       setLogFlipped(false);
       setLogFlipAngle(0);
+      setLogNavAnim(null);
     }
   }, [modals.log.isOpen]);
 
@@ -1289,17 +1294,39 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const navLogExercise = useCallback((direction) => {
     const ctx = modals.log.context;
-    if (!ctx) return;
+    if (!ctx || logNavAnimRef.current) return;
     const exList = ctx.workoutExercises || [];
     const idx = exList.findIndex((e) => e.id === ctx.exerciseId);
     const target = exList[idx + direction];
     if (!target) return;
-    setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
-    setShowTargetConfig(false);
-    setPacePopoverIdx(null);
-    setRpePopoverIdx(null);
-    saveLogData();
-    openLog(ctx.workoutId, target);
+
+    // Phase 1: exit animation (card peels away)
+    const exitPhase = direction > 0 ? "exit-up" : "exit-down";
+    logNavAnimRef.current = exitPhase;
+    setLogNavAnim(exitPhase);
+
+    // Phase 2: after exit, swap exercise and enter
+    setTimeout(() => {
+      setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
+      setShowTargetConfig(false);
+      setPacePopoverIdx(null);
+      setRpePopoverIdx(null);
+      saveLogData();
+      openLog(ctx.workoutId, target);
+
+      // Phase 3: snap new card to start position (no transition)
+      setLogNavAnim("enter-start");
+      // Phase 4: animate into place (next frame so browser picks up the start position)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setLogNavAnim("enter-end");
+          setTimeout(() => {
+            setLogNavAnim(null);
+            logNavAnimRef.current = null;
+          }, 300);
+        });
+      });
+    }, 350);
   }, [modals.log.context, saveLogData, openLog]);
 
   // Flip log card to show exercise detail (back face) or return to log (front face)
@@ -1348,11 +1375,36 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     onTouchEnd: logSwipeBase.onTouchEnd,
   };
 
-  const logDetailSwipe = useSwipe({
+  const logDetailScrollSnapRef = useRef(null);
+  const logDetailSwipeBase = useSwipe({
     onSwipeLeft: () => flipLogToFront(),
     onSwipeRight: () => flipLogToFront(),
+    onSwipeUp: () => {
+      const snap = logDetailScrollSnapRef.current;
+      const el = logDetailBodyRef.current;
+      if (!snap || !el) return;
+      const wasAtBottom = snap.top + snap.client >= snap.height - 5;
+      const scrollMoved = Math.abs(el.scrollTop - snap.top) > 5;
+      if (wasAtBottom && !scrollMoved) navLogExercise(1);
+    },
+    onSwipeDown: () => {
+      const snap = logDetailScrollSnapRef.current;
+      const el = logDetailBodyRef.current;
+      if (!snap || !el) return;
+      const wasAtTop = snap.top <= 5;
+      const scrollMoved = Math.abs(el.scrollTop - snap.top) > 5;
+      if (wasAtTop && !scrollMoved) navLogExercise(-1);
+    },
     thresholdPx: 50,
   });
+  const logDetailSwipe = {
+    onTouchStart: (e) => {
+      const el = logDetailBodyRef.current;
+      logDetailScrollSnapRef.current = el ? { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight } : null;
+      logDetailSwipeBase.onTouchStart(e);
+    },
+    onTouchEnd: logDetailSwipeBase.onTouchEnd,
+  };
 
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId) => {
@@ -3365,8 +3417,37 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             }
           };
 
+          // Nav animation styles (card-stack peel)
+          const navStyle = (() => {
+            switch (logNavAnim) {
+              case "exit-up": return {
+                transformOrigin: "top left",
+                transform: "rotate(-12deg) translateY(-110%)",
+                opacity: 0,
+                transition: "transform 0.35s ease-in, opacity 0.35s ease-in",
+              };
+              case "exit-down": return {
+                transformOrigin: "bottom left",
+                transform: "rotate(12deg) translateY(110%)",
+                opacity: 0,
+                transition: "transform 0.35s ease-in, opacity 0.35s ease-in",
+              };
+              case "enter-start": return {
+                transform: "translateY(30px) scale(0.97)",
+                opacity: 0,
+                transition: "none",
+              };
+              case "enter-end": return {
+                transform: "none",
+                opacity: 1,
+                transition: "transform 0.3s cubic-bezier(.2,.8,.3,1), opacity 0.3s ease-out",
+              };
+              default: return {};
+            }
+          })();
+
           return (
-        <div style={{ perspective: 1200, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <div style={{ perspective: 1200, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", ...navStyle }}>
           <div style={{
             flex: 1, minHeight: 0,
             transition: "transform 0.45s cubic-bezier(.4,.0,.2,1)",
@@ -4045,7 +4126,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </div>
 
                 {/* Back body */}
-                <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+                <div ref={logDetailBodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                       {logDetailEntry.movement && (
