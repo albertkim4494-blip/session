@@ -4686,19 +4686,16 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrid
         handleBack();
         return true;
       };
+      return () => { backOverrideRef.current = null; };
     } else if (logIsOpen) {
       // Exercise detail just closed, log modal still visible — back should close it
       backOverrideRef.current = () => {
         dispatchModal({ type: "CLOSE_LOG" });
         return true;
       };
-    } else {
-      backOverrideRef.current = null;
+      return () => { backOverrideRef.current = null; };
     }
-    return () => {
-      // Only clear if we're the ones who set it
-      if (!isOpen && !logIsOpen) backOverrideRef.current = null;
-    };
+    // When neither is open, don't touch the ref — other modals (catalog) may own it
   }, [isOpen, logIsOpen, backOverrideRef, handleBack, dispatchModal]);
 
   const navigateDetail = React.useCallback((dir) => {
