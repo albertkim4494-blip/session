@@ -1000,7 +1000,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   handleBackRef.current = () => {
     backCountRef.current++;
-    dbg("v13 b:" + backCountRef.current);
+    dbg("v14 b:" + backCountRef.current);
 
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
@@ -1019,36 +1019,43 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   useEffect(() => {
-    const hBefore = history.length;
-
-    // Use location.hash for REAL navigation entries that Android recognizes.
-    // (pushState entries don't count for Android's canGoBack in standalone PWAs)
-    let seq = 0;
-    let lastHash = "";
-    const pushEntry = () => {
-      seq++;
-      lastHash = "#wt" + seq;
-      location.hash = lastHash;
+    // Persistent log — survives app exit, viewable on reopen by tapping indicator
+    const logs = [];
+    const log = (msg) => {
+      logs.push(msg);
+      try { localStorage.setItem("__wt_bk", logs.join("\n")); } catch (_) {}
+      dbg(msg);
     };
 
-    // Clear leftover hash, then push 5 real entries
+    const sa = window.matchMedia("(display-mode: standalone)").matches;
+    log("v14 " + (sa ? "STANDALONE" : "BROWSER") + " h:" + history.length);
+
+    // Push 5 hash entries (real navigation entries)
+    let seq = 0, lastHash = "";
+    const push = () => { seq++; lastHash = "#wt" + seq; location.hash = lastHash; };
     history.replaceState(null, "", location.pathname + location.search);
-    for (let i = 0; i < 5; i++) pushEntry();
+    for (let i = 0; i < 5; i++) push();
+    log("pushed h:" + history.length + " hash:" + location.hash);
 
-    const hAfter = history.length;
-    const standalone = window.matchMedia("(display-mode: standalone)").matches;
-    dbg("v13 " + (standalone ? "S" : "B") + " h:" + hBefore + "→" + hAfter);
+    const isSelf = () => location.hash === lastHash;
 
-    // popstate: fires when user presses back.
-    // Self-caused check: ignore events from our own pushEntry calls.
-    const onPopState = () => {
-      if (location.hash === lastHash) return; // self-caused by pushEntry
-      handleBackRef.current?.();
-      pushEntry(); // replenish consumed entry
-    };
-
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    // Register ALL event listeners to see which ones fire
+    window.addEventListener("popstate", () => {
+      log("POPSTATE h:" + history.length + " #:" + location.hash + (isSelf() ? " SELF" : ""));
+      if (!isSelf()) { handleBackRef.current?.(); push(); }
+    });
+    window.addEventListener("hashchange", () => {
+      log("HASHCHG #:" + location.hash + (isSelf() ? " SELF" : ""));
+    });
+    window.addEventListener("pagehide", () => log("PAGEHIDE"));
+    window.addEventListener("visibilitychange", () => log("VIS:" + document.visibilityState));
+    window.addEventListener("beforeunload", () => log("BEFOREUNLOAD"));
+    if (window.navigation) {
+      window.navigation.addEventListener("navigate", (e) =>
+        log("NAV " + e.navigationType + " ci:" + e.canIntercept)
+      );
+    }
+    log("listeners ready");
   }, []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
@@ -4940,7 +4947,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div ref={dbgRef} style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v13</div>
+      <div ref={dbgRef} onClick={() => alert(localStorage.getItem("__wt_bk") || "no log")} style={{ position: "fixed", bottom: 2, right: 6, fontSize: 11, opacity: 0.8, zIndex: 99999, color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.7)", padding: "4px 8px", borderRadius: 4 }}>v14</div>
     </div>
   );
 }
