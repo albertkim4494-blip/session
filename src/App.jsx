@@ -186,6 +186,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Log card flip state (log ↔ exercise detail)
   const [logFlipped, setLogFlipped] = useState(false);
   const [logFlipAngle, setLogFlipAngle] = useState(0); // 0 | 180 | -180
+  const logFlipAngleRef = useRef(0);
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -1299,11 +1300,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Flip log card to show exercise detail (back face) or return to log (front face)
   const flipLogToDetail = useCallback((dir) => {
     if (!logDetailEntry) return;
-    setLogFlipAngle(dir === "right" ? -180 : 180);
+    const angle = dir === "right" ? -180 : 180;
+    logFlipAngleRef.current = angle;
+    setLogFlipAngle(angle);
     setLogFlipped(true);
   }, [logDetailEntry]);
 
   const flipLogToFront = useCallback(() => {
+    logFlipAngleRef.current = 0;
     setLogFlipAngle(0);
     setTimeout(() => setLogFlipped(false), 450);
   }, []);
@@ -1314,8 +1318,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   });
 
   const logDetailSwipe = useSwipe({
-    onSwipeLeft: () => { if (logFlipAngle < 0) flipLogToFront(); },
-    onSwipeRight: () => { if (logFlipAngle > 0) flipLogToFront(); },
+    onSwipeLeft: () => { if (logFlipAngleRef.current < 0) flipLogToFront(); },
+    onSwipeRight: () => { if (logFlipAngleRef.current > 0) flipLogToFront(); },
     thresholdPx: 50,
   });
 
@@ -3346,6 +3350,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               WebkitBackfaceVisibility: "hidden",
               display: "flex", flexDirection: "column",
               background: colors.cardBg, borderRadius: 18,
+              border: `1px solid ${colors.border}`,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+              overflow: "hidden",
             }}>
               {/* Front header */}
               <div style={styles.modalHeader}>
@@ -3983,6 +3990,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 transform: "rotateY(180deg)",
                 display: "flex", flexDirection: "column",
                 background: colors.cardBg, borderRadius: 18,
+                border: `1px solid ${colors.border}`,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+                overflow: "hidden",
               }}>
                 {/* Back header */}
                 <div style={styles.modalHeader}>

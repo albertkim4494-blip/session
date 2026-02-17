@@ -24,9 +24,11 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
     : { ...styles.modalSheet, ...((footer || noChrome) ? { height: `calc(95dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column", animation: sheetAnimation || "modalSlideUp 0.25s cubic-bezier(.2,.8,.3,1)" };
 
   if (noChrome) {
+    // overflow:visible + transparent bg so 3D preserve-3d works (faces carry their own bg)
+    const noChromeSheet = { ...sheetStyle, overflow: "visible", background: "transparent", border: "none", boxShadow: "none" };
     return (
       <div style={overlayStyle} onMouseDown={onClose}>
-        <div style={sheetStyle} onMouseDown={(e) => e.stopPropagation()}>
+        <div style={noChromeSheet} onMouseDown={(e) => e.stopPropagation()}>
           {children}
         </div>
       </div>
