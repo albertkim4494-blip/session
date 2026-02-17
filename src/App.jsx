@@ -187,6 +187,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [logFlipped, setLogFlipped] = useState(false);
   const [logFlipAngle, setLogFlipAngle] = useState(0); // 0 | 180 | -180
   const logFlipAngleRef = useRef(0);
+  const logFlipTimeoutRef = useRef(null);
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -531,6 +532,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Reset flip state when log closes
   useEffect(() => {
     if (!modals.log.isOpen) {
+      clearTimeout(logFlipTimeoutRef.current);
+      logFlipAngleRef.current = 0;
       setLogFlipped(false);
       setLogFlipAngle(0);
     }
@@ -1300,6 +1303,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Flip log card to show exercise detail (back face) or return to log (front face)
   const flipLogToDetail = useCallback((dir) => {
     if (!logDetailEntry) return;
+    clearTimeout(logFlipTimeoutRef.current);
     const angle = dir === "right" ? -180 : 180;
     logFlipAngleRef.current = angle;
     setLogFlipAngle(angle);
@@ -1307,9 +1311,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [logDetailEntry]);
 
   const flipLogToFront = useCallback(() => {
+    clearTimeout(logFlipTimeoutRef.current);
     logFlipAngleRef.current = 0;
     setLogFlipAngle(0);
-    setTimeout(() => setLogFlipped(false), 450);
+    logFlipTimeoutRef.current = setTimeout(() => setLogFlipped(false), 450);
   }, []);
 
   const logSwipe = useSwipe({
@@ -1318,8 +1323,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   });
 
   const logDetailSwipe = useSwipe({
-    onSwipeLeft: () => { if (logFlipAngleRef.current < 0) flipLogToFront(); },
-    onSwipeRight: () => { if (logFlipAngleRef.current > 0) flipLogToFront(); },
+    onSwipeLeft: () => flipLogToFront(),
+    onSwipeRight: () => flipLogToFront(),
     thresholdPx: 50,
   });
 
