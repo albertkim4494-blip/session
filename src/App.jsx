@@ -879,13 +879,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const popstateNavigatingRef = useRef(false);
   useEffect(() => {
     sessionStorage.setItem("wt_tab", tab);
-    // Push a history entry for UI-initiated tab switches (button click, swipe)
+    // Push a hash entry for UI-initiated tab switches (button click, swipe)
     // so the back button has something to consume instead of exiting the PWA.
-    // Skip when the tab change was triggered by the popstate handler itself.
+    // Skip when the tab change was triggered by the back handler itself.
     if (popstateNavigatingRef.current) {
       popstateNavigatingRef.current = false;
-    } else {
-      history.pushState({ app: true }, "");
+    } else if (hashCounterRef.current > 0) {
+      // Only push after mount (hashCounterRef > 0 means buffer entries exist)
+      pushWt();
     }
   }, [tab]);
 
@@ -997,78 +998,103 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const anyModalOpenRef = useRef(false);
   anyModalOpenRef.current = anyModalOpen;
 
-  // Push buffer history entries on mount so rapid back-presses never exit PWA.
+  // ---------------------------------------------------------------------------
+  // BACK BUTTON / HISTORY MANAGEMENT
+  // Uses hash-based history entries (#wt-N) so the hashchange event fires on
+  // back navigation. hashchange is the most reliable event on Android standalone
+  // PWAs — popstate alone is insufficient because the browser can commit to
+  // exiting the PWA before the pushState inside popstate takes effect.
+  // ---------------------------------------------------------------------------
+  const hashCounterRef = useRef(0);
+  const pushWt = () => {
+    hashCounterRef.current++;
+    history.pushState({ wt: hashCounterRef.current }, "", "#wt" + hashCounterRef.current);
+  };
+  const replaceWt = () => {
+    history.replaceState({ wt: hashCounterRef.current }, "", "#wt" + hashCounterRef.current);
+  };
+
+  // Push buffer entries on mount
   useEffect(() => {
-    for (let i = 0; i < 5; i++) history.pushState({ app: true }, "");
-    // DEBUG: show which back-button API is active
-    try { document.getElementById("__back_dbg").textContent = "nav:" + !!window.navigation + " h=" + history.length; } catch(_){}
+    // Clean any stale hash from previous session
+    history.replaceState(null, "", location.pathname + location.search);
+    for (let i = 0; i < 5; i++) pushWt();
   }, []);
 
-  // When modals open, push a {modal: true} history entry so the back button
-  // fires popstate instead of exiting. When modals close via code (X button,
-  // save, etc.), use replaceState to convert {modal: true} → {app: true}
-  // without calling history.back() (which was unreliable on some mobile browsers).
+  // When modals open/close, push/replace a hash entry
   useLayoutEffect(() => {
     if (anyModalOpen && !modalHistoryRef.current) {
-      history.pushState({ modal: true }, "");
+      pushWt();
       modalHistoryRef.current = true;
     } else if (!anyModalOpen && modalHistoryRef.current) {
       modalHistoryRef.current = false;
-      history.replaceState({ app: true }, "");
+      replaceWt();
     }
   }, [anyModalOpen]);
 
-  // Shared back-button handler used by both Navigation API and popstate
+  // Shared back-button handler
   const handleBackRef = useRef(null);
   handleBackRef.current = () => {
-    const tag = anyModalOpenRef.current ? "modal" : "tab=" + tabRef.current;
-    try { document.getElementById("__back_dbg").textContent = "back:" + tag + " h=" + history.length; } catch(_){}
-
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
           const handled = backOverrideRef.current();
           if (handled === "close") {
             modalHistoryRef.current = false;
-            history.pushState({ app: true }, "");
+            pushWt();
             return;
           }
           if (handled) {
-            history.pushState({ modal: true }, "");
+            pushWt();
             return;
           }
         } catch (_) { /* fall through to CLOSE_ALL */ }
       }
       modalHistoryRef.current = false;
       dispatchModal({ type: "CLOSE_ALL" });
-      history.pushState({ app: true }, "");
+      pushWt();
       return;
     }
     if (tabRef.current !== "train") {
       popstateNavigatingRef.current = true;
       setTab("train");
     }
-    history.pushState({ app: true }, "");
-    history.pushState({ app: true }, "");
+    pushWt();
+    pushWt();
   };
 
-  // Primary: Navigation API (Chrome 102+) — intercepts traverse before commit
+  // Dedup: prevent multiple handlers from running for the same back press
+  const backGuardRef = useRef(0);
+  const handleBackOnce = () => {
+    const now = Date.now();
+    if (now - backGuardRef.current < 100) return;
+    backGuardRef.current = now;
+    handleBackRef.current();
+  };
+
+  // PRIMARY: hashchange — fires when back navigates through hash entries
+  useEffect(() => {
+    const onHashChange = () => handleBackOnce();
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  // BACKUP 1: Navigation API (Chrome 102+)
   useEffect(() => {
     if (!window.navigation) return;
     const onNavigate = (e) => {
       if (e.navigationType === "traverse" && e.canIntercept) {
-        e.intercept({ handler() { handleBackRef.current(); } });
+        e.intercept({ handler() { handleBackOnce(); } });
       }
     };
     navigation.addEventListener("navigate", onNavigate);
     return () => navigation.removeEventListener("navigate", onNavigate);
   }, []);
 
-  // Fallback: popstate (Safari, Firefox, older Chrome)
+  // BACKUP 2: popstate (Safari, Firefox, older Chrome)
   useEffect(() => {
-    const handlePopState = () => { handleBackRef.current(); };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.addEventListener("popstate", handleBackOnce);
+    return () => window.removeEventListener("popstate", handleBackOnce);
   }, []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
@@ -2315,8 +2341,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   return (
     <div style={styles.app}>
-      {/* DEBUG: back button diagnostic — remove after testing */}
-      <div id="__back_dbg" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 99999, background: "#f00", color: "#fff", fontSize: 12, textAlign: "center", padding: 2, pointerEvents: "none" }}>back:waiting</div>
       {/* Main content column */}
       <div style={styles.content}>
         {/* Top bar */}
