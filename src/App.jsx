@@ -1036,30 +1036,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, [anyModalOpen]);
 
-  // DEBUG: persist back-button log to localStorage (survives app exit)
-  // Check on next launch: localStorage.getItem("__back_log")
-  const backLogRef = useRef([]);
-  useEffect(() => {
-    const prev = localStorage.getItem("__back_log");
-    if (prev) {
-      try { backLogRef.current = JSON.parse(prev).slice(-10); } catch(_) {}
-    }
-    // Log beforeunload to detect if the page is actually unloading
-    const onUnload = () => {
-      backLogRef.current.push({ t: Date.now(), e: "unload", h: history.length, hash: location.hash });
-      localStorage.setItem("__back_log", JSON.stringify(backLogRef.current.slice(-20)));
-    };
-    window.addEventListener("beforeunload", onUnload);
-    return () => window.removeEventListener("beforeunload", onUnload);
-  }, []);
-
   // Shared back-button handler
   const handleBackRef = useRef(null);
   handleBackRef.current = () => {
-    const tag = anyModalOpenRef.current ? "modal" : "tab=" + tabRef.current;
-    backLogRef.current.push({ t: Date.now(), e: "back", tag, h: history.length, hash: location.hash });
-    localStorage.setItem("__back_log", JSON.stringify(backLogRef.current.slice(-20)));
-
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
@@ -2351,15 +2330,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     );
   }
 
-  // DEBUG: show back-button log from previous session
-  const [dbgLog] = useState(() => {
-    try { return localStorage.getItem("__back_log") || "no log"; } catch(_) { return "err"; }
-  });
-
   return (
     <div style={styles.app}>
-      {/* DEBUG: back button log — remove after testing */}
-      <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 99999, background: "rgba(0,0,0,0.85)", color: "#0f0", fontSize: 9, padding: "2px 4px", pointerEvents: "none", maxHeight: 60, overflow: "hidden", fontFamily: "monospace" }}>{dbgLog}</div>
       {/* Main content column */}
       <div style={styles.content}>
         {/* Top bar */}

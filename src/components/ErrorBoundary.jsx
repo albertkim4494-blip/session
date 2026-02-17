@@ -12,6 +12,14 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error("ErrorBoundary caught:", error, info?.componentStack);
+    try {
+      localStorage.setItem("__crash_log", JSON.stringify({
+        message: String(error?.message || error),
+        stack: String(error?.stack || "").slice(0, 500),
+        component: String(info?.componentStack || "").slice(0, 300),
+        time: Date.now(),
+      }));
+    } catch (_) {}
   }
 
   handleReload = () => {
