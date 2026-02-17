@@ -94,13 +94,13 @@ button:focus-visible {
 }
 
 @keyframes cardFlipIn {
-  from { transform: perspective(1200px) rotateY(-180deg); }
+  from { transform: perspective(1200px) rotateY(180deg); }
   to   { transform: perspective(1200px) rotateY(0deg); }
 }
 
 @keyframes cardFlipBack {
   from { transform: perspective(1200px) rotateY(0deg); }
-  to   { transform: perspective(1200px) rotateY(180deg); }
+  to   { transform: perspective(1200px) rotateY(-180deg); }
 }
 
 @keyframes cardSlideLeft {
