@@ -310,7 +310,7 @@ export function ExerciseDetailModal({
         key={entry.id}
         style={{
           display: "flex", flexDirection: "column", gap: 14,
-          animation: slideDir ? `cardSlide${slideDir === "left" ? "Left" : "Right"} 0.35s cubic-bezier(0.22, 0.68, 0.35, 1.0)` : undefined,
+          animation: slideDir ? `cardSlide${slideDir === "left" ? "Left" : "Right"} 0.25s ease-out` : undefined,
         }}
         {...(swipeHandlers || {})}
       >
