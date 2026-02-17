@@ -992,17 +992,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // ---------------------------------------------------------------------------
   const handleBackRef = useRef(null);
   const backCountRef = useRef(0);
+  const dbgRef = useRef(null);
 
   const dbg = (msg) => {
-    try {
-      const el = document.getElementById("__wt_back_dbg");
-      if (el) el.textContent = msg;
-    } catch (_) {}
+    if (dbgRef.current) dbgRef.current.textContent = msg;
   };
 
-  handleBackRef.current = (source) => {
+  handleBackRef.current = () => {
     backCountRef.current++;
-    dbg("v12" + source + " b:" + backCountRef.current);
+    dbg("v13 b:" + backCountRef.current);
 
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
@@ -1021,63 +1019,36 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   useEffect(() => {
-    const el = document.getElementById("__wt_back_dbg");
-    const show = (msg) => { if (el) el.textContent = msg; };
+    const hBefore = history.length;
 
-    // Write diagnostic FIRST (before anything that could crash)
-    show("v12init");
+    // Use location.hash for REAL navigation entries that Android recognizes.
+    // (pushState entries don't count for Android's canGoBack in standalone PWAs)
+    let seq = 0;
+    let lastHash = "";
+    const pushEntry = () => {
+      seq++;
+      lastHash = "#wt" + seq;
+      location.hash = lastHash;
+    };
 
-    try {
-      history.replaceState(null, "", location.pathname + location.search);
-      for (let i = 0; i < 5; i++) history.pushState({ wt: i }, "");
-    } catch (err) {
-      show("v12err:" + err.message);
-      return;
-    }
+    // Clear leftover hash, then push 5 real entries
+    history.replaceState(null, "", location.pathname + location.search);
+    for (let i = 0; i < 5; i++) pushEntry();
 
+    const hAfter = history.length;
     const standalone = window.matchMedia("(display-mode: standalone)").matches;
-    show("v12" + (standalone ? "S" : "B") + " h:" + history.length + " b:0");
+    dbg("v13 " + (standalone ? "S" : "B") + " h:" + hBefore + "→" + hAfter);
 
-    const repush = () => {
-      try { history.pushState({ wt: "re" }, ""); } catch (_) {}
-    };
-
-    // Dedup: only skip handleBack for double-fire, but ALWAYS repush.
-    // The synchronous repush from popstate is what prevents app exit.
-    let lastBackTime = 0;
-
-    // popstate: fires AFTER history entry is consumed. Synchronous repush is critical.
+    // popstate: fires when user presses back.
+    // Self-caused check: ignore events from our own pushEntry calls.
     const onPopState = () => {
-      repush(); // ALWAYS repush synchronously — this prevents app exit
-      const now = Date.now();
-      if (now - lastBackTime < 300) return; // skip handleBack if Nav API already ran it
-      lastBackTime = now;
-      handleBackRef.current?.("P");
+      if (location.hash === lastHash) return; // self-caused by pushEntry
+      handleBackRef.current?.();
+      pushEntry(); // replenish consumed entry
     };
+
     window.addEventListener("popstate", onPopState);
-
-    // Navigation API: intercept traverse (runs before popstate)
-    let navCleanup = null;
-    if (window.navigation) {
-      const navHandler = (e) => {
-        if (e.navigationType === "traverse" && e.canIntercept) {
-          e.intercept({ handler: async () => {
-            const now = Date.now();
-            if (now - lastBackTime < 300) return;
-            lastBackTime = now;
-            handleBackRef.current?.("N");
-            repush();
-          }});
-        }
-      };
-      window.navigation.addEventListener("navigate", navHandler);
-      navCleanup = () => window.navigation.removeEventListener("navigate", navHandler);
-    }
-
-    return () => {
-      window.removeEventListener("popstate", onPopState);
-      navCleanup?.();
-    };
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
@@ -4969,7 +4940,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       />
 
       {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div id="__wt_back_dbg" style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v12</div>
+      <div ref={dbgRef} style={{ position: "fixed", bottom: 2, right: 2, fontSize: 10, opacity: 0.6, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: 3 }}>v13</div>
     </div>
   );
 }
