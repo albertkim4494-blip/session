@@ -4,31 +4,45 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
   const [status, setStatus] = useState("loading"); // "loading" | "loaded" | "error"
   const imgRef = useRef(null);
 
-  // Reset status whenever gifUrl changes and check if already cached
+  // Load and decode image before revealing — prevents white flash
   useEffect(() => {
     if (!gifUrl) return;
     setStatus("loading");
-    // If the image is already cached, onLoad may not fire — check complete
+
     const img = imgRef.current;
-    if (img && img.complete && img.naturalWidth > 0) {
+    if (!img) return;
+
+    // If already cached and decoded, show immediately
+    if (img.complete && img.naturalWidth > 0) {
       setStatus("loaded");
+      return;
     }
+
+    // Wait for load, then decode before revealing
+    const handleLoad = () => {
+      if (img.decode) {
+        img.decode().then(() => setStatus("loaded")).catch(() => setStatus("loaded"));
+      } else {
+        setStatus("loaded");
+      }
+    };
+    const handleError = () => setStatus("error");
+
+    img.addEventListener("load", handleLoad);
+    img.addEventListener("error", handleError);
+    return () => {
+      img.removeEventListener("load", handleLoad);
+      img.removeEventListener("error", handleError);
+    };
   }, [gifUrl]);
 
   if (!gifUrl) return null;
-
-  // On error, just hide — no fallback UI
   if (status === "error") return null;
 
   const isDark = colors?.appBg?.startsWith("#0") || colors?.appBg?.startsWith("#1");
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-      }}
-    >
+    <div style={{ display: "flex", justifyContent: "center" }}>
       <div
         style={{
           width: size,
@@ -36,7 +50,8 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
           borderRadius: 12,
           overflow: "hidden",
           position: "relative",
-          background: "transparent",
+          // Match theme bg so blend mode has the right backdrop
+          background: isDark ? (colors?.appBg || "#111") : (colors?.appBg || "#fff"),
         }}
       >
         {/* Loading skeleton */}
@@ -66,12 +81,11 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
             objectFit: "contain",
             filter: isDark ? "invert(1)" : "none",
             mixBlendMode: isDark ? "screen" : "multiply",
+            // No transition — show instantly once decoded to prevent flash
             opacity: status === "loaded" ? 1 : 0,
-            transition: "opacity 0.25s ease-out",
             position: status === "loaded" ? "static" : "absolute",
           }}
-          onLoad={() => setStatus("loaded")}
-          onError={() => setStatus("error")}
+          // onLoad/onError handled by useEffect event listeners
         />
       </div>
     </div>
