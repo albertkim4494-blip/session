@@ -192,7 +192,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logDetailBodyRef = useRef(null);
   const logNavAnimRef = useRef(null);
   const logCardRef = useRef(null);
-  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, lastScrollTop: 0, captureY: 0, boundaryAnchorY: 0 });
+  const logFooterRef = useRef(null);
+  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, captureY: 0, inSwipeZone: false });
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -1333,15 +1334,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, []);
 
   // --- Real-time drag-to-navigate touch system ---
+  // Navigation swipes only work from the Save/Cancel footer area.
+  // Scroll area is completely untouched — no scroll detection needed.
+  // Horizontal swipe (flip) works from anywhere on the card.
   const logTouchStart = useCallback((e) => {
     if (logNavAnimRef.current) return;
-    // Skip if mid-flip transition
     const angle = logFlipAngleRef.current;
     if (angle !== 0 && angle !== 180 && angle !== -180) return;
     const t = e.touches?.[0];
     if (!t) return;
     const isFlipped = angle === 180 || angle === -180;
-    const scrollEl = isFlipped ? logDetailBodyRef.current : logBodyRef.current;
     const d = logDragRef.current;
     d.active = true;
     d.startY = t.clientY;
@@ -1351,14 +1353,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     d.direction = 0;
     d.isHorizontal = false;
     d.captureY = 0;
-    d.boundaryAnchorY = 0;
-    d.scrollEl = scrollEl;
-    d.lastScrollTop = scrollEl ? scrollEl.scrollTop : 0;
+    // Only enable vertical nav swipe from footer area (not when flipped)
+    d.inSwipeZone = !isFlipped && !!logFooterRef.current?.contains(e.target);
   }, []);
 
-  // Passive touchmove — uses LIVE scroll position (not a snapshot) so we can
-  // detect boundaries even when the user scrolled there during this same touch.
-  // Passive so it never blocks compositor-threaded scrolling of child elements.
+  // Touchmove — simple: if touch started in footer swipe zone, track vertical drag.
+  // No scroll boundary detection needed since footer is not scrollable.
   useEffect(() => {
     const el = logCardRef.current;
     if (!el) return;
@@ -1380,39 +1380,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       }
       if (d.isHorizontal) return;
 
-      // Vertical — use LIVE scroll position + anchor-based capture
+      // Vertical — only if touch started in footer swipe zone
+      if (!d.inSwipeZone) { d.active = false; return; }
+
       if (!d.captured) {
-        const scrollEl = d.scrollEl;
-        if (!scrollEl) return;
-        const currentTop = scrollEl.scrollTop;
-        // If content scrolled since last frame, user is scrolling — reset anchor
-        const scrolling = Math.abs(currentTop - d.lastScrollTop) > 1;
-        d.lastScrollTop = currentTop;
-        if (scrolling) { d.boundaryAnchorY = 0; return; }
-
-        // Scroll has stopped — check if at a boundary
-        const atTop = currentTop <= 5;
-        const atBottom = currentTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 5;
-        if (!atTop && !atBottom) { d.boundaryAnchorY = 0; return; }
-
-        // At a boundary — set anchor on first stopped frame
-        if (!d.boundaryAnchorY) { d.boundaryAnchorY = t.clientY; return; }
-
-        // Accumulate movement from anchor (tolerates slow swipes)
-        const totalDy = t.clientY - d.boundaryAnchorY;
-        if (Math.abs(totalDy) < 10) return; // need 10px of deliberate movement
-
-        const direction = totalDy > 0 ? -1 : 1; // finger down = prev, finger up = next
-        const atBoundary = direction > 0 ? atBottom : atTop;
-        if (!atBoundary) { d.boundaryAnchorY = 0; return; }
+        const direction = dy < 0 ? 1 : -1; // finger up = next, finger down = prev
         const target = canNavLogExercise(direction);
-        if (!target) return;
-
-        // Capture — lock scroll and start tracking
+        if (!target) { d.active = false; return; }
         d.captured = true;
         d.direction = direction;
         d.captureY = t.clientY;
-        if (scrollEl) { scrollEl.style.overflow = "hidden"; scrollEl.style.overscrollBehavior = "none"; }
         const card = logCardRef.current;
         if (card) card.style.willChange = "transform, opacity";
         return;
@@ -1441,12 +1418,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (!d.active) return;
     d.active = false;
     const card = logCardRef.current;
-
-    // Restore scroll on captured drags
-    if (d.captured && d.scrollEl) {
-      d.scrollEl.style.overflow = "";
-      d.scrollEl.style.overscrollBehavior = "";
-    }
 
     // Horizontal swipe — trigger flip
     if (d.isHorizontal) {
@@ -1531,7 +1502,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const logTouchCancel = useCallback(() => {
     const d = logDragRef.current;
-    if (d.captured && d.scrollEl) { d.scrollEl.style.overflow = ""; d.scrollEl.style.overscrollBehavior = ""; }
     d.active = false;
     d.captured = false;
     const card = logCardRef.current;
@@ -4187,8 +4157,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </div>
               </div>
 
-              {/* Front footer */}
-              <div style={{ padding: "8px 12px 12px", flexShrink: 0 }}>
+              {/* Front footer — also the swipe zone for exercise navigation */}
+              <div ref={logFooterRef} style={{ padding: "8px 12px 12px", flexShrink: 0 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <button className="btn-press" style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
                     Save
