@@ -2732,7 +2732,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         <button style={{ background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, opacity: 0.6, cursor: "pointer", padding: "2px 8px", fontSize: 11, fontWeight: 700, marginLeft: 4 }} onClick={() => setSummaryOffset(0)}>Today</button>
                       )}
                       {/* Gear icon — absolutely positioned so it doesn't shift the centered date */}
-                      <div ref={statsConfigRef} style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)" }}>
+                      <div ref={statsConfigRef} style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", zIndex: 50 }}>
                         <button
                           onClick={() => setShowStatsConfig((v) => !v)}
                           style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: colors.text, opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -2744,8 +2744,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         </button>
                         {showStatsConfig && (
                           <div style={{
-                            position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 30,
-                            background: colors.cardBg, border: `1px solid ${colors.border}`,
+                            position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 50,
+                            background: colors.appBg, border: `1px solid ${colors.border}`,
                             borderRadius: 10, padding: "10px 14px", minWidth: 160,
                             boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
                             display: "flex", flexDirection: "column", gap: 6,
