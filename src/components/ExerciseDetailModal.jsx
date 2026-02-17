@@ -20,6 +20,7 @@ export function ExerciseDetailModal({
   open, entry, onBack, onClose, onAddExercise, onDeleteCustomExercise,
   workouts, styles, colors, targetWorkoutId,
   swipeHandlers, slideDir, position, total,
+  sheetAnimation,
 }) {
   const [checked, setChecked] = useState(new Set());
   const [added, setAdded] = useState(false);
@@ -276,6 +277,7 @@ export function ExerciseDetailModal({
       onClose={onClose}
       styles={styles}
       footer={footer}
+      sheetAnimation={sheetAnimation}
       headerContent={
         <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
           <button onClick={onBack} style={{ ...styles.iconBtn, padding: 4, flexShrink: 0 }} aria-label="Back">

@@ -4683,21 +4683,44 @@ function MoodPicker({ value, onChange, colors }) {
 function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrideRef }) {
   const { isOpen, entry, entries } = modals.exerciseDetail;
   const [slideDir, setSlideDir] = React.useState(null);
+  const [flipping, setFlipping] = React.useState("in"); // "in" | "back" | null
+  const [showAfterFlip, setShowAfterFlip] = React.useState(false);
+
+  // When modal opens, start flip-in; when it closes externally, reset
+  React.useEffect(() => {
+    if (isOpen) {
+      setFlipping("in");
+      setShowAfterFlip(true);
+    } else {
+      setShowAfterFlip(false);
+      setFlipping(null);
+    }
+  }, [isOpen]);
+
+  // Back handler: play flip-back, then close after animation ends
+  const handleBack = React.useCallback(() => {
+    setSlideDir(null);
+    setFlipping("back");
+    setTimeout(() => {
+      setShowAfterFlip(false);
+      setFlipping(null);
+      dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" });
+    }, 300);
+  }, [dispatchModal]);
 
   // System back button: close detail → return to log modal
   React.useEffect(() => {
     if (!backOverrideRef) return;
     if (isOpen) {
       backOverrideRef.current = () => {
-        setSlideDir(null);
-        dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" });
+        handleBack();
         return true;
       };
     }
     return () => {
       if (backOverrideRef.current) backOverrideRef.current = null;
     };
-  }, [isOpen, backOverrideRef, dispatchModal]);
+  }, [isOpen, backOverrideRef, handleBack]);
 
   const navigateDetail = React.useCallback((dir) => {
     if (!entry || !entries.length) return;
@@ -4706,6 +4729,7 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrid
     const next = idx + dir;
     if (next >= 0 && next < entries.length) {
       setSlideDir(dir > 0 ? "left" : "right");
+      setFlipping(null); // swipe uses slide, not flip
       dispatchModal({
         type: "OPEN_EXERCISE_DETAIL",
         payload: { entry: entries[next], entries },
@@ -4723,18 +4747,26 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrid
     ? entries.findIndex((e) => e.id === entry.id) + 1
     : 0;
 
+  // Determine sheet animation
+  const sheetAnimation = flipping === "in"
+    ? "cardFlipIn 0.4s ease-out"
+    : flipping === "back"
+    ? "cardFlipBack 0.3s ease-in forwards"
+    : undefined;
+
   return (
     <ExerciseDetailModal
-      open={isOpen}
+      open={showAfterFlip}
       entry={entry}
-      onBack={() => { setSlideDir(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); }}
-      onClose={() => { setSlideDir(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); dispatchModal({ type: "CLOSE_LOG" }); }}
+      onBack={handleBack}
+      onClose={() => { setSlideDir(null); setShowAfterFlip(false); setFlipping(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); dispatchModal({ type: "CLOSE_LOG" }); }}
       styles={styles}
       colors={colors}
       swipeHandlers={entries.length > 1 ? swipeHandlers : undefined}
       slideDir={slideDir}
       position={position}
       total={entries.length}
+      sheetAnimation={sheetAnimation}
     />
   );
 }

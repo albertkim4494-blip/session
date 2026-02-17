@@ -1,7 +1,7 @@
 import React from "react";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
-export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose }) {
+export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose, sheetAnimation }) {
   const kbInset = useKeyboardInset();
 
   if (!open) return null;
@@ -21,7 +21,7 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
 
   const sheetStyle = fullScreen
     ? { ...styles.modalSheet, borderRadius: 0, height: "100dvh", maxWidth: "100%", display: "flex", flexDirection: "column" }
-    : { ...styles.modalSheet, ...(footer ? { height: `calc(95dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column", animation: "modalSlideUp 0.25s cubic-bezier(.2,.8,.3,1)" };
+    : { ...styles.modalSheet, ...(footer ? { height: `calc(95dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column", animation: sheetAnimation || "modalSlideUp 0.25s cubic-bezier(.2,.8,.3,1)" };
 
   const bodyStyle = fullScreen
     ? { ...styles.modalBody, flex: 1, minHeight: 0, maxHeight: undefined }
