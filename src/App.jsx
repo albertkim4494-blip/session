@@ -4901,6 +4901,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           refreshSocial();
         }}
       />
+
+      {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
+      <div style={{ position: "fixed", bottom: 2, right: 2, fontSize: 9, opacity: 0.35, zIndex: 99999, pointerEvents: "none", color: "#888", fontFamily: "monospace" }}>v6</div>
     </div>
   );
 }

@@ -48,11 +48,6 @@ export function initBackHandler() {
     handleBack();
   });
 
-  // Version indicator — confirms this code is loaded (remove after debugging)
-  const el = document.createElement("div");
-  el.textContent = "v5";
-  el.style.cssText = "position:fixed;bottom:2px;right:2px;font-size:9px;opacity:0.35;z-index:99999;pointer-events:none;color:#888;font-family:monospace";
-  document.body.appendChild(el);
 }
 
 /**
