@@ -1516,7 +1516,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("touchcancel", onCancel);
     };
-  }, []);
+  }, [modals.log.isOpen]);
 
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId) => {
@@ -3550,7 +3550,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               background: colors.cardBg, borderRadius: 18,
               border: `1px solid ${colors.border}`,
               boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
-              overflow: "hidden",
+              overflow: "clip",
             }}>
               {/* Front header */}
               <div style={styles.modalHeader}>
@@ -3590,7 +3590,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </div>
 
               {/* Front body */}
-              <div ref={logBodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16, touchAction: "pan-y" }} onFocusCapture={handleFocusCapture}>
+              <div ref={logBodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16, WebkitOverflowScrolling: "touch", transform: "translateZ(0)" }} onFocusCapture={handleFocusCapture}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {logScheme && (
             <div style={{
@@ -4202,7 +4202,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 background: colors.cardBg, borderRadius: 18,
                 border: `1px solid ${colors.border}`,
                 boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
-                overflow: "hidden",
+                overflow: "clip",
               }}>
                 {/* Back header */}
                 <div style={styles.modalHeader}>
@@ -4224,7 +4224,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </div>
 
                 {/* Back body */}
-                <div ref={logDetailBodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+                <div ref={logDetailBodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16, WebkitOverflowScrolling: "touch", transform: "translateZ(0)" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                       {logDetailEntry.movement && (
