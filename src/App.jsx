@@ -1334,41 +1334,43 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, []);
 
   // --- Real-time drag-to-navigate touch system ---
-  // Swipe DOWN (prev): works from anywhere — header, footer, or scroll body when at top
+  // ALL touch listeners are passive addEventListener (not React props) so the
+  // browser never delays native scrolling waiting for JS.
+  // Swipe DOWN (prev): works from anywhere when at scroll top
   // Swipe UP (next): footer only — avoids bottom-boundary scroll conflicts
   // Horizontal swipe (flip): works from anywhere on the card
-  const logTouchStart = useCallback((e) => {
-    if (logNavAnimRef.current) return;
-    const angle = logFlipAngleRef.current;
-    if (angle !== 0 && angle !== 180 && angle !== -180) return;
-    const t = e.touches?.[0];
-    if (!t) return;
-    const isFlipped = angle === 180 || angle === -180;
-    const d = logDragRef.current;
-    d.active = true;
-    d.startY = t.clientY;
-    d.startX = t.clientX;
-    d.currentY = t.clientY;
-    d.captured = false;
-    d.direction = 0;
-    d.isHorizontal = false;
-    d.captureY = 0;
-    // Determine swipe zone (disabled when flipped)
-    if (isFlipped) {
-      d.swipeZone = null;
-    } else if (logFooterRef.current?.contains(e.target)) {
-      d.swipeZone = "footer"; // allows both up and down
-    } else {
-      d.swipeZone = "body"; // allows down (prev) only, when at scroll top
-    }
-  }, []);
+  const logTouchEndRef = useRef(null);
+  logTouchEndRef.current = { canNavLogExercise, swapLogExercise, flipLogToDetail, flipLogToFront };
 
-  // Touchmove handler:
-  // - Footer zone: capture immediately for either direction
-  // - Body zone: only capture swipe-down when scrollTop ≈ 0 (trivially reliable)
   useEffect(() => {
     const el = logCardRef.current;
     if (!el) return;
+
+    const onStart = (e) => {
+      if (logNavAnimRef.current) return;
+      const angle = logFlipAngleRef.current;
+      if (angle !== 0 && angle !== 180 && angle !== -180) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      const isFlipped = angle === 180 || angle === -180;
+      const d = logDragRef.current;
+      d.active = true;
+      d.startY = t.clientY;
+      d.startX = t.clientX;
+      d.currentY = t.clientY;
+      d.captured = false;
+      d.direction = 0;
+      d.isHorizontal = false;
+      d.captureY = 0;
+      if (isFlipped) {
+        d.swipeZone = null;
+      } else if (logFooterRef.current?.contains(e.target)) {
+        d.swipeZone = "footer";
+      } else {
+        d.swipeZone = "body";
+      }
+    };
+
     const onMove = (e) => {
       const d = logDragRef.current;
       if (!d.active) return;
@@ -1390,16 +1392,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (!d.swipeZone) { d.active = false; return; }
 
       if (!d.captured) {
-        const direction = dy < 0 ? 1 : -1; // finger up = next(1), finger down = prev(-1)
-
+        const direction = dy < 0 ? 1 : -1;
         if (d.swipeZone === "body") {
-          // Body zone: only allow swipe down (prev) when at scroll top
           if (direction !== -1) { d.active = false; return; }
           const scrollEl = logBodyRef.current;
           if (!scrollEl || scrollEl.scrollTop > 5) { d.active = false; return; }
         }
-
-        const target = canNavLogExercise(direction);
+        const fns = logTouchEndRef.current;
+        const target = fns.canNavLogExercise(direction);
         if (!target) { d.active = false; return; }
         d.captured = true;
         d.direction = direction;
@@ -1423,55 +1423,58 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         card.style.opacity = String(opacity);
       }
     };
-    el.addEventListener("touchmove", onMove, { passive: true });
-    return () => el.removeEventListener("touchmove", onMove);
-  }, [canNavLogExercise]);
 
-  const logTouchEnd = useCallback((e) => {
-    const d = logDragRef.current;
-    if (!d.active) return;
-    d.active = false;
-    const card = logCardRef.current;
+    const onEnd = (e) => {
+      const d = logDragRef.current;
+      if (!d.active) return;
+      d.active = false;
+      const card = logCardRef.current;
+      const fns = logTouchEndRef.current;
 
-    // Horizontal swipe — trigger flip
-    if (d.isHorizontal) {
-      const end = e.changedTouches?.[0];
-      if (end) {
-        const dx = end.clientX - d.startX;
-        if (Math.abs(dx) >= 50) {
-          const isFlipped = logFlipAngleRef.current === 180 || logFlipAngleRef.current === -180;
-          if (isFlipped) {
-            flipLogToFront();
-          } else {
-            flipLogToDetail(dx < 0 ? "left" : "right");
+      if (d.isHorizontal) {
+        const end = e.changedTouches?.[0];
+        if (end) {
+          const dx = end.clientX - d.startX;
+          if (Math.abs(dx) >= 50) {
+            const isFlipped = logFlipAngleRef.current === 180 || logFlipAngleRef.current === -180;
+            if (isFlipped) fns.flipLogToFront();
+            else fns.flipLogToDetail(dx < 0 ? "left" : "right");
           }
         }
+        return;
       }
-      return;
-    }
 
-    if (!d.captured || !card) return;
+      if (!d.captured || !card) return;
+      const rawDy = (e.changedTouches?.[0]?.clientY ?? d.currentY) - d.captureY;
+      const screenH = window.innerHeight;
+      const progress = Math.abs(rawDy) / screenH;
 
-    const rawDy = (e.changedTouches?.[0]?.clientY ?? d.currentY) - d.captureY;
-    const screenH = window.innerHeight;
-    const progress = Math.abs(rawDy) / screenH;
-    const threshold = 0.15; // 15% of screen height
-
-    if (progress >= threshold) {
-      // Commit navigation
-      const target = canNavLogExercise(d.direction);
-      if (!target) { resetCard(); return; }
-      logNavAnimRef.current = "flying";
-
-      if (d.direction > 0) {
-        // Swipe UP → next: current card flies off upward, new card enters from below
-        card.style.transition = "transform 0.25s ease-in, opacity 0.25s ease-in";
-        card.style.transform = `translateY(${-screenH}px) rotate(-15deg)`;
-        card.style.opacity = "0";
-        setTimeout(() => {
-          swapLogExercise(target);
+      if (progress >= 0.15) {
+        const target = fns.canNavLogExercise(d.direction);
+        if (!target) { resetCard(); return; }
+        logNavAnimRef.current = "flying";
+        if (d.direction > 0) {
+          card.style.transition = "transform 0.25s ease-in, opacity 0.25s ease-in";
+          card.style.transform = `translateY(${-screenH}px) rotate(-15deg)`;
+          card.style.opacity = "0";
+          setTimeout(() => {
+            fns.swapLogExercise(target);
+            card.style.transition = "none";
+            card.style.transform = "translateY(40px) scale(0.95)";
+            card.style.opacity = "0";
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                card.style.transition = "transform 0.35s cubic-bezier(.2,.8,.3,1), opacity 0.35s ease-out";
+                card.style.transform = "none";
+                card.style.opacity = "1";
+                setTimeout(() => { card.style.willChange = ""; card.style.transition = ""; logNavAnimRef.current = null; }, 350);
+              });
+            });
+          }, 250);
+        } else {
+          fns.swapLogExercise(target);
           card.style.transition = "none";
-          card.style.transform = "translateY(40px) scale(0.95)";
+          card.style.transform = `translateY(${-screenH}px) rotate(-8deg)`;
           card.style.opacity = "0";
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -1481,46 +1484,38 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               setTimeout(() => { card.style.willChange = ""; card.style.transition = ""; logNavAnimRef.current = null; }, 350);
             });
           });
-        }, 250);
+        }
       } else {
-        // Swipe DOWN → prev: swap immediately, prev card flies in from above
-        swapLogExercise(target);
-        card.style.transition = "none";
-        card.style.transform = `translateY(${-screenH}px) rotate(-8deg)`;
-        card.style.opacity = "0";
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            card.style.transition = "transform 0.35s cubic-bezier(.2,.8,.3,1), opacity 0.35s ease-out";
-            card.style.transform = "none";
-            card.style.opacity = "1";
-            setTimeout(() => { card.style.willChange = ""; card.style.transition = ""; logNavAnimRef.current = null; }, 350);
-          });
-        });
+        resetCard();
       }
-    } else {
-      // Spring back
-      resetCard();
-    }
 
-    function resetCard() {
-      card.style.transition = "transform 0.45s cubic-bezier(.25,1.5,.35,1), opacity 0.3s ease-out";
-      card.style.transform = "none";
-      card.style.opacity = "1";
-      setTimeout(() => {
-        card.style.willChange = "";
-        card.style.transition = "";
-        logNavAnimRef.current = null;
-      }, 450);
-    }
-  }, [canNavLogExercise, swapLogExercise, flipLogToDetail, flipLogToFront]);
+      function resetCard() {
+        card.style.transition = "transform 0.45s cubic-bezier(.25,1.5,.35,1), opacity 0.3s ease-out";
+        card.style.transform = "none";
+        card.style.opacity = "1";
+        setTimeout(() => { card.style.willChange = ""; card.style.transition = ""; logNavAnimRef.current = null; }, 450);
+      }
+    };
 
-  const logTouchCancel = useCallback(() => {
-    const d = logDragRef.current;
-    d.active = false;
-    d.captured = false;
-    const card = logCardRef.current;
-    if (card) { card.style.transform = ""; card.style.opacity = ""; card.style.transition = ""; card.style.willChange = ""; }
-    logNavAnimRef.current = null;
+    const onCancel = () => {
+      const d = logDragRef.current;
+      d.active = false;
+      d.captured = false;
+      const card = logCardRef.current;
+      if (card) { card.style.transform = ""; card.style.opacity = ""; card.style.transition = ""; card.style.willChange = ""; }
+      logNavAnimRef.current = null;
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: true });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onCancel, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onCancel);
+    };
   }, []);
 
   const completeSet = useCallback(
@@ -3537,9 +3532,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           return (
         <div
           ref={logCardRef}
-          onTouchStart={logTouchStart}
-          onTouchEnd={logTouchEnd}
-          onTouchCancel={logTouchCancel}
           style={{ perspective: 1200, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
         >
           <div style={{
@@ -4162,8 +4154,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             <label style={styles.label}>Notes (optional)</label>
             <textarea
               value={modals.log.notes}
-              onChange={(e) => dispatchModal({ type: "UPDATE_LOG_NOTES", payload: e.target.value })}
-              style={styles.textarea}
+              onChange={(e) => {
+                dispatchModal({ type: "UPDATE_LOG_NOTES", payload: e.target.value });
+                const el = e.target;
+                el.style.height = "auto";
+                const max = 150;
+                if (el.scrollHeight > max) {
+                  el.style.height = max + "px";
+                  el.style.overflowY = "auto";
+                } else {
+                  el.style.height = el.scrollHeight + "px";
+                  el.style.overflowY = "hidden";
+                }
+              }}
+              style={{ ...styles.textarea, overflowY: "hidden" }}
               rows={2}
               placeholder="Quick notes..."
             />
