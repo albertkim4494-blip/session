@@ -988,10 +988,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const anyModalOpenRef = useRef(false);
   anyModalOpenRef.current = anyModalOpen;
 
-  // Push two base history entries on mount so rapid back-presses never exit PWA
+  // Push buffer history entries on mount so rapid back-presses never exit PWA.
+  // Mobile browsers can queue multiple back-navigations before any popstate
+  // handler fires, so we need enough entries to absorb bursts.
   useEffect(() => {
-    history.pushState({ app: true }, "");
-    history.pushState({ app: true }, "");
+    for (let i = 0; i < 5; i++) history.pushState({ app: true }, "");
   }, []);
 
   // When modals open, push a {modal: true} history entry so the back button
@@ -1016,7 +1017,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (backOverrideRef.current) {
           try {
             const handled = backOverrideRef.current();
+            if (handled === "close") {
+              // Override closed the modal — push {app} (not {modal})
+              modalHistoryRef.current = false;
+              history.pushState({ app: true }, "");
+              return;
+            }
             if (handled) {
+              // Override handled it but modal stays open
               history.pushState({ modal: true }, "");
               return;
             }
@@ -1027,11 +1035,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         history.pushState({ app: true }, "");
         return;
       }
-      // No modal open — navigate to train tab first, then re-push
+      // No modal open — navigate to train tab first, then replenish buffer
       if (tabRef.current !== "train") {
         setTab("train");
         sessionStorage.setItem("wt_tab", "train");
       }
+      history.pushState({ app: true }, "");
       history.pushState({ app: true }, "");
     };
     window.addEventListener("popstate", handlePopState);
@@ -1051,10 +1060,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           setPacePopoverIdx(null);
           setRpePopoverIdx(null);
           dispatchModal({ type: "CLOSE_LOG" });
+          return "close";
         } else {
           flipLogToFront();
+          return true;
         }
-        return true;
       };
       backOverrideRef.current = handler;
       logBackHandlerRef.current = handler;
@@ -1064,7 +1074,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         setPacePopoverIdx(null);
         setRpePopoverIdx(null);
         dispatchModal({ type: "CLOSE_LOG" });
-        return true;
+        return "close";
       };
       backOverrideRef.current = handler;
       logBackHandlerRef.current = handler;

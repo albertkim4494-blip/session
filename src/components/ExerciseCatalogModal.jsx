@@ -141,7 +141,7 @@ export function ExerciseCatalogModal({
       // Home/category view: back closes catalog
       const handler = () => {
         onClose();
-        return true;
+        return "close";
       };
       backOverrideRef.current = handler;
       ownHandlerRef.current = handler;
