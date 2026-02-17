@@ -93,22 +93,22 @@ button:focus-visible {
   100% { background-position: -200% 0; }
 }
 
-/* Directional card flip — "Left" / "Right" = swipe direction */
-@keyframes cardFlipInLeft {
-  from { transform: perspective(1200px) rotateY(180deg); }
-  to   { transform: perspective(1200px) rotateY(0deg); }
+/* Detail slide — subtle directional transition for log ↔ detail */
+@keyframes detailEnterLeft {
+  from { opacity: 0; transform: translateX(15%); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-@keyframes cardFlipInRight {
-  from { transform: perspective(1200px) rotateY(-180deg); }
-  to   { transform: perspective(1200px) rotateY(0deg); }
+@keyframes detailEnterRight {
+  from { opacity: 0; transform: translateX(-15%); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-@keyframes cardFlipOutLeft {
-  from { transform: perspective(1200px) rotateY(0deg); }
-  to   { transform: perspective(1200px) rotateY(-180deg); }
+@keyframes detailExitLeft {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-15%); }
 }
-@keyframes cardFlipOutRight {
-  from { transform: perspective(1200px) rotateY(0deg); }
-  to   { transform: perspective(1200px) rotateY(180deg); }
+@keyframes detailExitRight {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(15%); }
 }
 
 @keyframes cardSlideLeft {

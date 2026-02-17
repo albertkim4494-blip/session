@@ -4678,7 +4678,7 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrid
     }
   }, [isOpen, openFlipDir]);
 
-  // Flip back to log — direction matches the swipe that triggered it
+  // Slide back to log — direction matches the swipe that triggered it
   const handleBack = React.useCallback((dir) => {
     setFlipDir(dir || "left");
     setFlipping("back");
@@ -4686,7 +4686,7 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrid
       setShowAfterFlip(false);
       setFlipping(null);
       dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" });
-    }, 300);
+    }, 200);
   }, [dispatchModal]);
 
   // System back button: exercise detail open → flip back to log;
@@ -4713,18 +4713,21 @@ function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrid
     }
   }, [isOpen, logIsOpen, backOverrideRef, handleBack, dispatchModal]);
 
-  // Swipe left/right → flip back to log with matching direction
+  // Swipe left/right → slide back to log; up/down → no-op (block propagation)
+  const noop = React.useCallback(() => {}, []);
   const swipeHandlers = useSwipe({
     onSwipeLeft: () => handleBack("left"),
     onSwipeRight: () => handleBack("right"),
+    onSwipeUp: noop,
+    onSwipeDown: noop,
     thresholdPx: 50,
   });
 
-  // Determine sheet animation — direction matches the swipe
+  // Determine sheet animation — subtle directional slide matching swipe
   const sheetAnimation = flipping === "in"
-    ? `cardFlipIn${flipDir === "right" ? "Right" : "Left"} 0.4s ease-out`
+    ? `detailEnter${flipDir === "right" ? "Right" : "Left"} 0.2s ease-out`
     : flipping === "back"
-    ? `cardFlipOut${flipDir === "right" ? "Right" : "Left"} 0.3s ease-in forwards`
+    ? `detailExit${flipDir === "right" ? "Right" : "Left"} 0.2s ease-in forwards`
     : undefined;
 
   return (
