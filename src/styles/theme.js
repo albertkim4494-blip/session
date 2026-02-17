@@ -713,7 +713,7 @@ export function getStyles(colors) {
       color: colors.text,
       fontSize: 14,
       fontFamily: "inherit",
-      resize: "vertical",
+      resize: "none",
       width: "100%",
       boxSizing: "border-box",
     },

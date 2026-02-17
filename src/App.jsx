@@ -3598,7 +3598,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </div>
 
               {/* Front body */}
-              <div ref={logBodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }} onFocusCapture={handleFocusCapture}>
+              <div ref={logBodyRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16, touchAction: "pan-y" }} onFocusCapture={handleFocusCapture}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {logScheme && (
             <div style={{
