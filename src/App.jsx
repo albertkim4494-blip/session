@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
-import { setBackHandler } from "./lib/backHandler";
 import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
 import { supabase } from "./lib/supabase";
 import { fetchCoachInsights } from "./lib/coachApi";
@@ -989,10 +988,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   anyModalOpenRef.current = anyModalOpen;
 
   // ---------------------------------------------------------------------------
-  // BACK BUTTON — handler registration (history mgmt is in lib/backHandler.js)
-  // setBackHandler runs on every render to keep closure over current refs.
+  // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
+  //
+  // Uses location.hash for real navigation entries that Android's native
+  // canGoBack() tracks. Self-caused events identified by hash comparison
+  // (not a counter). Both hashchange + popstate listened as defense-in-depth.
   // ---------------------------------------------------------------------------
-  setBackHandler(() => {
+  const handleBackRef = useRef(null);
+
+  handleBackRef.current = () => {
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
@@ -1009,10 +1013,43 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       sessionStorage.setItem("wt_tab", "train");
     }
     // If already on train, do nothing (stays in app)
-  });
+  };
 
-  // Clear back handler on unmount
-  useEffect(() => () => setBackHandler(null), []);
+  useEffect(() => {
+    let seq = 0;
+    let lastPushedHash = "";
+
+    const pushEntry = () => {
+      seq++;
+      lastPushedHash = "#wt" + seq;
+      location.hash = lastPushedHash;
+    };
+
+    // Clear any leftover hash from previous sessions
+    history.replaceState(null, "", location.pathname + location.search);
+
+    // Push buffer entries — real navigation entries Android tracks
+    for (let i = 0; i < 10; i++) pushEntry();
+
+    const isSelfCaused = () => location.hash === lastPushedHash;
+
+    const onBack = () => {
+      handleBackRef.current?.();
+      pushEntry();
+    };
+
+    // Primary: hashchange
+    const onHashChange = () => { if (!isSelfCaused()) onBack(); };
+    // Fallback: popstate (for edge cases where hashchange doesn't fire)
+    const onPopState = () => { if (!isSelfCaused()) onBack(); };
+
+    window.addEventListener("hashchange", onHashChange);
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, []);
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
   const logBackHandlerRef = useRef(null);
