@@ -3205,43 +3205,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       <Modal open={modals.log.isOpen} headerContent={(() => {
         const hCtx = modals.log.context;
         const hExList = hCtx?.workoutExercises || [];
-        const hIdx = hExList.findIndex((e) => e.id === hCtx?.exerciseId);
-        const hPos = hIdx >= 0 ? hIdx + 1 : 0;
-        const hTotal = hExList.length;
         return (
-        <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-          {/* Info icon — opens exercise detail */}
-          {hCtx?.catalogId ? (
-            <button
-              onClick={() => {
-                const entry = catalogMap.get(hCtx.catalogId);
-                if (!entry) return;
-                const entries = hExList
-                  .map((ex) => ex.catalogId ? catalogMap.get(ex.catalogId) : null)
-                  .filter(Boolean);
-                dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry, entries } });
-              }}
-              style={{ ...styles.iconBtn, padding: 4, flexShrink: 0 }}
-              aria-label="Exercise info"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.45 }}>
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-            </button>
-          ) : (
-            <div style={{ width: 24, flexShrink: 0 }} />
+        <div style={{ ...styles.modalTitle, cursor: hCtx?.catalogId ? "pointer" : "default", display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}
+          onClick={() => {
+            if (!hCtx?.catalogId) return;
+            const entry = catalogMap.get(hCtx.catalogId);
+            if (!entry) return;
+            const entries = hExList
+              .map((ex) => ex.catalogId ? catalogMap.get(ex.catalogId) : null)
+              .filter(Boolean);
+            dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry, entries } });
+          }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hCtx?.exerciseName || "Log"}</span>
+          {hCtx?.catalogId && (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35, flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
           )}
-          {/* Centered name + position */}
-          <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
-            <div style={{ ...styles.modalTitle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {hCtx?.exerciseName || "Log"}
-            </div>
-            {hPos > 0 && hTotal > 1 && (
-              <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.35, marginTop: -2 }}>{hPos} of {hTotal}</div>
-            )}
-          </div>
         </div>
         );
       })()

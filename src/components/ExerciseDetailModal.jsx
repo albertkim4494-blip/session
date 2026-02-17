@@ -287,9 +287,6 @@ export function ExerciseDetailModal({
           </button>
           <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
             <div style={{ ...styles.modalTitle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.name}</div>
-            {position > 0 && total > 1 && (
-              <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.35, marginTop: -2 }}>{position} of {total}</div>
-            )}
           </div>
           {entry.custom && onDeleteCustomExercise ? (
             <button
