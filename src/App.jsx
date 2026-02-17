@@ -190,9 +190,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logFlipTimeoutRef = useRef(null);
   const logBodyRef = useRef(null);
   const logDetailBodyRef = useRef(null);
-  const logScrollSnapRef = useRef(null);
-  const [logNavAnim, setLogNavAnim] = useState(null); // null|"exit-up"|"exit-down"|"enter-start"|"enter-end"
   const logNavAnimRef = useRef(null);
+  const logCardRef = useRef(null);
+  const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, scrollEl: null, scrollSnap: null });
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -542,7 +542,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       logNavAnimRef.current = null;
       setLogFlipped(false);
       setLogFlipAngle(0);
-      setLogNavAnim(null);
+      // Reset any inline drag styles on the card
+      const card = logCardRef.current;
+      if (card) { card.style.transform = ""; card.style.opacity = ""; card.style.transition = ""; card.style.willChange = ""; }
     }
   }, [modals.log.isOpen]);
 
@@ -1292,41 +1294,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     dispatchModal({ type: "CLOSE_LOG" });
   }, [modals.log, dateKey, state.logsByDate, state.preferences, saveLogData]);
 
-  const navLogExercise = useCallback((direction) => {
+  // Check if navigation to next/prev exercise is possible
+  const canNavLogExercise = useCallback((direction) => {
     const ctx = modals.log.context;
-    if (!ctx || logNavAnimRef.current) return;
+    if (!ctx) return null;
     const exList = ctx.workoutExercises || [];
     const idx = exList.findIndex((e) => e.id === ctx.exerciseId);
-    const target = exList[idx + direction];
-    if (!target) return;
+    return exList[idx + direction] || null;
+  }, [modals.log.context]);
 
-    // Phase 1: exit animation (card peels away)
-    const exitPhase = direction > 0 ? "exit-up" : "exit-down";
-    logNavAnimRef.current = exitPhase;
-    setLogNavAnim(exitPhase);
-
-    // Phase 2: after exit, swap exercise and enter
-    setTimeout(() => {
-      setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
-      setShowTargetConfig(false);
-      setPacePopoverIdx(null);
-      setRpePopoverIdx(null);
-      saveLogData();
-      openLog(ctx.workoutId, target);
-
-      // Phase 3: snap new card to start position (no transition)
-      setLogNavAnim("enter-start");
-      // Phase 4: animate into place (next frame so browser picks up the start position)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setLogNavAnim("enter-end");
-          setTimeout(() => {
-            setLogNavAnim(null);
-            logNavAnimRef.current = null;
-          }, 300);
-        });
-      });
-    }, 350);
+  // Swap to target exercise (called after fly-off animation)
+  const swapLogExercise = useCallback((target) => {
+    const ctx = modals.log.context;
+    if (!ctx) return;
+    setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
+    setShowTargetConfig(false);
+    setPacePopoverIdx(null);
+    setRpePopoverIdx(null);
+    saveLogData();
+    openLog(ctx.workoutId, target);
   }, [modals.log.context, saveLogData, openLog]);
 
   // Flip log card to show exercise detail (back face) or return to log (front face)
@@ -1346,65 +1332,182 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     logFlipTimeoutRef.current = setTimeout(() => setLogFlipped(false), 450);
   }, []);
 
-  const logSwipeBase = useSwipe({
-    onSwipeLeft: () => flipLogToDetail("left"),
-    onSwipeRight: () => flipLogToDetail("right"),
-    onSwipeUp: () => {
-      const snap = logScrollSnapRef.current;
-      const el = logBodyRef.current;
-      if (!snap || !el) return;
-      const wasAtBottom = snap.top + snap.client >= snap.height - 5;
-      const scrollMoved = Math.abs(el.scrollTop - snap.top) > 5;
-      if (wasAtBottom && !scrollMoved) navLogExercise(1);
-    },
-    onSwipeDown: () => {
-      const snap = logScrollSnapRef.current;
-      const el = logBodyRef.current;
-      if (!snap || !el) return;
-      const wasAtTop = snap.top <= 5;
-      const scrollMoved = Math.abs(el.scrollTop - snap.top) > 5;
-      if (wasAtTop && !scrollMoved) navLogExercise(-1);
-    },
-  });
-  const logSwipe = {
-    onTouchStart: (e) => {
-      const el = logBodyRef.current;
-      logScrollSnapRef.current = el ? { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight } : null;
-      logSwipeBase.onTouchStart(e);
-    },
-    onTouchEnd: logSwipeBase.onTouchEnd,
-  };
+  // --- Real-time drag-to-navigate touch system ---
+  const logTouchStart = useCallback((e) => {
+    if (logNavAnimRef.current) return;
+    // Skip if mid-flip transition
+    const angle = logFlipAngleRef.current;
+    if (angle !== 0 && angle !== 180 && angle !== -180) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    const isFlipped = angle === 180 || angle === -180;
+    const scrollEl = isFlipped ? logDetailBodyRef.current : logBodyRef.current;
+    const d = logDragRef.current;
+    d.active = true;
+    d.startY = t.clientY;
+    d.startX = t.clientX;
+    d.currentY = t.clientY;
+    d.captured = false;
+    d.direction = 0;
+    d.isHorizontal = false;
+    d.scrollEl = scrollEl;
+    d.scrollSnap = scrollEl ? { top: scrollEl.scrollTop, height: scrollEl.scrollHeight, client: scrollEl.clientHeight } : null;
+  }, []);
 
-  const logDetailScrollSnapRef = useRef(null);
-  const logDetailSwipeBase = useSwipe({
-    onSwipeLeft: () => flipLogToFront(),
-    onSwipeRight: () => flipLogToFront(),
-    onSwipeUp: () => {
-      const snap = logDetailScrollSnapRef.current;
-      const el = logDetailBodyRef.current;
-      if (!snap || !el) return;
-      const wasAtBottom = snap.top + snap.client >= snap.height - 5;
-      const scrollMoved = Math.abs(el.scrollTop - snap.top) > 5;
-      if (wasAtBottom && !scrollMoved) navLogExercise(1);
-    },
-    onSwipeDown: () => {
-      const snap = logDetailScrollSnapRef.current;
-      const el = logDetailBodyRef.current;
-      if (!snap || !el) return;
-      const wasAtTop = snap.top <= 5;
-      const scrollMoved = Math.abs(el.scrollTop - snap.top) > 5;
-      if (wasAtTop && !scrollMoved) navLogExercise(-1);
-    },
-    thresholdPx: 50,
-  });
-  const logDetailSwipe = {
-    onTouchStart: (e) => {
-      const el = logDetailBodyRef.current;
-      logDetailScrollSnapRef.current = el ? { top: el.scrollTop, height: el.scrollHeight, client: el.clientHeight } : null;
-      logDetailSwipeBase.onTouchStart(e);
-    },
-    onTouchEnd: logDetailSwipeBase.onTouchEnd,
-  };
+  // Non-passive touchmove on card wrapper (allows preventDefault to stop scroll)
+  useEffect(() => {
+    const el = logCardRef.current;
+    if (!el) return;
+    const onMove = (e) => {
+      const d = logDragRef.current;
+      if (!d.active) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      const dx = t.clientX - d.startX;
+      const dy = t.clientY - d.startY;
+
+      // Axis detection: first 10px decides horizontal vs vertical
+      if (!d.captured && !d.isHorizontal && Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (!d.captured && !d.isHorizontal) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          d.isHorizontal = true;
+          return;
+        }
+      }
+      if (d.isHorizontal) return;
+
+      // Vertical drag — check scroll boundary + canNav
+      if (!d.captured) {
+        const snap = d.scrollSnap;
+        const scrollEl = d.scrollEl;
+        if (!snap) return;
+        const scrollMoved = scrollEl ? Math.abs(scrollEl.scrollTop - snap.top) > 5 : false;
+        if (scrollMoved) { d.active = false; return; }
+        const direction = dy < 0 ? 1 : -1; // swipe up = next (+1), swipe down = prev (-1)
+        const atBoundary = direction > 0
+          ? (snap.top + snap.client >= snap.height - 5) // at bottom
+          : (snap.top <= 5); // at top
+        if (!atBoundary) { d.active = false; return; }
+        const target = canNavLogExercise(direction);
+        if (!target) { d.active = false; return; }
+        // Capture the drag
+        d.captured = true;
+        d.direction = direction;
+        if (scrollEl) scrollEl.style.overflow = "hidden";
+        const card = logCardRef.current;
+        if (card) card.style.willChange = "transform, opacity";
+      }
+
+      // Drag captured — update card transform
+      e.preventDefault();
+      d.currentY = t.clientY;
+      const rawDy = t.clientY - d.startY;
+      const screenH = window.innerHeight;
+      const progress = Math.min(Math.abs(rawDy) / screenH, 1);
+      const rotation = (rawDy / screenH) * 8;
+      const scale = 1 - progress * 0.06;
+      const opacity = 1 - progress * 0.5;
+      const card = logCardRef.current;
+      if (card) {
+        card.style.transform = `translateY(${rawDy}px) rotate(${rotation}deg) scale(${scale})`;
+        card.style.opacity = opacity;
+      }
+    };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, [canNavLogExercise]);
+
+  const logTouchEnd = useCallback((e) => {
+    const d = logDragRef.current;
+    if (!d.active) return;
+    d.active = false;
+    const card = logCardRef.current;
+
+    // Restore scroll on captured drags
+    if (d.captured && d.scrollEl) {
+      d.scrollEl.style.overflow = "";
+    }
+
+    // Horizontal swipe — trigger flip
+    if (d.isHorizontal) {
+      const end = e.changedTouches?.[0];
+      if (end) {
+        const dx = end.clientX - d.startX;
+        if (Math.abs(dx) >= 50) {
+          const isFlipped = logFlipAngleRef.current === 180 || logFlipAngleRef.current === -180;
+          if (isFlipped) {
+            flipLogToFront();
+          } else {
+            flipLogToDetail(dx < 0 ? "left" : "right");
+          }
+        }
+      }
+      return;
+    }
+
+    if (!d.captured || !card) return;
+
+    const rawDy = (e.changedTouches?.[0]?.clientY ?? d.currentY) - d.startY;
+    const screenH = window.innerHeight;
+    const progress = Math.abs(rawDy) / screenH;
+    const threshold = 0.15; // 15% of screen height
+
+    if (progress >= threshold) {
+      // Commit navigation
+      const target = canNavLogExercise(d.direction);
+      if (!target) { resetCard(); return; }
+      logNavAnimRef.current = "flying";
+
+      if (d.direction > 0) {
+        // Swipe UP → next: current card flies off upward, new card enters from below
+        card.style.transition = "transform 0.25s ease-in, opacity 0.25s ease-in";
+        card.style.transform = `translateY(${-screenH}px) rotate(-15deg)`;
+        card.style.opacity = "0";
+        setTimeout(() => {
+          swapLogExercise(target);
+          card.style.transition = "none";
+          card.style.transform = "translateY(40px) scale(0.95)";
+          card.style.opacity = "0";
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              card.style.transition = "transform 0.35s cubic-bezier(.2,.8,.3,1), opacity 0.35s ease-out";
+              card.style.transform = "none";
+              card.style.opacity = "1";
+              setTimeout(() => { card.style.willChange = ""; card.style.transition = ""; logNavAnimRef.current = null; }, 350);
+            });
+          });
+        }, 250);
+      } else {
+        // Swipe DOWN → prev: swap immediately, prev card flies in from above
+        swapLogExercise(target);
+        card.style.transition = "none";
+        card.style.transform = `translateY(${-screenH}px) rotate(-8deg)`;
+        card.style.opacity = "0";
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            card.style.transition = "transform 0.35s cubic-bezier(.2,.8,.3,1), opacity 0.35s ease-out";
+            card.style.transform = "none";
+            card.style.opacity = "1";
+            setTimeout(() => { card.style.willChange = ""; card.style.transition = ""; logNavAnimRef.current = null; }, 350);
+          });
+        });
+      }
+    } else {
+      // Spring back
+      resetCard();
+    }
+
+    function resetCard() {
+      card.style.transition = "transform 0.45s cubic-bezier(.25,1.5,.35,1), opacity 0.3s ease-out";
+      card.style.transform = "none";
+      card.style.opacity = "1";
+      setTimeout(() => {
+        card.style.willChange = "";
+        card.style.transition = "";
+        logNavAnimRef.current = null;
+      }, 450);
+    }
+  }, [canNavLogExercise, swapLogExercise, flipLogToDetail, flipLogToFront]);
 
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId) => {
@@ -3417,37 +3520,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             }
           };
 
-          // Nav animation styles (card-stack peel)
-          const navStyle = (() => {
-            switch (logNavAnim) {
-              case "exit-up": return {
-                transformOrigin: "top left",
-                transform: "rotate(-12deg) translateY(-110%)",
-                opacity: 0,
-                transition: "transform 0.35s ease-in, opacity 0.35s ease-in",
-              };
-              case "exit-down": return {
-                transformOrigin: "bottom left",
-                transform: "rotate(12deg) translateY(110%)",
-                opacity: 0,
-                transition: "transform 0.35s ease-in, opacity 0.35s ease-in",
-              };
-              case "enter-start": return {
-                transform: "translateY(30px) scale(0.97)",
-                opacity: 0,
-                transition: "none",
-              };
-              case "enter-end": return {
-                transform: "none",
-                opacity: 1,
-                transition: "transform 0.3s cubic-bezier(.2,.8,.3,1), opacity 0.3s ease-out",
-              };
-              default: return {};
-            }
-          })();
-
           return (
-        <div style={{ perspective: 1200, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", ...navStyle }}>
+        <div
+          ref={logCardRef}
+          onTouchStart={logTouchStart}
+          onTouchEnd={logTouchEnd}
+          style={{ perspective: 1200, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+        >
           <div style={{
             flex: 1, minHeight: 0,
             transition: "transform 0.45s cubic-bezier(.4,.0,.2,1)",
@@ -3456,7 +3535,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             position: "relative",
           }}>
             {/* ===== FRONT FACE: Log ===== */}
-            <div {...logSwipe} style={{
+            <div style={{
               position: "absolute", inset: 0,
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
@@ -4095,7 +4174,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
             {/* ===== BACK FACE: Exercise detail ===== */}
             {logDetailEntry && (
-              <div {...logDetailSwipe} style={{
+              <div style={{
                 position: "absolute", inset: 0,
                 backfaceVisibility: "hidden",
                 WebkitBackfaceVisibility: "hidden",
