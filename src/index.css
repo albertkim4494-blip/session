@@ -93,24 +93,6 @@ button:focus-visible {
   100% { background-position: -200% 0; }
 }
 
-/* Detail slide — subtle directional transition for log ↔ detail */
-@keyframes detailEnterLeft {
-  from { opacity: 0; transform: translateX(15%); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes detailEnterRight {
-  from { opacity: 0; transform: translateX(-15%); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes detailExitLeft {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(-15%); }
-}
-@keyframes detailExitRight {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(15%); }
-}
-
 @keyframes cardSlideLeft {
   from {
     opacity: 0;

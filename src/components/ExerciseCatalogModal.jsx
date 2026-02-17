@@ -137,6 +137,14 @@ export function ExerciseCatalogModal({
       };
       backOverrideRef.current = handler;
       ownHandlerRef.current = handler;
+    } else if (open) {
+      // Home/category view: back closes catalog
+      const handler = () => {
+        onClose();
+        return true;
+      };
+      backOverrideRef.current = handler;
+      ownHandlerRef.current = handler;
     } else {
       // Only clear if we still own it — don't clobber other component's handler
       if (backOverrideRef.current === ownHandlerRef.current) {
@@ -144,7 +152,7 @@ export function ExerciseCatalogModal({
       }
       ownHandlerRef.current = null;
     }
-  }, [open, !!detailEntry, view, backOverrideRef, goHome]);
+  }, [open, !!detailEntry, view, backOverrideRef, goHome, onClose]);
 
   // Two-step filter pipeline: structural filters → text search
   const filteredCatalog = useMemo(() => {

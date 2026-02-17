@@ -38,10 +38,11 @@ import { ExerciseCatalogModal } from "./components/ExerciseCatalogModal";
 import { GenerateWizardModal } from "./components/GenerateWizardModal";
 import { GenerateTodayModal } from "./components/GenerateTodayModal";
 import { CustomExerciseModal } from "./components/CustomExerciseModal";
-import { ExerciseDetailModal } from "./components/ExerciseDetailModal";
 import { EditExerciseModal } from "./components/EditExerciseModal";
 import { getSportIconUrl } from "./lib/sportIcons";
 import { enrichExercise } from "./lib/exerciseEnrichmentApi";
+import { ExerciseGif } from "./components/ExerciseGif";
+import { BodyDiagram } from "./components/BodyDiagram";
 import { FriendSearchModal } from "./components/FriendSearchModal";
 import { ShareWorkoutModal } from "./components/ShareWorkoutModal";
 import { WorkoutPreviewModal } from "./components/WorkoutPreviewModal";
@@ -181,6 +182,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [socialPending, setSocialPending] = useState([]);
   const [socialInbox, setSocialInbox] = useState([]);
   const [socialLoading, setSocialLoading] = useState(false);
+
+  // Log card flip state (log ↔ exercise detail)
+  const [logFlipped, setLogFlipped] = useState(false);
+  const [logFlipAngle, setLogFlipAngle] = useState(0); // 0 | 180 | -180
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -515,6 +520,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const fullCatalog = useMemo(() => [...EXERCISE_CATALOG, ...(state.customExercises || [])], [state.customExercises]);
   const catalogMap = useMemo(() => buildCatalogMap(fullCatalog), [fullCatalog]);
+
+  // Catalog entry for the back face of the log card flip
+  const logDetailEntry = useMemo(() => {
+    const cid = modals.log.context?.catalogId;
+    return cid ? catalogMap.get(cid) : null;
+  }, [modals.log.context?.catalogId, catalogMap]);
+
+  // Reset flip state when log closes
+  useEffect(() => {
+    if (!modals.log.isOpen) {
+      setLogFlipped(false);
+      setLogFlipAngle(0);
+    }
+  }, [modals.log.isOpen]);
 
   const logsForDate = state.logsByDate[dateKey] ?? EMPTY_OBJ;
 
@@ -945,7 +964,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     modals.changePassword.isOpen || modals.welcomeChoice.isOpen || modals.editWorkout?.isOpen ||
     modals.editExercise?.isOpen || modals.catalogBrowse.isOpen || modals.generateWizard.isOpen ||
     modals.generateToday.isOpen || modals.customExercise?.isOpen || modals.billing?.isOpen ||
-    modals.exerciseDetail?.isOpen || modals.social?.isOpen || modals.friendSearch?.isOpen ||
+    modals.social?.isOpen || modals.friendSearch?.isOpen ||
     modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen;
 
   const modalHistoryRef = useRef(false);
@@ -953,8 +972,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const anyModalOpenRef = useRef(false);
   anyModalOpenRef.current = anyModalOpen;
 
-  // Push a base history entry on mount so back-button never immediately exits PWA
+  // Push two base history entries on mount so rapid back-presses never exit PWA
   useEffect(() => {
+    history.pushState({ app: true }, "");
     history.pushState({ app: true }, "");
   }, []);
 
@@ -997,6 +1017,31 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  // Back button override for log modal (flipped state → flip back; normal → close log)
+  const logBackHandlerRef = useRef(null);
+  useEffect(() => {
+    if (modals.log.isOpen && logFlipped) {
+      const handler = () => { flipLogToFront(); return true; };
+      backOverrideRef.current = handler;
+      logBackHandlerRef.current = handler;
+    } else if (modals.log.isOpen) {
+      const handler = () => {
+        setShowTargetConfig(false);
+        setPacePopoverIdx(null);
+        setRpePopoverIdx(null);
+        dispatchModal({ type: "CLOSE_LOG" });
+        return true;
+      };
+      backOverrideRef.current = handler;
+      logBackHandlerRef.current = handler;
+    } else {
+      if (backOverrideRef.current === logBackHandlerRef.current) {
+        backOverrideRef.current = null;
+      }
+      logBackHandlerRef.current = null;
+    }
+  }, [modals.log.isOpen, logFlipped]);
 
   // ---------------------------------------------------------------------------
   // HELPER FUNCTIONS
@@ -1251,24 +1296,31 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     openLog(ctx.workoutId, target);
   }, [modals.log.context, saveLogData, openLog]);
 
-  // Swipe left/right on log → flip to exercise detail; up/down → navigate exercises
-  const openDetailFromLog = useCallback((flipDir) => {
-    const ctx = modals.log.context;
-    if (!ctx?.catalogId) return;
-    const entry = catalogMap.get(ctx.catalogId);
-    if (!entry) return;
-    const exList = ctx.workoutExercises || [];
-    const entries = exList
-      .map((ex) => ex.catalogId ? catalogMap.get(ex.catalogId) : null)
-      .filter(Boolean);
-    dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry, entries, flipDir } });
-  }, [modals.log.context, catalogMap, dispatchModal]);
+  // Flip log card to show exercise detail (back face) or return to log (front face)
+  const flipLogToDetail = useCallback((dir) => {
+    if (!logDetailEntry) return;
+    setLogFlipAngle(dir === "right" ? -180 : 180);
+    setLogFlipped(true);
+  }, [logDetailEntry]);
+
+  const flipLogToFront = useCallback(() => {
+    setLogFlipAngle(0);
+    setTimeout(() => setLogFlipped(false), 450);
+  }, []);
 
   const logSwipe = useSwipe({
-    onSwipeLeft: () => openDetailFromLog("left"),
-    onSwipeRight: () => openDetailFromLog("right"),
+    onSwipeLeft: () => flipLogToDetail("left"),
+    onSwipeRight: () => flipLogToDetail("right"),
     onSwipeUp: () => navLogExercise(1),
     onSwipeDown: () => navLogExercise(-1),
+  });
+
+  const logDetailSwipe = useSwipe({
+    onSwipeLeft: () => flipLogToFront(),
+    onSwipeRight: () => flipLogToFront(),
+    onSwipeUp: () => {},
+    onSwipeDown: () => {},
+    thresholdPx: 50,
   });
 
   const completeSet = useCallback(
@@ -1774,19 +1826,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       showToast("Failed to import file");
     }
   }
-
-  const handleViewExerciseDetail = useCallback((exercise) => {
-    if (!exercise?.catalogId) {
-      showToast("Exercise detail unavailable");
-      return;
-    }
-    const entry = catalogMap.get(exercise.catalogId);
-    if (!entry) {
-      showToast("Exercise detail unavailable");
-      return;
-    }
-    dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry } });
-  }, [catalogMap]);
 
   function handleAddSuggestion(exerciseName) {
     dispatchModal({
@@ -3216,18 +3255,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       {/* Log Modal */}
       <Modal open={modals.log.isOpen} headerContent={(() => {
         const hCtx = modals.log.context;
-        const hExList = hCtx?.workoutExercises || [];
+        if (logFlipped) {
+          return (
+            <div style={{ ...styles.modalTitle, display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hCtx?.exerciseName || "Detail"}</span>
+            </div>
+          );
+        }
         return (
         <div style={{ ...styles.modalTitle, cursor: hCtx?.catalogId ? "pointer" : "default", display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}
-          onClick={() => {
-            if (!hCtx?.catalogId) return;
-            const entry = catalogMap.get(hCtx.catalogId);
-            if (!entry) return;
-            const entries = hExList
-              .map((ex) => ex.catalogId ? catalogMap.get(ex.catalogId) : null)
-              .filter(Boolean);
-            dispatchModal({ type: "OPEN_EXERCISE_DETAIL", payload: { entry, entries } });
-          }}
+          onClick={() => flipLogToDetail("left")}
         >
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{hCtx?.exerciseName || "Log"}</span>
           {hCtx?.catalogId && (
@@ -3240,7 +3277,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         </div>
         );
       })()
-      } onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} headerActions={modals.log.isOpen ? (() => {
+      } onClose={() => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); setLogFlipped(false); setLogFlipAngle(0); dispatchModal({ type: "CLOSE_LOG" }); }} styles={styles} headerActions={modals.log.isOpen ? (() => {
+        if (logFlipped) {
+          return (
+            <button
+              onClick={() => flipLogToFront()}
+              style={{ ...styles.iconBtn, padding: 4 }}
+              aria-label="Back to log"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          );
+        }
         const hEx = modals.log.context?.exerciseId;
         let hExObj = null;
         if (hEx) {
@@ -3277,6 +3327,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </button>
         );
       })() : null} footer={modals.log.isOpen ? (() => {
+        if (logFlipped) return <div style={{ height: 1 }} />;
         return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <button className="btn-press" style={{ ...styles.primaryBtn, width: "100%", padding: "14px 12px", textAlign: "center" }} onClick={saveLog}>
@@ -3332,6 +3383,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             : null;
 
           return (
+        <div style={{ perspective: 1200, width: "100%", flex: 1, minHeight: 0 }}>
+          <div style={{
+            width: "100%", height: "100%",
+            transition: "transform 0.45s cubic-bezier(.4,.0,.2,1)",
+            transformStyle: "preserve-3d",
+            transform: `rotateY(${logFlipAngle}deg)`,
+            position: "relative",
+          }}>
+            {/* Front face: Log content */}
+            <div style={{
+              position: "absolute", inset: 0,
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              overflowY: "auto",
+            }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1 }} {...logSwipe}>
           {logScheme && (
             <div style={{
@@ -3903,6 +3969,47 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </div>
 
         </div>
+            </div>
+            {/* Back face: Exercise detail */}
+            {logDetailEntry && (
+              <div style={{
+                position: "absolute", inset: 0,
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+                transform: "rotateY(180deg)",
+                overflowY: "auto",
+                padding: "4px 0",
+              }} {...logDetailSwipe}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    {logDetailEntry.movement && (
+                      <span style={{
+                        display: "inline-block", padding: "3px 8px", borderRadius: 999,
+                        fontSize: 11, fontWeight: 700, background: colors.primaryBg,
+                        color: colors.primaryText, textTransform: "capitalize",
+                      }}>{logDetailEntry.movement}</span>
+                    )}
+                    {(logDetailEntry.equipment || []).map((e) => (
+                      <span key={e} style={{
+                        display: "inline-block", padding: "3px 8px", borderRadius: 999,
+                        fontSize: 10, fontWeight: 600, background: colors.subtleBg,
+                        border: `1px solid ${colors.border}`, opacity: 0.8,
+                      }}>{e}</span>
+                    ))}
+                  </div>
+                  <ExerciseGif gifUrl={logDetailEntry.gifUrl} exerciseName={logDetailEntry.name} colors={colors} />
+                  {logDetailEntry.muscles?.primary?.length > 0 && (
+                    <BodyDiagram
+                      highlightedMuscles={logDetailEntry.muscles.primary}
+                      secondaryMuscles={logDetailEntry.muscles.secondary || []}
+                      colors={colors}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
           );
         })()}
       </Modal>
@@ -4286,15 +4393,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }}
       />
 
-      {/* Exercise Detail Modal (view-only, from Train tab) */}
-      <ExerciseDetailView
-        modals={modals}
-        dispatchModal={dispatchModal}
-        styles={styles}
-        colors={colors}
-        backOverrideRef={backOverrideRef}
-      />
-
       {/* Profile Modal */}
       <ProfileModal
         open={modals.profile.isOpen}
@@ -4652,95 +4750,6 @@ function MoodPicker({ value, onChange, colors }) {
         ))}
       </div>
     </div>
-  );
-}
-
-// ============================================================================
-// ExerciseDetailView — wraps ExerciseDetailModal with swipe navigation
-// for the train-tab "view detail" flow (entries list from workout exercises)
-// ============================================================================
-
-function ExerciseDetailView({ modals, dispatchModal, styles, colors, backOverrideRef }) {
-  const { isOpen, entry, entries, flipDir: openFlipDir } = modals.exerciseDetail;
-  const [flipping, setFlipping] = React.useState(null); // "in" | "back" | null
-  const [flipDir, setFlipDir] = React.useState("left"); // "left" | "right"
-  const [showAfterFlip, setShowAfterFlip] = React.useState(false);
-
-  // When modal opens, start flip-in with the requested direction
-  React.useEffect(() => {
-    if (isOpen) {
-      setFlipDir(openFlipDir || "left");
-      setFlipping("in");
-      setShowAfterFlip(true);
-    } else {
-      setShowAfterFlip(false);
-      setFlipping(null);
-    }
-  }, [isOpen, openFlipDir]);
-
-  // Slide back to log — direction matches the swipe that triggered it
-  const handleBack = React.useCallback((dir) => {
-    setFlipDir(dir || "left");
-    setFlipping("back");
-    setTimeout(() => {
-      setShowAfterFlip(false);
-      setFlipping(null);
-      dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" });
-    }, 200);
-  }, [dispatchModal]);
-
-  // System back button: exercise detail open → flip back to log;
-  // exercise detail closed but log open → close log modal.
-  // Uses handler identity to avoid clobbering catalog's backOverrideRef.
-  const logIsOpen = modals.log.isOpen;
-  const ownHandlerRef = React.useRef(null);
-  React.useEffect(() => {
-    if (!backOverrideRef) return;
-    if (isOpen) {
-      const handler = () => { handleBack("left"); return true; };
-      backOverrideRef.current = handler;
-      ownHandlerRef.current = handler;
-    } else if (logIsOpen) {
-      const handler = () => { dispatchModal({ type: "CLOSE_LOG" }); return true; };
-      backOverrideRef.current = handler;
-      ownHandlerRef.current = handler;
-    } else {
-      // Only clear if we still own it — don't clobber catalog's handler
-      if (backOverrideRef.current === ownHandlerRef.current) {
-        backOverrideRef.current = null;
-      }
-      ownHandlerRef.current = null;
-    }
-  }, [isOpen, logIsOpen, backOverrideRef, handleBack, dispatchModal]);
-
-  // Swipe left/right → slide back to log; up/down → no-op (block propagation)
-  const noop = React.useCallback(() => {}, []);
-  const swipeHandlers = useSwipe({
-    onSwipeLeft: () => handleBack("left"),
-    onSwipeRight: () => handleBack("right"),
-    onSwipeUp: noop,
-    onSwipeDown: noop,
-    thresholdPx: 50,
-  });
-
-  // Determine sheet animation — subtle directional slide matching swipe
-  const sheetAnimation = flipping === "in"
-    ? `detailEnter${flipDir === "right" ? "Right" : "Left"} 0.2s ease-out`
-    : flipping === "back"
-    ? `detailExit${flipDir === "right" ? "Right" : "Left"} 0.2s ease-in forwards`
-    : undefined;
-
-  return (
-    <ExerciseDetailModal
-      open={showAfterFlip}
-      entry={entry}
-      onBack={() => handleBack("left")}
-      onClose={() => { setShowAfterFlip(false); setFlipping(null); dispatchModal({ type: "CLOSE_EXERCISE_DETAIL" }); dispatchModal({ type: "CLOSE_LOG" }); }}
-      styles={styles}
-      colors={colors}
-      swipeHandlers={swipeHandlers}
-      sheetAnimation={sheetAnimation}
-    />
   );
 }
 
