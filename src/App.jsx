@@ -1020,6 +1020,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   useEffect(() => {
     const handlePopState = () => {
+      // DEBUG: diagnostic toast — remove after confirming handler fires
+      const tag = anyModalOpenRef.current ? "modal" : "tab=" + tabRef.current;
+      document.title = "back:" + tag + " h=" + history.length;
+      try { document.getElementById("__back_dbg").textContent = "back:" + tag + " h=" + history.length; } catch(_){}
+
       // If any modal is open, close it instead of navigating away
       if (anyModalOpenRef.current) {
         // Check for sub-view override (e.g. detail view inside catalog)
@@ -2300,6 +2305,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   return (
     <div style={styles.app}>
+      {/* DEBUG: back button diagnostic — remove after testing */}
+      <div id="__back_dbg" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 99999, background: "#f00", color: "#fff", fontSize: 12, textAlign: "center", padding: 2, pointerEvents: "none" }}>back:waiting</div>
       {/* Main content column */}
       <div style={styles.content}>
         {/* Top bar */}
