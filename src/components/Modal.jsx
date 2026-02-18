@@ -1,7 +1,7 @@
 import React from "react";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
-export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose, sheetAnimation, noChrome }) {
+export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose, sheetAnimation, noChrome, sheetRef, footerRef }) {
   const kbInset = useKeyboardInset();
 
   if (!open) return null;
@@ -42,6 +42,7 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
   return (
     <div style={overlayStyle} onMouseDown={fullScreen ? undefined : onClose}>
       <div
+        ref={sheetRef}
         style={sheetStyle}
         onMouseDown={fullScreen ? undefined : (e) => e.stopPropagation()}
       >
@@ -66,7 +67,7 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
           {children}
         </div>
         {footer && (
-          <div style={{ padding: "8px 12px 12px", flexShrink: 0 }}>
+          <div ref={footerRef} style={{ padding: "8px 12px 12px", flexShrink: 0 }}>
             {footer}
           </div>
         )}

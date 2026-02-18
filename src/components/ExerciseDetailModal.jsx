@@ -19,7 +19,7 @@ import { ExerciseGif } from "./ExerciseGif";
 export function ExerciseDetailModal({
   open, entry, onBack, onClose, onAddExercise, onDeleteCustomExercise,
   workouts, styles, colors, targetWorkoutId,
-  contentRef, position, total,
+  contentRef, sheetRef, footerRef, position, total,
   sheetAnimation,
 }) {
   const [checked, setChecked] = useState(new Set());
@@ -278,6 +278,8 @@ export function ExerciseDetailModal({
       styles={styles}
       footer={footer}
       sheetAnimation={sheetAnimation}
+      sheetRef={sheetRef}
+      footerRef={footerRef}
       headerContent={
         <div style={{ ...styles.modalTitle, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
           {entry.name}
