@@ -83,6 +83,8 @@ export function ExerciseCatalogModal({
   const browseRef = useRef(null);
   const detailSheetRef = useRef(null);
   const detailFooterRef = useRef(null);
+  const detailBodyRef = useRef(null);
+  const bodyDragRef = useRef({ active: false, startX: 0, startY: 0, currentY: 0, captured: false, captureY: 0 });
   const footerDragRef = useRef({ active: false, startX: 0, startY: 0, currentY: 0, captured: false, direction: 0, captureY: 0 });
   const navAnimRef = useRef(null);
 
@@ -209,6 +211,121 @@ export function ExerciseCatalogModal({
     },
     swap: (entry) => setDetailEntry(entry),
   };
+
+  // Vertical swipe down from body (scrolled to top) — previous exercise
+  useEffect(() => {
+    const body = detailBodyRef.current;
+    const sheet = detailSheetRef.current;
+    if (!body || !sheet || !detailEntry) return;
+
+    const onStart = (e) => {
+      if (navAnimRef.current) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      const d = bodyDragRef.current;
+      d.active = true;
+      d.startX = t.clientX;
+      d.startY = t.clientY;
+      d.currentY = t.clientY;
+      d.captured = false;
+      d.captureY = 0;
+    };
+
+    const onMove = (e) => {
+      const d = bodyDragRef.current;
+      if (!d.active) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      const dx = t.clientX - d.startX;
+      const dy = t.clientY - d.startY;
+
+      if (!d.captured && Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (!d.captured) {
+        // Only capture vertical down when scrolled to top
+        if (Math.abs(dx) > Math.abs(dy) || dy <= 0) { d.active = false; return; }
+        if (body.scrollTop > 5) { d.active = false; return; }
+        const target = catalogNavRef.current.canNavigate(-1);
+        if (!target) { d.active = false; return; }
+        d.captured = true;
+        d.captureY = t.clientY;
+        sheet.style.willChange = "transform, opacity";
+        return;
+      }
+
+      d.currentY = t.clientY;
+      const rawDy = t.clientY - d.captureY;
+      const screenH = window.innerHeight;
+      const progress = Math.min(Math.abs(rawDy) / screenH, 1);
+      const rotation = (rawDy / screenH) * 8;
+      const scale = 1 - progress * 0.06;
+      const opacity = 1 - progress * 0.5;
+      sheet.style.transform = `translateY(${rawDy}px) rotate(${rotation}deg) scale(${scale})`;
+      sheet.style.opacity = String(opacity);
+    };
+
+    const onEnd = (e) => {
+      const d = bodyDragRef.current;
+      if (!d.active) return;
+      d.active = false;
+      if (!d.captured) return;
+
+      const rawDy = (e.changedTouches?.[0]?.clientY ?? d.currentY) - d.captureY;
+      const screenH = window.innerHeight;
+      const progress = Math.abs(rawDy) / screenH;
+      const fns = catalogNavRef.current;
+
+      if (progress >= 0.15) {
+        const target = fns.canNavigate(-1);
+        if (!target) { resetSheet(); return; }
+        navAnimRef.current = "flying";
+        sheet.style.transition = "transform 0.25s ease-in, opacity 0.25s ease-in";
+        sheet.style.transform = `translateY(${screenH}px) rotate(15deg)`;
+        sheet.style.opacity = "0";
+        setTimeout(() => {
+          fns.swap(target);
+          sheet.style.transition = "none";
+          sheet.style.transform = "translateY(-40px) scale(0.95)";
+          sheet.style.opacity = "0";
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              sheet.style.transition = "transform 0.35s cubic-bezier(.2,.8,.3,1), opacity 0.35s ease-out";
+              sheet.style.transform = "none";
+              sheet.style.opacity = "1";
+              setTimeout(() => { sheet.style.willChange = ""; sheet.style.transition = ""; navAnimRef.current = null; }, 350);
+            });
+          });
+        }, 250);
+      } else {
+        resetSheet();
+      }
+
+      function resetSheet() {
+        sheet.style.transition = "transform 0.45s cubic-bezier(.25,1.5,.35,1), opacity 0.3s ease-out";
+        sheet.style.transform = "none";
+        sheet.style.opacity = "1";
+        setTimeout(() => { sheet.style.willChange = ""; sheet.style.transition = ""; navAnimRef.current = null; }, 450);
+      }
+    };
+
+    const onCancel = () => {
+      const d = bodyDragRef.current;
+      d.active = false;
+      d.captured = false;
+      sheet.style.transform = ""; sheet.style.opacity = ""; sheet.style.transition = ""; sheet.style.willChange = "";
+      navAnimRef.current = null;
+    };
+
+    body.addEventListener("touchstart", onStart, { passive: true });
+    body.addEventListener("touchmove", onMove, { passive: true });
+    body.addEventListener("touchend", onEnd, { passive: true });
+    body.addEventListener("touchcancel", onCancel, { passive: true });
+    return () => {
+      body.removeEventListener("touchstart", onStart);
+      body.removeEventListener("touchmove", onMove);
+      body.removeEventListener("touchend", onEnd);
+      body.removeEventListener("touchcancel", onCancel);
+    };
+  }, [!!detailEntry]);
 
   // Vertical swipe on footer — whole card flies out (matches log modal)
   useEffect(() => {
@@ -784,6 +901,7 @@ export function ExerciseCatalogModal({
         targetWorkoutId={targetWorkoutId}
         sheetRef={detailSheetRef}
         footerRef={detailFooterRef}
+        bodyRef={detailBodyRef}
         position={detailEntry ? activeResults.findIndex((e) => e.id === detailEntry.id) + 1 : 0}
         total={activeResults.length}
       />

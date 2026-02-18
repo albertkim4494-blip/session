@@ -1,7 +1,7 @@
 import React from "react";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
-export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose, sheetAnimation, noChrome, sheetRef, footerRef }) {
+export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose, sheetAnimation, noChrome, sheetRef, footerRef, bodyRef }) {
   const kbInset = useKeyboardInset();
 
   if (!open) return null;
@@ -61,6 +61,7 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
           )}
         </div>
         <div
+          ref={bodyRef}
           style={bodyStyle}
           onFocusCapture={handleFocusCapture}
         >
