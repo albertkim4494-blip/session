@@ -588,7 +588,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (summaryMode === "week") {
       const start = startOfWeekSunday(anchor);
       const end = summaryOffset === 0 ? dateKey : endOfWeekSunday(anchor);
-      return { start, end, label: "Week" };
+      return { start, end, label: "Last 7 days" };
     }
     if (summaryMode === "month") {
       const start = startOfMonth(anchor);

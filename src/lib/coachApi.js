@@ -117,6 +117,7 @@ function buildEnrichedLogSummary(recentLogs, allWorkouts) {
           const w = Number(s.weight) || 0;
           let part = w > 0 ? `${r}@${w}` : `${r}`;
           if (s.targetRpe) part += ` RPE${s.targetRpe}`;
+          if (s.targetIntensity) part += ` INT${s.targetIntensity}`;
           if (s.targetPace) part += ` pace:${s.targetPace}`;
           if (s.targetCustom) part += ` [${s.targetCustom}]`;
           return part;
