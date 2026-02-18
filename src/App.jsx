@@ -999,6 +999,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (dbgRef.current) dbgRef.current.textContent = msg;
   };
 
+  const backExitRef = useRef(0);
   handleBackRef.current = () => {
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
@@ -1013,7 +1014,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (tabRef.current !== "train") {
       setTab("train");
       sessionStorage.setItem("wt_tab", "train");
+      return;
     }
+    // On train tab with no modals — double-back to exit
+    const now = Date.now();
+    if (now - backExitRef.current < 2000) {
+      window.close();
+      return;
+    }
+    backExitRef.current = now;
+    showToast("Press back again to exit", 2000);
   };
 
   useEffect(() => {
