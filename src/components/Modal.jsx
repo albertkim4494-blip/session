@@ -78,8 +78,11 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
 export function ConfirmModal({ open, title, message, confirmText = "Delete", onCancel, onConfirm, styles }) {
   if (!open) return null;
 
+  // Higher z-index so confirm dialog renders above all other modals
+  const confirmStyles = { ...styles, modalOverlay: { ...styles.modalOverlay, zIndex: 60 } };
+
   return (
-    <Modal open={open} title={title} onClose={onCancel} styles={styles}>
+    <Modal open={open} title={title} onClose={onCancel} styles={confirmStyles}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={styles.smallText}>{message}</div>
         <div style={styles.modalFooter}>

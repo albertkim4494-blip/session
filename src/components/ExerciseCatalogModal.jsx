@@ -653,10 +653,9 @@ export function ExerciseCatalogModal({
         onClose={() => { setSlideDir(null); setDetailEntry(null); onClose(); }}
         onAddExercise={onAddExercise ? (entry, workoutId) => onAddExercise(entry, workoutId) : undefined}
         onDeleteCustomExercise={onDeleteCustomExercise ? (entry) => {
-          onDeleteCustomExercise(entry, () => {
-            setSlideDir(null);
-            setDetailEntry(null);
-          });
+          onDeleteCustomExercise(entry);
+          setSlideDir(null);
+          setDetailEntry(null);
         } : undefined}
         workouts={workouts}
         styles={styles}
