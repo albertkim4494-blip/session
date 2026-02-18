@@ -2988,7 +2988,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </svg>
                   <div style={{ fontWeight: 600, fontSize: 16 }}>No data yet</div>
                   <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
-                    Log a workout on the <b>Train</b> tab and your progress will show up here.
+                    Log a session on the <b>Today</b> tab and your history will show up here.
                   </div>
                 </div>
               ) : (
@@ -3520,25 +3520,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 12h16" /><rect x="2" y="8" width="4" height="8" rx="1" /><rect x="18" y="8" width="4" height="8" rx="1" /><rect x="6" y="6" width="3" height="12" rx="1" /><rect x="15" y="6" width="3" height="12" rx="1" />
             </svg>
-            Train
+            Today
           </button>
           <button className="nav-press btn-press" style={{ ...styles.navBtn, ...(tab === "progress" ? styles.navBtnActive : {}) }} onClick={() => setTab("progress")}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 20h18" /><path d="M7 20V10" /><path d="M12 20V4" /><path d="M17 20V14" />
             </svg>
-            Progress
+            Sessions
           </button>
           <button className="nav-press btn-press" style={{ ...styles.navBtn, ...(tab === "program" ? styles.navBtnActive : {}) }} onClick={() => setTab("program")}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 7h8" /><path d="M8 12h8" /><path d="M8 17h4" />
             </svg>
-            Plan
+            Plans
           </button>
           <button className="nav-press btn-press" style={{ ...styles.navBtn, ...(tab === "social" ? styles.navBtnActive : {}), position: "relative" }} onClick={() => setTab("social")}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
             </svg>
-            Social
+            Community
             {socialBadge > 0 && (
               <div style={{
                 position: "absolute", top: 2, right: "50%", transform: "translateX(12px)",
