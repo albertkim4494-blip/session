@@ -1019,8 +1019,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     // On train tab with no modals — double-back to exit
     const now = Date.now();
     if (now - backExitRef.current < 2000) {
-      window.close();
-      return;
+      return "exit";
     }
     backExitRef.current = now;
     showToast("Press back again to exit", 2000);
@@ -1034,6 +1033,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     // Directly intercepts Android back button without needing history entries.
     let watcher = null;
     let cwWorking = false;
+    let exiting = false;
+
+    const triggerExit = () => {
+      exiting = true;
+      cwWorking = false;
+      // Drain history buffer so OS handles next back as app close
+      if (buffer > 0) {
+        history.go(-buffer);
+        buffer = 0;
+      }
+      setTimeout(() => history.back(), 100);
+      // Reset flag in case app doesn't close (e.g. desktop browser)
+      setTimeout(() => { exiting = false; }, 3000);
+    };
 
     const setupWatcher = () => {
       if (!hasCW) return;
@@ -1041,7 +1054,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         watcher = new CloseWatcher();
         watcher.addEventListener("close", () => {
           watcher = null;
-          handleBackRef.current?.();
+          const result = handleBackRef.current?.();
+          if (result === "exit") { triggerExit(); return; }
           setupWatcher(); // chain for next back press
         });
         cwWorking = true;
@@ -1061,6 +1075,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     };
 
     const ensureEntries = () => {
+      if (exiting) return;
       if (!initialized) {
         initialized = true;
         history.replaceState(null, "", location.pathname + location.search);
@@ -1075,13 +1090,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     let lastBackTime = 0;
     const onBack = () => {
+      if (exiting) return;
       if (location.hash === lastHash) return;
       const now = Date.now();
       if (now - lastBackTime < 300) return;
       lastBackTime = now;
       buffer = Math.max(0, buffer - 1);
       // Only handle via history if CloseWatcher is NOT active
-      if (!cwWorking) handleBackRef.current?.();
+      if (!cwWorking) {
+        const result = handleBackRef.current?.();
+        if (result === "exit") { triggerExit(); return; }
+      }
     };
 
     window.addEventListener("popstate", onBack);
