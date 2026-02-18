@@ -58,7 +58,11 @@ export default function AuthScreen() {
   return (
     <div style={styles.wrapper}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Session</h1>
+        <img
+          src="/icons/icon-192.png"
+          alt="Session"
+          style={styles.logo}
+        />
 
         {/* Mode toggle pills */}
         <div style={styles.pillRow}>
@@ -186,12 +190,12 @@ const styles = {
     borderRadius: 16,
     padding: 32,
   },
-  title: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: 700,
-    textAlign: "center",
-    margin: "0 0 24px",
+  logo: {
+    display: "block",
+    width: 88,
+    height: 88,
+    margin: "0 auto 24px",
+    borderRadius: 18,
   },
   pillRow: {
     display: "flex",
