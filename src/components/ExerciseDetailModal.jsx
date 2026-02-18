@@ -329,28 +329,24 @@ export function ExerciseDetailModal({
           />
         )}
 
-        {/* Swipe affordance: grip lines at bottom corners + position */}
+        {/* Swipe position indicator */}
         {total > 1 && (
           <div style={{
-            display: "flex", alignItems: "flex-end", justifyContent: "space-between",
-            padding: "8px 0 0", userSelect: "none",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 12, padding: "4px 0 2px", opacity: 0.35,
+            fontSize: 12, fontWeight: 600, userSelect: "none",
           }}>
-            {/* Left grip lines — visible when there's a previous */}
-            <div style={{ display: "flex", gap: 3, opacity: position > 1 ? 0.18 : 0 }}>
-              <div style={{ width: 3, height: 18, borderRadius: 2, background: "currentColor" }} />
-              <div style={{ width: 3, height: 18, borderRadius: 2, background: "currentColor" }} />
-            </div>
-
-            {/* Position text */}
-            <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.3 }}>
-              {position} / {total}
-            </span>
-
-            {/* Right grip lines — visible when there's a next */}
-            <div style={{ display: "flex", gap: 3, opacity: position < total ? 0.18 : 0 }}>
-              <div style={{ width: 3, height: 18, borderRadius: 2, background: "currentColor" }} />
-              <div style={{ width: 3, height: 18, borderRadius: 2, background: "currentColor" }} />
-            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ opacity: position > 1 ? 1 : 0 }}>
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            <span>{position} of {total}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ opacity: position < total ? 1 : 0 }}>
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
           </div>
         )}
       </div>
