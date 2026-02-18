@@ -213,6 +213,79 @@ function computeAdherenceStats(logsByDate) {
 }
 
 /**
+ * Build a detailed muscle volume breakdown showing which exercises contributed
+ * to each muscle group's set count, with dates. e.g.:
+ *   "CHEST: 7 sets — Bench Press ×4 (Feb 12), Cable Fly ×3 (Feb 14)"
+ */
+function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap) {
+  // Build exercise ID → info map
+  const exerciseIdToInfo = {};
+  for (const w of allWorkouts || []) {
+    for (const ex of w.exercises || []) {
+      exerciseIdToInfo[ex.id] = {
+        name: ex.name,
+        unit: ex.unit || "reps",
+        catalogId: ex.catalogId,
+      };
+    }
+  }
+
+  // Accumulate: muscleGroup → [ { name, sets, date } ]
+  const muscleExercises = {};
+  for (const [dateKey, dayLogs] of Object.entries(recentLogs || {})) {
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    if (dateKey < dateRange.start || dateKey > dateRange.end) continue;
+    for (const [exId, log] of Object.entries(dayLogs)) {
+      const info = exerciseIdToInfo[exId];
+      if (!info) continue;
+      if (!log?.sets || !Array.isArray(log.sets)) continue;
+      // Only strength exercises (reps unit)
+      if (info.unit !== "reps") continue;
+      const workingSets = log.sets.filter((s) => (Number(s.reps) || 0) > 0).length;
+      if (workingSets === 0) continue;
+
+      // Look up primary muscles from catalog
+      let primaryGroups = null;
+      if (info.catalogId && catalogMap) {
+        const entry = catalogMap.get(info.catalogId);
+        if (entry?.muscles?.primary?.length > 0) {
+          primaryGroups = entry.muscles.primary;
+        }
+      }
+      if (!primaryGroups) continue; // Skip exercises without catalog muscle data
+
+      for (const group of primaryGroups) {
+        if (!muscleExercises[group]) muscleExercises[group] = [];
+        muscleExercises[group].push({ name: info.name, sets: workingSets, date: dateKey });
+      }
+    }
+  }
+
+  // Format each muscle group
+  const lines = [];
+  const sortedGroups = Object.entries(muscleExercises).sort(
+    ([, a], [, b]) => b.reduce((s, e) => s + e.sets, 0) - a.reduce((s, e) => s + e.sets, 0)
+  );
+  for (const [group, entries] of sortedGroups) {
+    const totalSets = entries.reduce((s, e) => s + e.sets, 0);
+    // Merge same-exercise entries across dates
+    const byName = {};
+    for (const e of entries) {
+      if (!byName[e.name]) byName[e.name] = { sets: 0, dates: [] };
+      byName[e.name].sets += e.sets;
+      const shortDate = e.date.slice(5); // "02-12" from "2026-02-12"
+      if (!byName[e.name].dates.includes(shortDate)) byName[e.name].dates.push(shortDate);
+    }
+    const parts = Object.entries(byName).map(
+      ([name, d]) => `${name} ×${d.sets} (${d.dates.join(", ")})`
+    );
+    lines.push(`  ${group.replace(/_/g, " ").toLowerCase()}: ${totalSets} sets — ${parts.join(", ")}`);
+  }
+
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
+/**
  * Fetch AI coach insights. Uses localStorage cache with 15-min TTL.
  *
  * @param {Object} params
@@ -305,12 +378,14 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
 
   // Compute muscle set counts for the AI (primary-only, no secondary inflation)
   let muscleSetsSummary = null;
+  let muscleVolumeDetail = null;
   if (catalog?.length > 0) {
     const catalogMap = buildCatalogMap(catalog);
     const analysis = buildNormalizedAnalysis(allWorkouts, recentLogs, { start: dateRange.start, end: dateRange.end }, catalogMap);
     if (analysis.muscleGroupSets && Object.keys(analysis.muscleGroupSets).length > 0) {
       muscleSetsSummary = analysis.muscleGroupSets;
     }
+    muscleVolumeDetail = buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap);
   }
 
   // Ensure we have a fresh session token before calling the edge function
@@ -343,6 +418,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       adherence,
       previousInsights,
       muscleSetsSummary,
+      muscleVolumeDetail,
     },
   });
 

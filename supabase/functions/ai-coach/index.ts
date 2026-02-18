@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
       previousInsights,
       muscleSetsSummary,
       muscleVolumeSummary, // legacy, ignored if muscleSetsSummary present
+      muscleVolumeDetail, // detailed breakdown: "chest: 7 sets — Bench Press ×4 (02-12), Cable Fly ×3 (02-14)"
     } = await req.json();
 
     const wUnit = weightUnit || "lb";
@@ -183,19 +184,24 @@ Deno.serve(async (req) => {
 
     // Build muscle sets section (primary-only working set counts — the standard volume metric)
     let muscleVolumeSection = "";
-    const setsData = muscleSetsSummary || muscleVolumeSummary; // prefer sets, fall back to legacy reps
-    const setsLabel = muscleSetsSummary ? "sets" : "reps";
-    if (setsData && typeof setsData === "object") {
-      const entries = Object.entries(setsData)
-        .filter(([, v]) => typeof v === "number" && v > 0)
-        .sort(([, a], [, b]) => (b as number) - (a as number));
-      const totalSets = entries.reduce((sum, [, v]) => sum + (v as number), 0);
-      if (entries.length > 0) {
-        const lines = entries.map(([g, v]) => {
-          const pct = totalSets > 0 ? Math.round(((v as number) / totalSets) * 100) : 0;
-          return `  ${(g as string).replace(/_/g, " ").toLowerCase()}: ${v} ${setsLabel} (${pct}%)`;
-        });
-        muscleVolumeSection = `\nMUSCLE GROUP VOLUME (working ${setsLabel}, primary muscles only — ${totalSets} total):\n${lines.join("\n")}\n`;
+    // Prefer the detailed breakdown (includes exercise names & dates) over the summary
+    if (muscleVolumeDetail && typeof muscleVolumeDetail === "string" && muscleVolumeDetail.trim()) {
+      muscleVolumeSection = `\nMUSCLE GROUP VOLUME (working sets, primary muscles only — with exercise breakdown):\n${muscleVolumeDetail}\n`;
+    } else {
+      const setsData = muscleSetsSummary || muscleVolumeSummary;
+      const setsLabel = muscleSetsSummary ? "sets" : "reps";
+      if (setsData && typeof setsData === "object") {
+        const entries = Object.entries(setsData)
+          .filter(([, v]) => typeof v === "number" && v > 0)
+          .sort(([, a], [, b]) => (b as number) - (a as number));
+        const totalSets = entries.reduce((sum, [, v]) => sum + (v as number), 0);
+        if (entries.length > 0) {
+          const lines = entries.map(([g, v]) => {
+            const pct = totalSets > 0 ? Math.round(((v as number) / totalSets) * 100) : 0;
+            return `  ${(g as string).replace(/_/g, " ").toLowerCase()}: ${v} ${setsLabel} (${pct}%)`;
+          });
+          muscleVolumeSection = `\nMUSCLE GROUP VOLUME (working ${setsLabel}, primary muscles only — ${totalSets} total):\n${lines.join("\n")}\n`;
+        }
       }
     }
 
@@ -217,6 +223,14 @@ Factor sport demands into ALL recommendations. Prioritize complementary work, an
 
 Write like a person, not a template. Be direct. Be warm. Use "you" and "your." Reference their actual numbers, their actual exercises, what they actually did in the date range. No filler, no corporate-speak, no "Great job maintaining consistency!" generic nonsense. Say something only if you actually mean it based on their data.
 - IMPORTANT: Say "in the last 7 days" or "recently" instead of "this week" — the date range is rolling, not calendar-week-based.
+
+SPECIFICITY REQUIREMENTS — every insight MUST follow these:
+- ALWAYS state the date range up front: "Over the last 7 days (${dateRange?.start || "?"} to ${dateRange?.end || "?"})..."
+- When citing muscle volume, name the SPECIFIC EXERCISES that contributed: "7 chest sets — 4 from bench press, 3 from cable fly" NOT just "7 sets of chest"
+- When citing numbers, give context: "3 sets of back across 1 session" not just "3 sets of back"
+- When recommending changes, be concrete: "Add 3 sets of barbell rows to your next pull day" not "consider more back work"
+- BAD example: "You're doing 7 sets of chest but just 3 sets of back. Consider adding more back exercises."
+- GOOD example: "Over the last 7 days, your chest got 7 working sets (bench press ×4, cable fly ×3) but your back only got 3 sets from lat pulldowns on one session. Try adding 3-4 sets of barbell rows on your next training day to even this out."
 
 USER PROFILE:
 ${profileContext}
@@ -324,7 +338,7 @@ RESPONSE FORMAT:
 - type: one of "IMBALANCE", "NEGLECTED", "OVERTRAINING", "POSITIVE", "TIP", "RECOVERY", "PROGRESSION"
 - severity: one of "HIGH", "MEDIUM", "LOW", "INFO"
 - title: short title with a leading emoji (⚠️, 💡, 📊, ✅, 🔥, 😴, 📈)
-- message: 1-3 sentences. Sound human. Reference specific data.
+- message: 2-4 sentences. Sound human. First sentence states the finding with date range and specific numbers. Following sentences explain significance and give a concrete action step.
 - suggestions: array of { "catalogId": "<id>", "exercise": "<name>", "muscleGroup": "<GROUP>" } — only if actionable. Use exact catalogId and name from the EXERCISE CATALOG. muscleGroup: ANTERIOR_DELT, LATERAL_DELT, POSTERIOR_DELT, CHEST, TRICEPS, BACK, BICEPS, QUADS, HAMSTRINGS, GLUTES, CALVES, ABS.
 
 OUTPUT FORMAT:
