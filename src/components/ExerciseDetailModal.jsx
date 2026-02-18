@@ -328,6 +328,27 @@ export function ExerciseDetailModal({
             colors={colors}
           />
         )}
+
+        {/* Swipe position indicator */}
+        {total > 1 && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 12, padding: "4px 0 2px", opacity: 0.35,
+            fontSize: 12, fontWeight: 600, userSelect: "none",
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ opacity: position > 1 ? 1 : 0 }}>
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            <span>{position} of {total}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ opacity: position < total ? 1 : 0 }}>
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+          </div>
+        )}
       </div>
     </Modal>
   );
