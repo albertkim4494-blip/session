@@ -48,7 +48,7 @@ import { ShareWorkoutModal } from "./components/ShareWorkoutModal";
 import { WorkoutPreviewModal } from "./components/WorkoutPreviewModal";
 import {
   getFriends, getPendingRequests, getInbox, getUnreadCount,
-  acceptFriendRequest, declineFriendRequest, removeFriend, blockUser,
+  acceptFriendRequest, declineFriendRequest, removeFriend,
   acceptSharedWorkout, dismissSharedWorkout,
 } from "./lib/socialApi";
 
