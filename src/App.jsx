@@ -1010,11 +1010,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Fallback: history entries pushed during user activation.
   // ---------------------------------------------------------------------------
   const handleBackRef = useRef(null);
-  const dbgRef = useRef(null);
-
-  const dbg = (msg) => {
-    if (dbgRef.current) dbgRef.current.textContent = msg;
-  };
 
   handleBackRef.current = () => {
     if (anyModalOpenRef.current) {
@@ -1039,7 +1034,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   useEffect(() => {
     const hasCW = typeof CloseWatcher !== "undefined";
-    dbg("v17 CW:" + (hasCW ? "Y" : "N"));
 
     // --- PRIMARY: CloseWatcher API (Chrome 126+, Samsung Internet 28+) ---
     // Directly intercepts Android back button without needing history entries.
@@ -5159,9 +5153,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           refreshSocial();
         }}
       />
-
-      {/* Version indicator — confirms new code is loaded (remove after back-button debugging) */}
-      <div ref={dbgRef} style={{ position: "fixed", bottom: 2, right: 6, fontSize: 11, opacity: 0.7, zIndex: 99999, pointerEvents: "none", color: "#0f0", fontFamily: "monospace", background: "rgba(0,0,0,0.5)", padding: "2px 6px", borderRadius: 3 }}>v17</div>
     </div>
   );
 }
