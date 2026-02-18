@@ -19,7 +19,7 @@ import { ExerciseGif } from "./ExerciseGif";
 export function ExerciseDetailModal({
   open, entry, onBack, onClose, onAddExercise, onDeleteCustomExercise,
   workouts, styles, colors, targetWorkoutId,
-  contentRef, sheetRef, footerRef, position, total,
+  sheetRef, footerRef, position, total,
   sheetAnimation,
 }) {
   const [checked, setChecked] = useState(new Set());
@@ -309,7 +309,6 @@ export function ExerciseDetailModal({
       }
     >
       <div
-        ref={contentRef}
         style={{ display: "flex", flexDirection: "column", gap: 14 }}
       >
         {/* Movement + Equipment */}

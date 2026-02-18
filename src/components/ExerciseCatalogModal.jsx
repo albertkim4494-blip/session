@@ -81,10 +81,8 @@ export function ExerciseCatalogModal({
   const [activeGroups, setActiveGroups] = useState(new Set()); // which UI groups are expanded
   const [detailEntry, setDetailEntry] = useState(null);
   const browseRef = useRef(null);
-  const detailContentRef = useRef(null);
   const detailSheetRef = useRef(null);
   const detailFooterRef = useRef(null);
-  const catalogDragRef = useRef({ active: false, startX: 0, startY: 0, currentX: 0, currentY: 0, captured: false, direction: 0, captureX: 0, captureY: 0, isVertical: false });
   const footerDragRef = useRef({ active: false, startX: 0, startY: 0, currentY: 0, captured: false, direction: 0, captureY: 0 });
   const navAnimRef = useRef(null);
 
@@ -211,194 +209,6 @@ export function ExerciseCatalogModal({
     },
     swap: (entry) => setDetailEntry(entry),
   };
-
-  // Drag-based detail navigation — horizontal + vertical down from body
-  useEffect(() => {
-    const el = detailContentRef.current;
-    const sheet = detailSheetRef.current;
-    if (!el || !sheet || !detailEntry) return;
-
-    const onStart = (e) => {
-      if (navAnimRef.current) return;
-      const t = e.touches?.[0];
-      if (!t) return;
-      const d = catalogDragRef.current;
-      d.active = true;
-      d.startX = t.clientX;
-      d.startY = t.clientY;
-      d.currentX = t.clientX;
-      d.currentY = t.clientY;
-      d.captured = false;
-      d.direction = 0;
-      d.captureX = 0;
-      d.captureY = 0;
-      d.isVertical = false;
-    };
-
-    const onMove = (e) => {
-      const d = catalogDragRef.current;
-      if (!d.active) return;
-      const t = e.touches?.[0];
-      if (!t) return;
-      const dx = t.clientX - d.startX;
-      const dy = t.clientY - d.startY;
-
-      if (!d.captured && Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      if (!d.captured) {
-        if (Math.abs(dy) > Math.abs(dx)) {
-          // Vertical — only capture swipe down when scrolled to top
-          if (dy <= 0) { d.active = false; return; }
-          const scrollEl = el.parentElement;
-          if (scrollEl && scrollEl.scrollTop > 5) { d.active = false; return; }
-          const target = catalogNavRef.current.canNavigate(-1);
-          if (!target) { d.active = false; return; }
-          d.captured = true;
-          d.direction = -1;
-          d.captureY = t.clientY;
-          d.isVertical = true;
-          sheet.style.willChange = "transform, opacity";
-          return;
-        }
-        // Horizontal capture
-        const direction = dx < 0 ? 1 : -1;
-        const target = catalogNavRef.current.canNavigate(direction);
-        if (!target) { d.active = false; return; }
-        d.captured = true;
-        d.direction = direction;
-        d.captureX = t.clientX;
-        d.isVertical = false;
-        el.style.willChange = "transform, opacity";
-        return;
-      }
-
-      if (d.isVertical) {
-        d.currentY = t.clientY;
-        const rawDy = t.clientY - d.captureY;
-        const screenH = window.innerHeight;
-        const progress = Math.min(Math.abs(rawDy) / screenH, 1);
-        const rotation = (rawDy / screenH) * 8;
-        const scale = 1 - progress * 0.06;
-        const opacity = 1 - progress * 0.5;
-        sheet.style.transform = `translateY(${rawDy}px) rotate(${rotation}deg) scale(${scale})`;
-        sheet.style.opacity = String(opacity);
-      } else {
-        d.currentX = t.clientX;
-        const rawDx = t.clientX - d.captureX;
-        const screenW = window.innerWidth;
-        const progress = Math.min(Math.abs(rawDx) / screenW, 1);
-        const rotation = (rawDx / screenW) * 8;
-        const scale = 1 - progress * 0.06;
-        const opacity = 1 - progress * 0.5;
-        el.style.transform = `translateX(${rawDx}px) rotate(${rotation}deg) scale(${scale})`;
-        el.style.opacity = String(opacity);
-      }
-    };
-
-    const onEnd = (e) => {
-      const d = catalogDragRef.current;
-      if (!d.active) return;
-      d.active = false;
-      if (!d.captured) return;
-      const fns = catalogNavRef.current;
-
-      if (d.isVertical) {
-        const rawDy = (e.changedTouches?.[0]?.clientY ?? d.currentY) - d.captureY;
-        const screenH = window.innerHeight;
-        const progress = Math.abs(rawDy) / screenH;
-
-        if (progress >= 0.15) {
-          const target = fns.canNavigate(d.direction);
-          if (!target) { resetSheet(); return; }
-          navAnimRef.current = "flying";
-          sheet.style.transition = "transform 0.25s ease-in, opacity 0.25s ease-in";
-          sheet.style.transform = `translateY(${screenH}px) rotate(15deg)`;
-          sheet.style.opacity = "0";
-          setTimeout(() => {
-            fns.swap(target);
-            sheet.style.transition = "none";
-            sheet.style.transform = "translateY(-40px) scale(0.95)";
-            sheet.style.opacity = "0";
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                sheet.style.transition = "transform 0.35s cubic-bezier(.2,.8,.3,1), opacity 0.35s ease-out";
-                sheet.style.transform = "none";
-                sheet.style.opacity = "1";
-                setTimeout(() => { sheet.style.willChange = ""; sheet.style.transition = ""; navAnimRef.current = null; }, 350);
-              });
-            });
-          }, 250);
-        } else {
-          resetSheet();
-        }
-
-        function resetSheet() {
-          sheet.style.transition = "transform 0.45s cubic-bezier(.25,1.5,.35,1), opacity 0.3s ease-out";
-          sheet.style.transform = "none";
-          sheet.style.opacity = "1";
-          setTimeout(() => { sheet.style.willChange = ""; sheet.style.transition = ""; navAnimRef.current = null; }, 450);
-        }
-      } else {
-        const rawDx = (e.changedTouches?.[0]?.clientX ?? d.currentX) - d.captureX;
-        const screenW = window.innerWidth;
-        const progress = Math.abs(rawDx) / screenW;
-
-        if (progress >= 0.15) {
-          const target = fns.canNavigate(d.direction);
-          if (!target) { resetCard(); return; }
-          navAnimRef.current = "flying";
-          const exitX = d.direction > 0 ? -screenW : screenW;
-          const exitRot = d.direction > 0 ? -15 : 15;
-          el.style.transition = "transform 0.25s ease-in, opacity 0.25s ease-in";
-          el.style.transform = `translateX(${exitX}px) rotate(${exitRot}deg)`;
-          el.style.opacity = "0";
-          setTimeout(() => {
-            fns.swap(target);
-            el.style.transition = "none";
-            const entryX = d.direction > 0 ? 40 : -40;
-            el.style.transform = `translateX(${entryX}px) scale(0.95)`;
-            el.style.opacity = "0";
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                el.style.transition = "transform 0.35s cubic-bezier(.2,.8,.3,1), opacity 0.35s ease-out";
-                el.style.transform = "none";
-                el.style.opacity = "1";
-                setTimeout(() => { el.style.willChange = ""; el.style.transition = ""; navAnimRef.current = null; }, 350);
-              });
-            });
-          }, 250);
-        } else {
-          resetCard();
-        }
-
-        function resetCard() {
-          el.style.transition = "transform 0.45s cubic-bezier(.25,1.5,.35,1), opacity 0.3s ease-out";
-          el.style.transform = "none";
-          el.style.opacity = "1";
-          setTimeout(() => { el.style.willChange = ""; el.style.transition = ""; navAnimRef.current = null; }, 450);
-        }
-      }
-    };
-
-    const onCancel = () => {
-      const d = catalogDragRef.current;
-      d.active = false;
-      d.captured = false;
-      el.style.transform = ""; el.style.opacity = ""; el.style.transition = ""; el.style.willChange = "";
-      sheet.style.transform = ""; sheet.style.opacity = ""; sheet.style.transition = ""; sheet.style.willChange = "";
-      navAnimRef.current = null;
-    };
-
-    el.addEventListener("touchstart", onStart, { passive: true });
-    el.addEventListener("touchmove", onMove, { passive: true });
-    el.addEventListener("touchend", onEnd, { passive: true });
-    el.addEventListener("touchcancel", onCancel, { passive: true });
-    return () => {
-      el.removeEventListener("touchstart", onStart);
-      el.removeEventListener("touchmove", onMove);
-      el.removeEventListener("touchend", onEnd);
-      el.removeEventListener("touchcancel", onCancel);
-    };
-  }, [!!detailEntry]);
 
   // Vertical swipe on footer — whole card flies out (matches log modal)
   useEffect(() => {
@@ -972,7 +782,6 @@ export function ExerciseCatalogModal({
         styles={styles}
         colors={colors}
         targetWorkoutId={targetWorkoutId}
-        contentRef={detailContentRef}
         sheetRef={detailSheetRef}
         footerRef={detailFooterRef}
         position={detailEntry ? activeResults.findIndex((e) => e.id === detailEntry.id) + 1 : 0}

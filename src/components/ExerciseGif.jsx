@@ -1,5 +1,22 @@
 import { useState, useEffect, useRef } from "react";
 
+function hexToHue(hex) {
+  if (!hex || hex.length < 7) return 0;
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  if (d === 0) return 0;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h = Math.round(h * 60);
+  if (h < 0) h += 360;
+  return h;
+}
+
 export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
   const [status, setStatus] = useState("loading"); // "loading" | "loaded" | "error"
   const imgRef = useRef(null);
@@ -41,6 +58,12 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
 
   const isDark = colors?.appBg?.startsWith("#0") || colors?.appBg?.startsWith("#1");
 
+  // Hue-rotate GIF muscle highlights (red) to match theme accent color
+  const accentHue = hexToHue(colors?.accent);
+  const imgFilter = isDark
+    ? `invert(1) hue-rotate(${accentHue - 180}deg)`
+    : `hue-rotate(${accentHue}deg)`;
+
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
       <div
@@ -79,7 +102,7 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
             width: "100%",
             height: "100%",
             objectFit: "contain",
-            filter: isDark ? "invert(1)" : "none",
+            filter: imgFilter,
             mixBlendMode: isDark ? "screen" : "multiply",
             // No transition — show instantly once decoded to prevent flash
             opacity: status === "loaded" ? 1 : 0,
