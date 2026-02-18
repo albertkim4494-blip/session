@@ -58,7 +58,7 @@ export default function AuthScreen() {
   return (
     <div style={styles.wrapper}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Workout Tracker</h1>
+        <h1 style={styles.title}>Session</h1>
 
         {/* Mode toggle pills */}
         <div style={styles.pillRow}>

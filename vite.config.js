@@ -8,8 +8,8 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "Workout Tracker",
-        short_name: "Workout",
+        name: "Session",
+        short_name: "Session",
         start_url: "/",
         scope: "/",
         display: "standalone",

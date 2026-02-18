@@ -2093,7 +2093,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `workout-tracker-export-${yyyyMmDd(new Date())}.json`;
+      a.download = `session-export-${yyyyMmDd(new Date())}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
