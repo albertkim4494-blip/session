@@ -328,31 +328,6 @@ export function ExerciseDetailModal({
             colors={colors}
           />
         )}
-
-        {/* Swipe affordance: grip lines at bottom corners + position */}
-        {total > 1 && (
-          <div style={{
-            display: "flex", alignItems: "flex-end", justifyContent: "space-between",
-            padding: "8px 0 0", userSelect: "none",
-          }}>
-            {/* Left grip lines — visible when there's a previous */}
-            <div style={{ display: "flex", gap: 3, opacity: position > 1 ? 0.18 : 0 }}>
-              <div style={{ width: 3, height: 18, borderRadius: 2, background: "currentColor" }} />
-              <div style={{ width: 3, height: 18, borderRadius: 2, background: "currentColor" }} />
-            </div>
-
-            {/* Position text */}
-            <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.3 }}>
-              {position} / {total}
-            </span>
-
-            {/* Right grip lines — visible when there's a next */}
-            <div style={{ display: "flex", gap: 3, opacity: position < total ? 0.18 : 0 }}>
-              <div style={{ width: 3, height: 18, borderRadius: 2, background: "currentColor" }} />
-              <div style={{ width: 3, height: 18, borderRadius: 2, background: "currentColor" }} />
-            </div>
-          </div>
-        )}
       </div>
     </Modal>
   );
