@@ -78,7 +78,8 @@ export function ExerciseDetailModal({
     opacity: 0.8,
   };
 
-  const hasMuscles = entry.muscles?.primary?.length > 0;
+  const allMuscles = [...(entry.muscles?.primary || []), ...(entry.muscles?.secondary || [])];
+  const hasMuscles = allMuscles.length > 0;
   const hasWorkouts = workouts && workouts.length > 0;
   const isBrowseMode = !targetWorkoutId;
 
@@ -322,13 +323,22 @@ export function ExerciseDetailModal({
         {/* Exercise demonstration GIF */}
         <ExerciseGif gifUrl={entry.gifUrl} exerciseName={entry.name} colors={colors} />
 
-        {/* Body diagram */}
+        {/* Body diagram + muscle chips */}
         {hasMuscles && (
-          <BodyDiagram
-            highlightedMuscles={entry.muscles.primary}
-            secondaryMuscles={entry.muscles.secondary || []}
-            colors={colors}
-          />
+          <>
+            <BodyDiagram
+              highlightedMuscles={entry.muscles.primary}
+              secondaryMuscles={entry.muscles.secondary || []}
+              colors={colors}
+            />
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {allMuscles.map((m) => (
+                <span key={m} style={{ ...chipBase, background: colors.subtleBg, border: `1px solid ${colors.border}`, textTransform: "capitalize" }}>
+                  {m.replace(/_/g, " ")}
+                </span>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </Modal>
