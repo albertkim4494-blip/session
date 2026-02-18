@@ -3,7 +3,6 @@ import { Modal } from "./Modal";
 import { EXERCISE_CATALOG } from "../lib/exerciseCatalog";
 import { catalogSearch, normalizeQuery, filterCatalog } from "../lib/exerciseCatalogUtils";
 import { ExerciseDetailModal } from "./ExerciseDetailModal";
-import { useSwipe } from "../hooks/useSwipe";
 import { getSportIconUrl } from "../lib/sportIcons";
 import { BodyDiagram, SLUG_TO_MUSCLES } from "./BodyDiagram";
 import { MUSCLE_LABELS, UI_MUSCLE_GROUPS, UI_GROUP_CONFIG, muscleToUiGroup } from "../lib/muscleGroups";
@@ -81,8 +80,10 @@ export function ExerciseCatalogModal({
   const [hoveredMuscles, setHoveredMuscles] = useState(new Set());
   const [activeGroups, setActiveGroups] = useState(new Set()); // which UI groups are expanded
   const [detailEntry, setDetailEntry] = useState(null);
-  const [slideDir, setSlideDir] = useState(null);
   const browseRef = useRef(null);
+  const detailContentRef = useRef(null);
+  const catalogDragRef = useRef({ active: false, startX: 0, startY: 0, currentX: 0, captured: false, direction: 0, captureX: 0 });
+  const navAnimRef = useRef(null);
 
   const src = catalog || EXERCISE_CATALOG;
 
@@ -96,7 +97,7 @@ export function ExerciseCatalogModal({
       setHoveredMuscles(new Set());
       setActiveGroups(new Set());
       setDetailEntry(null);
-      setSlideDir(null);
+      navAnimRef.current = null;
     }
   }, [open]);
 
@@ -125,7 +126,7 @@ export function ExerciseCatalogModal({
     if (open && detailEntry) {
       const handler = () => {
         setDetailEntry(null);
-        setSlideDir(null);
+        navAnimRef.current = null;
         return true;
       };
       backOverrideRef.current = handler;
@@ -194,24 +195,149 @@ export function ExerciseCatalogModal({
     }).slice(0, 8);
   }, [query, selectedMuscles, workouts, logsByDate, catalogNameSet, targetWorkoutId, view]);
 
-  // Swipe between exercises in detail view
-  const navigateDetail = useCallback((dir) => {
-    if (!detailEntry) return;
-    const list = view === "home" ? homeSearchResults : catalogResults;
-    const idx = list.findIndex((e) => e.id === detailEntry.id);
-    if (idx < 0) return;
-    const next = idx + dir;
-    if (next >= 0 && next < list.length) {
-      setSlideDir(dir > 0 ? "left" : "right");
-      setDetailEntry(list[next]);
-    }
-  }, [detailEntry, catalogResults, homeSearchResults, view]);
+  // Always-fresh navigation helpers (avoid stale closures in touch handlers)
+  const catalogNavRef = useRef(null);
+  catalogNavRef.current = {
+    canNavigate: (dir) => {
+      if (!detailEntry) return null;
+      const list = view === "home" ? homeSearchResults : catalogResults;
+      const idx = list.findIndex((e) => e.id === detailEntry.id);
+      if (idx < 0) return null;
+      const next = idx + dir;
+      return (next >= 0 && next < list.length) ? list[next] : null;
+    },
+    swap: (entry) => setDetailEntry(entry),
+  };
 
-  const swipeHandlers = useSwipe({
-    onSwipeLeft: () => navigateDetail(1),
-    onSwipeRight: () => navigateDetail(-1),
-    thresholdPx: 50,
-  });
+  // Drag-based detail navigation (matches log modal feel)
+  useEffect(() => {
+    const el = detailContentRef.current;
+    if (!el || !detailEntry) return;
+
+    const onStart = (e) => {
+      if (navAnimRef.current) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      const d = catalogDragRef.current;
+      d.active = true;
+      d.startX = t.clientX;
+      d.startY = t.clientY;
+      d.currentX = t.clientX;
+      d.captured = false;
+      d.direction = 0;
+      d.captureX = 0;
+    };
+
+    const onMove = (e) => {
+      const d = catalogDragRef.current;
+      if (!d.active) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      const dx = t.clientX - d.startX;
+      const dy = t.clientY - d.startY;
+
+      // Axis detection: first 10px decides horizontal vs vertical
+      if (!d.captured && Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (!d.captured) {
+        if (Math.abs(dy) > Math.abs(dx)) {
+          d.active = false; // vertical — let scroll work
+          return;
+        }
+        const direction = dx < 0 ? 1 : -1;
+        const target = catalogNavRef.current.canNavigate(direction);
+        if (!target) { d.active = false; return; }
+        d.captured = true;
+        d.direction = direction;
+        d.captureX = t.clientX;
+        el.style.willChange = "transform, opacity";
+        return;
+      }
+
+      // Captured — update card transform
+      d.currentX = t.clientX;
+      const rawDx = t.clientX - d.captureX;
+      const screenW = window.innerWidth;
+      const progress = Math.min(Math.abs(rawDx) / screenW, 1);
+      const rotation = (rawDx / screenW) * 8;
+      const scale = 1 - progress * 0.06;
+      const opacity = 1 - progress * 0.5;
+      el.style.transform = `translateX(${rawDx}px) rotate(${rotation}deg) scale(${scale})`;
+      el.style.opacity = String(opacity);
+    };
+
+    const onEnd = (e) => {
+      const d = catalogDragRef.current;
+      if (!d.active) return;
+      d.active = false;
+      if (!d.captured) return;
+
+      const rawDx = (e.changedTouches?.[0]?.clientX ?? d.currentX) - d.captureX;
+      const screenW = window.innerWidth;
+      const progress = Math.abs(rawDx) / screenW;
+      const fns = catalogNavRef.current;
+
+      if (progress >= 0.15) {
+        const target = fns.canNavigate(d.direction);
+        if (!target) { resetCard(); return; }
+        navAnimRef.current = "flying";
+
+        // Exit: fly off in swipe direction
+        const exitX = d.direction > 0 ? -screenW : screenW;
+        const exitRot = d.direction > 0 ? -15 : 15;
+        el.style.transition = "transform 0.25s ease-in, opacity 0.25s ease-in";
+        el.style.transform = `translateX(${exitX}px) rotate(${exitRot}deg)`;
+        el.style.opacity = "0";
+
+        setTimeout(() => {
+          fns.swap(target);
+          // Entrance: start from opposite side
+          el.style.transition = "none";
+          const entryX = d.direction > 0 ? 40 : -40;
+          el.style.transform = `translateX(${entryX}px) scale(0.95)`;
+          el.style.opacity = "0";
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              el.style.transition = "transform 0.35s cubic-bezier(.2,.8,.3,1), opacity 0.35s ease-out";
+              el.style.transform = "none";
+              el.style.opacity = "1";
+              setTimeout(() => { el.style.willChange = ""; el.style.transition = ""; navAnimRef.current = null; }, 350);
+            });
+          });
+        }, 250);
+      } else {
+        resetCard();
+      }
+
+      function resetCard() {
+        el.style.transition = "transform 0.45s cubic-bezier(.25,1.5,.35,1), opacity 0.3s ease-out";
+        el.style.transform = "none";
+        el.style.opacity = "1";
+        setTimeout(() => { el.style.willChange = ""; el.style.transition = ""; navAnimRef.current = null; }, 450);
+      }
+    };
+
+    const onCancel = () => {
+      const d = catalogDragRef.current;
+      d.active = false;
+      d.captured = false;
+      el.style.transform = "";
+      el.style.opacity = "";
+      el.style.transition = "";
+      el.style.willChange = "";
+      navAnimRef.current = null;
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: true });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onCancel, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onCancel);
+    };
+  }, [!!detailEntry]);
 
   // Exercise count for the browse button (filtered by hovered muscles)
   const browseCount = useMemo(() => {
@@ -649,20 +775,19 @@ export function ExerciseCatalogModal({
       <ExerciseDetailModal
         open={!!detailEntry}
         entry={detailEntry}
-        onBack={() => { setSlideDir(null); setDetailEntry(null); }}
-        onClose={() => { setSlideDir(null); setDetailEntry(null); onClose(); }}
+        onBack={() => { navAnimRef.current = null; setDetailEntry(null); }}
+        onClose={() => { navAnimRef.current = null; setDetailEntry(null); onClose(); }}
         onAddExercise={onAddExercise ? (entry, workoutId) => onAddExercise(entry, workoutId) : undefined}
         onDeleteCustomExercise={onDeleteCustomExercise ? (entry) => {
           onDeleteCustomExercise(entry);
-          setSlideDir(null);
+          navAnimRef.current = null;
           setDetailEntry(null);
         } : undefined}
         workouts={workouts}
         styles={styles}
         colors={colors}
         targetWorkoutId={targetWorkoutId}
-        swipeHandlers={swipeHandlers}
-        slideDir={slideDir}
+        contentRef={detailContentRef}
         position={detailEntry ? activeResults.findIndex((e) => e.id === detailEntry.id) + 1 : 0}
         total={activeResults.length}
       />

@@ -19,7 +19,7 @@ import { ExerciseGif } from "./ExerciseGif";
 export function ExerciseDetailModal({
   open, entry, onBack, onClose, onAddExercise, onDeleteCustomExercise,
   workouts, styles, colors, targetWorkoutId,
-  swipeHandlers, slideDir, position, total,
+  contentRef, position, total,
   sheetAnimation,
 }) {
   const [checked, setChecked] = useState(new Set());
@@ -306,12 +306,8 @@ export function ExerciseDetailModal({
       }
     >
       <div
-        key={entry.id}
-        style={{
-          display: "flex", flexDirection: "column", gap: 14,
-          animation: slideDir ? `cardSlide${slideDir === "left" ? "Left" : "Right"} 0.25s ease-out` : undefined,
-        }}
-        {...(swipeHandlers || {})}
+        ref={contentRef}
+        style={{ display: "flex", flexDirection: "column", gap: 14 }}
       >
         {/* Movement + Equipment */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
