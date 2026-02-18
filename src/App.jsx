@@ -4312,11 +4312,22 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     </div>
                     <ExerciseGif gifUrl={logDetailEntry.gifUrl} exerciseName={logDetailEntry.name} colors={colors} />
                     {logDetailEntry.muscles?.primary?.length > 0 && (
-                      <BodyDiagram
-                        highlightedMuscles={logDetailEntry.muscles.primary}
-                        secondaryMuscles={logDetailEntry.muscles.secondary || []}
-                        colors={colors}
-                      />
+                      <>
+                        <BodyDiagram
+                          highlightedMuscles={logDetailEntry.muscles.primary}
+                          secondaryMuscles={logDetailEntry.muscles.secondary || []}
+                          colors={colors}
+                        />
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[...(logDetailEntry.muscles.primary || []), ...(logDetailEntry.muscles.secondary || [])].map((m) => (
+                            <span key={m} style={{
+                              display: "inline-block", padding: "3px 8px", borderRadius: 999,
+                              fontSize: 11, fontWeight: 700, background: colors.subtleBg,
+                              border: `1px solid ${colors.border}`, textTransform: "capitalize",
+                            }}>{m.replace(/_/g, " ")}</span>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
