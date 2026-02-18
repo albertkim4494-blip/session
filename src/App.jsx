@@ -1071,7 +1071,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     };
 
     const ensureEntries = () => {
-      if (exiting) return;
+      if (exiting) {
+        // User interacted — cancel exit, re-enable back interception
+        exiting = false;
+        setupWatcher();
+        while (buffer < 5) push();
+        return;
+      }
       if (!initialized) {
         initialized = true;
         history.replaceState(null, "", location.pathname + location.search);
