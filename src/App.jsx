@@ -3593,10 +3593,36 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           const logScheme = logCtx?.scheme;
           const showWeight = logUnit.key === "reps" && !logExercise?.bodyweight;
           const exerciseTargets = logExercise?.targets || [];
-          const singleTarget = exerciseTargets.length === 1;
+          const tCount = exerciseTargets.length;
+          const hasPace = exerciseTargets.includes("pace");
+          const hasCustom = exerciseTargets.includes("custom");
+          let topRowTarget = null, secondRowTargets = [], thirdRowTargets = [];
+          if (tCount === 1) {
+            topRowTarget = exerciseTargets[0];
+          } else if (tCount === 2) {
+            if (hasCustom) {
+              topRowTarget = exerciseTargets.find((t) => t !== "custom");
+              secondRowTargets = ["custom"];
+            } else {
+              secondRowTargets = ["pace", "rpe", "intensity"].filter((t) => exerciseTargets.includes(t));
+            }
+          } else if (tCount === 3) {
+            if (hasPace) {
+              topRowTarget = "pace";
+              secondRowTargets = ["rpe", "intensity", "custom"].filter((t) => exerciseTargets.includes(t));
+            } else {
+              topRowTarget = "rpe";
+              secondRowTargets = ["intensity", "custom"].filter((t) => exerciseTargets.includes(t));
+            }
+          } else if (tCount === 4) {
+            topRowTarget = "pace";
+            secondRowTargets = ["rpe", "intensity"];
+            thirdRowTargets = ["custom"];
+          }
+          const hasTopRow = !!topRowTarget;
           const baseGridCols = showWeight
-            ? (singleTarget ? "28px 1fr 1fr 1fr 32px" : "28px 1fr 1fr 32px")
-            : (singleTarget ? "28px 1fr 1fr 32px" : "28px 1fr 32px");
+            ? (hasTopRow ? "28px 1fr 1fr 1fr 32px" : "28px 1fr 1fr 32px")
+            : (hasTopRow ? "28px 1fr 1fr 32px" : "28px 1fr 32px");
 
           // Find last session data for context
           const existingLog = state.logsByDate[dateKey]?.[logCtx?.exerciseId];
@@ -3744,7 +3770,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>Set</div>
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{logUnit.label}</div>
             {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>Weight ({getWeightLabel(state.preferences?.measurementSystem)})</div>}
-            {singleTarget && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{exerciseTargets[0] === "rpe" ? "RPE" : exerciseTargets[0] === "intensity" ? "Intensity" : exerciseTargets[0] === "pace" ? "Pace" : "Target"}</div>}
+            {hasTopRow && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{topRowTarget === "pace" ? "Pace" : topRowTarget === "rpe" ? "RPE" : topRowTarget === "intensity" ? "Intensity" : "Target"}</div>}
             <div ref={targetConfigRef} style={{ position: "relative" }}>
               <button
                 onClick={() => setShowTargetConfig((v) => !v)}
@@ -3784,9 +3810,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   )}
                   <div style={{ borderBottom: `1px solid ${colors.border}`, margin: "2px 0" }} />
                   {[
+                    { key: "pace", label: "Pace (MM:SS)" },
                     { key: "rpe", label: "RPE (1–10)" },
                     { key: "intensity", label: "Intensity (1–10)" },
-                    { key: "pace", label: "Pace (MM:SS)" },
                     { key: "custom", label: "Custom (text)" },
                   ].map((opt) => (
                     <label key={opt.key} style={{
@@ -3916,7 +3942,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     />
                   )}
 
-                  {singleTarget && exerciseTargets.includes("rpe") && (
+                  {/* Top-row target (in grid) */}
+                  {topRowTarget === "rpe" && (
                     <div style={{ position: "relative" }}>
                       <button
                         type="button"
@@ -3962,8 +3989,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       )}
                     </div>
                   )}
-
-                  {singleTarget && exerciseTargets.includes("pace") && (
+                  {topRowTarget === "pace" && (
                     <div style={{ position: "relative" }}>
                       <button
                         type="button"
@@ -4030,26 +4056,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       )}
                     </div>
                   )}
-
-                  {singleTarget && exerciseTargets.includes("custom") && (
-                    <div>
-                      <input
-                        type="text"
-                        value={s.targetCustom || ""}
-                        onChange={(e) => {
-                          const newSets = [...modals.log.sets];
-                          newSets[i] = { ...newSets[i], targetCustom: e.target.value };
-                          dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                        }}
-                        onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                        enterKeyHint="done"
-                        style={{ ...styles.numInput, fontSize: 12, textAlign: "center", width: "100%" }}
-                        placeholder=""
-                      />
-                    </div>
-                  )}
-
-                  {singleTarget && exerciseTargets.includes("intensity") && (
+                  {topRowTarget === "intensity" && (
                     <div style={{ position: "relative" }}>
                       <button
                         type="button"
@@ -4095,6 +4102,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       )}
                     </div>
                   )}
+                  {topRowTarget === "custom" && (
+                    <div>
+                      <input
+                        type="text"
+                        value={s.targetCustom || ""}
+                        onChange={(e) => {
+                          const newSets = [...modals.log.sets];
+                          newSets[i] = { ...newSets[i], targetCustom: e.target.value };
+                          dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                        enterKeyHint="done"
+                        style={{ ...styles.numInput, fontSize: 12, textAlign: "center", width: "100%" }}
+                        placeholder=""
+                      />
+                    </div>
+                  )}
 
                   <button
                     style={{ ...styles.deleteLogBtn, opacity: modals.log.sets.length <= 1 ? 0.15 : 0.4 }}
@@ -4111,192 +4135,192 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </button>
                   </div>
 
-                  {exerciseTargets.length >= 2 && (
-                    <div style={{ display: "flex", gap: 8, paddingTop: 6, paddingLeft: 34, alignItems: "center" }}>
-                      {exerciseTargets.includes("rpe") && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, position: "relative" }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>RPE</span>
-                          <button
-                            type="button"
-                            onClick={() => { setRpePopoverIdx(rpePopoverIdx === i ? null : i); setPacePopoverIdx(null); setIntensityPopoverIdx(null); }}
-                            style={{
-                              ...styles.numInput, fontSize: 13, textAlign: "center",
-                              width: "100%", cursor: "pointer",
-                              opacity: s.targetRpe ? 1 : 0.4,
-                            }}
-                          >
-                            {s.targetRpe || "—"}
-                          </button>
-                          {rpePopoverIdx === i && (
-                            <div ref={rpePopoverRef} style={{
-                              position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
-                              background: colors.cardBg, border: `1px solid ${colors.border}`,
-                              borderRadius: 8, padding: 4,
-                              boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
-                              maxHeight: 200, overflowY: "auto",
-                            }}>
-                              {["1","2","3","4","5","6","7","8","9","10"].map((v) => (
-                                <button
-                                  key={v}
-                                  type="button"
-                                  onClick={() => {
+                  {/* Overflow rows (2nd and 3rd) */}
+                  {[secondRowTargets, thirdRowTargets].map((rowTargets, rowIdx) =>
+                    rowTargets.length > 0 && (
+                      <div key={rowIdx} style={{ display: "flex", gap: 8, paddingTop: 6, paddingLeft: 34, alignItems: "center" }}>
+                        {rowTargets.includes("rpe") && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, position: "relative" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>RPE</span>
+                            <button
+                              type="button"
+                              onClick={() => { setRpePopoverIdx(rpePopoverIdx === i ? null : i); setPacePopoverIdx(null); setIntensityPopoverIdx(null); }}
+                              style={{
+                                ...styles.numInput, fontSize: 13, textAlign: "center",
+                                width: "100%", cursor: "pointer",
+                                opacity: s.targetRpe ? 1 : 0.4,
+                              }}
+                            >
+                              {s.targetRpe || "—"}
+                            </button>
+                            {rpePopoverIdx === i && (
+                              <div ref={rpePopoverRef} style={{
+                                position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
+                                background: colors.cardBg, border: `1px solid ${colors.border}`,
+                                borderRadius: 8, padding: 4,
+                                boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                                maxHeight: 200, overflowY: "auto",
+                              }}>
+                                {["1","2","3","4","5","6","7","8","9","10"].map((v) => (
+                                  <button
+                                    key={v}
+                                    type="button"
+                                    onClick={() => {
+                                      const newSets = [...modals.log.sets];
+                                      newSets[i] = { ...newSets[i], targetRpe: v };
+                                      dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                                      setRpePopoverIdx(null);
+                                    }}
+                                    style={{
+                                      width: "100%", padding: "7px 0", borderRadius: 8, border: "none",
+                                      background: s.targetRpe === v ? colors.primaryBg : "transparent",
+                                      color: s.targetRpe === v ? colors.primaryText : colors.text,
+                                      fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    {v}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {rowTargets.includes("intensity") && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, position: "relative" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Intensity</span>
+                            <button
+                              type="button"
+                              onClick={() => { setIntensityPopoverIdx(intensityPopoverIdx === i ? null : i); setRpePopoverIdx(null); setPacePopoverIdx(null); }}
+                              style={{
+                                ...styles.numInput, fontSize: 13, textAlign: "center",
+                                width: "100%", cursor: "pointer",
+                                opacity: s.targetIntensity ? 1 : 0.4,
+                              }}
+                            >
+                              {s.targetIntensity || "—"}
+                            </button>
+                            {intensityPopoverIdx === i && (
+                              <div ref={intensityPopoverRef} style={{
+                                position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
+                                background: colors.cardBg, border: `1px solid ${colors.border}`,
+                                borderRadius: 8, padding: 4,
+                                boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                                maxHeight: 200, overflowY: "auto",
+                              }}>
+                                {["1","2","3","4","5","6","7","8","9","10"].map((v) => (
+                                  <button
+                                    key={v}
+                                    type="button"
+                                    onClick={() => {
+                                      const newSets = [...modals.log.sets];
+                                      newSets[i] = { ...newSets[i], targetIntensity: v };
+                                      dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                                      setIntensityPopoverIdx(null);
+                                    }}
+                                    style={{
+                                      width: "100%", padding: "7px 0", borderRadius: 8, border: "none",
+                                      background: s.targetIntensity === v ? colors.primaryBg : "transparent",
+                                      color: s.targetIntensity === v ? colors.primaryText : colors.text,
+                                      fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    {v}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {rowTargets.includes("pace") && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, position: "relative" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Pace</span>
+                            <button
+                              type="button"
+                              onClick={() => { setPacePopoverIdx(pacePopoverIdx === i ? null : i); setRpePopoverIdx(null); setIntensityPopoverIdx(null); }}
+                              style={{
+                                ...styles.numInput, fontSize: 12, textAlign: "center",
+                                width: "100%", cursor: "pointer",
+                                opacity: s.targetPace ? 1 : 0.4,
+                              }}
+                            >
+                              {s.targetPace || "—"}
+                            </button>
+                            {pacePopoverIdx === i && (
+                              <div ref={pacePopoverRef} style={{
+                                position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 20,
+                                background: colors.cardBg, border: `1px solid ${colors.border}`,
+                                borderRadius: 8, padding: "10px 12px",
+                                boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                                display: "flex", alignItems: "center", gap: 6,
+                              }}>
+                                {(() => {
+                                  const p = parsePace(s.targetPace);
+                                  const update = (h, m, sec) => {
                                     const newSets = [...modals.log.sets];
-                                    newSets[i] = { ...newSets[i], targetRpe: v };
+                                    newSets[i] = { ...newSets[i], targetPace: formatPace(h, m, sec) };
                                     dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                                    setRpePopoverIdx(null);
-                                  }}
-                                  style={{
-                                    width: "100%", padding: "7px 0", borderRadius: 8, border: "none",
-                                    background: s.targetRpe === v ? colors.primaryBg : "transparent",
-                                    color: s.targetRpe === v ? colors.primaryText : colors.text,
-                                    fontSize: 13, fontWeight: 600, cursor: "pointer",
-                                    textAlign: "center",
-                                  }}
-                                >
-                                  {v}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {exerciseTargets.includes("pace") && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, position: "relative" }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Pace</span>
-                          <button
-                            type="button"
-                            onClick={() => { setPacePopoverIdx(pacePopoverIdx === i ? null : i); setRpePopoverIdx(null); setIntensityPopoverIdx(null); }}
-                            style={{
-                              ...styles.numInput, fontSize: 12, textAlign: "center",
-                              width: "100%", cursor: "pointer",
-                              opacity: s.targetPace ? 1 : 0.4,
-                            }}
-                          >
-                            {s.targetPace || "—"}
-                          </button>
-                          {pacePopoverIdx === i && (
-                            <div ref={pacePopoverRef} style={{
-                              position: "absolute", left: 0, top: "100%", marginTop: 4, zIndex: 20,
-                              background: colors.cardBg, border: `1px solid ${colors.border}`,
-                              borderRadius: 8, padding: "10px 12px",
-                              boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
-                              display: "flex", alignItems: "center", gap: 6,
-                            }}>
-                              {(() => {
-                                const p = parsePace(s.targetPace);
-                                const update = (h, m, sec) => {
-                                  const newSets = [...modals.log.sets];
-                                  newSets[i] = { ...newSets[i], targetPace: formatPace(h, m, sec) };
-                                  dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                                };
-                                return (<>
-                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                    <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Hrs</span>
-                                    <input type="number" inputMode="numeric" min="0" max="23"
-                                      value={p.h || ""}
-                                      onChange={(e) => update(Math.min(23, Math.max(0, parseInt(e.target.value) || 0)), p.m, p.s)}
-                                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                                      style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
-                                      placeholder="0"
-                                    />
-                                  </div>
-                                  <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
-                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                    <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Min</span>
-                                    <input type="number" inputMode="numeric" min="0" max="59"
-                                      value={p.m || ""}
-                                      onChange={(e) => update(p.h, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)), p.s)}
-                                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                                      style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
-                                      placeholder="0"
-                                    />
-                                  </div>
-                                  <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
-                                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                    <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Sec</span>
-                                    <input type="number" inputMode="numeric" min="0" max="59"
-                                      value={p.s || ""}
-                                      onChange={(e) => update(p.h, p.m, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
-                                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                                      style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
-                                      placeholder="0"
-                                    />
-                                  </div>
-                                </>);
-                              })()}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {exerciseTargets.includes("custom") && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Target</span>
-                          <input
-                            type="text"
-                            value={s.targetCustom || ""}
-                            onChange={(e) => {
-                              const newSets = [...modals.log.sets];
-                              newSets[i] = { ...newSets[i], targetCustom: e.target.value };
-                              dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                            }}
-                            onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-                            enterKeyHint="done"
-                            style={{ ...styles.numInput, fontSize: 12, textAlign: "center", width: "100%" }}
-                            placeholder=""
-                          />
-                        </div>
-                      )}
-
-                      {exerciseTargets.includes("intensity") && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, position: "relative" }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Intensity</span>
-                          <button
-                            type="button"
-                            onClick={() => { setIntensityPopoverIdx(intensityPopoverIdx === i ? null : i); setRpePopoverIdx(null); setPacePopoverIdx(null); }}
-                            style={{
-                              ...styles.numInput, fontSize: 13, textAlign: "center",
-                              width: "100%", cursor: "pointer",
-                              opacity: s.targetIntensity ? 1 : 0.4,
-                            }}
-                          >
-                            {s.targetIntensity || "—"}
-                          </button>
-                          {intensityPopoverIdx === i && (
-                            <div ref={intensityPopoverRef} style={{
-                              position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
-                              background: colors.cardBg, border: `1px solid ${colors.border}`,
-                              borderRadius: 8, padding: 4,
-                              boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
-                              maxHeight: 200, overflowY: "auto",
-                            }}>
-                              {["1","2","3","4","5","6","7","8","9","10"].map((v) => (
-                                <button
-                                  key={v}
-                                  type="button"
-                                  onClick={() => {
-                                    const newSets = [...modals.log.sets];
-                                    newSets[i] = { ...newSets[i], targetIntensity: v };
-                                    dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                                    setIntensityPopoverIdx(null);
-                                  }}
-                                  style={{
-                                    width: "100%", padding: "7px 0", borderRadius: 8, border: "none",
-                                    background: s.targetIntensity === v ? colors.primaryBg : "transparent",
-                                    color: s.targetIntensity === v ? colors.primaryText : colors.text,
-                                    fontSize: 13, fontWeight: 600, cursor: "pointer",
-                                    textAlign: "center",
-                                  }}
-                                >
-                                  {v}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                                  };
+                                  return (<>
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                      <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Hrs</span>
+                                      <input type="number" inputMode="numeric" min="0" max="23"
+                                        value={p.h || ""}
+                                        onChange={(e) => update(Math.min(23, Math.max(0, parseInt(e.target.value) || 0)), p.m, p.s)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                                        style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                    <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                      <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Min</span>
+                                      <input type="number" inputMode="numeric" min="0" max="59"
+                                        value={p.m || ""}
+                                        onChange={(e) => update(p.h, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)), p.s)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                                        style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                    <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.4, paddingTop: 14 }}>:</span>
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                      <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45 }}>Sec</span>
+                                      <input type="number" inputMode="numeric" min="0" max="59"
+                                        value={p.s || ""}
+                                        onChange={(e) => update(p.h, p.m, Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                                        onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                                        style={{ ...styles.numInput, width: 40, textAlign: "center", fontSize: 14 }}
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </>);
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {rowTargets.includes("custom") && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Target</span>
+                            <input
+                              type="text"
+                              value={s.targetCustom || ""}
+                              onChange={(e) => {
+                                const newSets = [...modals.log.sets];
+                                newSets[i] = { ...newSets[i], targetCustom: e.target.value };
+                                dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                              }}
+                              onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                              enterKeyHint="done"
+                              style={{ ...styles.numInput, fontSize: 12, textAlign: "center", width: "100%" }}
+                              placeholder=""
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
                   )}
                 </div>
                 {showRestAfter && (
