@@ -999,7 +999,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (dbgRef.current) dbgRef.current.textContent = msg;
   };
 
-  const backExitRef = useRef(0);
   handleBackRef.current = () => {
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
@@ -1016,13 +1015,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       sessionStorage.setItem("wt_tab", "train");
       return;
     }
-    // On train tab with no modals — double-back to exit
-    const now = Date.now();
-    if (now - backExitRef.current < 2000) {
-      return "exit";
-    }
-    backExitRef.current = now;
+    // On train tab with no modals — show toast and let next back exit
     showToast("Press back again to exit", 2000);
+    return "prepare_exit";
   };
 
   useEffect(() => {
@@ -1035,17 +1030,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let cwWorking = false;
     let exiting = false;
 
-    const triggerExit = () => {
+    const prepareExit = () => {
       exiting = true;
       cwWorking = false;
-      // Drain history buffer so OS handles next back as app close
-      if (buffer > 0) {
-        history.go(-buffer);
-        buffer = 0;
-      }
-      setTimeout(() => history.back(), 100);
-      // Reset flag in case app doesn't close (e.g. desktop browser)
-      setTimeout(() => { exiting = false; }, 3000);
+      // Drain history buffer so next back goes straight to OS
+      if (buffer > 0) { history.go(-buffer); buffer = 0; }
+      // Re-enable after 2.5s if user doesn't exit
+      setTimeout(() => {
+        if (!exiting) return;
+        exiting = false;
+        setupWatcher();
+        while (buffer < 5) push();
+      }, 2500);
     };
 
     const setupWatcher = () => {
@@ -1055,7 +1051,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         watcher.addEventListener("close", () => {
           watcher = null;
           const result = handleBackRef.current?.();
-          if (result === "exit") { triggerExit(); return; }
+          if (result === "prepare_exit") { prepareExit(); return; }
           setupWatcher(); // chain for next back press
         });
         cwWorking = true;
@@ -1099,7 +1095,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       // Only handle via history if CloseWatcher is NOT active
       if (!cwWorking) {
         const result = handleBackRef.current?.();
-        if (result === "exit") { triggerExit(); return; }
+        if (result === "prepare_exit") { prepareExit(); return; }
       }
     };
 
