@@ -177,6 +177,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // RPE popover state
   const [rpePopoverIdx, setRpePopoverIdx] = useState(null);
   const rpePopoverRef = useRef(null);
+  // Intensity popover state
+  const [intensityPopoverIdx, setIntensityPopoverIdx] = useState(null);
+  const intensityPopoverRef = useRef(null);
 
   // Social state
   const [socialBadge, setSocialBadge] = useState(0);
@@ -392,6 +395,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
     }
   }, [rpePopoverIdx]);
+
+  // Click-outside to dismiss Intensity popover
+  useEffect(() => {
+    function handleDown(e) {
+      if (intensityPopoverRef.current && !intensityPopoverRef.current.contains(e.target)) {
+        setIntensityPopoverIdx(null);
+      }
+    }
+    if (intensityPopoverIdx !== null) {
+      document.addEventListener("mousedown", handleDown);
+      document.addEventListener("touchstart", handleDown);
+      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
+    }
+  }, [intensityPopoverIdx]);
 
   // After onboarding, show welcome choice modal
   useEffect(() => {
@@ -1242,14 +1259,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           targetRpe: s.targetRpe || "",
           targetPace: s.targetPace || "",
           targetCustom: s.targetCustom || "",
+          targetIntensity: s.targetIntensity || "",
         }));
       } else {
         // Pre-fill from scheme (e.g. "3x8-12" → 3 sets of 8 reps)
         const scheme = schemeStr ? parseScheme(schemeStr) : null;
         if (scheme) {
-          sets = Array.from({ length: scheme.sets }, () => ({ reps: scheme.reps, weight: "", targetRpe: "", targetPace: "", targetCustom: "" }));
+          sets = Array.from({ length: scheme.sets }, () => ({ reps: scheme.reps, weight: "", targetRpe: "", targetPace: "", targetCustom: "", targetIntensity: "" }));
         } else {
-          sets = [{ reps: 0, weight: "", targetRpe: "", targetPace: "", targetCustom: "" }];
+          sets = [{ reps: 0, weight: "", targetRpe: "", targetPace: "", targetCustom: "", targetIntensity: "" }];
         }
       }
 
@@ -1263,6 +1281,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             targetRpe: ts.targetRpe || "",
             targetPace: ts.targetPace || "",
             targetCustom: ts.targetCustom || "",
+            targetIntensity: ts.targetIntensity || "",
           });
         }
       }
@@ -1271,7 +1290,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const parsedScheme = schemeStr ? parseScheme(schemeStr) : null;
       if (existing && parsedScheme && sets.length < parsedScheme.sets) {
         for (let i = sets.length; i < parsedScheme.sets; i++) {
-          sets.push({ reps: parsedScheme.reps, weight: "", targetRpe: "", targetPace: "", targetCustom: "" });
+          sets.push({ reps: parsedScheme.reps, weight: "", targetRpe: "", targetPace: "", targetCustom: "", targetIntensity: "" });
         }
       }
 
@@ -1283,12 +1302,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           targetRpe: s.targetRpe || "",
           targetPace: s.targetPace || "",
           targetCustom: s.targetCustom || "",
+          targetIntensity: s.targetIntensity || "",
         };
       });
 
       setShowTargetConfig(false);
       setPacePopoverIdx(null);
       setRpePopoverIdx(null);
+      setIntensityPopoverIdx(null);
       dispatchModal({
         type: "OPEN_LOG",
         payload: {
@@ -1344,6 +1365,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (s.targetRpe) result.targetRpe = s.targetRpe;
         if (s.targetPace) result.targetPace = s.targetPace;
         if (s.targetCustom) result.targetCustom = s.targetCustom;
+        if (s.targetIntensity) result.targetIntensity = s.targetIntensity;
         return result;
       };
 
@@ -1631,6 +1653,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (setData.targetRpe) savedSet.targetRpe = setData.targetRpe;
         if (setData.targetPace) savedSet.targetPace = setData.targetPace;
         if (setData.targetCustom) savedSet.targetCustom = setData.targetCustom;
+        if (setData.targetIntensity) savedSet.targetIntensity = setData.targetIntensity;
         entry.sets[setIndex] = savedSet;
         st.logsByDate[dateKey][exerciseId] = entry;
         return st;
@@ -3721,7 +3744,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45, textAlign: "center" }}>Set</div>
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{logUnit.label}</div>
             {showWeight && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>Weight ({getWeightLabel(state.preferences?.measurementSystem)})</div>}
-            {singleTarget && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{exerciseTargets[0] === "rpe" ? "RPE" : exerciseTargets[0] === "pace" ? "Pace" : "Target"}</div>}
+            {singleTarget && <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.45 }}>{exerciseTargets[0] === "rpe" ? "RPE" : exerciseTargets[0] === "intensity" ? "Intensity" : exerciseTargets[0] === "pace" ? "Pace" : "Target"}</div>}
             <div ref={targetConfigRef} style={{ position: "relative" }}>
               <button
                 onClick={() => setShowTargetConfig((v) => !v)}
@@ -3762,6 +3785,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <div style={{ borderBottom: `1px solid ${colors.border}`, margin: "2px 0" }} />
                   {[
                     { key: "rpe", label: "RPE (1–10)" },
+                    { key: "intensity", label: "Intensity (1–10)" },
                     { key: "pace", label: "Pace (MM:SS)" },
                     { key: "custom", label: "Custom (text)" },
                   ].map((opt) => (
@@ -3835,6 +3859,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           if (s.targetRpe) setPayload.targetRpe = s.targetRpe;
                           if (s.targetPace) setPayload.targetPace = s.targetPace;
                           if (s.targetCustom) setPayload.targetCustom = s.targetCustom;
+                          if (s.targetIntensity) setPayload.targetIntensity = s.targetIntensity;
                           completeSet(logCtx.exerciseId, i, setPayload, logCtx.workoutId);
                         }
                       }
@@ -3895,7 +3920,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     <div style={{ position: "relative" }}>
                       <button
                         type="button"
-                        onClick={() => { setRpePopoverIdx(rpePopoverIdx === i ? null : i); setPacePopoverIdx(null); }}
+                        onClick={() => { setRpePopoverIdx(rpePopoverIdx === i ? null : i); setPacePopoverIdx(null); setIntensityPopoverIdx(null); }}
                         style={{
                           ...styles.numInput, fontSize: 13, textAlign: "center",
                           width: "100%", cursor: "pointer",
@@ -3942,7 +3967,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     <div style={{ position: "relative" }}>
                       <button
                         type="button"
-                        onClick={() => { setPacePopoverIdx(pacePopoverIdx === i ? null : i); setRpePopoverIdx(null); }}
+                        onClick={() => { setPacePopoverIdx(pacePopoverIdx === i ? null : i); setRpePopoverIdx(null); setIntensityPopoverIdx(null); }}
                         style={{
                           ...styles.numInput, fontSize: 12, textAlign: "center",
                           width: "100%", cursor: "pointer",
@@ -4024,6 +4049,53 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     </div>
                   )}
 
+                  {singleTarget && exerciseTargets.includes("intensity") && (
+                    <div style={{ position: "relative" }}>
+                      <button
+                        type="button"
+                        onClick={() => { setIntensityPopoverIdx(intensityPopoverIdx === i ? null : i); setRpePopoverIdx(null); setPacePopoverIdx(null); }}
+                        style={{
+                          ...styles.numInput, fontSize: 13, textAlign: "center",
+                          width: "100%", cursor: "pointer",
+                          opacity: s.targetIntensity ? 1 : 0.4,
+                        }}
+                      >
+                        {s.targetIntensity || "—"}
+                      </button>
+                      {intensityPopoverIdx === i && (
+                        <div ref={intensityPopoverRef} style={{
+                          position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
+                          background: colors.cardBg, border: `1px solid ${colors.border}`,
+                          borderRadius: 8, padding: 4,
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                          maxHeight: 200, overflowY: "auto",
+                        }}>
+                          {["1","2","3","4","5","6","7","8","9","10"].map((v) => (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => {
+                                const newSets = [...modals.log.sets];
+                                newSets[i] = { ...newSets[i], targetIntensity: v };
+                                dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                                setIntensityPopoverIdx(null);
+                              }}
+                              style={{
+                                width: "100%", padding: "7px 0", borderRadius: 8, border: "none",
+                                background: s.targetIntensity === v ? colors.primaryBg : "transparent",
+                                color: s.targetIntensity === v ? colors.primaryText : colors.text,
+                                fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                textAlign: "center",
+                              }}
+                            >
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <button
                     style={{ ...styles.deleteLogBtn, opacity: modals.log.sets.length <= 1 ? 0.15 : 0.4 }}
                     onClick={() => {
@@ -4046,7 +4118,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>RPE</span>
                           <button
                             type="button"
-                            onClick={() => { setRpePopoverIdx(rpePopoverIdx === i ? null : i); setPacePopoverIdx(null); }}
+                            onClick={() => { setRpePopoverIdx(rpePopoverIdx === i ? null : i); setPacePopoverIdx(null); setIntensityPopoverIdx(null); }}
                             style={{
                               ...styles.numInput, fontSize: 13, textAlign: "center",
                               width: "100%", cursor: "pointer",
@@ -4094,7 +4166,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Pace</span>
                           <button
                             type="button"
-                            onClick={() => { setPacePopoverIdx(pacePopoverIdx === i ? null : i); setRpePopoverIdx(null); }}
+                            onClick={() => { setPacePopoverIdx(pacePopoverIdx === i ? null : i); setRpePopoverIdx(null); setIntensityPopoverIdx(null); }}
                             style={{
                               ...styles.numInput, fontSize: 12, textAlign: "center",
                               width: "100%", cursor: "pointer",
@@ -4176,6 +4248,54 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           />
                         </div>
                       )}
+
+                      {exerciseTargets.includes("intensity") && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, position: "relative" }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, whiteSpace: "nowrap" }}>Intensity</span>
+                          <button
+                            type="button"
+                            onClick={() => { setIntensityPopoverIdx(intensityPopoverIdx === i ? null : i); setRpePopoverIdx(null); setPacePopoverIdx(null); }}
+                            style={{
+                              ...styles.numInput, fontSize: 13, textAlign: "center",
+                              width: "100%", cursor: "pointer",
+                              opacity: s.targetIntensity ? 1 : 0.4,
+                            }}
+                          >
+                            {s.targetIntensity || "—"}
+                          </button>
+                          {intensityPopoverIdx === i && (
+                            <div ref={intensityPopoverRef} style={{
+                              position: "absolute", left: 0, right: 0, top: "100%", marginTop: 4, zIndex: 20,
+                              background: colors.cardBg, border: `1px solid ${colors.border}`,
+                              borderRadius: 8, padding: 4,
+                              boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                              maxHeight: 200, overflowY: "auto",
+                            }}>
+                              {["1","2","3","4","5","6","7","8","9","10"].map((v) => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  onClick={() => {
+                                    const newSets = [...modals.log.sets];
+                                    newSets[i] = { ...newSets[i], targetIntensity: v };
+                                    dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
+                                    setIntensityPopoverIdx(null);
+                                  }}
+                                  style={{
+                                    width: "100%", padding: "7px 0", borderRadius: 8, border: "none",
+                                    background: s.targetIntensity === v ? colors.primaryBg : "transparent",
+                                    color: s.targetIntensity === v ? colors.primaryText : colors.text,
+                                    fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  {v}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -4214,8 +4334,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             onClick={() => {
               const last = modals.log.sets[modals.log.sets.length - 1];
               const nextSet = last
-                ? { reps: last.reps ?? 0, weight: last.weight ?? "", targetRpe: last.targetRpe ?? "", targetPace: last.targetPace ?? "", targetCustom: last.targetCustom ?? "" }
-                : { reps: 0, weight: "", targetRpe: "", targetPace: "", targetCustom: "" };
+                ? { reps: last.reps ?? 0, weight: last.weight ?? "", targetRpe: last.targetRpe ?? "", targetPace: last.targetPace ?? "", targetCustom: last.targetCustom ?? "", targetIntensity: last.targetIntensity ?? "" }
+                : { reps: 0, weight: "", targetRpe: "", targetPace: "", targetCustom: "", targetIntensity: "" };
               dispatchModal({ type: "UPDATE_LOG_SETS", payload: [...modals.log.sets, nextSet] });
             }}
           >
