@@ -435,8 +435,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (cloudState && typeof cloudState === "object" && Object.keys(cloudState).length > 0) {
           // Normalize cloud data the same way as localStorage (merge defaults, migrate flags)
           const normalized = normalizeState(cloudState);
-          setState(normalized);
-          persistState(normalized);
+          const localState = loadState();
+
+          // Compare timestamps — use whichever is newer to avoid overwriting
+          // unsaved local changes (e.g. preference change where cloud save was still debouncing)
+          const cloudTs = normalized.meta?.updatedAt || 0;
+          const localTs = localState.meta?.updatedAt || 0;
+
+          if (localTs > cloudTs) {
+            // Local is newer — keep it and push to cloud
+            setState(localState);
+            await saveCloudState(session.user.id, localState);
+          } else {
+            setState(normalized);
+            persistState(normalized);
+          }
         } else {
           const localState = loadState();
           await saveCloudState(session.user.id, localState);
