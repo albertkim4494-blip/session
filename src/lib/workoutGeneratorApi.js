@@ -73,6 +73,9 @@ function buildHistorySummary(state, catalog, weightLabel = "lb") {
     .reverse()
     .slice(0, 14);
 
+  // Helper: check if a set is completed (mirrors setHelpers.isSetCompleted)
+  const isSetDone = (s) => s.completed !== undefined ? s.completed : Number(s.reps) > 0;
+
   const lines = [];
   for (const dateKey of dateKeys) {
     const dayLogs = logs[dateKey];
@@ -81,18 +84,22 @@ function buildHistorySummary(state, catalog, weightLabel = "lb") {
       const info = exMap.get(exId);
       if (!info || !log?.sets || !Array.isArray(log.sets)) continue;
 
-      const setCount = log.sets.length;
-      const totalReps = log.sets.reduce((s, r) => s + (Number(r.reps) || 0), 0);
+      // Only include completed sets in history summary
+      const completedSets = log.sets.filter(isSetDone);
+      if (completedSets.length === 0) continue;
+
+      const setCount = completedSets.length;
+      const totalReps = completedSets.reduce((s, r) => s + (Number(r.reps) || 0), 0);
       const maxWeight = Math.max(
-        ...log.sets.map((s) => Number(s.weight) || 0),
+        ...completedSets.map((s) => Number(s.weight) || 0),
         0
       );
 
       const weightStr = maxWeight > 0 ? ` @ ${maxWeight} ${weightLabel}` : "";
       let line = `${dateKey}: ${info.name} — ${setCount} sets, ${totalReps} ${info.unit}${weightStr}`;
 
-      // Include RPE data if present
-      const rpes = log.sets.map((s) => Number(s.targetRpe)).filter((v) => v > 0);
+      // Include RPE data if present (from completed sets only)
+      const rpes = completedSets.map((s) => Number(s.targetRpe)).filter((v) => v > 0);
       if (rpes.length > 0) {
         const avgRpe = (rpes.reduce((a, b) => a + b, 0) / rpes.length).toFixed(1);
         line += ` (avg RPE ${avgRpe})`;
@@ -180,6 +187,15 @@ function buildFatigueSignals(state, catalog, todayKey) {
   const logs = state.logsByDate || {};
   const today = todayKey || new Date().toISOString().slice(0, 10);
 
+  // Helper: check if a set is completed
+  const isSetDone = (s) => s.completed !== undefined ? s.completed : Number(s.reps) > 0;
+  const dayHasCompleted = (dayLogs) => {
+    if (!dayLogs || typeof dayLogs !== "object") return false;
+    return Object.values(dayLogs).some(
+      (log) => Array.isArray(log?.sets) && log.sets.some(isSetDone)
+    );
+  };
+
   // Recent moods (last 7 days)
   const recentDates = Object.keys(logs)
     .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
@@ -191,18 +207,18 @@ function buildFatigueSignals(state, catalog, todayKey) {
   const rpes = [];
   for (const dk of recentDates) {
     const dayLogs = logs[dk];
-    if (!dayLogs || typeof dayLogs !== "object") continue;
+    if (!dayHasCompleted(dayLogs)) continue;
     for (const log of Object.values(dayLogs)) {
       if (log.mood != null) moods.push({ date: dk, mood: Number(log.mood), label: MOOD_LABELS[String(log.mood)] || "unknown" });
       if (Array.isArray(log.sets)) {
         for (const s of log.sets) {
-          if (s.targetRpe && Number(s.targetRpe) > 0) rpes.push(Number(s.targetRpe));
+          if (isSetDone(s) && s.targetRpe && Number(s.targetRpe) > 0) rpes.push(Number(s.targetRpe));
         }
       }
     }
   }
 
-  // Today's already-trained muscles
+  // Today's already-trained muscles (only exercises with completed sets)
   const todayMuscles = new Set();
   const todayExercises = [];
   const todayLogs = logs[today];
@@ -218,7 +234,8 @@ function buildFatigueSignals(state, catalog, todayKey) {
       }
     }
 
-    for (const exId of Object.keys(todayLogs)) {
+    for (const [exId, log] of Object.entries(todayLogs)) {
+      if (!Array.isArray(log?.sets) || !log.sets.some(isSetDone)) continue;
       const ex = exMap.get(exId);
       if (!ex) continue;
       todayExercises.push(ex.name);
@@ -229,13 +246,13 @@ function buildFatigueSignals(state, catalog, todayKey) {
     }
   }
 
-  // Compute consecutive training days
+  // Compute consecutive training days (only days with completed sets)
   let consecutiveDays = 0;
   const d = new Date(today + "T00:00:00");
   for (let i = 1; i <= 7; i++) {
     d.setDate(d.getDate() - 1);
     const dk = d.toISOString().slice(0, 10);
-    if (logs[dk] && Object.keys(logs[dk]).length > 0) {
+    if (dayHasCompleted(logs[dk])) {
       consecutiveDays++;
     } else {
       break;

@@ -30,13 +30,36 @@ function buildFingerprint(dateRange, recentLogs, exerciseCount, profile) {
 }
 
 /**
- * Filter logsByDate to only include entries within the date range.
+ * Check if a set is completed (mirrors setHelpers.isSetCompleted).
+ * Inlined here to avoid circular dependency.
+ */
+function isCompleted(set) {
+  if (set.completed !== undefined) return set.completed;
+  return Number(set.reps) > 0; // fallback for unmigrated data
+}
+
+/**
+ * Filter logsByDate to only include entries within the date range,
+ * AND only include exercises that have at least one completed set.
+ * Non-completed sets (prefilled/empty) are stripped so downstream
+ * analysis never counts unperformed work.
  */
 function filterLogsToRange(logsByDate, start, end) {
   const filtered = {};
   for (const [dateKey, dayLogs] of Object.entries(logsByDate || {})) {
-    if (dateKey >= start && dateKey <= end) {
-      filtered[dateKey] = dayLogs;
+    if (dateKey < start || dateKey > end) continue;
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+
+    const filteredDay = {};
+    for (const [exId, log] of Object.entries(dayLogs)) {
+      if (!log?.sets || !Array.isArray(log.sets)) continue;
+      const completedSets = log.sets.filter(isCompleted);
+      if (completedSets.length === 0) continue;
+      filteredDay[exId] = { ...log, sets: completedSets };
+    }
+
+    if (Object.keys(filteredDay).length > 0) {
+      filtered[dateKey] = filteredDay;
     }
   }
   return filtered;
@@ -339,9 +362,12 @@ function computeAdherenceStats(logsByDate) {
   let sessionsLast30 = 0;
   for (const [dateKey, dayLogs] of Object.entries(logsByDate || {})) {
     if (dateKey < cutoff) continue;
-    if (dayLogs && typeof dayLogs === "object" && Object.keys(dayLogs).length > 0) {
-      sessionsLast30++;
-    }
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    // Only count days that have at least one completed set
+    const hasCompleted = Object.values(dayLogs).some(
+      (log) => Array.isArray(log?.sets) && log.sets.some(isCompleted)
+    );
+    if (hasCompleted) sessionsLast30++;
   }
 
   return {
@@ -536,9 +562,16 @@ function buildFatigueTrend(logsByDate) {
     .filter((d) => d >= cutoff && /^\d{4}-\d{2}-\d{2}$/.test(d))
     .sort();
 
+  const dayHasCompleted = (dayLogs) => {
+    if (!dayLogs || typeof dayLogs !== "object") return false;
+    return Object.values(dayLogs).some(
+      (log) => Array.isArray(log?.sets) && log.sets.some(isCompleted)
+    );
+  };
+
   for (const dateKey of sortedDates) {
     const dayLogs = logsByDate[dateKey];
-    if (!dayLogs || typeof dayLogs !== "object" || Object.keys(dayLogs).length === 0) continue;
+    if (!dayHasCompleted(dayLogs)) continue;
     trainingDays++;
     for (const log of Object.values(dayLogs)) {
       if (log.mood != null) {
@@ -549,7 +582,7 @@ function buildFatigueTrend(logsByDate) {
       }
       if (Array.isArray(log.sets)) {
         for (const s of log.sets) {
-          if (s.targetRpe && Number(s.targetRpe) > 0) rpes.push(Number(s.targetRpe));
+          if (isCompleted(s) && s.targetRpe && Number(s.targetRpe) > 0) rpes.push(Number(s.targetRpe));
         }
       }
     }
@@ -562,7 +595,7 @@ function buildFatigueTrend(logsByDate) {
   const d = new Date(today + "T00:00:00");
   for (let i = 0; i <= 7; i++) {
     const dk = d.toISOString().slice(0, 10);
-    if (logsByDate[dk] && typeof logsByDate[dk] === "object" && Object.keys(logsByDate[dk]).length > 0) {
+    if (dayHasCompleted(logsByDate[dk])) {
       consecutiveDays++;
     } else if (i > 0) {
       break; // stop counting on first gap (skip today check)
@@ -620,14 +653,12 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     }
   }
 
-  // Short-circuit when there are zero logged sessions in the date range.
+  // Short-circuit when there are zero completed sessions in the date range.
   // Without this, the AI sees the program structure + adherence stats and
   // hallucinates volume claims (e.g. "too much chest") from exercises that
   // were never actually performed in the selected period.
-  const loggedDaysInRange = Object.keys(recentLogs).filter(
-    (k) => recentLogs[k] && typeof recentLogs[k] === "object" && Object.keys(recentLogs[k]).length > 0
-  ).length;
-  if (loggedDaysInRange === 0) {
+  // Note: recentLogs is already completion-filtered by filterLogsToRange.
+  if (Object.keys(recentLogs).length === 0) {
     const noDataInsights = [{
       type: "TIP",
       severity: "INFO",

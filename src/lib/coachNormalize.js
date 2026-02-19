@@ -205,7 +205,13 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
       const { name, unit } = info;
       const activity = classifyActivity(name, unit);
 
-      const totalValue = log.sets.reduce(
+      // Only count completed sets (prevents prefilled/empty rows from inflating data)
+      const completedSets = log.sets.filter(s =>
+        s.completed !== undefined ? s.completed : Number(s.reps) > 0
+      );
+      if (completedSets.length === 0) continue;
+
+      const totalValue = completedSets.reduce(
         (sum, set) => sum + (Number(set.reps) || 0),
         0
       );
@@ -236,7 +242,7 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
         totalStrengthReps += totalValue;
 
         // Track working sets per PRIMARY muscle only (no secondary inflation)
-        const workingSets = log.sets.filter(s => (Number(s.reps) || 0) > 0).length;
+        const workingSets = completedSets.filter(s => (Number(s.reps) || 0) > 0).length;
         totalStrengthSets += workingSets;
         for (const group of primaryGroups) {
           muscleGroupSets[group] = (muscleGroupSets[group] || 0) + workingSets;
