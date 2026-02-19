@@ -134,22 +134,11 @@ export function normalizeState(st) {
     next.preferences.exerciseRestTimes = {};
   }
 
-  // One-time migration: read equipment/theme/measurementSystem from old standalone localStorage keys
+  // Clean up legacy standalone localStorage keys (migration complete)
   try {
-    if (typeof next.preferences.equipment === "string" || (!next.preferences.equipment && !Array.isArray(next.preferences.equipment))) {
-      const oldEquip = localStorage.getItem("wt_equipment");
-      if (oldEquip && typeof next.preferences.equipment !== "string") {
-        next.preferences.equipment = oldEquip;
-      }
-    }
-    if (!next.preferences.theme || next.preferences.theme === "dark") {
-      const oldTheme = localStorage.getItem("wt_theme");
-      if (oldTheme) next.preferences.theme = oldTheme;
-    }
-    if (!next.preferences.measurementSystem || next.preferences.measurementSystem === "imperial") {
-      const oldMs = localStorage.getItem("wt_measurement_system");
-      if (oldMs) next.preferences.measurementSystem = oldMs;
-    }
+    localStorage.removeItem("wt_theme");
+    localStorage.removeItem("wt_equipment");
+    localStorage.removeItem("wt_measurement_system");
   } catch {
     // localStorage may be unavailable (SSR, private browsing)
   }
