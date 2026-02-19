@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { getUnitAbbr, buildNormalizedAnalysis } from "./coachNormalize";
 import { buildCatalogMap } from "./exerciseCatalogUtils";
+import { recordAiEvent } from "./aiMetrics";
 
 const CACHE_KEY = "wt_coach_cache";
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
@@ -41,36 +42,173 @@ function filterLogsToRange(logsByDate, start, end) {
   return filtered;
 }
 
+// ---------------------------------------------------------------------------
+// Rolling insight history (v2) for anti-repetition
+// ---------------------------------------------------------------------------
+
 /**
- * Load previous insight titles/types from localStorage so the AI can avoid repeating itself.
+ * djb2 hash for fast string comparison.
  */
-function loadPreviousInsights() {
+function simpleHash(str) {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+/**
+ * Load insight history from localStorage. Auto-migrates v1 → v2.
+ */
+function loadInsightHistory() {
   try {
     const raw = localStorage.getItem(LAST_INSIGHTS_KEY);
-    if (!raw) return null;
+    if (!raw) return { version: 2, history: [], fetchCounter: 0 };
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.titles) && parsed.titles.length > 0) return parsed;
-    return null;
+
+    // Already v2
+    if (parsed.version === 2 && Array.isArray(parsed.history)) return parsed;
+
+    // Migrate v1: { titles: [...], types: [...] }
+    if (Array.isArray(parsed.titles) && parsed.titles.length > 0) {
+      const now = new Date().toISOString().slice(0, 10);
+      const history = parsed.titles.map((title, i) => ({
+        titleHash: simpleHash(title),
+        title,
+        type: parsed.types?.[i] || "INFO",
+        firstShown: now,
+        lastShown: now,
+        shownCount: 1,
+        fetchIndex: 0,
+      }));
+      return { version: 2, history: history.slice(0, 20), fetchCounter: 1 };
+    }
+
+    return { version: 2, history: [], fetchCounter: 0 };
   } catch {
-    return null;
+    return { version: 2, history: [], fetchCounter: 0 };
   }
 }
 
 /**
- * Save insight titles/types after a successful fetch.
+ * Save insights to rolling history. Upserts by titleHash, trims to 20 entries.
  */
-function savePreviousInsights(insights) {
+function saveInsightHistory(insights, historyState) {
   try {
+    const fetchIndex = (historyState.fetchCounter || 0) + 1;
+    const now = new Date().toISOString().slice(0, 10);
+    const history = [...historyState.history];
+
+    for (const insight of insights) {
+      const hash = simpleHash(insight.title);
+      const existing = history.find((h) => h.titleHash === hash);
+      if (existing) {
+        existing.lastShown = now;
+        existing.shownCount += 1;
+        existing.fetchIndex = fetchIndex;
+      } else {
+        history.push({
+          titleHash: hash,
+          title: insight.title,
+          type: insight.type || "INFO",
+          firstShown: now,
+          lastShown: now,
+          shownCount: 1,
+          fetchIndex,
+        });
+      }
+    }
+
+    // Sort by most recent first, trim to 20
+    history.sort((a, b) => b.fetchIndex - a.fetchIndex);
+    const trimmed = history.slice(0, 20);
+
     localStorage.setItem(
       LAST_INSIGHTS_KEY,
-      JSON.stringify({
-        titles: insights.map((i) => i.title),
-        types: insights.map((i) => i.type),
-      })
+      JSON.stringify({ version: 2, history: trimmed, fetchCounter: fetchIndex })
     );
+
+    return { version: 2, history: trimmed, fetchCounter: fetchIndex };
   } catch {
     // Ignore storage errors
+    return historyState;
   }
+}
+
+/**
+ * Build the payload sent to the edge function for anti-repetition.
+ */
+function buildPreviousInsightsPayload(historyState) {
+  const { history } = historyState;
+  if (!history || history.length === 0) return null;
+
+  return {
+    titles: history.map((h) => h.title),
+    types: history.map((h) => h.type),
+    shownCounts: history.map((h) => h.shownCount),
+    dateRanges: history.map((h) => `${h.firstShown} to ${h.lastShown}`),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Client-side novelty filter
+// ---------------------------------------------------------------------------
+
+/**
+ * Jaccard word similarity between two strings (strip emoji, lowercase, skip short words).
+ */
+function wordSimilarity(a, b) {
+  const normalize = (s) =>
+    s
+      .replace(/[\u{1F300}-\u{1FAD6}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}]/gu, "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 3);
+  const setA = new Set(normalize(a));
+  const setB = new Set(normalize(b));
+  if (setA.size === 0 || setB.size === 0) return 0;
+  let intersection = 0;
+  for (const w of setA) {
+    if (setB.has(w)) intersection++;
+  }
+  return intersection / (setA.size + setB.size - intersection);
+}
+
+/**
+ * Filter out repetitive insights by comparing against recent history.
+ * Returns filtered insights (always at least 1).
+ */
+function filterRepetitiveInsights(insights, historyState) {
+  if (!insights || insights.length === 0) return insights;
+
+  const { history, fetchCounter } = historyState;
+  // Titles from last 3 fetches
+  const recentThreshold = (fetchCounter || 0) - 2;
+  const recentTitles = (history || [])
+    .filter((h) => h.fetchIndex >= recentThreshold)
+    .map((h) => h.title);
+
+  if (recentTitles.length === 0) return insights;
+
+  // Score each insight by max similarity to recent titles
+  const scored = insights.map((insight) => {
+    const maxSim = Math.max(
+      0,
+      ...recentTitles.map((t) => wordSimilarity(insight.title, t))
+    );
+    return { insight, maxSim };
+  });
+
+  // Filter out >60% overlap
+  const kept = scored.filter((s) => s.maxSim <= 0.6).map((s) => s.insight);
+
+  // Always keep at least 1 (the least similar)
+  if (kept.length === 0) {
+    scored.sort((a, b) => a.maxSim - b.maxSim);
+    return [scored[0].insight];
+  }
+
+  return kept;
 }
 
 /**
@@ -286,6 +424,171 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
 }
 
 /**
+ * Compute volume-load trends: sum(reps × weight) per session for strength exercises with 2+ sessions.
+ * Compares first vs last session volume-load.
+ */
+function computeVolumeLoadTrends(recentLogs, allWorkouts, weightLabel = "lb") {
+  const exerciseMap = {};
+  for (const w of allWorkouts || []) {
+    for (const ex of w.exercises || []) {
+      exerciseMap[ex.id] = { name: ex.name, unit: ex.unit || "reps" };
+    }
+  }
+
+  // Collect per-exercise: array of { date, volumeLoad }
+  const byExercise = {};
+  for (const [dateKey, dayLogs] of Object.entries(recentLogs || {})) {
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    for (const [exId, log] of Object.entries(dayLogs)) {
+      const info = exerciseMap[exId];
+      if (!info || info.unit !== "reps") continue;
+      if (!log?.sets || !Array.isArray(log.sets)) continue;
+      const volumeLoad = log.sets.reduce(
+        (sum, s) => sum + (Number(s.reps) || 0) * (Number(s.weight) || 0),
+        0
+      );
+      if (volumeLoad <= 0) continue;
+      if (!byExercise[exId]) byExercise[exId] = { name: info.name, entries: [] };
+      byExercise[exId].entries.push({ date: dateKey, volumeLoad });
+    }
+  }
+
+  const trends = [];
+  for (const { name, entries } of Object.values(byExercise)) {
+    if (entries.length < 2) continue;
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    const first = entries[0].volumeLoad;
+    const last = entries[entries.length - 1].volumeLoad;
+    const dir = last > first ? "UP" : last < first ? "DOWN" : "FLAT";
+    trends.push(`${name}: ${first} → ${last} ${weightLabel}-reps (${dir})`);
+  }
+
+  return trends.length > 0 ? trends : null;
+}
+
+/**
+ * Compute estimated 1RM trends using Epley formula: 1RM = weight × (1 + reps/30).
+ * Uses heaviest working set per session (highest weight where reps > 0).
+ * Compares first vs last for exercises with 2+ sessions.
+ */
+function computeEstimated1RMTrends(recentLogs, allWorkouts, weightLabel = "lb") {
+  const exerciseMap = {};
+  for (const w of allWorkouts || []) {
+    for (const ex of w.exercises || []) {
+      exerciseMap[ex.id] = { name: ex.name, unit: ex.unit || "reps" };
+    }
+  }
+
+  // Collect per-exercise: array of { date, e1rm }
+  const byExercise = {};
+  for (const [dateKey, dayLogs] of Object.entries(recentLogs || {})) {
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    for (const [exId, log] of Object.entries(dayLogs)) {
+      const info = exerciseMap[exId];
+      if (!info || info.unit !== "reps") continue;
+      if (!log?.sets || !Array.isArray(log.sets)) continue;
+
+      // Find heaviest working set (highest weight where reps > 0)
+      let bestE1rm = 0;
+      for (const s of log.sets) {
+        const w = Number(s.weight) || 0;
+        const r = Number(s.reps) || 0;
+        if (w <= 0 || r <= 0) continue;
+        const e1rm = Math.round(w * (1 + r / 30));
+        if (e1rm > bestE1rm) bestE1rm = e1rm;
+      }
+      if (bestE1rm <= 0) continue;
+      if (!byExercise[exId]) byExercise[exId] = { name: info.name, entries: [] };
+      byExercise[exId].entries.push({ date: dateKey, e1rm: bestE1rm });
+    }
+  }
+
+  const trends = [];
+  for (const { name, entries } of Object.values(byExercise)) {
+    if (entries.length < 2) continue;
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    const first = entries[0].e1rm;
+    const last = entries[entries.length - 1].e1rm;
+    const dir = last > first ? "UP" : last < first ? "DOWN" : "FLAT";
+    trends.push(`${name}: e1RM ${first} → ${last} ${weightLabel} (${dir})`);
+  }
+
+  return trends.length > 0 ? trends : null;
+}
+
+/**
+ * Build fatigue trend from last 7 days of logs: training days, RPE, mood distribution, consecutive days.
+ * Flags ELEVATED fatigue if avgRPE >= 8 OR rough moods >= 2 OR consecutive training days >= 4.
+ */
+function buildFatigueTrend(logsByDate) {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const cutoff = sevenDaysAgo.toISOString().slice(0, 10);
+
+  let trainingDays = 0;
+  const rpes = [];
+  const moods = { good: 0, neutral: 0, rough: 0 };
+  let consecutiveDays = 0;
+
+  // Count training days and collect RPE/mood
+  const sortedDates = Object.keys(logsByDate || {})
+    .filter((d) => d >= cutoff && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort();
+
+  for (const dateKey of sortedDates) {
+    const dayLogs = logsByDate[dateKey];
+    if (!dayLogs || typeof dayLogs !== "object" || Object.keys(dayLogs).length === 0) continue;
+    trainingDays++;
+    for (const log of Object.values(dayLogs)) {
+      if (log.mood != null) {
+        const m = Number(log.mood);
+        if (m >= 1) moods.good++;
+        else if (m <= -1) moods.rough++;
+        else moods.neutral++;
+      }
+      if (Array.isArray(log.sets)) {
+        for (const s of log.sets) {
+          if (s.targetRpe && Number(s.targetRpe) > 0) rpes.push(Number(s.targetRpe));
+        }
+      }
+    }
+  }
+
+  if (trainingDays === 0) return null;
+
+  // Count consecutive training days backwards from today
+  const today = now.toISOString().slice(0, 10);
+  const d = new Date(today + "T00:00:00");
+  for (let i = 0; i <= 7; i++) {
+    const dk = d.toISOString().slice(0, 10);
+    if (logsByDate[dk] && typeof logsByDate[dk] === "object" && Object.keys(logsByDate[dk]).length > 0) {
+      consecutiveDays++;
+    } else if (i > 0) {
+      break; // stop counting on first gap (skip today check)
+    }
+    d.setDate(d.getDate() - 1);
+  }
+
+  const avgRpe = rpes.length > 0
+    ? (rpes.reduce((a, b) => a + b, 0) / rpes.length).toFixed(1)
+    : null;
+
+  const signals = [];
+  if (avgRpe && parseFloat(avgRpe) >= 8) signals.push("high RPE");
+  if (moods.rough >= 2) signals.push("multiple rough moods");
+  if (consecutiveDays >= 4) signals.push(`${consecutiveDays} consecutive training days`);
+
+  const lines = [`Training days in last 7: ${trainingDays}`];
+  if (avgRpe) lines.push(`Avg RPE: ${avgRpe}/10`);
+  lines.push(`Mood: ${moods.good} good, ${moods.neutral} neutral, ${moods.rough} rough`);
+  if (consecutiveDays > 0) lines.push(`Consecutive training days: ${consecutiveDays}`);
+  lines.push(`Fatigue signals: ${signals.length > 0 ? "ELEVATED (" + signals.join(", ") + ")" : "NORMAL"}`);
+
+  return lines.join("\n");
+}
+
+/**
  * Fetch AI coach insights. Uses localStorage cache with 15-min TTL.
  *
  * @param {Object} params
@@ -315,6 +618,33 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     } catch {
       // Ignore cache parse errors
     }
+  }
+
+  // Short-circuit when there are zero logged sessions in the date range.
+  // Without this, the AI sees the program structure + adherence stats and
+  // hallucinates volume claims (e.g. "too much chest") from exercises that
+  // were never actually performed in the selected period.
+  const loggedDaysInRange = Object.keys(recentLogs).filter(
+    (k) => recentLogs[k] && typeof recentLogs[k] === "object" && Object.keys(recentLogs[k]).length > 0
+  ).length;
+  if (loggedDaysInRange === 0) {
+    const noDataInsights = [{
+      type: "TIP",
+      severity: "INFO",
+      title: "📊 No workout data yet",
+      message: `No logged sessions between ${dateRange.start} and ${dateRange.end}. Log a workout and check back — the more data I have, the better my advice gets.`,
+      suggestions: [],
+      confidence: null,
+      evidence: "",
+      expected_outcome: "",
+    }];
+    try {
+      localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({ fingerprint, insights: noDataInsights, timestamp: Date.now() })
+      );
+    } catch { /* ignore */ }
+    return { insights: noDataInsights, fromCache: false };
   }
 
   // Merge daily workout exercises into the workouts array
@@ -373,8 +703,12 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   const enrichedLogSummary = buildEnrichedLogSummary(recentLogs, allWorkouts);
   const weightLabel = measurementSystem === "metric" ? "kg" : "lb";
   const progressionTrends = computeProgressionTrends(recentLogs, allWorkouts, weightLabel);
+  const volumeLoadTrends = computeVolumeLoadTrends(recentLogs, allWorkouts, weightLabel);
+  const estimated1RMTrends = computeEstimated1RMTrends(recentLogs, allWorkouts, weightLabel);
+  const fatigueTrend = buildFatigueTrend(state?.logsByDate);
   const adherence = computeAdherenceStats(state?.logsByDate);
-  const previousInsights = loadPreviousInsights();
+  const insightHistory = loadInsightHistory();
+  const previousInsights = buildPreviousInsightsPayload(insightHistory);
 
   // Compute muscle set counts for the AI (primary-only, no secondary inflation)
   let muscleSetsSummary = null;
@@ -415,6 +749,9 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       weightUnit: weightLabel,
       enrichedLogSummary,
       progressionTrends,
+      volumeLoadTrends,
+      estimated1RMTrends,
+      fatigueTrend,
       adherence,
       previousInsights,
       muscleSetsSummary,
@@ -439,8 +776,11 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       }
     }
     console.error("Coach API error detail:", detail);
+    recordAiEvent("ai_parse_fail", "coach", { detail });
     throw new Error(detail);
   }
+
+  recordAiEvent("ai_success", "coach");
 
   // Normalize each insight so UI never crashes on missing fields
   const insights = (data?.insights || []).map((i) => ({
@@ -450,20 +790,24 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     title: i.title || "Insight",
     message: i.message || "",
     suggestions: Array.isArray(i.suggestions) ? i.suggestions : [],
+    confidence: typeof i.confidence === "number" ? i.confidence : null,
+    evidence: typeof i.evidence === "string" ? i.evidence : "",
+    expected_outcome: typeof i.expected_outcome === "string" ? i.expected_outcome : "",
   }));
 
-  // Save to cache
+  // Save unfiltered insights to rolling history, then filter for novelty
+  const updatedHistory = saveInsightHistory(insights, insightHistory);
+  const filtered = filterRepetitiveInsights(insights, updatedHistory);
+
+  // Update cache with filtered insights
   try {
     localStorage.setItem(
       CACHE_KEY,
-      JSON.stringify({ fingerprint, insights, timestamp: Date.now() })
+      JSON.stringify({ fingerprint, insights: filtered, timestamp: Date.now() })
     );
   } catch {
     // Ignore storage errors
   }
 
-  // Save insight titles/types for anti-repetition
-  savePreviousInsights(insights);
-
-  return { insights, fromCache: false };
+  return { insights: filtered, fromCache: false };
 }

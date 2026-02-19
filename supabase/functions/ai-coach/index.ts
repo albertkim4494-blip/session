@@ -32,6 +32,9 @@ Deno.serve(async (req) => {
       weightUnit,
       enrichedLogSummary,
       progressionTrends,
+      volumeLoadTrends,
+      estimated1RMTrends,
+      fatigueTrend,
       adherence,
       previousInsights,
       muscleSetsSummary,
@@ -176,10 +179,18 @@ Deno.serve(async (req) => {
       adherenceSection = `\nADHERENCE (last 30 days):\n  Sessions: ${adherence.sessionsLast30 ?? "?"}\n  Average: ${adherence.sessionsPerWeek ?? "?"} sessions/week\n`;
     }
 
-    // Build anti-repetition section
+    // Build anti-repetition section (enhanced with shown counts and date ranges)
     let antiRepetitionSection = "";
     if (previousInsights && Array.isArray(previousInsights.titles) && previousInsights.titles.length > 0) {
-      antiRepetitionSection = `\nPREVIOUS RECOMMENDATIONS (do NOT repeat these topics):\n${previousInsights.titles.map((t: string) => `  - ${t}`).join("\n")}\n`;
+      const lines = previousInsights.titles.map((t: string, i: number) => {
+        const count = previousInsights.shownCounts?.[i];
+        const range = previousInsights.dateRanges?.[i];
+        let line = `  - ${t}`;
+        if (count > 1) line += ` (shown ${count}x)`;
+        if (range) line += ` [${range}]`;
+        return line;
+      });
+      antiRepetitionSection = `\nPREVIOUS RECOMMENDATIONS (do NOT repeat these topics — especially those shown 2+ times, unless the underlying data has materially changed since they were last shown):\n${lines.join("\n")}\n`;
     }
 
     // Build muscle sets section (primary-only working set counts — the standard volume metric)
@@ -222,7 +233,7 @@ Factor sport demands into ALL recommendations. Prioritize complementary work, an
     const systemPrompt = `You are this person's personal coach. Not a generic fitness bot — their coach. You know their profile, you see their logs, and you talk to them like a real human who's been watching their training.
 
 Write like a person, not a template. Be direct. Be warm. Use "you" and "your." Reference their actual numbers, their actual exercises, what they actually did in the date range. No filler, no corporate-speak, no "Great job maintaining consistency!" generic nonsense. Say something only if you actually mean it based on their data.
-- IMPORTANT: Say "in the last 7 days" or "recently" instead of "this week" — the date range is rolling, not calendar-week-based.
+- IMPORTANT: Use the date range label provided (e.g. "this week", "this month"). The date range start/end dates are the source of truth — only discuss data that falls within those dates.
 
 SPECIFICITY REQUIREMENTS — every insight MUST follow these:
 - ALWAYS state the date range up front: "Over the last 7 days (${dateRange?.start || "?"} to ${dateRange?.end || "?"})..."
@@ -334,15 +345,36 @@ ANTI-REPETITION:
 RESPONSE FORMAT:
 - Return ONLY valid JSON, no markdown, no explanation outside the JSON.
 - Return 1-3 insights.
-- Each insight: { type, severity, title, message, suggestions }
+- Each insight: { type, severity, title, message, suggestions, confidence, evidence, expected_outcome }
 - type: one of "IMBALANCE", "NEGLECTED", "OVERTRAINING", "POSITIVE", "TIP", "RECOVERY", "PROGRESSION"
 - severity: one of "HIGH", "MEDIUM", "LOW", "INFO"
 - title: short title with a leading emoji (⚠️, 💡, 📊, ✅, 🔥, 😴, 📈)
 - message: 2-4 sentences. Sound human. First sentence states the finding with date range and specific numbers. Following sentences explain significance and give a concrete action step.
 - suggestions: array of { "catalogId": "<id>", "exercise": "<name>", "muscleGroup": "<GROUP>" } — only if actionable. Use exact catalogId and name from the EXERCISE CATALOG. muscleGroup: ANTERIOR_DELT, LATERAL_DELT, POSTERIOR_DELT, CHEST, TRICEPS, BACK, BICEPS, QUADS, HAMSTRINGS, GLUTES, CALVES, ABS.
+- confidence: number 0.0-1.0 — how confident you are based on available data (1.0 = strong data support, 0.5 = reasonable inference, <0.3 = speculative)
+- evidence: string — which specific data points triggered this insight (cite dates, numbers, exercise names)
+- expected_outcome: string — what should improve and in what timeframe if user follows advice
 
 OUTPUT FORMAT:
-{ "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...] } ] }`;
+{ "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...], "confidence": 0.8, "evidence": "...", "expected_outcome": "..." } ] }`;
+
+    // Build volume-load trends section
+    let volumeLoadSection = "";
+    if (Array.isArray(volumeLoadTrends) && volumeLoadTrends.length > 0) {
+      volumeLoadSection = `\nVOLUME-LOAD TRENDS (total reps × weight per session):\n${volumeLoadTrends.map((t: string) => `  ${t}`).join("\n")}\n`;
+    }
+
+    // Build estimated 1RM trends section
+    let e1rmSection = "";
+    if (Array.isArray(estimated1RMTrends) && estimated1RMTrends.length > 0) {
+      e1rmSection = `\nESTIMATED 1RM TRENDS (Epley formula):\n${estimated1RMTrends.map((t: string) => `  ${t}`).join("\n")}\n`;
+    }
+
+    // Build fatigue trend section
+    let fatigueSection = "";
+    if (fatigueTrend && typeof fatigueTrend === "string" && fatigueTrend.trim()) {
+      fatigueSection = `\nFATIGUE TREND (last 7 days):\n${fatigueTrend.split("\n").map((l: string) => `  ${l}`).join("\n")}\n`;
+    }
 
     const userMessage = `Date range: ${dateRange?.label || "unknown"} (${dateRange?.start || "?"} to ${dateRange?.end || "?"})
 
@@ -351,7 +383,7 @@ ${programSummary}
 
 RECENT TRAINING LOGS:
 ${logSummary}
-${catalogSection}${muscleVolumeSection}${progressionSection}${adherenceSection}${antiRepetitionSection}
+${catalogSection}${muscleVolumeSection}${progressionSection}${volumeLoadSection}${e1rmSection}${fatigueSection}${adherenceSection}${antiRepetitionSection}
 Analyze this data and return JSON insights.`;
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -381,6 +413,7 @@ Analyze this data and return JSON insights.`;
     }
 
     const openaiData = await openaiRes.json();
+    const usage = openaiData.usage;
     const content = openaiData.choices?.[0]?.message?.content || "{}";
 
     // Parse the JSON from the model response (strip markdown fences if present)
@@ -389,12 +422,22 @@ Analyze this data and return JSON insights.`;
       const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
       parsed = JSON.parse(cleaned);
     } catch {
+      console.log(JSON.stringify({ event: "ai_parse_fail", feature: "coach", contentPreview: content.slice(0, 200) }));
       console.error("Failed to parse AI response:", content);
       parsed = { insights: [] };
     }
 
     // Validate structure
     const insights = Array.isArray(parsed.insights) ? parsed.insights.slice(0, 3) : [];
+
+    console.log(JSON.stringify({
+      event: "ai_success",
+      feature: "coach",
+      insightCount: insights.length,
+      promptTokens: usage?.prompt_tokens,
+      completionTokens: usage?.completion_tokens,
+      totalTokens: usage?.total_tokens,
+    }));
 
     return new Response(
       JSON.stringify({ insights }),

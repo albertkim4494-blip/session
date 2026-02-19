@@ -329,6 +329,176 @@ OUTPUT FORMAT:
 }
 
 // ---------------------------------------------------------------------------
+// Schema validation
+// ---------------------------------------------------------------------------
+
+const SCHEME_RE = /^(\d+)x(\d+(-\d+)?s?)$/;
+
+function normalizeScheme(scheme: string): string | null {
+  if (!scheme || typeof scheme !== "string") return null;
+  if (scheme === "sport") return "sport";
+  // Light repair: collapse whitespace around 'x'
+  const cleaned = scheme.trim().replace(/\s*x\s*/gi, "x").toLowerCase();
+  if (SCHEME_RE.test(cleaned)) return cleaned;
+  return null;
+}
+
+interface ValidationError {
+  error: "validation_failed";
+  code: string;
+  field: string;
+  reason: string;
+}
+
+function validateExercise(
+  ex: Record<string, unknown>,
+  index: number,
+  prefix: string
+): ValidationError | null {
+  if (!ex.catalogId || typeof ex.catalogId !== "string" || !ex.catalogId.trim()) {
+    return {
+      error: "validation_failed",
+      code: "MISSING_CATALOG_ID",
+      field: `${prefix}.exercises[${index}].catalogId`,
+      reason: "Exercise missing catalogId",
+    };
+  }
+  if (!ex.name || typeof ex.name !== "string" || !ex.name.trim()) {
+    return {
+      error: "validation_failed",
+      code: "MISSING_NAME",
+      field: `${prefix}.exercises[${index}].name`,
+      reason: "Exercise missing name",
+    };
+  }
+  const normalized = normalizeScheme(ex.scheme as string);
+  if (!normalized) {
+    return {
+      error: "validation_failed",
+      code: "INVALID_SCHEME",
+      field: `${prefix}.exercises[${index}].scheme`,
+      reason: `Invalid scheme "${ex.scheme}" — expected format like "3x10", "4x8-12", "1x60s", or "sport"`,
+    };
+  }
+  // Apply normalized scheme back
+  ex.scheme = normalized;
+  return null;
+}
+
+function validateWorkoutOutput(
+  parsed: Record<string, unknown>,
+  mode: string
+): ValidationError | null {
+  if (mode === "program") {
+    if (!Array.isArray(parsed.workouts) || parsed.workouts.length === 0) {
+      return {
+        error: "validation_failed",
+        code: "EMPTY_WORKOUTS",
+        field: "workouts",
+        reason: "Program must contain at least one workout",
+      };
+    }
+    for (let wi = 0; wi < parsed.workouts.length; wi++) {
+      const w = parsed.workouts[wi] as Record<string, unknown>;
+      if (!w.name || typeof w.name !== "string" || !w.name.trim()) {
+        w.name = `Day ${wi + 1}`;
+      }
+      if (!Array.isArray(w.exercises) || w.exercises.length < 2) {
+        return {
+          error: "validation_failed",
+          code: "TOO_FEW_EXERCISES",
+          field: `workouts[${wi}].exercises`,
+          reason: `Workout "${w.name}" has fewer than 2 exercises`,
+        };
+      }
+      for (let ei = 0; ei < w.exercises.length; ei++) {
+        const err = validateExercise(
+          w.exercises[ei] as Record<string, unknown>,
+          ei,
+          `workouts[${wi}]`
+        );
+        if (err) return err;
+      }
+    }
+  } else if (mode === "today") {
+    if (!parsed.name || typeof parsed.name !== "string" || !(parsed.name as string).trim()) {
+      parsed.name = "Today's Workout";
+    }
+    if (!Array.isArray(parsed.targetMuscles)) {
+      parsed.targetMuscles = [];
+    }
+    if (!Array.isArray(parsed.exercises) || parsed.exercises.length < 2) {
+      return {
+        error: "validation_failed",
+        code: "TOO_FEW_EXERCISES",
+        field: "exercises",
+        reason: "Today's workout must have at least 2 exercises",
+      };
+    }
+    for (let ei = 0; ei < parsed.exercises.length; ei++) {
+      const err = validateExercise(
+        parsed.exercises[ei] as Record<string, unknown>,
+        ei,
+        "today"
+      );
+      if (err) return err;
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// AI output repair (1 retry on parse failure)
+// ---------------------------------------------------------------------------
+
+async function attemptRepair(
+  rawContent: string,
+  mode: string
+): Promise<Record<string, unknown> | null> {
+  const schemaHint =
+    mode === "program"
+      ? '{"workouts":[{"name":"...","exercises":[{"catalogId":"...","name":"...","scheme":"3x10"}]}]}'
+      : '{"name":"...","targetMuscles":["CHEST"],"exercises":[{"catalogId":"...","name":"...","scheme":"3x10"}]}';
+
+  try {
+    const repairRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Fix the following malformed JSON so it matches this schema: ${schemaHint}\nReturn ONLY valid JSON, nothing else.`,
+          },
+          { role: "user", content: rawContent },
+        ],
+        temperature: 0.0,
+        max_tokens: 2000,
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!repairRes.ok) return null;
+
+    const repairData = await repairRes.json();
+    const repaired = repairData.choices?.[0]?.message?.content;
+    if (!repaired) return null;
+
+    const cleaned = repaired
+      .replace(/```json\s*/g, "")
+      .replace(/```\s*/g, "")
+      .trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 
@@ -360,6 +530,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Invalid mode. Use 'program' or 'today'." }, 400);
     }
 
+    // Use gpt-4o for full program generation (higher quality), gpt-4o-mini for today (speed)
+    const model = mode === "program" ? "gpt-4o" : "gpt-4o-mini";
+
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -367,7 +540,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -388,6 +561,7 @@ Deno.serve(async (req) => {
     }
 
     const openaiData = await openaiRes.json();
+    const usage = openaiData.usage;
     const content = openaiData.choices?.[0]?.message?.content || "{}";
 
     let parsed;
@@ -398,9 +572,39 @@ Deno.serve(async (req) => {
         .trim();
       parsed = JSON.parse(cleaned);
     } catch {
-      console.error("Failed to parse AI response:", content);
+      console.log(JSON.stringify({ event: "ai_parse_fail", feature: mode, contentPreview: content.slice(0, 200) }));
+      console.error("Failed to parse AI response, attempting repair:", content.slice(0, 200));
+      // Attempt repair: 1 extra API call
+      const repaired = await attemptRepair(content, mode);
+      if (repaired) {
+        const valErr = validateWorkoutOutput(repaired, mode);
+        if (!valErr) {
+          console.log(JSON.stringify({ event: "ai_repair_success", feature: mode }));
+          return jsonResponse(repaired);
+        }
+        console.log(JSON.stringify({ event: "ai_schema_fail", feature: mode, code: valErr.code, field: valErr.field }));
+        console.error("Repaired JSON failed validation:", valErr);
+        return jsonResponse(valErr, 422);
+      }
       return jsonResponse({ error: "Failed to parse AI response" }, 502);
     }
+
+    // Validate the parsed output
+    const validationError = validateWorkoutOutput(parsed, mode);
+    if (validationError) {
+      console.log(JSON.stringify({ event: "ai_schema_fail", feature: mode, code: validationError.code, field: validationError.field }));
+      console.error("Workout validation failed:", validationError);
+      return jsonResponse(validationError, 422);
+    }
+
+    console.log(JSON.stringify({
+      event: "ai_success",
+      feature: mode,
+      model,
+      promptTokens: usage?.prompt_tokens,
+      completionTokens: usage?.completion_tokens,
+      totalTokens: usage?.total_tokens,
+    }));
 
     return jsonResponse(parsed);
   } catch (err) {

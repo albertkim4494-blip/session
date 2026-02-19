@@ -7,6 +7,7 @@ import { supabase } from "./supabase";
 import { exerciseFitsEquipment } from "./exerciseCatalog";
 import { buildCatalogMap } from "./exerciseCatalogUtils";
 import { analyzeMuscleRecency } from "./workoutGenerator";
+import { recordAiEvent } from "./aiMetrics";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -139,22 +140,35 @@ function buildMuscleRecency(state, catalog, todayKey) {
 /**
  * Transform AI response exercises into app workout structure.
  * Uses catalog names (not AI names) to prevent typos.
+ * Returns { exercises, diagnostics } with drop reasons for observability.
  */
 function transformExercises(aiExercises, catalogMap) {
-  if (!Array.isArray(aiExercises)) return [];
+  const diagnostics = { dropped: 0, reasons: [] };
+  if (!Array.isArray(aiExercises)) return { exercises: [], diagnostics };
 
-  return aiExercises
-    .filter((e) => e.catalogId && catalogMap.has(e.catalogId))
-    .map((e) => {
-      const entry = catalogMap.get(e.catalogId);
-      return {
-        id: uid("ex"),
-        name: entry.name, // use catalog name, not AI's
-        unit: entry.defaultUnit,
-        catalogId: e.catalogId,
-        scheme: e.scheme || null, // per-exercise scheme from AI
-      };
+  const exercises = [];
+  for (const e of aiExercises) {
+    if (!e.catalogId) {
+      diagnostics.dropped++;
+      diagnostics.reasons.push(`Dropped ${e.name || "unknown"}: missing catalogId`);
+      continue;
+    }
+    if (!catalogMap.has(e.catalogId)) {
+      diagnostics.dropped++;
+      diagnostics.reasons.push(`Dropped ${e.name || e.catalogId}: catalogId not in catalog`);
+      continue;
+    }
+    const entry = catalogMap.get(e.catalogId);
+    exercises.push({
+      id: uid("ex"),
+      name: entry.name, // use catalog name, not AI's
+      unit: entry.defaultUnit,
+      catalogId: e.catalogId,
+      scheme: e.scheme || null, // per-exercise scheme from AI
     });
+  }
+
+  return { exercises, diagnostics };
 }
 
 /**
@@ -282,16 +296,31 @@ export async function generateProgramAI({
     );
 
     if (error) throw new Error(error.message || "Edge function error");
-    if (data?.error) throw new Error(data.error);
+    if (data?.error) throw new Error(data.reason ? `${data.error}: ${data.reason}` : data.error);
     if (!Array.isArray(data?.workouts)) throw new Error("Invalid AI response");
 
-    const workouts = data.workouts.map((w) => ({
-      id: uid("w"),
-      name: w.name || "Workout",
-      category: "Workout",
-      scheme: w.scheme || "3x10",
-      exercises: transformExercises(w.exercises, catalogMap),
-    }));
+    let hasSparseWorkout = false;
+    const workouts = data.workouts.map((w) => {
+      const { exercises, diagnostics } = transformExercises(w.exercises, catalogMap);
+      if (diagnostics.dropped > 0) {
+        console.warn(`[AI program] ${w.name}: dropped ${diagnostics.dropped} exercises`, diagnostics.reasons);
+      }
+      if (exercises.length < 3) hasSparseWorkout = true;
+      return {
+        id: uid("w"),
+        name: w.name || "Workout",
+        category: "Workout",
+        scheme: w.scheme || "3x10",
+        exercises,
+      };
+    });
+
+    if (hasSparseWorkout) {
+      recordAiEvent("ai_empty_workout", "program");
+      return { success: false, error: "AI output too sparse after catalog validation" };
+    }
+
+    recordAiEvent("ai_success", "program");
 
     // Use the first lifting day's scheme as the overall scheme
     const scheme =
@@ -300,6 +329,7 @@ export async function generateProgramAI({
     return { success: true, data: { workouts, scheme } };
   } catch (err) {
     console.error("AI program generation failed:", err);
+    recordAiEvent("ai_fallback_used", "program", { error: err.message });
     return { success: false, error: err.message || "AI generation failed" };
   }
 }
@@ -342,8 +372,20 @@ export async function generateTodayAI({
     );
 
     if (error) throw new Error(error.message || "Edge function error");
-    if (data?.error) throw new Error(data.error);
+    if (data?.error) throw new Error(data.reason ? `${data.error}: ${data.reason}` : data.error);
     if (!Array.isArray(data?.exercises)) throw new Error("Invalid AI response");
+
+    const { exercises, diagnostics } = transformExercises(data.exercises, catalogMap);
+    if (diagnostics.dropped > 0) {
+      console.warn(`[AI today] dropped ${diagnostics.dropped} exercises`, diagnostics.reasons);
+    }
+
+    if (exercises.length < 3) {
+      recordAiEvent("ai_empty_workout", "today");
+      return { success: false, error: "AI output too sparse after catalog validation" };
+    }
+
+    recordAiEvent("ai_success", "today");
 
     const workout = {
       id: uid("w"),
@@ -354,12 +396,13 @@ export async function generateTodayAI({
         ? data.targetMuscles
         : [],
       note: data.note || null,
-      exercises: transformExercises(data.exercises, catalogMap),
+      exercises,
     };
 
     return { success: true, data: workout };
   } catch (err) {
     console.error("AI today generation failed:", err);
+    recordAiEvent("ai_fallback_used", "today", { error: err.message });
     return { success: false, error: err.message || "AI generation failed" };
   }
 }
