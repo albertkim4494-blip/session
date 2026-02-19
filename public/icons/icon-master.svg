@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Background -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="44 40 424 424" width="512" height="512">
+  <!-- Background — matches manifest background_color so splash screen is seamless -->
   <rect width="512" height="512" fill="#E8E0D4"/>
 
   <!-- "sessi" text -->

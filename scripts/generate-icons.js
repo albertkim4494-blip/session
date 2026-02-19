@@ -108,8 +108,14 @@ function buildIconSvg() {
     circleCx, circleCy, circleRx, circleRy, CIRCLE_COLOR, 42
   );
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Background -->
+  // Zoom in ~20% on the logo by narrowing the viewBox
+  // Center at (256, 252) — slightly above canvas center to vertically center the text
+  const vbSize = 424;
+  const vbX = 256 - vbSize / 2; // 44
+  const vbY = 252 - vbSize / 2; // 40
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vbX} ${vbY} ${vbSize} ${vbSize}" width="512" height="512">
+  <!-- Background — matches manifest background_color so splash screen is seamless -->
   <rect width="512" height="512" fill="${BG_COLOR}"/>
 
   <!-- "sessi" text -->
