@@ -47,6 +47,7 @@ import { BodyDiagram } from "./components/BodyDiagram";
 import { FriendSearchModal } from "./components/FriendSearchModal";
 import { ShareWorkoutModal } from "./components/ShareWorkoutModal";
 import { WorkoutPreviewModal } from "./components/WorkoutPreviewModal";
+import { CircuitTimer } from "./components/CircuitTimer";
 import {
   getFriends, getPendingRequests, getInbox, getUnreadCount,
   acceptFriendRequest, declineFriendRequest, removeFriend,
@@ -200,6 +201,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logCardRef = useRef(null);
   const logFooterRef = useRef(null);
   const logDragRef = useRef({ active: false, startY: 0, startX: 0, currentY: 0, captured: false, direction: 0, isHorizontal: false, captureY: 0, swipeZone: null });
+
+  // Circuit timer state
+  const [circuitWorkout, setCircuitWorkout] = useState(null);
 
   // Rest timer state
   const [restTimer, setRestTimer] = useState({ active: false, exerciseId: null, exerciseName: "", restSec: 90, completedSetIndex: -1 });
@@ -2729,7 +2733,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onToggleRestTimer={toggleWorkoutRestTimer}
                       globalRestEnabled={state.preferences?.restTimerEnabled !== false}
                       weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
-
+                      onStartCircuit={(w) => setCircuitWorkout(w)}
                     />
                   ))}
                   {dailyWorkoutsToday.map((w) => (
@@ -2750,7 +2754,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onToggleRestTimer={toggleWorkoutRestTimer}
                       globalRestEnabled={state.preferences?.restTimerEnabled !== false}
                       weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
-
+                      onStartCircuit={(w) => setCircuitWorkout(w)}
                     />
                   ))}
                   <button
@@ -5171,6 +5175,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           refreshSocial();
         }}
       />
+      {circuitWorkout && (
+        <CircuitTimer
+          workout={circuitWorkout}
+          dateKey={dateKey}
+          existingLogs={state.logsByDate[dateKey] || {}}
+          onCompleteSet={completeSet}
+          onClose={() => setCircuitWorkout(null)}
+          colors={colors}
+          styles={styles}
+          timerSoundEnabled={state.preferences?.timerSound !== false}
+          timerSoundType={state.preferences?.timerSoundType || "beep"}
+          findPrior={findPriorForExercise}
+          measurementSystem={state.preferences?.measurementSystem}
+        />
+      )}
     </div>
   );
 }
@@ -5372,7 +5391,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit }) {
   const cat = (workout.category || "Workout").trim();
 
   // Compute rest timer state from exercises: all on, all off, or mixed
@@ -5495,6 +5514,34 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
                 colors={colors}
               />
             ))}
+            {onStartCircuit && workout.exercises.length >= 2 && (
+              <button
+                className="btn-press"
+                onClick={() => onStartCircuit(workout)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  padding: "8px 16px",
+                  borderRadius: 10,
+                  border: `1px solid ${colors?.border || "#333"}`,
+                  background: "transparent",
+                  color: colors?.text || "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  opacity: 0.7,
+                  marginTop: 4,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                Start Circuit
+              </button>
+            )}
           </div>
         )
       )}
