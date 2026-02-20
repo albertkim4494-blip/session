@@ -428,13 +428,13 @@ OUTPUT FORMAT:
     }
 
     const userMessage = `Date range: ${dateRange?.label || "unknown"} (${dateRange?.start || "?"} to ${dateRange?.end || "?"})
-
+${muscleVolumeSection}${progressionSection}${volumeLoadSection}${e1rmSection}
 WORKOUT PROGRAM:
 ${programSummary}
 
 RECENT TRAINING LOGS:
 ${logSummary}
-${catalogSection}${muscleVolumeSection}${progressionSection}${volumeLoadSection}${e1rmSection}${fatigueSection}${recentHistorySection}${olderHistorySection}${adherenceSection}${antiRepetitionSection}
+${catalogSection}${fatigueSection}${recentHistorySection}${olderHistorySection}${adherenceSection}${antiRepetitionSection}
 Analyze this data and return JSON insights.`;
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -444,7 +444,7 @@ Analyze this data and return JSON insights.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
