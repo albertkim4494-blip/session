@@ -41,14 +41,16 @@ const MUSCLE_GROUPS = {
   TRICEPS: ['tricep', 'triceps', 'extension', 'skullcrusher', 'pushdown'],
   BACK: ['back', 'row', 'pull up', 'pullup', 'chin up', 'chinup', 'lat', 'pulldown', 'pull down', 'deadlift'],
   BICEPS: ['bicep', 'biceps', 'curl'],
+  FOREARMS: ['forearm', 'wrist curl', 'wrist', 'grip', 'farmer'],
   QUADS: ['quad', 'squat', 'leg press', 'lunge'],
   HAMSTRINGS: ['hamstring', 'leg curl', 'rdl', 'romanian'],
   GLUTES: ['glute', 'hip thrust'],
-  CALVES: ['calf', 'calves', 'raise'],
+  CALVES: ['calf', 'calves', 'calf raise'],
   ABS: ['ab', 'abs', 'core', 'plank', 'crunch', 'sit up', 'situp'],
+  OBLIQUES: ['oblique', 'russian twist', 'woodchop', 'wood chop', 'side bend', 'pallof'],
 };
 
-function classifyExerciseMuscles(exerciseName) {
+export function classifyExerciseMuscles(exerciseName) {
   const lower = exerciseName.toLowerCase();
   const matches = [];
   for (const [group, keywords] of Object.entries(MUSCLE_GROUPS)) {

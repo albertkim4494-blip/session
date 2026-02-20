@@ -224,6 +224,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const coachCacheRef = useRef(new Map());
   const coachLastSignatureRef = useRef(null);
   const coachLastFetchRef = useRef(0);
+  const coachStaleRef = useRef(false); // set true after log saves to bypass cooldown
 
   // Swipe navigation between tabs
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
@@ -831,17 +832,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       } catch {}
     }
 
-    // 2. Check in-memory cache
-    const memCached = coachCacheRef.current.get(coachSignature);
-    if (memCached && Date.now() - memCached.createdAt < COACH_CACHE_TTL_MS) {
-      setCoachInsights(memCached.insights);
-      setCoachError(null);
-      return;
+    // 2. Check stale flag (set after log saves)
+    const isStale = coachStaleRef.current;
+    if (isStale) {
+      coachStaleRef.current = false;
+      // Clear caches so we hit the edge function fresh
+      coachCacheRef.current.delete(coachSignature);
+      try { localStorage.removeItem(cacheKey); } catch {}
+      try { localStorage.removeItem("wt_coach_cache"); } catch {} // also clear coachApi's own cache
     }
 
-    // 3. Cooldown check
+    // 3. Check in-memory cache (skipped if stale)
+    if (!isStale) {
+      const memCached = coachCacheRef.current.get(coachSignature);
+      if (memCached && Date.now() - memCached.createdAt < COACH_CACHE_TTL_MS) {
+        setCoachInsights(memCached.insights);
+        setCoachError(null);
+        return;
+      }
+    }
     const timeSinceLastFetch = Date.now() - coachLastFetchRef.current;
-    if (timeSinceLastFetch < COACH_COOLDOWN_MS && coachInsights.length > 0) {
+    if (!isStale && timeSinceLastFetch < COACH_COOLDOWN_MS && coachInsights.length > 0) {
       const prevSig = coachLastSignatureRef.current;
       if (prevSig) {
         const prevReps = parseInt(prevSig.split("|")[4]) || 0;
@@ -1395,6 +1406,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       return st;
     });
+    coachStaleRef.current = true;
   }, [modals.log, dateKey]);
 
   const saveLog = useCallback(() => {
@@ -1665,6 +1677,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         st.logsByDate[dateKey][exerciseId] = entry;
         return st;
       });
+      coachStaleRef.current = true;
 
       // Smart toast — compute context after state update
       const workout = workoutById.get(workoutId);
@@ -1750,6 +1763,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         entry.sets[setIndex] = { ...entry.sets[setIndex], completed: false };
         return st;
       });
+      coachStaleRef.current = true;
       setRestTimer((prev) =>
         prev.active && prev.exerciseId === exerciseId && prev.completedSetIndex === setIndex
           ? { ...prev, active: false }

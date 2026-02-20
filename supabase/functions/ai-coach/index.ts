@@ -40,6 +40,8 @@ Deno.serve(async (req) => {
       muscleSetsSummary,
       muscleVolumeSummary, // legacy, ignored if muscleSetsSummary present
       muscleVolumeDetail, // detailed breakdown: "chest: 7 sets — Bench Press ×4 (02-12), Cable Fly ×3 (02-14)"
+      recentHistory, // tier 1: summarized 4-week history before current range
+      olderHistory,  // tier 2: high-level all-time history before recent
     } = await req.json();
 
     const wUnit = weightUnit || "lb";
@@ -236,12 +238,13 @@ Write like a person, not a template. Be direct. Be warm. Use "you" and "your." R
 - IMPORTANT: Use the date range label provided (e.g. "this week", "this month"). The date range start/end dates are the source of truth — only discuss data that falls within those dates.
 
 SPECIFICITY REQUIREMENTS — every insight MUST follow these:
-- ALWAYS state the date range up front: "Over the last 7 days (${dateRange?.start || "?"} to ${dateRange?.end || "?"})..."
+- Reference the date range naturally using the label: "${dateRange?.label || "This week"}" — do NOT include the actual start/end dates in parentheses. The user already sees the date range in the app UI. Just say "This week" or "This month", not "This week (2026-02-15 to 2026-02-20)".
 - When citing muscle volume, name the SPECIFIC EXERCISES that contributed: "7 chest sets — 4 from bench press, 3 from cable fly" NOT just "7 sets of chest"
 - When citing numbers, give context: "3 sets of back across 1 session" not just "3 sets of back"
 - When recommending changes, be concrete: "Add 3 sets of barbell rows to your next pull day" not "consider more back work"
+- VOLUME MATH: When comparing muscle groups, use ACCURATE percentages. If someone did 4 sets of push-ups and 1 set of pull-ups, chest is 80% and back is 20% — NOT 100% and 0%. Every completed set counts. Never round a non-zero number to 0% or claim 100% when other muscle groups were trained.
 - BAD example: "You're doing 7 sets of chest but just 3 sets of back. Consider adding more back exercises."
-- GOOD example: "Over the last 7 days, your chest got 7 working sets (bench press ×4, cable fly ×3) but your back only got 3 sets from lat pulldowns on one session. Try adding 3-4 sets of barbell rows on your next training day to even this out."
+- GOOD example: "This week, your chest got 7 working sets (bench press ×4, cable fly ×3) but your back got 3 sets from lat pulldowns on one session. Try adding 3-4 sets of barbell rows on your next training day to even this out."
 
 USER PROFILE:
 ${profileContext}
@@ -277,6 +280,7 @@ RECOVERY & REST:
 
 ANALYSIS RULES:
 - MUSCLE GROUP VOLUME is measured in WORKING SETS per primary muscle group. This is the standard training science metric. Use set counts, not rep counts, when discussing volume balance.
+- The MUSCLE GROUP VOLUME section below contains pre-computed set counts and percentages per muscle group. USE THESE EXACT NUMBERS — do not invent your own percentages. If it says "chest: 4 sets (80%)" and "back: 1 set (20%)", say 80/20, not 100/0. NEVER claim a muscle group has 0% or was "neglected" if it appears in the volume data with any sets > 0.
 - A muscle group with 0 sets means it was NOT directly trained — do not claim it was trained with indirect/secondary work.
 - Duration/sport activities measured in minutes are NOT strength volume.
 - Repeated sport activities (e.g. Water Polo 3x/week) are normal — don't flag as low variety.
@@ -286,12 +290,43 @@ ANALYSIS RULES:
 - When suggesting exercises, ONLY use exercises from the EXERCISE CATALOG provided. Use exact catalogId and name from the catalog.
 - The catalog is already filtered to the user's equipment. Do NOT invent exercises outside it.
 
+TIERED HISTORICAL CONTEXT — data arrives in layers with decreasing weight:
+1. CURRENT RANGE (RECENT TRAINING LOGS above): HIGHEST weight. This is the primary data for your analysis — specific sets, reps, weights, RPE, mood, notes. All detailed insights should be grounded here.
+2. RECENT HISTORY (4 weeks before current range): MEDIUM weight. Summarized per-exercise stats (best/avg weight, session count, RPE averages), muscle group balance, mood distribution, and injury/pain notes. Use this to:
+   - Contextualize the current range: "Your bench best was 185 last month, and you hit 190 this week — you're progressing."
+   - Avoid false neglect alarms: if a muscle was trained 3x in the past 4 weeks but not yet this week, that's NORMAL rotation — LOW/INFO at most, not HIGH.
+   - Spot emerging trends: if RPE has been climbing across recent history + current range, note potential fatigue accumulation.
+3. OLDER HISTORY (all-time before recent): LOW weight. High-level only — training tenure, long-term progression (first → best weight), overall mood trend, chronic injury notes. Use ONLY for:
+   - Long-term progression narrative: "You started benching 135 in October, now hitting 190 — impressive trajectory."
+   - Chronic patterns: if older history mentions recurring shoulder pain, factor that into current recommendations.
+   - Do NOT cite specific older data as actionable — it's too stale for direct advice.
+
+TIME-DECAY RULES:
+- Mood and casual notes ("felt tired", "off day") from recent history have LOW relevance — everyone has off days. Only flag mood if there's a clear negative TREND (3+ rough sessions in recent history).
+- Injury/pain notes retain relevance longer — if someone noted "shoulder pain" 3 weeks ago, still consider it.
+- Weight progression retains relevance indefinitely — use it for long-term narrative.
+- Frequency/consistency from recent history is relevant for current advice. From older history, only as backdrop.
+
+SEVERITY CALIBRATION WITH HISTORY:
+- Muscle untrained in current range BUT trained regularly in recent history = LOW/INFO, casual mention.
+- Muscle untrained in current range AND in recent history (5+ weeks gap) = MEDIUM.
+- Muscle rarely or never trained across all history = HIGH.
+- Training frequency dips are normal. One lighter week after consistent recent history is NOT a crisis.
+
 INTENSITY & RPE TRACKING:
 - Logs may include RPE (Rate of Perceived Exertion, 1-10) and/or Intensity (1-10, user's subjective effort rating). Both appear as per-set annotations like "RPE8" or "INT7".
 - Use intensity/RPE data to assess training load and recovery needs — high intensity (8-10) across multiple exercises suggests heavy demand; consistently low (1-4) might mean the user could push harder.
 - When intensity data is present, reference it specifically: "Your squats at INT9 suggest you were pushing hard" or "RPE 6-7 across the board — you had room to spare."
 - If both RPE and intensity are logged, treat them as complementary signals. RPE is effort relative to max; intensity is the user's overall perceived difficulty.
 - Do NOT mention intensity/RPE if the user hasn't logged any — don't tell them they should be tracking it.
+
+EXERCISE UNIT TYPES — logs use different units depending on exercise type. Analyze each type appropriately:
+- **Strength (reps)**: Format is "8@185 RPE8" meaning 8 reps at 185 ${wUnit}. Evaluate volume (sets × reps), progressive overload (weight increases over time), and effort (RPE/intensity). Higher weight at same reps = progress. More reps at same weight = progress.
+- **Duration (sec, min, hrs)**: Format is "45 min total (2 sessions)". These are time-based activities (e.g. planks, yoga, sports, cardio). Analyze total duration and frequency. More time or higher frequency = endurance progress. Do NOT count duration reps as strength reps — "45 min" of swimming is NOT "45 reps."
+- **Distance (miles, yards, laps, steps)**: Format is "3.5 miles (1 set)". Analyze total distance and progression over time. More distance at same or lower time = improvement.
+- **Pace (mm:ss or h:mm:ss)**: Appears as per-set annotation like "pace:7:30". This is time per unit distance (usually per mile or per km). LOWER pace = FASTER = better performance. A change from pace:8:00 to pace:7:30 is an improvement. Analyze pace trends the same way you'd analyze strength progression — consistent improvement means the user is getting fitter.
+- **Custom fields**: Appear as per-set annotation like "[tempo: 3-1-2]" or "[band: red]". These are user-defined tracking fields. Acknowledge them if relevant to your analysis — they show the user is tracking specific training variables. Don't assume what they mean; use context clues.
+- CRITICAL: Do NOT mix unit types in comparisons. You cannot compare 30 min of cardio to 30 reps of bench press. Treat each unit type as its own domain of analysis.
 ${sportBioSection ? "- Factor sport demands into ALL recommendations.\n" : ""}
 PROGRESSION TRACKING:
 - Celebrate weight increases (type: "PROGRESSION"). Be specific: "Bench went from 175 to 185 — your pressing is clicking."
@@ -308,7 +343,13 @@ BODY-RELATIVE STRENGTH AWARENESS:
 - Smaller/lighter individuals naturally lift less absolute weight. A 110lb woman squatting 95lb (0.86x BW) is stronger relative to her body than a 200lb man squatting 135lb (0.68x BW).
 - Do NOT push someone to increase weight if they're already at or above intermediate ratios for their profile. Acknowledge their strength level instead.
 - If someone is well below beginner ratios and the weight has been flat for 3+ weeks, gently suggest progressive overload with specific increments (e.g., "Try adding ${wUnit === "kg" ? "2.5 kg" : "5 lb"} next session").
-- For bodyweight exercises (pushups, pull-ups, dips), evaluate volume and rep quality rather than added weight. High-rep bodyweight work is legitimate training.
+- BODYWEIGHT EXERCISE DIFFICULTY TIERS — these are NOT interchangeable. Comparing raw rep counts across different bodyweight exercises is misleading:
+  * EASY tier (high reps expected): push-ups, bodyweight squats, lunges, crunches, planks. 30+ reps is common.
+  * MEDIUM tier: dips, inverted rows, pike push-ups, step-ups. 10-20 reps is solid.
+  * HARD tier (low reps expected): pull-ups, chin-ups, muscle-ups, pistol squats, handstand push-ups. 5-15 reps is strong. Most people can do 3x more push-ups than pull-ups.
+  * When comparing muscle balance, 10 pull-ups represents MORE relative effort and training stimulus than 30 push-ups. Do NOT treat low pull-up reps as "neglecting back" when those reps are genuinely hard. 1 set of 10 pull-ups is meaningful back training.
+  * If someone does both push-ups and pull-ups, acknowledge the difficulty difference. "You hit 100 push-ups and 10 pull-ups — that pull-up set carries more weight per rep than it looks."
+- Evaluate bodyweight exercises by volume AND difficulty tier, not raw rep count alone. High-rep bodyweight work is legitimate training.
 - If profile data is missing (no weight, no age), don't guess — just evaluate based on the trend data you have.
 - BMI is context, not a primary metric — a muscular BMI 28 differs from a sedentary BMI 28. Never recommend weight loss based solely on BMI.
 
@@ -350,7 +391,7 @@ RESPONSE FORMAT:
 - severity: one of "HIGH", "MEDIUM", "LOW", "INFO"
 - title: short title with a leading emoji (⚠️, 💡, 📊, ✅, 🔥, 😴, 📈)
 - message: 2-4 sentences. Sound human. First sentence states the finding with date range and specific numbers. Following sentences explain significance and give a concrete action step.
-- suggestions: array of { "catalogId": "<id>", "exercise": "<name>", "muscleGroup": "<GROUP>" } — only if actionable. Use exact catalogId and name from the EXERCISE CATALOG. muscleGroup: ANTERIOR_DELT, LATERAL_DELT, POSTERIOR_DELT, CHEST, TRICEPS, BACK, BICEPS, QUADS, HAMSTRINGS, GLUTES, CALVES, ABS.
+- suggestions: array of { "catalogId": "<id>", "exercise": "<name>", "muscleGroup": "<GROUP>" } — only if actionable. Use exact catalogId and name from the EXERCISE CATALOG. muscleGroup: ANTERIOR_DELT, LATERAL_DELT, POSTERIOR_DELT, CHEST, TRICEPS, BACK, BICEPS, FOREARMS, QUADS, HAMSTRINGS, GLUTES, CALVES, ABS, OBLIQUES.
 - confidence: number 0.0-1.0 — how confident you are based on available data (1.0 = strong data support, 0.5 = reasonable inference, <0.3 = speculative)
 - evidence: string — which specific data points triggered this insight (cite dates, numbers, exercise names)
 - expected_outcome: string — what should improve and in what timeframe if user follows advice
@@ -376,6 +417,16 @@ OUTPUT FORMAT:
       fatigueSection = `\nFATIGUE TREND (last 7 days):\n${fatigueTrend.split("\n").map((l: string) => `  ${l}`).join("\n")}\n`;
     }
 
+    // Build tiered historical context sections
+    let recentHistorySection = "";
+    if (recentHistory && typeof recentHistory === "string" && recentHistory.trim()) {
+      recentHistorySection = `\nRECENT HISTORY (4 weeks before current range — MEDIUM weight, use for trends and context):\n${recentHistory.split("\n").map((l: string) => `  ${l}`).join("\n")}\n`;
+    }
+    let olderHistorySection = "";
+    if (olderHistory && typeof olderHistory === "string" && olderHistory.trim()) {
+      olderHistorySection = `\nOLDER HISTORY (all-time before recent — LOW weight, use for long-term progression and chronic patterns only):\n${olderHistory.split("\n").map((l: string) => `  ${l}`).join("\n")}\n`;
+    }
+
     const userMessage = `Date range: ${dateRange?.label || "unknown"} (${dateRange?.start || "?"} to ${dateRange?.end || "?"})
 
 WORKOUT PROGRAM:
@@ -383,7 +434,7 @@ ${programSummary}
 
 RECENT TRAINING LOGS:
 ${logSummary}
-${catalogSection}${muscleVolumeSection}${progressionSection}${volumeLoadSection}${e1rmSection}${fatigueSection}${adherenceSection}${antiRepetitionSection}
+${catalogSection}${muscleVolumeSection}${progressionSection}${volumeLoadSection}${e1rmSection}${fatigueSection}${recentHistorySection}${olderHistorySection}${adherenceSection}${antiRepetitionSection}
 Analyze this data and return JSON insights.`;
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {

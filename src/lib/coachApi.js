@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { getUnitAbbr, buildNormalizedAnalysis } from "./coachNormalize";
+import { getUnitAbbr, buildNormalizedAnalysis, classifyExerciseMuscles } from "./coachNormalize";
 import { buildCatalogMap } from "./exerciseCatalogUtils";
 import { recordAiEvent } from "./aiMetrics";
 
@@ -295,7 +295,7 @@ function buildEnrichedLogSummary(recentLogs, allWorkouts) {
 
       // Append notes if present
       if (log.notes && typeof log.notes === "string" && log.notes.trim()) {
-        const truncated = log.notes.trim().slice(0, 50);
+        const truncated = log.notes.trim().slice(0, 200);
         line += ` [note: "${truncated}"]`;
       }
 
@@ -377,6 +377,243 @@ function computeAdherenceStats(logsByDate) {
 }
 
 /**
+ * Keywords in notes that indicate injury/pain — these survive time-decay
+ * into the recent history tier. Casual mood notes ("felt tired") do not.
+ */
+const NOTABLE_NOTE_KEYWORDS = /\b(pain|hurt|injury|injured|sore|soreness|tight|tightness|strain|strained|pull|pulled|tweak|tweaked|snap|popped|swollen|inflamed|numb|tingling|doctor|physio|PT|rehab|surgery|tear|torn)\b/i;
+
+/**
+ * Build tiered historical summaries with time-decay.
+ *
+ * Tier 1 — RECENT HISTORY (4 weeks before currentRange.start):
+ *   Per-exercise: sessions, weight range (best/avg), avg RPE
+ *   Muscle groups trained (sets per group)
+ *   Mood distribution, frequency
+ *   Injury/pain notes (full text, up to 100 chars each)
+ *
+ * Tier 2 — OLDER HISTORY (everything before recent history):
+ *   Training tenure, total sessions, avg frequency
+ *   Top exercises with all-time progression (first → best weight)
+ *   Overall mood trend (one-liner)
+ *   Chronic/injury notes only
+ *
+ * @returns {{ recentHistory: string|null, olderHistory: string|null }}
+ */
+function buildTieredHistory(logsByDate, allWorkouts, currentRange, catalogMap, weightLabel = "lb") {
+  const MOOD_LABELS = { "2": "great", "1": "good", "0": "okay", "-1": "rough", "-2": "terrible" };
+  const DURATION_FACTORS = { sec: 1 / 60, min: 1, hrs: 60 };
+
+  // Date boundaries
+  const recentStart = (() => {
+    const d = new Date(currentRange.start + "T00:00:00");
+    d.setDate(d.getDate() - 28); // 4 weeks before current range
+    return d.toISOString().slice(0, 10);
+  })();
+  const recentEnd = (() => {
+    // Day before current range start
+    const d = new Date(currentRange.start + "T00:00:00");
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const exerciseMap = {};
+  for (const w of allWorkouts || []) {
+    for (const ex of w.exercises || []) {
+      exerciseMap[ex.id] = { name: ex.name, unit: ex.unit || "reps" };
+    }
+  }
+
+  // Accumulators for each tier
+  const tiers = {
+    recent: { sessions: 0, exercises: {}, moods: { great: 0, good: 0, okay: 0, rough: 0, terrible: 0 }, notableNotes: [], muscleSets: {} },
+    older:  { sessions: 0, exercises: {}, moods: { great: 0, good: 0, okay: 0, rough: 0, terrible: 0 }, notableNotes: [], firstDate: null, lastDate: null },
+  };
+
+  for (const [dateKey, dayLogs] of Object.entries(logsByDate || {})) {
+    if (!dayLogs || typeof dayLogs !== "object") continue;
+    // Skip dates in the current range — those are already sent as detailed logs
+    if (dateKey >= currentRange.start && dateKey <= currentRange.end) continue;
+
+    const hasCompleted = Object.values(dayLogs).some(
+      (log) => Array.isArray(log?.sets) && log.sets.some(isCompleted)
+    );
+    if (!hasCompleted) continue;
+
+    // Determine which tier
+    const tier = (dateKey >= recentStart && dateKey <= recentEnd) ? tiers.recent : tiers.older;
+    if (dateKey < recentStart) {
+      if (!tier.firstDate || dateKey < tier.firstDate) tiers.older.firstDate = dateKey;
+      if (!tier.lastDate || dateKey > tier.lastDate) tiers.older.lastDate = dateKey;
+    }
+    tier.sessions++;
+
+    for (const [exId, log] of Object.entries(dayLogs)) {
+      if (!log?.sets || !Array.isArray(log.sets)) continue;
+      const completedSets = log.sets.filter(isCompleted);
+      if (completedSets.length === 0) continue;
+
+      const info = exerciseMap[exId];
+      const name = info?.name || exId;
+      const unit = info?.unit || "reps";
+
+      if (!tier.exercises[exId]) {
+        tier.exercises[exId] = { name, unit, sessionCount: 0, weights: [], rpes: [], totalSets: 0, totalValue: 0 };
+      }
+      const exAcc = tier.exercises[exId];
+      exAcc.sessionCount++;
+      exAcc.totalSets += completedSets.length;
+
+      if (unit === "reps") {
+        const maxW = Math.max(...completedSets.map((s) => Number(s.weight) || 0), 0);
+        if (maxW > 0) exAcc.weights.push({ date: dateKey, weight: maxW });
+        exAcc.totalValue += completedSets.reduce((sum, s) => sum + (Number(s.reps) || 0), 0);
+      } else if (unit in DURATION_FACTORS) {
+        const totalMin = completedSets.reduce((sum, s) => sum + (Number(s.reps) || 0), 0) * DURATION_FACTORS[unit];
+        exAcc.totalValue += Math.round(totalMin);
+      } else {
+        exAcc.totalValue += completedSets.reduce((sum, s) => sum + (Number(s.reps) || 0), 0);
+      }
+
+      // RPE
+      for (const s of completedSets) {
+        const rpe = Number(s.targetRpe);
+        if (rpe > 0) exAcc.rpes.push(rpe);
+      }
+
+      // Muscle groups (recent tier only — for muscle balance context)
+      if (tier === tiers.recent && catalogMap) {
+        const catEntry = catalogMap.get(log.catalogId) || catalogMap.get(exId);
+        if (catEntry?.muscles?.primary) {
+          for (const m of catEntry.muscles.primary) {
+            tier.muscleSets[m] = (tier.muscleSets[m] || 0) + completedSets.length;
+          }
+        }
+      }
+
+      // Mood
+      if (log.mood != null && MOOD_LABELS[String(log.mood)]) {
+        tier.moods[MOOD_LABELS[String(log.mood)]]++;
+      }
+
+      // Notable notes (injury/pain keywords only)
+      if (log.notes && typeof log.notes === "string" && NOTABLE_NOTE_KEYWORDS.test(log.notes)) {
+        tier.notableNotes.push({ date: dateKey, exercise: name, note: log.notes.trim().slice(0, 100) });
+      }
+    }
+  }
+
+  // --- Format RECENT HISTORY ---
+  let recentHistory = null;
+  if (tiers.recent.sessions > 0) {
+    const r = tiers.recent;
+    const weeks = Math.max(1, Math.round((new Date(recentEnd) - new Date(recentStart)) / 86400000 / 7));
+    const lines = [];
+    lines.push(`${r.sessions} sessions over ~${weeks} weeks (${recentStart} to ${recentEnd}), ${(r.sessions / weeks).toFixed(1)} sessions/week`);
+
+    // Per-exercise summaries (top 10 by session count)
+    const exSorted = Object.values(r.exercises)
+      .sort((a, b) => b.sessionCount - a.sessionCount)
+      .slice(0, 10);
+    if (exSorted.length > 0) {
+      lines.push("Exercises:");
+      for (const ex of exSorted) {
+        let detail = `${ex.sessionCount} sessions, ${ex.totalSets} sets`;
+        if (ex.unit === "reps" && ex.weights.length > 0) {
+          const ws = ex.weights.map((w) => w.weight);
+          const best = Math.max(...ws);
+          const avg = Math.round(ws.reduce((a, b) => a + b, 0) / ws.length);
+          detail += `, best: ${best} ${weightLabel}, avg: ${avg} ${weightLabel}`;
+        } else if (ex.unit !== "reps") {
+          detail += `, total: ${ex.totalValue} ${ex.unit === "min" || ex.unit === "hrs" || ex.unit === "sec" ? "min" : ex.unit}`;
+        }
+        if (ex.rpes.length > 0) {
+          const avgRpe = (ex.rpes.reduce((a, b) => a + b, 0) / ex.rpes.length).toFixed(1);
+          detail += `, avg RPE: ${avgRpe}`;
+        }
+        lines.push(`  ${ex.name}: ${detail}`);
+      }
+    }
+
+    // Muscle group sets
+    const muscleEntries = Object.entries(r.muscleSets).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
+    if (muscleEntries.length > 0) {
+      lines.push("Muscle groups: " + muscleEntries.map(([g, v]) => `${g.replace(/_/g, " ").toLowerCase()}: ${v} sets`).join(", "));
+    }
+
+    // Mood
+    const totalMoods = Object.values(r.moods).reduce((a, b) => a + b, 0);
+    if (totalMoods > 0) {
+      const parts = Object.entries(r.moods).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ${v}`);
+      lines.push(`Mood: ${parts.join(", ")}`);
+    }
+
+    // Notable notes
+    if (r.notableNotes.length > 0) {
+      lines.push("Flagged notes:");
+      for (const n of r.notableNotes.slice(0, 5)) {
+        lines.push(`  ${n.date} (${n.exercise}): "${n.note}"`);
+      }
+    }
+
+    recentHistory = lines.join("\n");
+  }
+
+  // --- Format OLDER HISTORY ---
+  let olderHistory = null;
+  if (tiers.older.sessions > 0) {
+    const o = tiers.older;
+    const first = o.firstDate || recentStart;
+    const last = o.lastDate || recentStart;
+    const totalDays = Math.max(1, Math.round((new Date(last) - new Date(first)) / 86400000) + 1);
+    const totalWeeks = Math.max(1, Math.round(totalDays / 7));
+    const lines = [];
+    lines.push(`${o.sessions} sessions over ~${totalWeeks} weeks (${first} to ${last}), ${(o.sessions / totalWeeks).toFixed(1)} sessions/week`);
+
+    // Top exercises — first → best weight (PRs and all-time progression)
+    const exSorted = Object.values(o.exercises)
+      .filter((e) => e.sessionCount >= 2)
+      .sort((a, b) => b.sessionCount - a.sessionCount)
+      .slice(0, 8);
+    if (exSorted.length > 0) {
+      lines.push("Key exercises:");
+      for (const ex of exSorted) {
+        if (ex.unit === "reps" && ex.weights.length >= 2) {
+          ex.weights.sort((a, b) => a.date.localeCompare(b.date));
+          const firstW = ex.weights[0].weight;
+          const bestW = Math.max(...ex.weights.map((w) => w.weight));
+          const arrow = bestW > firstW ? "↑" : bestW < firstW ? "↓" : "→";
+          lines.push(`  ${ex.name}: ${ex.sessionCount} sessions, ${firstW}→${bestW} ${weightLabel} ${arrow}`);
+        } else {
+          lines.push(`  ${ex.name}: ${ex.sessionCount} sessions`);
+        }
+      }
+    }
+
+    // Mood — just a one-liner trend
+    const totalMoods = Object.values(o.moods).reduce((a, b) => a + b, 0);
+    if (totalMoods > 0) {
+      const positive = o.moods.great + o.moods.good;
+      const negative = o.moods.rough + o.moods.terrible;
+      const ratio = positive / totalMoods;
+      const trend = ratio >= 0.7 ? "mostly positive" : ratio >= 0.4 ? "mixed" : "mostly rough";
+      lines.push(`Overall mood: ${trend} (${totalMoods} entries)`);
+    }
+
+    // Chronic/injury notes only
+    if (o.notableNotes.length > 0) {
+      lines.push("Historical injury/pain notes:");
+      for (const n of o.notableNotes.slice(-3)) { // most recent 3
+        lines.push(`  ${n.date} (${n.exercise}): "${n.note}"`);
+      }
+    }
+
+    olderHistory = lines.join("\n");
+  }
+
+  return { recentHistory, olderHistory };
+}
+
+/**
  * Build a detailed muscle volume breakdown showing which exercises contributed
  * to each muscle group's set count, with dates. e.g.:
  *   "CHEST: 7 sets — Bench Press ×4 (Feb 12), Cable Fly ×3 (Feb 14)"
@@ -408,7 +645,7 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
       const workingSets = log.sets.filter((s) => (Number(s.reps) || 0) > 0).length;
       if (workingSets === 0) continue;
 
-      // Look up primary muscles from catalog
+      // Look up primary muscles from catalog, fall back to keyword classification
       let primaryGroups = null;
       if (info.catalogId && catalogMap) {
         const entry = catalogMap.get(info.catalogId);
@@ -416,7 +653,13 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
           primaryGroups = entry.muscles.primary;
         }
       }
-      if (!primaryGroups) continue; // Skip exercises without catalog muscle data
+      if (!primaryGroups) {
+        const keywordGroups = classifyExerciseMuscles(info.name);
+        if (keywordGroups.length > 0 && keywordGroups[0] !== "UNCLASSIFIED") {
+          primaryGroups = keywordGroups;
+        }
+      }
+      if (!primaryGroups) continue; // Skip truly unclassifiable exercises
 
       for (const group of primaryGroups) {
         if (!muscleExercises[group]) muscleExercises[group] = [];
@@ -425,13 +668,17 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
     }
   }
 
-  // Format each muscle group
+  // Format each muscle group with percentages
   const lines = [];
   const sortedGroups = Object.entries(muscleExercises).sort(
     ([, a], [, b]) => b.reduce((s, e) => s + e.sets, 0) - a.reduce((s, e) => s + e.sets, 0)
   );
+  const grandTotalSets = sortedGroups.reduce(
+    (sum, [, entries]) => sum + entries.reduce((s, e) => s + e.sets, 0), 0
+  );
   for (const [group, entries] of sortedGroups) {
     const totalSets = entries.reduce((s, e) => s + e.sets, 0);
+    const pct = grandTotalSets > 0 ? Math.round((totalSets / grandTotalSets) * 100) : 0;
     // Merge same-exercise entries across dates
     const byName = {};
     for (const e of entries) {
@@ -443,10 +690,10 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
     const parts = Object.entries(byName).map(
       ([name, d]) => `${name} ×${d.sets} (${d.dates.join(", ")})`
     );
-    lines.push(`  ${group.replace(/_/g, " ").toLowerCase()}: ${totalSets} sets — ${parts.join(", ")}`);
+    lines.push(`  ${group.replace(/_/g, " ").toLowerCase()}: ${totalSets} sets (${pct}%) — ${parts.join(", ")}`);
   }
 
-  return lines.length > 0 ? lines.join("\n") : null;
+  return lines.length > 0 ? `Total: ${grandTotalSets} working sets\n${lines.join("\n")}` : null;
 }
 
 /**
@@ -687,6 +934,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       name: ex.name,
       unit: ex.unit || "reps",
       unitAbbr: getUnitAbbr(ex.unit, ex.customUnitAbbr),
+      catalogId: ex.catalogId,
     })),
   }));
 
@@ -700,6 +948,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
             name: ex.name,
             unit: ex.unit || "reps",
             unitAbbr: getUnitAbbr(ex.unit, ex.customUnitAbbr),
+            catalogId: ex.catalogId,
           }))
         );
     }
@@ -744,14 +993,16 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   // Compute muscle set counts for the AI (primary-only, no secondary inflation)
   let muscleSetsSummary = null;
   let muscleVolumeDetail = null;
-  if (catalog?.length > 0) {
-    const catalogMap = buildCatalogMap(catalog);
+  let tieredHistory = { recentHistory: null, olderHistory: null };
+  const catalogMap = catalog?.length > 0 ? buildCatalogMap(catalog) : null;
+  if (catalogMap) {
     const analysis = buildNormalizedAnalysis(allWorkouts, recentLogs, { start: dateRange.start, end: dateRange.end }, catalogMap);
     if (analysis.muscleGroupSets && Object.keys(analysis.muscleGroupSets).length > 0) {
       muscleSetsSummary = analysis.muscleGroupSets;
     }
     muscleVolumeDetail = buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap);
   }
+  tieredHistory = buildTieredHistory(state?.logsByDate, allWorkouts, dateRange, catalogMap, weightLabel);
 
   // Ensure we have a fresh session token before calling the edge function
   await supabase.auth.getSession();
@@ -787,6 +1038,8 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       previousInsights,
       muscleSetsSummary,
       muscleVolumeDetail,
+      recentHistory: tieredHistory.recentHistory,
+      olderHistory: tieredHistory.olderHistory,
     },
   });
 
