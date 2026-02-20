@@ -129,6 +129,7 @@ export function CircuitTimer({
   dateKey,
   existingLogs,
   onCompleteSet,
+  onUncompleteSet,
   onClose,
   colors,
   styles,
@@ -160,16 +161,14 @@ export function CircuitTimer({
   const currentExercise = exercises[currentExerciseIndex] || null;
   const nextExerciseIndex = currentExerciseIndex + 1 < exercises.length ? currentExerciseIndex + 1 : 0;
   const nextExercise = exercises[nextExerciseIndex] || null;
-  const setIndex = currentRound - 1; // round 1 = set 0
 
   // Track total sets logged
   const setsLoggedRef = useRef(0);
 
-  // Reps/weight input state for work phase
-  const [repsInput, setRepsInput] = useState("");
-  const [weightInput, setWeightInput] = useState("");
+  // Multi-set state for work phase — array of { reps, weight }
+  const [localSets, setLocalSets] = useState([]);
 
-  // Pre-fill reps/weight when exercise changes
+  // Build set template when exercise changes
   useEffect(() => {
     if (phase !== "get-ready" && phase !== "work") return;
     if (!currentExercise) return;
@@ -177,22 +176,19 @@ export function CircuitTimer({
     const exId = currentExercise.id;
     const dayLog = existingLogs?.[exId];
     const priorLog = findPrior?.(exId);
-    const log = dayLog || priorLog;
+    const template = dayLog || priorLog;
+    const scheme = parseScheme(currentExercise.scheme || workout.scheme);
+    const numSets = template?.sets?.length || scheme?.sets || 3;
 
-    if (log?.sets?.[setIndex]) {
-      setRepsInput(String(log.sets[setIndex].reps || ""));
-      setWeightInput(String(log.sets[setIndex].weight || ""));
-    } else if (log?.sets?.length > 0) {
-      // Use last set as template
-      const last = log.sets[log.sets.length - 1];
-      setRepsInput(String(last.reps || ""));
-      setWeightInput(String(last.weight || ""));
-    } else {
-      // Try scheme
-      const scheme = parseScheme(currentExercise.scheme || workout.scheme);
-      setRepsInput(scheme ? String(scheme.reps) : "");
-      setWeightInput("");
+    const sets = [];
+    for (let i = 0; i < numSets; i++) {
+      const src = template?.sets?.[i] || template?.sets?.[template.sets.length - 1];
+      sets.push({
+        reps: src ? String(src.reps || "") : (scheme ? String(scheme.reps) : ""),
+        weight: src ? String(src.weight || "") : "",
+      });
     }
+    setLocalSets(sets);
   }, [currentExerciseIndex, currentRound, phase]);
 
   // ---------------------------------------------------------------------------
@@ -272,23 +268,34 @@ export function CircuitTimer({
   // Actions
   // ---------------------------------------------------------------------------
 
-  const handleDone = useCallback(() => {
-    const reps = Number(repsInput) || 0;
-    if (reps <= 0) return; // need at least reps
-
-    const weight = weightInput.trim();
-    onCompleteSet(currentExercise.id, setIndex, { reps, weight }, workout.id);
+  const handleCompleteSet = useCallback((setIdx) => {
+    const s = localSets[setIdx];
+    if (!s) return;
+    const reps = Number(s.reps) || 0;
+    if (reps <= 0) return;
+    const weight = s.weight.trim();
+    onCompleteSet(currentExercise.id, setIdx, { reps, weight }, workout.id);
     setsLoggedRef.current += 1;
+  }, [localSets, currentExercise, workout.id, onCompleteSet]);
 
-    if (timerSoundEnabled && (currentExerciseIndex >= exercises.length - 1 && currentRound >= totalRounds)) {
-      // Circuit complete sound
-      playTimerSound(timerSoundType || "chime");
-      navigator.vibrate?.([200, 100, 200, 100, 200]);
+  const handleUncompleteSet = useCallback((setIdx) => {
+    if (!currentExercise) return;
+    onUncompleteSet(currentExercise.id, setIdx);
+  }, [currentExercise, onUncompleteSet]);
+
+  const handleNext = useCallback(() => {
+    const isLastExercise = currentExerciseIndex >= exercises.length - 1;
+    const isLastRound = currentRound >= totalRounds;
+
+    if (isLastExercise && isLastRound) {
+      if (timerSoundEnabled) {
+        playTimerSound(timerSoundType || "chime");
+        navigator.vibrate?.([200, 100, 200, 100, 200]);
+      }
     }
 
     dispatch({ type: "DONE_SET" });
-  }, [repsInput, weightInput, currentExercise, setIndex, workout.id, onCompleteSet,
-      currentExerciseIndex, exercises.length, currentRound, totalRounds, timerSoundEnabled, timerSoundType]);
+  }, [currentExerciseIndex, exercises.length, currentRound, totalRounds, timerSoundEnabled, timerSoundType]);
 
   const handleSkipRest = useCallback(() => {
     if (phase === "rest") {
@@ -534,9 +541,17 @@ export function CircuitTimer({
   if (phase === "work") {
     const exUnit = getUnit(currentExercise?.unit, currentExercise);
     const isTimeUnit = currentExercise?.unit === "sec" || currentExercise?.unit === "min";
+    const isBWExercise = currentExercise?.bodyweight;
+    const showWeight = exUnit.key === "reps" && !isBWExercise;
     const nextText = currentExerciseIndex < exercises.length - 1
       ? exercises[currentExerciseIndex + 1]?.name
       : currentRound < totalRounds ? exercises[0]?.name : null;
+
+    // Read saved sets from existingLogs to show checkmarks
+    const savedSets = existingLogs?.[currentExercise?.id]?.sets;
+    const firstUncompleted = localSets.findIndex((_, idx) =>
+      !(savedSets && idx < savedSets.length && isSetCompleted(savedSets[idx]))
+    );
 
     return (
       <div style={overlay}>
@@ -549,50 +564,164 @@ export function CircuitTimer({
           </button>
           <span>Round {currentRound}/{totalRounds}</span>
         </div>
-        <div style={center}>
-          <div style={exerciseName}>{currentExercise?.name}</div>
-          <div style={subText}>Set {currentRound} of {totalRounds}</div>
-
-          <div style={medNumber}>{formatTime(workTimer.seconds)}</div>
-
-          <div style={{ display: "flex", gap: 16, alignItems: "center", marginTop: 8 }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <label style={{ fontSize: 12, opacity: 0.5, fontWeight: 600 }}>
-                {isTimeUnit ? exUnit.label : "Reps"}
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                style={inputStyle}
-                value={repsInput}
-                onChange={(e) => setRepsInput(e.target.value)}
-              />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <label style={{ fontSize: 12, opacity: 0.5, fontWeight: 600 }}>Weight</label>
-              <input
-                type="text"
-                inputMode="decimal"
-                style={inputStyle}
-                value={weightInput}
-                onChange={(e) => setWeightInput(e.target.value)}
-                placeholder="BW"
-              />
-            </div>
+        <div style={{ flex: 1, overflow: "auto", padding: "0 16px 16px" }}>
+          <div style={{ textAlign: "center", marginBottom: 12, paddingTop: 8 }}>
+            <div style={exerciseName}>{currentExercise?.name}</div>
+            <div style={{ ...subText, marginTop: 4 }}>{formatTime(workTimer.seconds)}</div>
           </div>
 
-          <button
-            className="btn-press"
-            style={{ ...primaryBtn, marginTop: 16, fontSize: 18 }}
-            onClick={handleDone}
-          >
-            Done
-          </button>
+          {/* Set header row */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: showWeight ? "32px 1fr 1fr" : "32px 1fr",
+            gap: 8,
+            padding: "0 4px 6px",
+            fontSize: 11,
+            fontWeight: 600,
+            opacity: 0.4,
+            textTransform: "uppercase",
+          }}>
+            <span />
+            <span style={{ textAlign: "center" }}>{isTimeUnit ? exUnit.label : "Reps"}</span>
+            {showWeight && <span style={{ textAlign: "center" }}>{getWeightLabel(measurementSystem)}</span>}
+          </div>
 
-          {nextText && <div style={{ ...subText, marginTop: 8 }}>Next: {nextText}</div>}
+          {/* Set rows */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {localSets.map((s, i) => {
+              const isSaved = savedSets && i < savedSets.length && isSetCompleted(savedSets[i]);
+              const isNext = i === firstUncompleted;
+              return (
+                <div key={i} style={{
+                  display: "grid",
+                  gridTemplateColumns: showWeight ? "32px 1fr 1fr" : "32px 1fr",
+                  gap: 8,
+                  alignItems: "center",
+                  padding: "6px 4px",
+                  borderRadius: 10,
+                  border: isSaved
+                    ? "1px solid rgba(46,204,113,0.4)"
+                    : `1px solid ${colors?.border || "#333"}`,
+                  background: isSaved
+                    ? "rgba(46,204,113,0.08)"
+                    : (colors?.cardAltBg || "rgba(255,255,255,0.04)"),
+                  transition: "border 0.2s, background 0.2s",
+                }}>
+                  {/* Checkmark button */}
+                  <button
+                    style={{
+                      width: 28, height: 28, borderRadius: 999, padding: 0,
+                      border: isSaved ? "2px solid #2ecc71" : isNext ? "2px solid rgba(46,204,113,0.5)" : `2px solid ${colors?.border || "#333"}`,
+                      background: isSaved ? "#2ecc71" : "transparent",
+                      cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: isSaved ? "#fff" : (colors?.text || "#fff"),
+                      transition: "all 0.2s",
+                      WebkitTapHighlightColor: "transparent",
+                    }}
+                    onClick={() => {
+                      if (isSaved) {
+                        handleUncompleteSet(i);
+                      } else {
+                        handleCompleteSet(i);
+                      }
+                    }}
+                    aria-label={isSaved ? `Uncomplete set ${i + 1}` : `Complete set ${i + 1}`}
+                  >
+                    {isSaved ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <span style={{ fontSize: 12, fontWeight: 700, opacity: isNext ? 0.7 : 0.3 }}>{i + 1}</span>
+                    )}
+                  </button>
+
+                  {/* Reps input */}
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={s.reps}
+                    onChange={(e) => {
+                      const updated = [...localSets];
+                      updated[i] = { ...updated[i], reps: e.target.value.replace(/[^\d.]/g, "") };
+                      setLocalSets(updated);
+                    }}
+                    onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                    enterKeyHint="done"
+                    style={{
+                      ...inputStyle,
+                      width: "100%",
+                      fontSize: 16,
+                      padding: "8px 6px",
+                      opacity: isSaved ? 0.5 : 1,
+                    }}
+                    placeholder="0"
+                    disabled={isSaved}
+                  />
+
+                  {/* Weight input */}
+                  {showWeight && (
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={s.weight}
+                      onChange={(e) => {
+                        const updated = [...localSets];
+                        updated[i] = { ...updated[i], weight: e.target.value.replace(/[^\d.]/g, "") };
+                        setLocalSets(updated);
+                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+                      enterKeyHint="done"
+                      style={{
+                        ...inputStyle,
+                        width: "100%",
+                        fontSize: 16,
+                        padding: "8px 6px",
+                        opacity: isSaved ? 0.5 : 1,
+                      }}
+                      placeholder={getWeightLabel(measurementSystem)}
+                      disabled={isSaved}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Add set button */}
+            <button
+              style={{
+                ...secondaryBtn,
+                padding: "6px 12px",
+                fontSize: 12,
+                opacity: 0.5,
+                alignSelf: "center",
+              }}
+              onClick={() => {
+                const last = localSets[localSets.length - 1] || { reps: "", weight: "" };
+                setLocalSets([...localSets, { reps: last.reps, weight: last.weight }]);
+              }}
+            >
+              + Add Set
+            </button>
+          </div>
+
+          {/* Next / advance button */}
+          <div style={{ textAlign: "center", marginTop: 16 }}>
+            <button
+              className="btn-press"
+              style={{ ...primaryBtn, fontSize: 16 }}
+              onClick={handleNext}
+            >
+              {currentExerciseIndex >= exercises.length - 1 && currentRound >= totalRounds
+                ? "Finish"
+                : "Next"}
+            </button>
+            {nextText && <div style={{ ...subText, marginTop: 8 }}>Next: {nextText}</div>}
+          </div>
         </div>
 
-        <div style={{ padding: "12px 16px", textAlign: "center", flexShrink: 0 }}>
+        <div style={{ padding: "8px 16px 12px", textAlign: "center", flexShrink: 0 }}>
           <button style={{ ...secondaryBtn, fontSize: 12, opacity: 0.6 }} onClick={handleStop}>
             Stop
           </button>

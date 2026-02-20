@@ -5181,6 +5181,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           dateKey={dateKey}
           existingLogs={state.logsByDate[dateKey] || {}}
           onCompleteSet={completeSet}
+          onUncompleteSet={uncompleteSet}
           onClose={() => setCircuitWorkout(null)}
           colors={colors}
           styles={styles}
