@@ -19,7 +19,8 @@ import {
   validateExerciseName, validateWorkoutName,
   toNumberOrNull, formatMaxWeight,
 } from "./lib/validation";
-import { computeCoachSignature, COACH_COOLDOWN_MS, COACH_CACHE_TTL_MS, COACH_CHANGE_THRESHOLD } from "./lib/coachSignature";
+import { computeCoachSignature, COACH_CACHE_TTL_MS } from "./lib/coachSignature";
+import { getDailyRefreshCount, incrementDailyRefresh } from "./lib/aiMetrics";
 import { initialModalState, modalReducer } from "./lib/modalReducer";
 
 // Extracted hooks
@@ -224,7 +225,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const coachCacheRef = useRef(new Map());
   const coachLastSignatureRef = useRef(null);
   const coachLastFetchRef = useRef(0);
-  const coachStaleRef = useRef(false); // set true after log saves to bypass cooldown
+  const MAX_DAILY_REFRESHES = 10;
 
   // Swipe navigation between tabs
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
@@ -807,59 +808,40 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [state.logsByDate, modals.datePicker.monthCursor]);
 
   // AI Coach signature
-  const { signature: coachSignature, totalReps: coachTotalReps } = useMemo(
+  const { signature: coachSignature } = useMemo(
     () => computeCoachSignature(state, summaryRange),
     [state.logsByDate, state.program.workouts, summaryRange]
   );
 
-  // AI Coach — load from cache, fetch when needed
+  // AI Coach — once-per-day auto-fetch, cached insights otherwise
   useEffect(() => {
     if (!dataReady || !profile) return;
 
     const userId = session.user.id;
     const cacheKey = `wt_coach_v2:${userId}:${summaryMode}:${dateKey}`;
+    const autoDateKey = "wt_coach_last_auto_date";
 
-    // 1. Try localStorage persisted cache
-    if (coachInsights.length === 0) {
-      try {
-        const stored = JSON.parse(localStorage.getItem(cacheKey));
-        if (stored && stored.insights?.length > 0 && Date.now() - stored.createdAt < COACH_CACHE_TTL_MS) {
-          setCoachInsights(stored.insights);
-          coachLastSignatureRef.current = stored.signature;
-          coachLastFetchRef.current = stored.createdAt;
-          if (stored.signature === coachSignature) return;
-        }
-      } catch {}
-    }
-
-    // 2. Check stale flag (set after log saves)
-    const isStale = coachStaleRef.current;
-    if (isStale) {
-      coachStaleRef.current = false;
-      // Clear caches so we hit the edge function fresh
-      coachCacheRef.current.delete(coachSignature);
-      try { localStorage.removeItem(cacheKey); } catch {}
-      try { localStorage.removeItem("wt_coach_cache"); } catch {} // also clear coachApi's own cache
-    }
-
-    // 3. Check in-memory cache (skipped if stale)
-    if (!isStale) {
-      const memCached = coachCacheRef.current.get(coachSignature);
-      if (memCached && Date.now() - memCached.createdAt < COACH_CACHE_TTL_MS) {
-        setCoachInsights(memCached.insights);
-        setCoachError(null);
-        return;
+    // 1. Try localStorage persisted cache — always show cached insights immediately
+    try {
+      const stored = JSON.parse(localStorage.getItem(cacheKey));
+      if (stored && stored.insights?.length > 0 && Date.now() - stored.createdAt < COACH_CACHE_TTL_MS) {
+        setCoachInsights(stored.insights);
+        coachLastSignatureRef.current = stored.signature;
+        coachLastFetchRef.current = stored.createdAt;
       }
+    } catch {}
+
+    // 2. Check in-memory cache
+    const memCached = coachCacheRef.current.get(coachSignature);
+    if (memCached && Date.now() - memCached.createdAt < COACH_CACHE_TTL_MS) {
+      setCoachInsights(memCached.insights);
+      setCoachError(null);
     }
-    const timeSinceLastFetch = Date.now() - coachLastFetchRef.current;
-    if (!isStale && timeSinceLastFetch < COACH_COOLDOWN_MS && coachInsights.length > 0) {
-      const prevSig = coachLastSignatureRef.current;
-      if (prevSig) {
-        const prevReps = parseInt(prevSig.split("|")[4]) || 0;
-        const change = prevReps > 0 ? Math.abs(coachTotalReps - prevReps) / prevReps : 1;
-        if (change < COACH_CHANGE_THRESHOLD) return;
-      }
-    }
+
+    // 3. Once-per-day auto-fetch: only hit the API if we haven't fetched today
+    const today = new Date().toISOString().slice(0, 10);
+    const lastAutoDate = localStorage.getItem(autoDateKey);
+    if (lastAutoDate === today) return; // Already fetched today — use cached insights
 
     // 4. Fetch from AI
     let cancelled = false;
@@ -872,7 +854,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const coachOpts = { catalog: filteredCatalog, userExerciseNames: userExNames };
 
     fetchCoachInsights({ profile, state, dateRange: summaryRange, catalog: filteredCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
-      .then(({ insights }) => {
+      .then(({ insights, fromCache }) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
         setCoachError(null);
@@ -884,6 +866,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             insights, signature: coachSignature, createdAt: Date.now(),
           }));
         } catch {}
+        // Mark today as auto-fetched (even if coachApi returned from its own cache)
+        try { localStorage.setItem(autoDateKey, today); } catch {}
       })
       .catch((err) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
@@ -902,7 +886,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       });
 
     return () => { cancelled = true; };
-  }, [dataReady, profile, coachSignature]);
+  }, [dataReady, profile]);
 
   // ---------------------------------------------------------------------------
   // EFFECTS
@@ -1406,7 +1390,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       return st;
     });
-    coachStaleRef.current = true;
+
   }, [modals.log, dateKey]);
 
   const saveLog = useCallback(() => {
@@ -1677,7 +1661,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         st.logsByDate[dateKey][exerciseId] = entry;
         return st;
       });
-      coachStaleRef.current = true;
+  
 
       // Smart toast — compute context after state update
       const workout = workoutById.get(workoutId);
@@ -1763,7 +1747,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         entry.sets[setIndex] = { ...entry.sets[setIndex], completed: false };
         return st;
       });
-      coachStaleRef.current = true;
+  
       setRestTimer((prev) =>
         prev.active && prev.exerciseId === exerciseId && prev.completedSetIndex === setIndex
           ? { ...prev, active: false }
@@ -2963,6 +2947,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 error={coachError}
                 userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
                 onRefresh={() => {
+                  // Rate limit manual refreshes
+                  if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) {
+                    showToast("Daily refresh limit reached \u2014 insights update automatically each day");
+                    return;
+                  }
+                  incrementDailyRefresh();
+
                   const reqId = ++coachReqIdRef.current;
                   setCoachLoading(true);
                   setCoachError(null);

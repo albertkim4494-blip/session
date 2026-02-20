@@ -42,7 +42,13 @@ Deno.serve(async (req) => {
       muscleVolumeDetail, // detailed breakdown: "chest: 7 sets — Bench Press ×4 (02-12), Cable Fly ×3 (02-14)"
       recentHistory, // tier 1: summarized 4-week history before current range
       olderHistory,  // tier 2: high-level all-time history before recent
+      modelHint,     // client-computed model routing: "gpt-4o" or "gpt-4o-mini"
     } = await req.json();
+
+    // Validate and resolve model + max_tokens
+    const ALLOWED_MODELS = new Set(["gpt-4o", "gpt-4o-mini"]);
+    const model = ALLOWED_MODELS.has(modelHint) ? modelHint : "gpt-4o-mini";
+    const maxTokens = model === "gpt-4o" ? 1000 : 800;
 
     const wUnit = weightUnit || "lb";
 
@@ -444,13 +450,13 @@ Analyze this data and return JSON insights.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
         ],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: maxTokens,
       }),
     });
 
@@ -484,6 +490,8 @@ Analyze this data and return JSON insights.`;
     console.log(JSON.stringify({
       event: "ai_success",
       feature: "coach",
+      model,
+      maxTokens,
       insightCount: insights.length,
       promptTokens: usage?.prompt_tokens,
       completionTokens: usage?.completion_tokens,

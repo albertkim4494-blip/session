@@ -869,6 +869,39 @@ function buildFatigueTrend(logsByDate) {
 }
 
 /**
+ * Compute a complexity score (0-7) to decide model routing.
+ * Score >= 4 → gpt-4o (complex analysis), else → gpt-4o-mini (cheaper).
+ *
+ * Scoring factors:
+ *   +1 if logged days in range >= 5
+ *   +1 if unique exercises >= 8
+ *   +1 if progression trends >= 4
+ *   +1 if muscle groups >= 5
+ *   +1 if user has sports
+ *   +1 if tiered history present (recentHistory or olderHistory)
+ *   +1 if previous insights >= 5 (anti-repetition harder → needs smarter model)
+ */
+export function computeComplexityScore({
+  loggedDays = 0,
+  exerciseCount = 0,
+  trendCount = 0,
+  muscleGroupCount = 0,
+  hasSports = false,
+  hasHistory = false,
+  previousInsightCount = 0,
+}) {
+  let score = 0;
+  if (loggedDays >= 5) score++;
+  if (exerciseCount >= 8) score++;
+  if (trendCount >= 4) score++;
+  if (muscleGroupCount >= 5) score++;
+  if (hasSports) score++;
+  if (hasHistory) score++;
+  if (previousInsightCount >= 5) score++;
+  return score;
+}
+
+/**
  * Fetch AI coach insights. Uses localStorage cache with 15-min TTL.
  *
  * @param {Object} params
@@ -1004,6 +1037,28 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   }
   tieredHistory = buildTieredHistory(state?.logsByDate, allWorkouts, dateRange, catalogMap, weightLabel);
 
+  // Compute complexity score for model routing
+  const loggedDays = Object.keys(recentLogs).length;
+  const allExerciseIds = new Set();
+  for (const dayLogs of Object.values(recentLogs)) {
+    if (dayLogs && typeof dayLogs === "object") {
+      for (const exId of Object.keys(dayLogs)) allExerciseIds.add(exId);
+    }
+  }
+  const trendCount = (progressionTrends?.length || 0) + (volumeLoadTrends?.length || 0);
+  const muscleGroupCount = muscleSetsSummary ? Object.keys(muscleSetsSummary).length : 0;
+
+  const complexityScore = computeComplexityScore({
+    loggedDays,
+    exerciseCount: allExerciseIds.size,
+    trendCount,
+    muscleGroupCount,
+    hasSports: !!profile?.sports,
+    hasHistory: !!(tieredHistory.recentHistory || tieredHistory.olderHistory),
+    previousInsightCount: previousInsights?.titles?.length || 0,
+  });
+  const modelHint = complexityScore >= 4 ? "gpt-4o" : "gpt-4o-mini";
+
   // Ensure we have a fresh session token before calling the edge function
   await supabase.auth.getSession();
 
@@ -1040,6 +1095,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       muscleVolumeDetail,
       recentHistory: tieredHistory.recentHistory,
       olderHistory: tieredHistory.olderHistory,
+      modelHint,
     },
   });
 
@@ -1064,7 +1120,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     throw new Error(detail);
   }
 
-  recordAiEvent("ai_success", "coach");
+  recordAiEvent("ai_success", "coach", { model: modelHint, complexityScore });
 
   // Normalize each insight so UI never crashes on missing fields
   const insights = (data?.insights || []).map((i) => ({
