@@ -236,12 +236,13 @@ export function CircuitTimer({
     }
     if (timerSoundEnabled) playTimerSound(timerSoundType || "chime");
     navigator.vibrate?.([100, 50, 100]);
-    setTimeCountdownStarted(false);
     // Advance to next time set, or auto-advance to next exercise
     if (timeSetIndex < localSets.length - 1) {
+      setTimeCountdownStarted(false);
       setTimeSetIndex((prev) => prev + 1);
     } else {
-      // Last time set done — auto-advance after brief pause
+      // Last time set done — keep timeCountdownStarted true so UI shows
+      // "Done — advancing..." instead of flashing the preset screen
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = setTimeout(() => {
         dispatch({ type: "DONE_SET" });
