@@ -4,6 +4,7 @@ import { playTimerSound } from "../lib/timerSounds";
 import { parseScheme } from "../lib/workoutGenerator";
 import { isSetCompleted } from "../lib/setHelpers";
 import { getUnit, getWeightLabel } from "../lib/constants";
+import { formatTimerDisplay } from "../lib/timerUtils";
 
 // ---------------------------------------------------------------------------
 // localStorage config persistence
@@ -17,8 +18,8 @@ function loadConfig() {
       const c = JSON.parse(raw);
       return {
         rounds: Math.min(5, Math.max(1, c.rounds || 3)),
-        restBetweenExercises: Math.min(120, Math.max(15, c.restBetweenExercises || 60)),
-        restBetweenRounds: Math.min(180, Math.max(30, c.restBetweenRounds || 120)),
+        restBetweenExercises: Math.min(120, Math.max(0, c.restBetweenExercises ?? 60)),
+        restBetweenRounds: Math.min(180, Math.max(0, c.restBetweenRounds ?? 120)),
       };
     }
   } catch {}
@@ -53,25 +54,32 @@ function circuitReducer(state, action) {
     case "BEGIN_WORK":
       return { ...state, phase: "work", workElapsed: 0 };
     case "DONE_SET": {
-      const { exerciseCount, totalRounds } = state;
+      const { exerciseCount, totalRounds, restBetweenExercises, restBetweenRounds } = state;
       const isLastExercise = state.currentExerciseIndex >= exerciseCount - 1;
       const isLastRound = state.currentRound >= totalRounds;
       if (isLastExercise && isLastRound) {
         return { ...state, phase: "complete", totalEndTime: Date.now() };
       }
       if (isLastExercise) {
+        // Skip round rest if 0
+        if (restBetweenRounds <= 0) {
+          return { ...state, phase: "get-ready", currentExerciseIndex: 0, currentRound: state.currentRound + 1, workElapsed: 0 };
+        }
         return { ...state, phase: "round-rest" };
+      }
+      // Skip exercise rest if 0
+      if (restBetweenExercises <= 0) {
+        return { ...state, phase: "get-ready", currentExerciseIndex: state.currentExerciseIndex + 1, workElapsed: 0 };
       }
       return { ...state, phase: "rest" };
     }
-    case "REST_DONE": {
+    case "REST_DONE":
       return {
         ...state,
         phase: "get-ready",
         currentExerciseIndex: state.currentExerciseIndex + 1,
         workElapsed: 0,
       };
-    }
     case "ROUND_REST_DONE":
       return {
         ...state,
@@ -82,8 +90,6 @@ function circuitReducer(state, action) {
       };
     case "TOGGLE_PAUSE":
       return { ...state, paused: !state.paused };
-    case "UPDATE_WORK_ELAPSED":
-      return { ...state, workElapsed: action.payload };
     default:
       return state;
   }
@@ -99,11 +105,9 @@ function formatTime(totalSeconds) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function getLastSetsText(exerciseId, existingLogs, findPrior, measurementSystem) {
-  // Check current-day logs first, then prior days
+function getLastSetsText(exerciseId, existingLogs, findPrior) {
   const log = existingLogs?.[exerciseId] || findPrior?.(exerciseId);
   if (!log?.sets?.length) return null;
-  const wLabel = getWeightLabel(measurementSystem);
   return log.sets
     .filter((s) => Number(s.reps) > 0)
     .map((s) => {
@@ -114,12 +118,13 @@ function getLastSetsText(exerciseId, existingLogs, findPrior, measurementSystem)
 }
 
 function estimateMinutes(exercises, rounds, restEx, restRound) {
-  // Rough: 45s avg work + rest per exercise, plus round rest
   const workPerExercise = 45;
   const perRound = exercises * (workPerExercise + restEx);
-  const total = perRound * rounds + restRound * (rounds - 1);
+  const total = perRound * rounds + restRound * Math.max(0, rounds - 1);
   return Math.round(total / 60);
 }
+
+const TIME_PRESETS = [30, 45, 60, 90, 120, 180];
 
 // ---------------------------------------------------------------------------
 // CircuitTimer Component
@@ -159,14 +164,19 @@ export function CircuitTimer({
     restBetweenExercises, restBetweenRounds, paused } = state;
 
   const currentExercise = exercises[currentExerciseIndex] || null;
-  const nextExerciseIndex = currentExerciseIndex + 1 < exercises.length ? currentExerciseIndex + 1 : 0;
-  const nextExercise = exercises[nextExerciseIndex] || null;
 
   // Track total sets logged
   const setsLoggedRef = useRef(0);
 
   // Multi-set state for work phase — array of { reps, weight }
   const [localSets, setLocalSets] = useState([]);
+
+  // Time-based exercise: which set is active for countdown, and whether countdown started
+  const [timeSetIndex, setTimeSetIndex] = useState(0);
+  const [timeCountdownStarted, setTimeCountdownStarted] = useState(false);
+
+  // Is current exercise time-based?
+  const isTimeBased = currentExercise?.unit === "sec";
 
   // Build set template when exercise changes
   useEffect(() => {
@@ -178,7 +188,8 @@ export function CircuitTimer({
     const priorLog = findPrior?.(exId);
     const template = dayLog || priorLog;
     const scheme = parseScheme(currentExercise.scheme || workout.scheme);
-    const numSets = template?.sets?.length || scheme?.sets || 3;
+    // Default to 1 set when no prior data (not 3)
+    const numSets = template?.sets?.length || scheme?.sets || 1;
 
     const sets = [];
     for (let i = 0; i < numSets; i++) {
@@ -189,6 +200,8 @@ export function CircuitTimer({
       });
     }
     setLocalSets(sets);
+    setTimeSetIndex(0);
+    setTimeCountdownStarted(false);
   }, [currentExerciseIndex, currentRound, phase]);
 
   // ---------------------------------------------------------------------------
@@ -213,8 +226,27 @@ export function CircuitTimer({
     dispatch({ type: "ROUND_REST_DONE" });
   }, [timerSoundEnabled, timerSoundType]);
 
+  // Work timer completion — for time-based exercises, auto-complete the set
+  const onWorkTimerComplete = useCallback(() => {
+    if (!currentExercise || !isTimeBased) return;
+    const s = localSets[timeSetIndex];
+    if (!s) return;
+    const reps = Number(s.reps) || 0;
+    if (reps > 0) {
+      onCompleteSet(currentExercise.id, timeSetIndex, { reps, weight: "" }, workout.id);
+      setsLoggedRef.current += 1;
+    }
+    if (timerSoundEnabled) playTimerSound(timerSoundType || "chime");
+    navigator.vibrate?.([100, 50, 100]);
+    setTimeCountdownStarted(false);
+    // Advance to next set if exists
+    if (timeSetIndex < localSets.length - 1) {
+      setTimeSetIndex((prev) => prev + 1);
+    }
+  }, [currentExercise, isTimeBased, localSets, timeSetIndex, onCompleteSet, workout.id, timerSoundEnabled, timerSoundType]);
+
   const getReadyTimer = useTimer(onGetReadyComplete);
-  const workTimer = useTimer(null); // stopwatch, no auto-complete
+  const workTimer = useTimer(onWorkTimerComplete);
   const restTimer = useTimer(onRestComplete);
   const roundRestTimer = useTimer(onRoundRestComplete);
 
@@ -236,7 +268,10 @@ export function CircuitTimer({
       navigator.vibrate?.(10);
       getReadyTimer.start(GET_READY_SEC, "countdown");
     } else if (phase === "work") {
-      workTimer.start(0, "stopwatch");
+      // For regular exercises, start stopwatch. Time-based waits for user to tap Go.
+      if (!isTimeBased) {
+        workTimer.start(0, "stopwatch");
+      }
     } else if (phase === "rest") {
       restTimer.start(restBetweenExercises, "countdown");
     } else if (phase === "round-rest") {
@@ -248,7 +283,7 @@ export function CircuitTimer({
   useEffect(() => {
     if (phase === "work") {
       if (paused && workTimer.isRunning) workTimer.stop();
-      else if (!paused && !workTimer.isRunning && phase === "work") workTimer.toggle();
+      else if (!paused && !workTimer.isRunning && phase === "work" && (timeCountdownStarted || !isTimeBased)) workTimer.toggle();
     }
     if (phase === "rest") {
       if (paused && restTimer.isRunning) restTimer.stop();
@@ -296,6 +331,16 @@ export function CircuitTimer({
 
     dispatch({ type: "DONE_SET" });
   }, [currentExerciseIndex, exercises.length, currentRound, totalRounds, timerSoundEnabled, timerSoundType]);
+
+  // Start countdown for time-based exercise
+  const handleStartTimeCountdown = useCallback((durationSec) => {
+    // Update localSets with the chosen duration
+    const updated = [...localSets];
+    updated[timeSetIndex] = { ...updated[timeSetIndex], reps: String(durationSec) };
+    setLocalSets(updated);
+    setTimeCountdownStarted(true);
+    workTimer.start(durationSec, "countdown");
+  }, [localSets, timeSetIndex, workTimer]);
 
   const handleSkipRest = useCallback(() => {
     if (phase === "rest") {
@@ -372,7 +417,7 @@ export function CircuitTimer({
     opacity: 0.6,
   };
 
-  const exerciseName = {
+  const exerciseNameStyle = {
     fontSize: 24,
     fontWeight: 700,
     lineHeight: 1.2,
@@ -480,10 +525,10 @@ export function CircuitTimer({
           {stepperRow("Rounds", totalRounds, 1, 5, 1, (v) =>
             dispatch({ type: "SET_CONFIG", payload: { totalRounds: v } })
           )}
-          {stepperRow("Exercise rest", restBetweenExercises, 15, 120, 15, (v) =>
+          {stepperRow("Exercise rest", restBetweenExercises, 0, 120, 15, (v) =>
             dispatch({ type: "SET_CONFIG", payload: { restBetweenExercises: v } })
           )}
-          {stepperRow("Round rest", restBetweenRounds, 30, 180, 30, (v) =>
+          {stepperRow("Round rest", restBetweenRounds, 0, 180, 30, (v) =>
             dispatch({ type: "SET_CONFIG", payload: { restBetweenRounds: v } })
           )}
 
@@ -515,7 +560,7 @@ export function CircuitTimer({
   // Get Ready phase
   // ---------------------------------------------------------------------------
   if (phase === "get-ready") {
-    const lastText = getLastSetsText(currentExercise?.id, existingLogs, findPrior, measurementSystem);
+    const lastText = getLastSetsText(currentExercise?.id, existingLogs, findPrior);
     return (
       <div style={overlay}>
         <div style={headerBar}>
@@ -525,12 +570,11 @@ export function CircuitTimer({
         <div style={center}>
           <div style={phaseLabel}>Get Ready</div>
           <div style={bigNumber}>{getReadyTimer.seconds}</div>
-          <div style={exerciseName}>{currentExercise?.name}</div>
+          <div style={exerciseNameStyle}>{currentExercise?.name}</div>
           <div style={subText}>Set {currentRound} of {totalRounds}</div>
           {lastText && <div style={subText}>Last: {lastText}</div>}
         </div>
-        {/* Pause overlay */}
-        {paused && <PauseOverlay colors={colors} onResume={() => dispatch({ type: "TOGGLE_PAUSE" })} />}
+        {paused && <PauseOverlay onResume={() => dispatch({ type: "TOGGLE_PAUSE" })} />}
       </div>
     );
   }
@@ -540,7 +584,6 @@ export function CircuitTimer({
   // ---------------------------------------------------------------------------
   if (phase === "work") {
     const exUnit = getUnit(currentExercise?.unit, currentExercise);
-    const isTimeUnit = currentExercise?.unit === "sec" || currentExercise?.unit === "min";
     const isBWExercise = currentExercise?.bodyweight;
     const showWeight = exUnit.key === "reps" && !isBWExercise;
     const nextText = currentExerciseIndex < exercises.length - 1
@@ -553,6 +596,155 @@ export function CircuitTimer({
       !(savedSets && idx < savedSets.length && isSetCompleted(savedSets[idx]))
     );
 
+    // --- Time-based exercise UI ---
+    if (isTimeBased) {
+      const currentTimeSetData = localSets[timeSetIndex];
+      const targetSec = Number(currentTimeSetData?.reps) || 0;
+      const allTimeSetsCompleted = savedSets
+        ? localSets.every((_, idx) => idx < savedSets.length && isSetCompleted(savedSets[idx]))
+        : false;
+
+      // SVG ring for countdown
+      const CIRCUMFERENCE = 2 * Math.PI * 52;
+      const displaySec = workTimer.isRunning || workTimer.seconds > 0 ? workTimer.seconds : targetSec;
+      const timerTarget = workTimer.target || targetSec || 1;
+      const progress = timeCountdownStarted && timerTarget > 0
+        ? Math.min(1, Math.max(0, 1 - displaySec / timerTarget))
+        : 0;
+      const dashOffset = CIRCUMFERENCE * (1 - progress);
+
+      return (
+        <div style={overlay}>
+          <div style={headerBar}>
+            <button
+              style={{ ...secondaryBtn, padding: "6px 14px", fontSize: 12 }}
+              onClick={() => dispatch({ type: "TOGGLE_PAUSE" })}
+            >
+              {paused ? "Resume" : "Pause"}
+            </button>
+            <span>Round {currentRound}/{totalRounds}</span>
+          </div>
+          <div style={center}>
+            <div style={exerciseNameStyle}>{currentExercise?.name}</div>
+            {localSets.length > 1 && (
+              <div style={subText}>Set {timeSetIndex + 1} of {localSets.length}</div>
+            )}
+
+            {/* No prior duration and countdown not started — show presets */}
+            {!timeCountdownStarted && targetSec <= 0 && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 10, fontWeight: 600 }}>Select duration:</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+                  {TIME_PRESETS.map((sec) => (
+                    <button
+                      key={sec}
+                      className="btn-press"
+                      style={{
+                        ...secondaryBtn,
+                        padding: "10px 16px",
+                        fontSize: 15,
+                        fontWeight: 700,
+                        minWidth: 64,
+                      }}
+                      onClick={() => handleStartTimeCountdown(sec)}
+                    >
+                      {formatTimerDisplay(sec)}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    style={{ ...inputStyle, width: 80, fontSize: 16 }}
+                    placeholder="sec"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && Number(e.target.value) > 0) {
+                        handleStartTimeCountdown(Number(e.target.value));
+                      }
+                    }}
+                  />
+                  <span style={{ fontSize: 13, opacity: 0.5 }}>sec</span>
+                </div>
+              </div>
+            )}
+
+            {/* Has a target duration — show ring timer */}
+            {(targetSec > 0 || timeCountdownStarted) && (
+              <>
+                <div style={{ position: "relative", width: 140, height: 140, margin: "8px 0" }}>
+                  <svg width="140" height="140" style={{ transform: "rotate(-90deg)" }}>
+                    <circle cx="70" cy="70" r="52" fill="none" stroke={colors?.border || "#333"} strokeWidth="6" />
+                    <circle
+                      cx="70" cy="70" r="52" fill="none"
+                      stroke={colors?.accent || "#4fc3f7"}
+                      strokeWidth="6" strokeLinecap="round"
+                      strokeDasharray={CIRCUMFERENCE}
+                      strokeDashoffset={dashOffset}
+                      style={{ transition: "stroke-dashoffset 0.3s linear" }}
+                    />
+                  </svg>
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 32, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                  }}>
+                    {formatTimerDisplay(displaySec)}
+                  </div>
+                </div>
+
+                {!timeCountdownStarted ? (
+                  <button
+                    className="btn-press"
+                    style={{ ...primaryBtn, fontSize: 18 }}
+                    onClick={() => handleStartTimeCountdown(targetSec)}
+                  >
+                    Go
+                  </button>
+                ) : workTimer.isRunning ? (
+                  <div style={{ fontSize: 13, opacity: 0.5, fontWeight: 600 }}>In progress...</div>
+                ) : (
+                  /* Timer completed for this set */
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#2ecc71" }}>
+                    Set complete!
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Show Next when all time sets are completed (or timer finished for single set) */}
+            {(allTimeSetsCompleted || (!workTimer.isRunning && timeCountdownStarted && timeSetIndex >= localSets.length - 1)) && (
+              <button
+                className="btn-press"
+                style={{ ...primaryBtn, fontSize: 16, marginTop: 8 }}
+                onClick={handleNext}
+              >
+                {currentExerciseIndex >= exercises.length - 1 && currentRound >= totalRounds ? "Finish" : "Next"}
+              </button>
+            )}
+
+            {nextText && <div style={{ ...subText, marginTop: 8 }}>Next: {nextText}</div>}
+          </div>
+
+          <div style={{ padding: "8px 16px 12px", textAlign: "center", flexShrink: 0 }}>
+            <button style={{ ...secondaryBtn, fontSize: 12, opacity: 0.6 }} onClick={handleStop}>
+              Stop
+            </button>
+          </div>
+
+          {paused && <PauseOverlay onResume={() => dispatch({ type: "TOGGLE_PAUSE" })} />}
+          {showStopConfirm && (
+            <ConfirmOverlay
+              message="End circuit? Progress is already saved."
+              onConfirm={confirmStop}
+              onCancel={() => setShowStopConfirm(false)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // --- Regular exercise UI (reps/weight) ---
     return (
       <div style={overlay}>
         <div style={headerBar}>
@@ -566,7 +758,7 @@ export function CircuitTimer({
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "0 16px 16px" }}>
           <div style={{ textAlign: "center", marginBottom: 12, paddingTop: 8 }}>
-            <div style={exerciseName}>{currentExercise?.name}</div>
+            <div style={exerciseNameStyle}>{currentExercise?.name}</div>
             <div style={{ ...subText, marginTop: 4 }}>{formatTime(workTimer.seconds)}</div>
           </div>
 
@@ -582,7 +774,7 @@ export function CircuitTimer({
             textTransform: "uppercase",
           }}>
             <span />
-            <span style={{ textAlign: "center" }}>{isTimeUnit ? exUnit.label : "Reps"}</span>
+            <span style={{ textAlign: "center" }}>Reps</span>
             {showWeight && <span style={{ textAlign: "center" }}>{getWeightLabel(measurementSystem)}</span>}
           </div>
 
@@ -615,8 +807,11 @@ export function CircuitTimer({
                       background: isSaved ? "#2ecc71" : "transparent",
                       cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      color: isSaved ? "#fff" : (colors?.text || "#fff"),
+                      color: isSaved ? "#fff" : isNext ? "rgba(46,204,113,0.6)" : (colors?.text || "#fff"),
+                      fontWeight: 700, fontSize: 12,
                       transition: "all 0.2s",
+                      ...(isSaved ? { animation: "chipPop 0.3s ease-out" } : {}),
+                      ...(isNext && !isSaved ? { animation: "setBreathe 2s ease-in-out infinite" } : {}),
                       WebkitTapHighlightColor: "transparent",
                     }}
                     onClick={() => {
@@ -630,10 +825,12 @@ export function CircuitTimer({
                   >
                     {isSaved ? (
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
+                        <polyline points="20 6 9 17 4 12" style={{ strokeDasharray: 24, animation: "checkDraw 0.3s ease-out forwards" }} />
                       </svg>
                     ) : (
-                      <span style={{ fontSize: 12, fontWeight: 700, opacity: isNext ? 0.7 : 0.3 }}>{i + 1}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: isNext ? 0.7 : 0.3 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
                     )}
                   </button>
 
@@ -727,10 +924,9 @@ export function CircuitTimer({
           </button>
         </div>
 
-        {paused && <PauseOverlay colors={colors} onResume={() => dispatch({ type: "TOGGLE_PAUSE" })} />}
+        {paused && <PauseOverlay onResume={() => dispatch({ type: "TOGGLE_PAUSE" })} />}
         {showStopConfirm && (
           <ConfirmOverlay
-            colors={colors}
             message="End circuit? Progress is already saved."
             onConfirm={confirmStop}
             onCancel={() => setShowStopConfirm(false)}
@@ -750,7 +946,7 @@ export function CircuitTimer({
     const progress = totalSec > 0 ? Math.max(0, Math.min(1, 1 - timer.seconds / totalSec)) : 0;
 
     const upNextEx = isRoundRest ? exercises[0] : exercises[currentExerciseIndex + 1];
-    const upNextText = getLastSetsText(upNextEx?.id, existingLogs, findPrior, measurementSystem);
+    const upNextText = getLastSetsText(upNextEx?.id, existingLogs, findPrior);
 
     return (
       <div style={overlay}>
@@ -799,10 +995,9 @@ export function CircuitTimer({
           </button>
         </div>
 
-        {paused && <PauseOverlay colors={colors} onResume={() => dispatch({ type: "TOGGLE_PAUSE" })} />}
+        {paused && <PauseOverlay onResume={() => dispatch({ type: "TOGGLE_PAUSE" })} />}
         {showStopConfirm && (
           <ConfirmOverlay
-            colors={colors}
             message="End circuit? Progress is already saved."
             onConfirm={confirmStop}
             onCancel={() => setShowStopConfirm(false)}
@@ -847,7 +1042,7 @@ export function CircuitTimer({
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function PauseOverlay({ colors, onResume }) {
+function PauseOverlay({ onResume }) {
   return (
     <div
       style={{
@@ -871,7 +1066,7 @@ function PauseOverlay({ colors, onResume }) {
   );
 }
 
-function ConfirmOverlay({ colors, message, onConfirm, onCancel }) {
+function ConfirmOverlay({ message, onConfirm, onCancel }) {
   return (
     <div
       style={{
