@@ -185,7 +185,6 @@ export function CircuitTimer({
   timerSoundType,
   findPrior,
   measurementSystem,
-  voiceInputEnabled,
 }) {
   const exercises = workout.exercises || [];
   const savedCfg = useMemo(loadConfig, []);
@@ -245,7 +244,8 @@ export function CircuitTimer({
   const [showExerciseDetail, setShowExerciseDetail] = useState(false);
   const catalogEntry = currentExercise?.catalogId ? catalogMap.get(currentExercise.catalogId) : null;
 
-  // Voice commands
+  // Voice commands — per-session opt-in from config screen
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceFeedback, setVoiceFeedback] = useState("");
   const recognitionRef = useRef(null);
@@ -984,6 +984,46 @@ export function CircuitTimer({
             dispatch({ type: "SET_CONFIG", payload: { restBetweenRounds: v } })
           )}
 
+          {hasSpeechRecognition && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: 300, padding: "8px 0" }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>Voice Commands</span>
+              <div style={{ display: "flex", gap: 0, borderRadius: 999, overflow: "hidden", border: `1.5px solid ${colors?.border || "rgba(255,255,255,0.10)"}` }}>
+                {[
+                  { key: false, label: "Off" },
+                  { key: true, label: "On" },
+                ].map((opt) => {
+                  const isActive = voiceEnabled === opt.key;
+                  return (
+                    <button
+                      key={String(opt.key)}
+                      type="button"
+                      onClick={() => setVoiceEnabled(opt.key)}
+                      style={{
+                        padding: "6px 16px",
+                        fontSize: 13,
+                        fontWeight: isActive ? 700 : 500,
+                        border: "none",
+                        background: isActive ? (colors?.accent || "#4fc3f7") + "33" : "transparent",
+                        color: isActive ? (colors?.accent || "#4fc3f7") : (colors?.text || "#fff"),
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        WebkitTapHighlightColor: "transparent",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {voiceEnabled && (
+            <div style={{ fontSize: 12, opacity: 0.5, maxWidth: 300, textAlign: "center", fontStyle: "italic", marginTop: -4 }}>
+              Say "next", "pause", "resume", "add set" during exercises
+            </div>
+          )}
+
           <div style={{ ...subText, marginTop: 8 }}>
             {exercises.length} exercise{exercises.length !== 1 ? "s" : ""} &times; {totalRounds} round{totalRounds !== 1 ? "s" : ""}
             <br />
@@ -1028,6 +1068,7 @@ export function CircuitTimer({
             style={{ ...primaryBtn, marginTop: 16 }}
             onClick={() => {
               saveConfig({ rounds: totalRounds, restBetweenExercises, restBetweenRounds });
+              if (voiceEnabled) setVoiceActive(true);
               dispatch({ type: "START" });
             }}
           >
@@ -1108,9 +1149,7 @@ export function CircuitTimer({
             >
               {paused ? "Resume" : "Pause"}
             </button>
-            {voiceInputEnabled && hasSpeechRecognition && (
-              <MicButton active={voiceActive} onToggle={() => setVoiceActive(v => !v)} colors={colors} feedback={voiceFeedback} />
-            )}
+            {voiceActive && <VoiceIndicator colors={colors} feedback={voiceFeedback} />}
             <span>Round {currentRound}/{totalRounds}</span>
           </div>
           <div style={center}>
@@ -1378,9 +1417,7 @@ export function CircuitTimer({
           >
             {paused ? "Resume" : "Pause"}
           </button>
-          {voiceInputEnabled && hasSpeechRecognition && (
-            <MicButton active={voiceActive} onToggle={() => setVoiceActive(v => !v)} colors={colors} feedback={voiceFeedback} />
-          )}
+          {voiceActive && <VoiceIndicator colors={colors} feedback={voiceFeedback} />}
           <span>Round {currentRound}/{totalRounds}</span>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "0 16px 16px" }}>
@@ -1760,36 +1797,22 @@ export function CircuitTimer({
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MicButton({ active, onToggle, colors, feedback }) {
+function VoiceIndicator({ colors, feedback }) {
   return (
-    <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-      <button
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 999,
-          border: "none",
-          background: active ? (colors?.accent || "#4fc3f7") + "33" : "transparent",
-          color: active ? (colors?.accent || "#4fc3f7") : (colors?.text || "#fff"),
-          opacity: active ? 1 : 0.4,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 0,
-          WebkitTapHighlightColor: "transparent",
-          animation: active ? "micPulse 1.5s ease-in-out infinite" : "none",
-        }}
-        onClick={onToggle}
-        aria-label={active ? "Stop voice commands" : "Start voice commands"}
+    <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 4 }}>
+      <svg
+        width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke={colors?.accent || "#4fc3f7"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        style={{ animation: "micPulse 1.5s ease-in-out infinite", flexShrink: 0 }}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="9" y="1" width="6" height="11" rx="3" />
-          <path d="M19 10v2a7 7 0 01-14 0v-2" />
-          <line x1="12" y1="19" x2="12" y2="23" />
-          <line x1="8" y1="23" x2="16" y2="23" />
-        </svg>
-      </button>
+        <rect x="9" y="1" width="6" height="11" rx="3" />
+        <path d="M19 10v2a7 7 0 01-14 0v-2" />
+        <line x1="12" y1="19" x2="12" y2="23" />
+        <line x1="8" y1="23" x2="16" y2="23" />
+      </svg>
+      <span style={{ fontSize: 11, fontWeight: 600, color: colors?.accent || "#4fc3f7", whiteSpace: "nowrap" }}>
+        Listening
+      </span>
       {feedback && (
         <div style={{
           position: "absolute",

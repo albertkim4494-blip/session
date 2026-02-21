@@ -5193,7 +5193,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           timerSoundType={state.preferences?.timerSoundType || "beep"}
           findPrior={findPriorForExercise}
           measurementSystem={state.preferences?.measurementSystem}
-          voiceInputEnabled={!!state.preferences?.voiceInput}
         />
       )}
     </div>
