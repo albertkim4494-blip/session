@@ -28,25 +28,32 @@ function MicButton({ field, listeningField, onToggle, colors }) {
       onClick={() => onToggle(field)}
       aria-label={active ? "Stop listening" : "Voice input"}
       style={{
-        background: "transparent",
-        border: "none",
+        background: active ? (colors?.accent || "#4fc3f7") + "22" : "rgba(255,255,255,0.06)",
+        border: `1px solid ${active ? (colors?.accent || "#4fc3f7") + "55" : "rgba(255,255,255,0.10)"}`,
+        borderRadius: 8,
         cursor: "pointer",
-        padding: 4,
-        color: active ? colors?.accent : colors?.text,
-        opacity: active ? 1 : 0.4,
+        padding: "4px 8px",
+        color: active ? (colors?.accent || "#4fc3f7") : (colors?.text || "#fff"),
+        opacity: active ? 1 : 0.6,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        gap: 4,
         flexShrink: 0,
+        fontFamily: "inherit",
+        fontSize: 11,
+        fontWeight: 600,
         animation: active ? "micPulse 1.2s ease-in-out infinite" : "none",
+        WebkitTapHighlightColor: "transparent",
       }}
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
         <path d="M19 10v2a7 7 0 01-14 0v-2" />
         <line x1="12" y1="19" x2="12" y2="23" />
         <line x1="8" y1="23" x2="16" y2="23" />
       </svg>
+      {active ? "Listening..." : "Mic"}
     </button>
   );
 }

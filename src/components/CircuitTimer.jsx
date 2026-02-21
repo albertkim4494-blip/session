@@ -1054,42 +1054,98 @@ export function CircuitTimer({
           )}
 
           {hasSpeechRecognition && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: 300, padding: "8px 0" }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>Voice Commands</span>
-              <div style={{ display: "flex", gap: 0, borderRadius: 999, overflow: "hidden", border: `1.5px solid ${colors?.border || "rgba(255,255,255,0.10)"}` }}>
-                {[
-                  { key: false, label: "Off" },
-                  { key: true, label: "On" },
-                ].map((opt) => {
-                  const isActive = voiceEnabled === opt.key;
-                  return (
-                    <button
-                      key={String(opt.key)}
-                      type="button"
-                      onClick={() => setVoiceEnabled(opt.key)}
-                      style={{
-                        padding: "6px 16px",
-                        fontSize: 13,
-                        fontWeight: isActive ? 700 : 500,
-                        border: "none",
-                        background: isActive ? (colors?.accent || "#4fc3f7") + "33" : "transparent",
-                        color: isActive ? (colors?.accent || "#4fc3f7") : (colors?.text || "#fff"),
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        WebkitTapHighlightColor: "transparent",
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: 300, padding: "8px 0", gap: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>Voice Commands</span>
+                <div style={{ display: "flex", gap: 0, borderRadius: 999, overflow: "hidden", border: `1.5px solid ${colors?.border || "rgba(255,255,255,0.10)"}` }}>
+                  {[
+                    { key: false, label: "Off" },
+                    { key: true, label: "On" },
+                  ].map((opt) => {
+                    const isActive = voiceEnabled === opt.key;
+                    return (
+                      <button
+                        key={String(opt.key)}
+                        type="button"
+                        onClick={async () => {
+                          if (!opt.key) {
+                            setVoiceEnabled(false);
+                            setVoiceError("");
+                            if (micStreamRef.current) {
+                              micStreamRef.current.getTracks().forEach((t) => t.stop());
+                              micStreamRef.current = null;
+                            }
+                            return;
+                          }
+                          // Test voice on toggle — get mic permission + verify SpeechRecognition works
+                          setVoiceError("");
+                          try {
+                            if (!navigator.mediaDevices?.getUserMedia) {
+                              setVoiceError("Mic not available");
+                              return;
+                            }
+                            micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+                          } catch (e) {
+                            setVoiceError("Mic " + (e.name === "NotAllowedError" ? "denied" : "not available"));
+                            return;
+                          }
+                          // Quick SpeechRecognition smoke test
+                          try {
+                            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                            const test = new SR();
+                            test.continuous = false;
+                            test.interimResults = false;
+                            await new Promise((resolve, reject) => {
+                              const t = setTimeout(() => { test.abort(); resolve(); }, 2000);
+                              test.onstart = () => { clearTimeout(t); test.abort(); resolve(); };
+                              test.onerror = (ev) => {
+                                clearTimeout(t);
+                                if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+                                  reject(new Error(ev.error));
+                                } else {
+                                  resolve(); // no-speech, network etc are OK — API works
+                                }
+                              };
+                              test.onend = () => { clearTimeout(t); resolve(); };
+                              test.start();
+                            });
+                            setVoiceEnabled(true);
+                          } catch {
+                            setVoiceError("Speech service denied");
+                            if (micStreamRef.current) {
+                              micStreamRef.current.getTracks().forEach((t) => t.stop());
+                              micStreamRef.current = null;
+                            }
+                          }
+                        }}
+                        style={{
+                          padding: "6px 16px",
+                          fontSize: 13,
+                          fontWeight: isActive ? 700 : 500,
+                          border: "none",
+                          background: isActive ? (colors?.accent || "#4fc3f7") + "33" : "transparent",
+                          color: isActive ? (colors?.accent || "#4fc3f7") : (colors?.text || "#fff"),
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          WebkitTapHighlightColor: "transparent",
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
-
-          {voiceEnabled && (
-            <div style={{ fontSize: 12, opacity: 0.5, maxWidth: 300, textAlign: "center", fontStyle: "italic", marginTop: -4 }}>
-              Say "next", "pause", "resume", "add set" during exercises
+              {voiceEnabled && !voiceError && (
+                <div style={{ fontSize: 12, opacity: 0.5, textAlign: "center", fontStyle: "italic" }}>
+                  Say "next", "pause", "resume", "add set" during exercises
+                </div>
+              )}
+              {voiceError && (
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#e53935", textAlign: "center" }}>
+                  {voiceError}
+                </div>
+              )}
             </div>
           )}
 
@@ -1135,20 +1191,12 @@ export function CircuitTimer({
           <button
             className="btn-press"
             style={{ ...primaryBtn, marginTop: 16 }}
-            onClick={async () => {
+            onClick={() => {
               saveConfig({ rounds: totalRounds, restBetweenExercises, restBetweenRounds });
-              if (voiceEnabled) {
-                // Pre-grant mic permission via getUserMedia — on Android PWAs,
-                // SpeechRecognition may not trigger its own permission prompt.
-                // Keep stream open — some Android devices need an active
-                // MediaStream for SpeechRecognition to receive audio.
-                try {
-                  micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-                  setVoiceActive(true);
-                } catch {
-                  // Permission denied — start without voice
-                  setVoiceEnabled(false);
-                }
+              // Mic stream was already acquired when toggling voice On.
+              // If it's still active, enable voice for the circuit.
+              if (voiceEnabled && micStreamRef.current) {
+                setVoiceActive(true);
               }
               dispatch({ type: "START" });
             }}
