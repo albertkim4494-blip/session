@@ -943,6 +943,9 @@ export function CircuitTimer({
       const targetSec = Number(currentTimeSetData?.reps) || 0;
 
       // SVG ring for countdown
+      // Can remove last set if 2+ sets and we haven't reached the last one yet
+      const canRemoveTimeSet = localSets.length > 1 && timeSetIndex < localSets.length - 1;
+
       const CIRCUMFERENCE = 2 * Math.PI * 60;
       const displaySec = workTimer.isRunning || workTimer.seconds > 0 ? workTimer.seconds : targetSec;
       const timerTarget = workTimer.target || targetSec || 1;
@@ -1108,22 +1111,40 @@ export function CircuitTimer({
                         Skip
                       </button>
                     </div>
-                    <button
-                      className="btn-press"
-                      style={{ ...secondaryBtn, fontSize: 13, padding: "8px 18px", opacity: 0.7, marginTop: 4 }}
-                      onClick={() => {
-                        clearTimeout(autoAdvanceRef.current);
-                        const priorDur = timeTargetRef.current || 0;
-                        const newSets = [...localSets, { reps: String(priorDur || ""), weight: "" }];
-                        setLocalSets(newSets);
-                        if (currentExercise) {
-                          perRunSetCountRef.current.set(currentExercise.id, newSets.length);
-                          updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
-                        }
-                      }}
-                    >
-                      + Add Set
-                    </button>
+                    <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                      {canRemoveTimeSet && (
+                        <button
+                          className="btn-press"
+                          style={{ ...secondaryBtn, fontSize: 13, padding: "8px 18px", opacity: 0.7 }}
+                          onClick={() => {
+                            const newSets = localSets.slice(0, -1);
+                            setLocalSets(newSets);
+                            if (currentExercise) {
+                              perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+                              updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+                            }
+                          }}
+                        >
+                          &minus; Remove Set
+                        </button>
+                      )}
+                      <button
+                        className="btn-press"
+                        style={{ ...secondaryBtn, fontSize: 13, padding: "8px 18px", opacity: 0.7 }}
+                        onClick={() => {
+                          clearTimeout(autoAdvanceRef.current);
+                          const priorDur = timeTargetRef.current || 0;
+                          const newSets = [...localSets, { reps: String(priorDur || ""), weight: "" }];
+                          setLocalSets(newSets);
+                          if (currentExercise) {
+                            perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+                            updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+                          }
+                        }}
+                      >
+                        + Add Set
+                      </button>
+                    </div>
                   </>
                 ) : (
                   /* Timer completed — brief auto-advance state */
@@ -1131,30 +1152,48 @@ export function CircuitTimer({
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#2ecc71", marginBottom: 8 }}>
                       &#10003; Set complete!
                     </div>
-                    <button
-                      className="btn-press"
-                      style={{ ...secondaryBtn, fontSize: 14, padding: "10px 20px" }}
-                      onClick={() => {
-                        clearTimeout(autoAdvanceRef.current);
-                        const priorDur = timeTargetRef.current || 0;
-                        const newSets = [...localSets, { reps: String(priorDur || ""), weight: "" }];
-                        const newIdx = localSets.length;
-                        setLocalSets(newSets);
-                        setTimeSetIndex(newIdx);
-                        if (currentExercise) {
-                          perRunSetCountRef.current.set(currentExercise.id, newSets.length);
-                          updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
-                        }
-                        if (priorDur > 0) {
-                          setTimeCountdownStarted(true);
-                          workTimer.start(priorDur, "countdown");
-                        } else {
-                          setTimeCountdownStarted(false);
-                        }
-                      }}
-                    >
-                      + Add Set
-                    </button>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      {canRemoveTimeSet && (
+                        <button
+                          className="btn-press"
+                          style={{ ...secondaryBtn, fontSize: 14, padding: "10px 20px" }}
+                          onClick={() => {
+                            const newSets = localSets.slice(0, -1);
+                            setLocalSets(newSets);
+                            if (currentExercise) {
+                              perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+                              updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+                            }
+                          }}
+                        >
+                          &minus; Remove Set
+                        </button>
+                      )}
+                      <button
+                        className="btn-press"
+                        style={{ ...secondaryBtn, fontSize: 14, padding: "10px 20px" }}
+                        onClick={() => {
+                          clearTimeout(autoAdvanceRef.current);
+                          const priorDur = timeTargetRef.current || 0;
+                          const newSets = [...localSets, { reps: String(priorDur || ""), weight: "" }];
+                          const newIdx = localSets.length;
+                          setLocalSets(newSets);
+                          setTimeSetIndex(newIdx);
+                          if (currentExercise) {
+                            perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+                            updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+                          }
+                          if (priorDur > 0) {
+                            setTimeCountdownStarted(true);
+                            workTimer.start(priorDur, "countdown");
+                          } else {
+                            setTimeCountdownStarted(false);
+                          }
+                        }}
+                      >
+                        + Add Set
+                      </button>
+                    </div>
                   </>
                 )}
               </>
