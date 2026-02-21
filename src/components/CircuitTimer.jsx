@@ -508,15 +508,15 @@ export function CircuitTimer({
   const voiceRestartRef = useRef(null);
 
   // Voice recognition effect
-  // Uses continuous=false + restart-on-end pattern because continuous=true
-  // is broken on Android Chrome (Chromium bug 40324711): stops after ~3-7s
-  // of silence and plays system beep sounds on restart.
+  // Uses continuous=true so the mic stays open for hands-free commands.
+  // On Android Chrome, continuous mode stops after ~3-7s of silence and
+  // fires onend — we restart with a new instance when that happens.
   const consecutiveErrorsRef = useRef(0);
+  const commandFiredRef = useRef(false);
 
   useEffect(() => {
     if (!voiceActive || !hasSpeechRecognition) return;
     if (phase !== "work" && phase !== "get-ready") {
-      // Pause recognition during rest/round-rest — will resume when work starts
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch {}
         recognitionRef.current = null;
@@ -532,66 +532,82 @@ export function CircuitTimer({
     const showFeedback = (text) => {
       setVoiceFeedback(text);
       clearTimeout(voiceFeedbackTimerRef.current);
-      voiceFeedbackTimerRef.current = setTimeout(() => setVoiceFeedback(""), 1500);
+      voiceFeedbackTimerRef.current = setTimeout(() => setVoiceFeedback(""), 2000);
+    };
+
+    // Try to match a voice command from transcript text
+    const tryMatchCommand = (transcript) => {
+      const now = Date.now();
+      if (now - voiceCooldownRef.current < 1500) return false;
+
+      if (/\b(next|skip|done|text|necks)\b/i.test(transcript)) {
+        voiceCooldownRef.current = now;
+        commandFiredRef.current = true;
+        showFeedback("Next \u2192");
+        handleNextRef.current?.();
+        return true;
+      }
+      if (/\b(add set|another set|at set)\b/i.test(transcript)) {
+        voiceCooldownRef.current = now;
+        commandFiredRef.current = true;
+        showFeedback("+ Add Set");
+        addSetViaVoiceRef.current?.();
+        return true;
+      }
+      if (/\b(pause|paws|pars)\b/i.test(transcript)) {
+        voiceCooldownRef.current = now;
+        commandFiredRef.current = true;
+        showFeedback("Paused");
+        if (!pausedRef.current) dispatch({ type: "TOGGLE_PAUSE" });
+        return true;
+      }
+      if (/\b(resume|continue|result)\b/i.test(transcript)) {
+        voiceCooldownRef.current = now;
+        commandFiredRef.current = true;
+        showFeedback("Resumed");
+        if (pausedRef.current) dispatch({ type: "TOGGLE_PAUSE" });
+        return true;
+      }
+      return false;
     };
 
     const startRecognition = () => {
       if (cancelled) return;
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = "en-US";
       recognitionRef.current = recognition;
+      commandFiredRef.current = false;
 
       recognition.onresult = (event) => {
         consecutiveErrorsRef.current = 0;
-        const now = Date.now();
-        if (now - voiceCooldownRef.current < 1000) return;
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (!event.results[i].isFinal) continue;
           const transcript = event.results[i][0].transcript.toLowerCase().trim();
+          if (!transcript) continue;
 
-          if (/\b(next|skip|done)\b/.test(transcript)) {
-            voiceCooldownRef.current = now;
-            showFeedback("Next \u2192");
-            handleNextRef.current?.();
-            return;
+          // Show what was heard (interim or final) as live feedback
+          if (!commandFiredRef.current) {
+            showFeedback("\u201c" + transcript + "\u201d");
           }
-          if (/\b(add set|another set)\b/.test(transcript)) {
-            voiceCooldownRef.current = now;
-            showFeedback("+ Add Set");
-            addSetViaVoiceRef.current?.();
-            return;
-          }
-          if (/\bpause\b/.test(transcript)) {
-            voiceCooldownRef.current = now;
-            showFeedback("Paused");
-            if (!pausedRef.current) dispatch({ type: "TOGGLE_PAUSE" });
-            return;
-          }
-          if (/\b(resume|continue)\b/.test(transcript)) {
-            voiceCooldownRef.current = now;
-            showFeedback("Resumed");
-            if (pausedRef.current) dispatch({ type: "TOGGLE_PAUSE" });
-            return;
-          }
+
+          // Try matching command on both interim and final results
+          if (tryMatchCommand(transcript)) return;
         }
       };
 
       recognition.onend = () => {
-        // Create a new instance after a short delay — Android silently fails
-        // when reusing the same SpeechRecognition instance after onend.
+        // Android stops continuous recognition after silence — restart
         if (!cancelled) {
-          voiceRestartRef.current = setTimeout(startRecognition, 300);
+          voiceRestartRef.current = setTimeout(startRecognition, 200);
         }
       };
 
       recognition.onerror = (event) => {
-        if (event.error === "no-speech") {
-          // Transient — onend will restart
-          return;
+        if (event.error === "no-speech" || event.error === "aborted") {
+          return; // Transient — onend will restart
         }
         if (event.error === "network") {
           consecutiveErrorsRef.current += 1;
@@ -607,23 +623,11 @@ export function CircuitTimer({
           setVoiceError("Mic denied");
           setVoiceActive(false);
         }
-        if (event.error === "aborted") {
-          // Only count as fatal if we didn't abort it ourselves
-          if (!cancelled) {
-            consecutiveErrorsRef.current += 1;
-            if (consecutiveErrorsRef.current >= 5) {
-              cancelled = true;
-              setVoiceError("Not supported");
-              setVoiceActive(false);
-            }
-          }
-        }
       };
 
       try {
         recognition.start();
       } catch (e) {
-        // .start() can throw on some Android WebViews
         cancelled = true;
         setVoiceError("Not supported");
         setVoiceActive(false);
@@ -639,8 +643,6 @@ export function CircuitTimer({
         try { recognitionRef.current.abort(); } catch {}
         recognitionRef.current = null;
       }
-      // Release mic stream when voice is deactivated or phase changes
-      // to non-listening (rest/complete) — keeps stream only during work/get-ready
       if (phase !== "work" && phase !== "get-ready") {
         if (micStreamRef.current) {
           micStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -1081,12 +1083,26 @@ export function CircuitTimer({
                           setVoiceError("");
                           try {
                             if (!navigator.mediaDevices?.getUserMedia) {
-                              setVoiceError("Mic not available");
+                              setVoiceError("Mic not available on this browser");
                               return;
+                            }
+                            // Check if mic permission is permanently blocked
+                            if (navigator.permissions?.query) {
+                              try {
+                                const perm = await navigator.permissions.query({ name: "microphone" });
+                                if (perm.state === "denied") {
+                                  setVoiceError("Mic blocked \u2014 tap the lock icon in Chrome \u2192 Site settings \u2192 Microphone \u2192 Allow");
+                                  return;
+                                }
+                              } catch (_) {}
                             }
                             micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
                           } catch (e) {
-                            setVoiceError("Mic " + (e.name === "NotAllowedError" ? "denied" : "not available"));
+                            if (e.name === "NotAllowedError") {
+                              setVoiceError("Mic blocked \u2014 open Chrome \u2192 Site settings \u2192 Microphone \u2192 Allow");
+                            } else {
+                              setVoiceError("Mic not available");
+                            }
                             return;
                           }
                           // Quick SpeechRecognition smoke test
