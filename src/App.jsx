@@ -89,6 +89,7 @@ function ensureAnimations() {
 @keyframes restBarSlideDown { from{transform:translateY(0);opacity:1} to{transform:translateY(100%);opacity:0} }
 @keyframes timerPulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
 @keyframes setBreathe { 0%{box-shadow:0 0 0 0 rgba(46,204,113,0.35)} 50%{box-shadow:0 0 0 4px rgba(46,204,113,0.15)} 100%{box-shadow:0 0 0 0 rgba(46,204,113,0)} }
+@keyframes micPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 .btn-press { transition: transform 0.15s ease, opacity 0.15s ease; }
 .btn-press:active { transform: scale(0.97); opacity: 0.85; }
 @media (hover: hover) {
@@ -5192,6 +5193,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           timerSoundType={state.preferences?.timerSoundType || "beep"}
           findPrior={findPriorForExercise}
           measurementSystem={state.preferences?.measurementSystem}
+          voiceInputEnabled={!!state.preferences?.voiceInput}
         />
       )}
     </div>

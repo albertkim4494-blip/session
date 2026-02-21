@@ -10,6 +10,12 @@ import { ExerciseGif } from "./ExerciseGif";
 import { BodyDiagram } from "./BodyDiagram";
 
 // ---------------------------------------------------------------------------
+// Voice command feature detection
+// ---------------------------------------------------------------------------
+const hasSpeechRecognition = typeof window !== "undefined" &&
+  !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+// ---------------------------------------------------------------------------
 // localStorage config persistence
 // ---------------------------------------------------------------------------
 const CONFIG_KEY = "wt_circuit_config";
@@ -179,6 +185,7 @@ export function CircuitTimer({
   timerSoundType,
   findPrior,
   measurementSystem,
+  voiceInputEnabled,
 }) {
   const exercises = workout.exercises || [];
   const savedCfg = useMemo(loadConfig, []);
@@ -237,6 +244,13 @@ export function CircuitTimer({
   // Collapsible exercise detail (GIF + body diagram)
   const [showExerciseDetail, setShowExerciseDetail] = useState(false);
   const catalogEntry = currentExercise?.catalogId ? catalogMap.get(currentExercise.catalogId) : null;
+
+  // Voice commands
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [voiceFeedback, setVoiceFeedback] = useState("");
+  const recognitionRef = useRef(null);
+  const voiceCooldownRef = useRef(0);
+  const voiceFeedbackTimerRef = useRef(null);
 
   // Is current exercise time-based?
   const isTimeBased = currentExercise?.unit === "sec";
@@ -480,6 +494,134 @@ export function CircuitTimer({
   }, [paused]);
 
   // ---------------------------------------------------------------------------
+  // Voice commands — SpeechRecognition lifecycle
+  // ---------------------------------------------------------------------------
+
+  // Stable ref for handleNext so voice effect doesn't re-run on every handleNext change
+  const handleNextRef = useRef(null);
+
+  // Voice recognition effect
+  useEffect(() => {
+    if (!voiceActive || !hasSpeechRecognition) return;
+    if (phase !== "work" && phase !== "get-ready") {
+      // Pause recognition during rest/round-rest — will resume when work starts
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+        recognitionRef.current = null;
+      }
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+    recognitionRef.current = recognition;
+
+    const showFeedback = (text) => {
+      setVoiceFeedback(text);
+      clearTimeout(voiceFeedbackTimerRef.current);
+      voiceFeedbackTimerRef.current = setTimeout(() => setVoiceFeedback(""), 1500);
+    };
+
+    recognition.onresult = (event) => {
+      const now = Date.now();
+      if (now - voiceCooldownRef.current < 1000) return;
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (!event.results[i].isFinal) continue;
+        const transcript = event.results[i][0].transcript.toLowerCase().trim();
+
+        // Match commands — first match wins
+        if (/\b(next|skip|done)\b/.test(transcript)) {
+          voiceCooldownRef.current = now;
+          showFeedback("Next \u2192");
+          handleNextRef.current?.();
+          return;
+        }
+        if (/\b(add set|another set)\b/.test(transcript)) {
+          voiceCooldownRef.current = now;
+          showFeedback("+ Add Set");
+          addSetViaVoiceRef.current?.();
+          return;
+        }
+        if (/\bpause\b/.test(transcript)) {
+          voiceCooldownRef.current = now;
+          showFeedback("Paused");
+          if (!paused) dispatch({ type: "TOGGLE_PAUSE" });
+          return;
+        }
+        if (/\b(resume|continue)\b/.test(transcript)) {
+          voiceCooldownRef.current = now;
+          showFeedback("Resumed");
+          if (paused) dispatch({ type: "TOGGLE_PAUSE" });
+          return;
+        }
+      }
+    };
+
+    recognition.onend = () => {
+      // Chrome stops continuous recognition periodically — restart if still active
+      if (voiceActive && (phase === "work" || phase === "get-ready")) {
+        try { recognition.start(); } catch {}
+      }
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error === "no-speech" || event.error === "network") {
+        // Transient — onend will restart
+        return;
+      }
+      if (event.error === "not-allowed" || event.error === "aborted") {
+        setVoiceActive(false);
+      }
+    };
+
+    try { recognition.start(); } catch {}
+
+    return () => {
+      try { recognition.abort(); } catch {}
+      recognitionRef.current = null;
+    };
+  }, [voiceActive, phase]);
+
+  // Stop voice on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+      }
+      clearTimeout(voiceFeedbackTimerRef.current);
+    };
+  }, []);
+
+  // Add-set helper ref for voice commands (avoids closure staleness)
+  const addSetViaVoiceRef = useRef(null);
+  useEffect(() => {
+    addSetViaVoiceRef.current = () => {
+      if (isTimeBased) {
+        clearTimeout(autoAdvanceRef.current);
+        const priorDur = timeTargetRef.current || 0;
+        const newSets = [...localSets, { reps: String(priorDur || ""), weight: "" }];
+        setLocalSets(newSets);
+        if (currentExercise) {
+          perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+          updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+        }
+      } else {
+        const last = localSets[localSets.length - 1] || { reps: "", weight: "" };
+        const newSets = [...localSets, { reps: last.reps, weight: last.weight }];
+        setLocalSets(newSets);
+        if (currentExercise) {
+          perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+          updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+        }
+      }
+    };
+  });
+
+  // ---------------------------------------------------------------------------
   // Set rest timer (between individual sets)
   // ---------------------------------------------------------------------------
 
@@ -622,6 +764,9 @@ export function CircuitTimer({
     dispatch({ type: "DONE_SET" });
   }, [currentExerciseIndex, exercises.length, currentRound, totalRounds, timerSoundEnabled, timerSoundType,
     currentExercise, existingLogs, localSets, onCompleteSet, workout.id, isTimeBased, workTimer, timeSetIndex, clearSetRest]);
+
+  // Keep handleNextRef current for voice commands
+  handleNextRef.current = handleNext;
 
   // Start countdown for time-based exercise
   const handleStartTimeCountdown = useCallback((durationSec) => {
@@ -963,6 +1108,9 @@ export function CircuitTimer({
             >
               {paused ? "Resume" : "Pause"}
             </button>
+            {voiceInputEnabled && hasSpeechRecognition && (
+              <MicButton active={voiceActive} onToggle={() => setVoiceActive(v => !v)} colors={colors} feedback={voiceFeedback} />
+            )}
             <span>Round {currentRound}/{totalRounds}</span>
           </div>
           <div style={center}>
@@ -1230,6 +1378,9 @@ export function CircuitTimer({
           >
             {paused ? "Resume" : "Pause"}
           </button>
+          {voiceInputEnabled && hasSpeechRecognition && (
+            <MicButton active={voiceActive} onToggle={() => setVoiceActive(v => !v)} colors={colors} feedback={voiceFeedback} />
+          )}
           <span>Round {currentRound}/{totalRounds}</span>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "0 16px 16px" }}>
@@ -1608,6 +1759,60 @@ export function CircuitTimer({
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+function MicButton({ active, onToggle, colors, feedback }) {
+  return (
+    <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+      <button
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 999,
+          border: "none",
+          background: active ? (colors?.accent || "#4fc3f7") + "33" : "transparent",
+          color: active ? (colors?.accent || "#4fc3f7") : (colors?.text || "#fff"),
+          opacity: active ? 1 : 0.4,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 0,
+          WebkitTapHighlightColor: "transparent",
+          animation: active ? "micPulse 1.5s ease-in-out infinite" : "none",
+        }}
+        onClick={onToggle}
+        aria-label={active ? "Stop voice commands" : "Start voice commands"}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="9" y="1" width="6" height="11" rx="3" />
+          <path d="M19 10v2a7 7 0 01-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="23" />
+          <line x1="8" y1="23" x2="16" y2="23" />
+        </svg>
+      </button>
+      {feedback && (
+        <div style={{
+          position: "absolute",
+          top: "100%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          marginTop: 4,
+          whiteSpace: "nowrap",
+          fontSize: 11,
+          fontWeight: 700,
+          color: colors?.accent || "#4fc3f7",
+          background: (colors?.cardBg || "rgba(0,0,0,0.8)"),
+          padding: "3px 8px",
+          borderRadius: 6,
+          zIndex: 10,
+          animation: "chipPop 0.3s ease-out",
+        }}>
+          {feedback}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function PauseOverlay({ onResume }) {
   return (

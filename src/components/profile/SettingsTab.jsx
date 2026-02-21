@@ -451,7 +451,7 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
 
           <div>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Voice Input</span>
-            <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>Enable microphone for voice-to-text on training fields</span>
+            <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>Enable microphone for voice-to-text and voice commands in circuit timer</span>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               {[
                 { key: false, label: "Off" },
