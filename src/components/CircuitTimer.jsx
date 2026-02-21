@@ -1086,16 +1086,10 @@ export function CircuitTimer({
                               setVoiceError("Mic not available on this browser");
                               return;
                             }
-                            // Check if mic permission is permanently blocked
-                            if (navigator.permissions?.query) {
-                              try {
-                                const perm = await navigator.permissions.query({ name: "microphone" });
-                                if (perm.state === "denied") {
-                                  setVoiceError("Mic blocked \u2014 tap the lock icon in Chrome \u2192 Site settings \u2192 Microphone \u2192 Allow");
-                                  return;
-                                }
-                              } catch (_) {}
-                            }
+                            // Call getUserMedia directly — this triggers the browser
+                            // permission prompt if needed. Don't pre-check with
+                            // Permissions API as it returns stale "denied" on some
+                            // Android Chrome versions without giving the user a prompt.
                             micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
                           } catch (e) {
                             if (e.name === "NotAllowedError") {
