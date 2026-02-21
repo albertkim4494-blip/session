@@ -695,10 +695,12 @@ export function CircuitTimer({
                   ))}
                 </div>
                 <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <span style={{ fontSize: 13, opacity: 0.5 }}>Custom:</span>
                   <input
+                    id="circuit-custom-sec"
                     type="number"
                     inputMode="numeric"
-                    style={{ ...inputStyle, width: 80, fontSize: 16 }}
+                    style={{ ...inputStyle, width: 72, fontSize: 16 }}
                     placeholder="sec"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && Number(e.target.value) > 0) {
@@ -706,7 +708,17 @@ export function CircuitTimer({
                       }
                     }}
                   />
-                  <span style={{ fontSize: 13, opacity: 0.5 }}>sec</span>
+                  <button
+                    className="btn-press"
+                    style={{ ...primaryBtn, padding: "8px 16px", fontSize: 14, minWidth: 0 }}
+                    onClick={() => {
+                      const el = document.getElementById("circuit-custom-sec");
+                      const v = Number(el?.value);
+                      if (v > 0) handleStartTimeCountdown(v);
+                    }}
+                  >
+                    Go
+                  </button>
                 </div>
               </div>
             )}
