@@ -35,7 +35,8 @@ function saveConfig(cfg) {
 // ---------------------------------------------------------------------------
 // State machine reducer
 // ---------------------------------------------------------------------------
-const GET_READY_SEC = 5;
+const INITIAL_GET_READY_SEC = 5;
+const MIN_TRANSITION_SEC = 3;
 
 function circuitReducer(state, action) {
   switch (action.type) {
@@ -54,36 +55,29 @@ function circuitReducer(state, action) {
     case "BEGIN_WORK":
       return { ...state, phase: "work", workElapsed: 0 };
     case "DONE_SET": {
-      const { exerciseCount, totalRounds, restBetweenExercises, restBetweenRounds } = state;
+      const { exerciseCount, totalRounds } = state;
       const isLastExercise = state.currentExerciseIndex >= exerciseCount - 1;
       const isLastRound = state.currentRound >= totalRounds;
       if (isLastExercise && isLastRound) {
         return { ...state, phase: "complete", totalEndTime: Date.now() };
       }
       if (isLastExercise) {
-        // Skip round rest if 0
-        if (restBetweenRounds <= 0) {
-          return { ...state, phase: "get-ready", currentExerciseIndex: 0, currentRound: state.currentRound + 1, workElapsed: 0 };
-        }
         return { ...state, phase: "round-rest" };
-      }
-      // Skip exercise rest if 0
-      if (restBetweenExercises <= 0) {
-        return { ...state, phase: "get-ready", currentExerciseIndex: state.currentExerciseIndex + 1, workElapsed: 0 };
       }
       return { ...state, phase: "rest" };
     }
+    // Rest phases go directly to work — no separate get-ready
     case "REST_DONE":
       return {
         ...state,
-        phase: "get-ready",
+        phase: "work",
         currentExerciseIndex: state.currentExerciseIndex + 1,
         workElapsed: 0,
       };
     case "ROUND_REST_DONE":
       return {
         ...state,
-        phase: "get-ready",
+        phase: "work",
         currentExerciseIndex: 0,
         currentRound: state.currentRound + 1,
         workElapsed: 0,
@@ -184,7 +178,7 @@ export function CircuitTimer({
 
   // Build set template when exercise changes
   useEffect(() => {
-    if (phase !== "get-ready" && phase !== "work") return;
+    if (phase !== "get-ready" && phase !== "work" && phase !== "rest" && phase !== "round-rest") return;
     if (!currentExercise) return;
 
     const exId = currentExercise.id;
@@ -260,16 +254,24 @@ export function CircuitTimer({
   const restTimer = useTimer(onRestComplete);
   const roundRestTimer = useTimer(onRoundRestComplete);
 
-  // Countdown beeps during last 3 seconds of get-ready
+  // Countdown beeps during last 3 seconds of get-ready, rest, and round-rest
   const lastBeepRef = useRef(0);
   useEffect(() => {
-    if (phase !== "get-ready" || !getReadyTimer.isRunning) return;
-    if (getReadyTimer.seconds <= 3 && getReadyTimer.seconds > 0 && getReadyTimer.seconds !== lastBeepRef.current) {
-      lastBeepRef.current = getReadyTimer.seconds;
+    let sec = 0;
+    let running = false;
+    if (phase === "get-ready") { sec = getReadyTimer.seconds; running = getReadyTimer.isRunning; }
+    else if (phase === "rest") { sec = restTimer.seconds; running = restTimer.isRunning; }
+    else if (phase === "round-rest") { sec = roundRestTimer.seconds; running = roundRestTimer.isRunning; }
+    else return;
+    if (!running) return;
+    if (sec <= 3 && sec > 0 && sec !== lastBeepRef.current) {
+      lastBeepRef.current = sec;
       if (timerSoundEnabled) playTimerSound("beep");
       navigator.vibrate?.(10);
     }
-  }, [phase, getReadyTimer.seconds, getReadyTimer.isRunning, timerSoundEnabled]);
+  }, [phase, getReadyTimer.seconds, getReadyTimer.isRunning,
+    restTimer.seconds, restTimer.isRunning,
+    roundRestTimer.seconds, roundRestTimer.isRunning, timerSoundEnabled]);
 
   // Phase-driven timer starts
   useEffect(() => {
@@ -277,16 +279,18 @@ export function CircuitTimer({
     if (phase === "get-ready") {
       lastBeepRef.current = 0;
       navigator.vibrate?.(10);
-      getReadyTimer.start(GET_READY_SEC, "countdown");
+      getReadyTimer.start(INITIAL_GET_READY_SEC, "countdown");
     } else if (phase === "work") {
       if (!isTimeBased) {
         workTimer.start(0, "stopwatch");
       }
       // Time-based auto-start is handled by a separate effect below
     } else if (phase === "rest") {
-      restTimer.start(restBetweenExercises, "countdown");
+      lastBeepRef.current = 0;
+      restTimer.start(Math.max(MIN_TRANSITION_SEC, restBetweenExercises), "countdown");
     } else if (phase === "round-rest") {
-      roundRestTimer.start(restBetweenRounds, "countdown");
+      lastBeepRef.current = 0;
+      roundRestTimer.start(Math.max(MIN_TRANSITION_SEC, restBetweenRounds), "countdown");
     }
   }, [phase, currentExerciseIndex, currentRound]);
 
@@ -978,8 +982,10 @@ export function CircuitTimer({
   if (phase === "rest" || phase === "round-rest") {
     const isRoundRest = phase === "round-rest";
     const timer = isRoundRest ? roundRestTimer : restTimer;
-    const totalSec = isRoundRest ? restBetweenRounds : restBetweenExercises;
-    const progress = totalSec > 0 ? Math.max(0, Math.min(1, 1 - timer.seconds / totalSec)) : 0;
+    const configuredSec = isRoundRest ? restBetweenRounds : restBetweenExercises;
+    const actualTotalSec = Math.max(MIN_TRANSITION_SEC, configuredSec);
+    const progress = actualTotalSec > 0 ? Math.max(0, Math.min(1, 1 - timer.seconds / actualTotalSec)) : 0;
+    const isGetReadyZone = timer.seconds <= 3 && timer.seconds > 0;
 
     const upNextEx = isRoundRest ? exercises[0] : exercises[currentExerciseIndex + 1];
     const upNextText = getLastSetsText(upNextEx?.id, existingLogs, findPrior);
@@ -987,45 +993,74 @@ export function CircuitTimer({
     return (
       <div style={overlay}>
         <div style={headerBar}>
-          <span>Round {currentRound}/{totalRounds}</span>
-          <span>{isRoundRest ? "Round Rest" : "Rest"}</span>
+          <span>Round {isRoundRest ? currentRound + 1 : currentRound}/{totalRounds}</span>
+          <span>
+            {isRoundRest
+              ? "Round Rest"
+              : isGetReadyZone ? "Get Ready" : "Rest"}
+          </span>
         </div>
         <div style={center}>
-          <div style={medNumber}>{formatTime(timer.seconds)}</div>
+          {/* Show "GET READY" prominently when entering final 3s */}
+          {isGetReadyZone && (
+            <div style={{
+              ...phaseLabel,
+              color: colors?.accent || "#4fc3f7",
+              opacity: 1,
+              fontSize: 16,
+              letterSpacing: 3,
+              marginBottom: -4,
+            }}>
+              GET READY
+            </div>
+          )}
+
+          <div style={isGetReadyZone ? bigNumber : medNumber}>
+            {isGetReadyZone ? timer.seconds : formatTime(timer.seconds)}
+          </div>
+
           <div style={progressBarBg}>
             <div style={{
               width: `${progress * 100}%`,
               height: "100%",
               borderRadius: 3,
-              background: colors?.accent || "#4fc3f7",
+              background: isGetReadyZone ? "#2ecc71" : (colors?.accent || "#4fc3f7"),
               transition: "width 0.3s linear",
             }} />
           </div>
 
+          {/* Next exercise info — always prominent */}
           {upNextEx && (
             <div style={{ marginTop: 16 }}>
-              <div style={{ ...subText, marginBottom: 4 }}>Up next:</div>
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{upNextEx.name}</div>
+              <div style={{ ...subText, marginBottom: 4 }}>
+                {isGetReadyZone ? "Next up:" : "Up next:"}
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{upNextEx.name}</div>
               {upNextText && <div style={subText}>Last: {upNextText}</div>}
             </div>
           )}
 
-          <button
-            className="btn-press"
-            style={{ ...secondaryBtn, marginTop: 16 }}
-            onClick={handleSkipRest}
-          >
-            Skip Rest
-          </button>
+          {/* Only show skip for longer rests (>MIN_TRANSITION_SEC means user configured actual rest) */}
+          {configuredSec > MIN_TRANSITION_SEC && (
+            <button
+              className="btn-press"
+              style={{ ...secondaryBtn, marginTop: 16 }}
+              onClick={handleSkipRest}
+            >
+              Skip Rest
+            </button>
+          )}
         </div>
 
         <div style={{ padding: "12px 16px", textAlign: "center", flexShrink: 0 }}>
-          <button
-            style={{ ...secondaryBtn, fontSize: 12, opacity: 0.6, marginRight: 12 }}
-            onClick={() => dispatch({ type: "TOGGLE_PAUSE" })}
-          >
-            {paused ? "Resume" : "Pause"}
-          </button>
+          {configuredSec > MIN_TRANSITION_SEC && (
+            <button
+              style={{ ...secondaryBtn, fontSize: 12, opacity: 0.6, marginRight: 12 }}
+              onClick={() => dispatch({ type: "TOGGLE_PAUSE" })}
+            >
+              {paused ? "Resume" : "Pause"}
+            </button>
+          )}
           <button style={{ ...secondaryBtn, fontSize: 12, opacity: 0.6 }} onClick={handleStop}>
             Stop
           </button>
