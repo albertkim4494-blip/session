@@ -68,7 +68,6 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
   const [micError, setMicError] = useState("");
   const statsConfigRef = useRef(null);
   const recognitionRef = useRef(null);
-  const micStreamRef = useRef(null);
 
   useEffect(() => {
     if (!showStatsConfig) return;
@@ -81,15 +80,11 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     return () => document.removeEventListener("mousedown", handler);
   }, [showStatsConfig]);
 
-  // Cleanup speech recognition + mic stream on unmount
+  // Cleanup speech recognition on unmount
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch (_) {}
-      }
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
       }
     };
   }, []);
@@ -117,10 +112,6 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
         try { recognitionRef.current.stop(); } catch (_) {}
       }
       setListeningField(null);
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
-      }
       return;
     }
 
@@ -129,15 +120,12 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
       try { recognitionRef.current.abort(); } catch (_) {}
     }
 
-    // Pre-grant mic permission via getUserMedia — Android PWAs may not
-    // trigger the SpeechRecognition permission prompt on their own.
-    // Keep the stream open while recognition runs (some Android devices
-    // need an active stream for SpeechRecognition to receive audio).
+    // Request mic permission via getUserMedia, then release immediately.
+    // SpeechRecognition manages its own audio capture — on Android only
+    // one consumer can use the mic at a time.
     try {
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-      }
-      micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
     } catch (_) {
       setMicError("Mic access denied");
       return;
@@ -164,10 +152,6 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     recognition.onerror = (event) => {
       setListeningField(null);
       recognitionRef.current = null;
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
-      }
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         setMicError("Mic access denied");
       } else if (event.error === "network") {
@@ -180,10 +164,6 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     recognition.onend = () => {
       setListeningField(null);
       recognitionRef.current = null;
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
-      }
     };
 
     recognitionRef.current = recognition;
@@ -193,10 +173,6 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     } catch (_) {
       setListeningField(null);
       setMicError("Voice not available");
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
-      }
     }
   }, [listeningField, modalState, update]);
 

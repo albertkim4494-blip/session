@@ -508,9 +508,10 @@ export function CircuitTimer({
   const voiceRestartRef = useRef(null);
 
   // Voice recognition effect
-  // Uses continuous=true so the mic stays open for hands-free commands.
-  // On Android Chrome, continuous mode stops after ~3-7s of silence and
-  // fires onend — we restart with a new instance when that happens.
+  // On Android Chrome, SpeechRecognition uses Google's cloud speech service.
+  // IMPORTANT: Release any getUserMedia stream BEFORE starting recognition —
+  // Android only allows one mic consumer at a time. SpeechRecognition manages
+  // its own audio capture internally.
   const consecutiveErrorsRef = useRef(0);
   const commandFiredRef = useRef(false);
 
@@ -523,6 +524,12 @@ export function CircuitTimer({
       }
       clearTimeout(voiceRestartRef.current);
       return;
+    }
+
+    // Release getUserMedia stream — SpeechRecognition needs exclusive mic access on Android
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
     }
 
     let cancelled = false;
@@ -643,24 +650,25 @@ export function CircuitTimer({
         try { recognitionRef.current.abort(); } catch {}
         recognitionRef.current = null;
       }
-      if (phase !== "work" && phase !== "get-ready") {
-        if (micStreamRef.current) {
-          micStreamRef.current.getTracks().forEach((t) => t.stop());
-          micStreamRef.current = null;
-        }
-      }
     };
   }, [voiceActive, phase]);
 
-  // Stop voice + release mic stream on unmount
+  // Auto-off voice when circuit completes — reset for next session
+  const voiceWasUsedRef = useRef(false);
+  if (voiceActive) voiceWasUsedRef.current = true;
+
+  useEffect(() => {
+    if (phase === "complete" && voiceActive) {
+      setVoiceActive(false);
+      setVoiceEnabled(false);
+    }
+  }, [phase, voiceActive]);
+
+  // Stop voice on unmount
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch {}
-      }
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((t) => t.stop());
-        micStreamRef.current = null;
       }
       clearTimeout(voiceFeedbackTimerRef.current);
       clearTimeout(voiceRestartRef.current);
@@ -1073,58 +1081,27 @@ export function CircuitTimer({
                           if (!opt.key) {
                             setVoiceEnabled(false);
                             setVoiceError("");
-                            if (micStreamRef.current) {
-                              micStreamRef.current.getTracks().forEach((t) => t.stop());
-                              micStreamRef.current = null;
-                            }
                             return;
                           }
-                          // Test voice on toggle — get mic permission + verify SpeechRecognition works
+                          // Request mic permission via getUserMedia (triggers browser prompt).
+                          // Release the stream immediately — SpeechRecognition manages its
+                          // own mic access. On Android, only one consumer can use the mic
+                          // at a time, so we must not hold it open.
                           setVoiceError("");
                           try {
                             if (!navigator.mediaDevices?.getUserMedia) {
                               setVoiceError("Mic not available on this browser");
                               return;
                             }
-                            // Call getUserMedia directly — this triggers the browser
-                            // permission prompt if needed. Don't pre-check with
-                            // Permissions API as it returns stale "denied" on some
-                            // Android Chrome versions without giving the user a prompt.
-                            micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+                            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                            // Permission granted — release immediately
+                            stream.getTracks().forEach((t) => t.stop());
+                            setVoiceEnabled(true);
                           } catch (e) {
                             if (e.name === "NotAllowedError") {
                               setVoiceError("Mic blocked \u2014 open Chrome \u2192 Site settings \u2192 Microphone \u2192 Allow");
                             } else {
                               setVoiceError("Mic not available");
-                            }
-                            return;
-                          }
-                          // Quick SpeechRecognition smoke test
-                          try {
-                            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                            const test = new SR();
-                            test.continuous = false;
-                            test.interimResults = false;
-                            await new Promise((resolve, reject) => {
-                              const t = setTimeout(() => { test.abort(); resolve(); }, 2000);
-                              test.onstart = () => { clearTimeout(t); test.abort(); resolve(); };
-                              test.onerror = (ev) => {
-                                clearTimeout(t);
-                                if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
-                                  reject(new Error(ev.error));
-                                } else {
-                                  resolve(); // no-speech, network etc are OK — API works
-                                }
-                              };
-                              test.onend = () => { clearTimeout(t); resolve(); };
-                              test.start();
-                            });
-                            setVoiceEnabled(true);
-                          } catch {
-                            setVoiceError("Speech service denied");
-                            if (micStreamRef.current) {
-                              micStreamRef.current.getTracks().forEach((t) => t.stop());
-                              micStreamRef.current = null;
                             }
                           }
                         }}
@@ -1203,11 +1180,7 @@ export function CircuitTimer({
             style={{ ...primaryBtn, marginTop: 16 }}
             onClick={() => {
               saveConfig({ rounds: totalRounds, restBetweenExercises, restBetweenRounds });
-              // Mic stream was already acquired when toggling voice On.
-              // If it's still active, enable voice for the circuit.
-              if (voiceEnabled && micStreamRef.current) {
-                setVoiceActive(true);
-              }
+              if (voiceEnabled) setVoiceActive(true);
               dispatch({ type: "START" });
             }}
           >
@@ -1917,6 +1890,16 @@ export function CircuitTimer({
             <br />
             Total time: {formatTime(totalElapsed)}
           </div>
+          {voiceWasUsedRef.current && (
+            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="1" width="6" height="11" rx="3" />
+                <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                <line x1="4" y1="4" x2="20" y2="20" />
+              </svg>
+              Microphone off
+            </div>
+          )}
           <button
             className="btn-press"
             style={{ ...primaryBtn, marginTop: 16 }}
