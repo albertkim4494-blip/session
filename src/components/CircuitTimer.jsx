@@ -5,6 +5,9 @@ import { parseScheme } from "../lib/workoutGenerator";
 import { isSetCompleted } from "../lib/setHelpers";
 import { getUnit, getWeightLabel } from "../lib/constants";
 import { formatTimerDisplay } from "../lib/timerUtils";
+import { EXERCISE_CATALOG } from "../lib/exerciseCatalog";
+import { ExerciseGif } from "./ExerciseGif";
+import { BodyDiagram } from "./BodyDiagram";
 
 // ---------------------------------------------------------------------------
 // localStorage config persistence
@@ -29,6 +32,46 @@ function loadConfig() {
 function saveConfig(cfg) {
   try {
     localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+  } catch {}
+}
+
+// ---------------------------------------------------------------------------
+// Per-exercise circuit run cache (survives remounts within same day/workout)
+// ---------------------------------------------------------------------------
+const CIRCUIT_RUN_CACHE_KEY = "wt_circuit_run_cache";
+
+function loadCircuitRunCache(dateKey, workoutId) {
+  try {
+    const raw = localStorage.getItem(CIRCUIT_RUN_CACHE_KEY);
+    if (!raw) return null;
+    const cache = JSON.parse(raw);
+    if (cache.date !== dateKey || cache.workoutId !== workoutId) {
+      localStorage.removeItem(CIRCUIT_RUN_CACHE_KEY);
+      return null;
+    }
+    return cache;
+  } catch { return null; }
+}
+
+function updateCircuitRunCache(dateKey, workoutId, exerciseId, data) {
+  try {
+    const raw = localStorage.getItem(CIRCUIT_RUN_CACHE_KEY);
+    const cache = raw ? JSON.parse(raw) : {};
+    if (cache.date !== dateKey || cache.workoutId !== workoutId) {
+      cache.date = dateKey;
+      cache.workoutId = workoutId;
+      cache.sets = {};
+      cache.durations = {};
+    }
+    if (data.sets != null) {
+      if (!cache.sets) cache.sets = {};
+      cache.sets[exerciseId] = data.sets;
+    }
+    if (data.duration != null) {
+      if (!cache.durations) cache.durations = {};
+      cache.durations[exerciseId] = data.duration;
+    }
+    localStorage.setItem(CIRCUIT_RUN_CACHE_KEY, JSON.stringify(cache));
   } catch {}
 }
 
@@ -173,8 +216,43 @@ export function CircuitTimer({
   const [timeSetIndex, setTimeSetIndex] = useState(0);
   const [timeCountdownStarted, setTimeCountdownStarted] = useState(false);
 
+  // Set rest timer (between individual sets for regular exercises)
+  const [setRestActive, setSetRestActive] = useState(false);
+  const [setRestSecondsLeft, setSetRestSecondsLeft] = useState(0);
+  const setRestIntervalRef = useRef(null);
+  const setRestStartRef = useRef(0);
+  const setRestTotalRef = useRef(0);
+
+  // Set index offset — when re-running a circuit, offset new sets so they don't overwrite prior logs
+  const setIndexOffsetRef = useRef(0);
+
+  // Ref tracking the total duration for the current timed set (immune to closure staleness)
+  const timeTargetRef = useRef(0);
+
+  // Per-exercise chosen durations for time-based exercises (persists across rounds within one circuit session)
+  const chosenTimeDurationsRef = useRef(new Map());
+
+  // Per-exercise set count from first encounter (prevents accumulation on re-runs)
+  const perRunSetCountRef = useRef(new Map());
+
+  // Collapsible exercise detail (GIF + body diagram)
+  const [showExerciseDetail, setShowExerciseDetail] = useState(false);
+  const catalogMap = useMemo(() => {
+    const m = new Map();
+    for (const entry of EXERCISE_CATALOG) m.set(entry.id, entry);
+    return m;
+  }, []);
+  const catalogEntry = currentExercise?.catalogId ? catalogMap.get(currentExercise.catalogId) : null;
+
   // Is current exercise time-based?
   const isTimeBased = currentExercise?.unit === "sec";
+
+  // Refs so the localSets effect always reads fresh values without
+  // re-running every time existingLogs/findPrior references change
+  const existingLogsRef = useRef(existingLogs);
+  existingLogsRef.current = existingLogs;
+  const findPriorRef = useRef(findPrior);
+  findPriorRef.current = findPrior;
 
   // Build set template when exercise changes
   useEffect(() => {
@@ -182,24 +260,107 @@ export function CircuitTimer({
     if (!currentExercise) return;
 
     const exId = currentExercise.id;
-    const dayLog = existingLogs?.[exId];
-    const priorLog = findPrior?.(exId);
+    const dayLog = existingLogsRef.current?.[exId];
+    const priorLog = findPriorRef.current?.(exId);
     const template = dayLog || priorLog;
     const scheme = parseScheme(currentExercise.scheme || workout.scheme);
-    // Default to 1 set when no prior data (not 3)
-    const numSets = template?.sets?.length || scheme?.sets || 1;
 
+    // Calculate offset: count already-completed sets so new circuit run appends instead of overwrites
+    const completedCount = dayLog?.sets?.filter(s => isSetCompleted(s)).length || 0;
+    setIndexOffsetRef.current = completedCount;
+
+    // --- Load persistent cache (survives component remounts within same day/workout) ---
+    const cache = loadCircuitRunCache(dateKey, workout.id);
+    const cachedSetCount = cache?.sets?.[exId];
+    const cachedDuration = cache?.durations?.[exId] || 0;
+
+    // --- Determine numSets (stable across re-runs) ---
+    // Priority: in-memory ref → localStorage cache → scheme → priorLog → template → 1
+    // The cache prevents dayLog.sets.length from growing (3→6→9) across remounts.
+    const isTimeEx = currentExercise.unit === "sec";
+    const inMemCount = perRunSetCountRef.current.get(exId);
+    let numSets;
+    if (inMemCount != null) {
+      numSets = inMemCount;
+    } else if (cachedSetCount != null) {
+      numSets = cachedSetCount;
+    } else if (scheme?.sets) {
+      numSets = scheme.sets;
+    } else if (priorLog?.sets?.length) {
+      numSets = priorLog.sets.length;
+    } else {
+      numSets = template?.sets?.length || 1;
+    }
+    perRunSetCountRef.current.set(exId, numSets);
+    updateCircuitRunCache(dateKey, workout.id, exId, { sets: numSets });
+
+    // --- Build localSets ---
     const sets = [];
-    for (let i = 0; i < numSets; i++) {
-      const src = template?.sets?.[i] || template?.sets?.[template.sets.length - 1];
-      sets.push({
-        reps: src ? String(src.reps || "") : (scheme ? String(scheme.reps) : ""),
-        weight: src ? String(src.weight || "") : "",
+    let autoStartDur = 0;
+
+    if (isTimeEx) {
+      // Merge in-memory + cached chosen duration
+      const chosenDur = chosenTimeDurationsRef.current.get(exId) || cachedDuration;
+
+      // Find user-preferred duration from logs (skip scheme-default values)
+      const schemeReps = scheme?.reps || 0;
+      const allTemplateSets = template?.sets || [];
+      const userChosenSet = [...allTemplateSets].reverse().find(s => {
+        const r = Number(s.reps);
+        return r > 0 && (schemeReps === 0 || r !== schemeReps);
       });
+      const userPreferredDur = Number(userChosenSet?.reps) || 0;
+
+      // Display value: chosen > user-preferred > any logged > empty
+      let timeReps = "";
+      if (chosenDur > 0) {
+        timeReps = String(chosenDur);
+      } else if (userPreferredDur > 0) {
+        timeReps = String(userPreferredDur);
+      } else {
+        const lastAny = [...allTemplateSets].reverse().find(s => Number(s.reps) > 0);
+        timeReps = lastAny ? String(lastAny.reps) : "";
+      }
+
+      for (let i = 0; i < numSets; i++) {
+        sets.push({ reps: timeReps, weight: "" });
+      }
+
+      // Auto-start: chosen > user-preferred
+      autoStartDur = chosenDur > 0 ? chosenDur : userPreferredDur;
+    } else {
+      // Regular exercises: pre-fill per-set from most recent logged values
+      const repsSource = template;
+      const srcLen = repsSource?.sets?.length || 0;
+      const srcStart = srcLen > numSets ? srcLen - numSets : 0;
+      for (let i = 0; i < numSets; i++) {
+        const src = repsSource?.sets?.[srcStart + i] || repsSource?.sets?.[srcLen - 1];
+        let reps;
+        if (src) {
+          reps = String(src.reps || "");
+        } else {
+          reps = scheme ? String(scheme.reps) : "";
+        }
+        sets.push({ reps, weight: src ? String(src.weight || "") : "" });
+      }
     }
     setLocalSets(sets);
     setTimeSetIndex(0);
-    setTimeCountdownStarted(false);
+    setShowExerciseDetail(false);
+    timeTargetRef.current = Number(sets[0]?.reps) || 0;
+
+    // --- Auto-start time-based (inline to avoid race conditions) ---
+    if (isTimeEx && autoStartDur > 0 && phase === "work") {
+      if (!chosenTimeDurationsRef.current.has(exId)) {
+        chosenTimeDurationsRef.current.set(exId, autoStartDur);
+        updateCircuitRunCache(dateKey, workout.id, exId, { duration: autoStartDur });
+      }
+      timeTargetRef.current = autoStartDur;
+      setTimeCountdownStarted(true);
+      workTimer.start(autoStartDur, "countdown");
+    } else {
+      setTimeCountdownStarted(false);
+    }
   }, [currentExerciseIndex, currentRound, phase]);
 
   // ---------------------------------------------------------------------------
@@ -227,27 +388,20 @@ export function CircuitTimer({
   // Work timer completion — for time-based exercises, auto-complete the set
   const onWorkTimerComplete = useCallback(() => {
     if (!currentExercise || !isTimeBased) return;
-    const s = localSets[timeSetIndex];
-    if (!s) return;
-    const reps = Number(s.reps) || 0;
+    // Read total from ref — always current even after +/- 30s adjustments
+    const reps = timeTargetRef.current || 0;
     if (reps > 0) {
-      onCompleteSet(currentExercise.id, timeSetIndex, { reps, weight: "" }, workout.id);
+      onCompleteSet(currentExercise.id, timeSetIndex + setIndexOffsetRef.current, { reps, weight: "" }, workout.id);
       setsLoggedRef.current += 1;
     }
     if (timerSoundEnabled) playTimerSound(timerSoundType || "chime");
     navigator.vibrate?.([100, 50, 100]);
-    // Advance to next time set, or auto-advance to next exercise
+    // Advance to next time set, or wait for user to choose
     if (timeSetIndex < localSets.length - 1) {
       setTimeCountdownStarted(false);
       setTimeSetIndex((prev) => prev + 1);
-    } else {
-      // Last time set done — keep timeCountdownStarted true so UI shows
-      // "Done — advancing..." instead of flashing the preset screen
-      clearTimeout(autoAdvanceRef.current);
-      autoAdvanceRef.current = setTimeout(() => {
-        dispatch({ type: "DONE_SET" });
-      }, 1200);
     }
+    // Last set: don't auto-advance — let user choose "Another Set" or "Next"
   }, [currentExercise, isTimeBased, localSets, timeSetIndex, onCompleteSet, workout.id, timerSoundEnabled, timerSoundType]);
 
   const getReadyTimer = useTimer(onGetReadyComplete);
@@ -295,16 +449,17 @@ export function CircuitTimer({
     }
   }, [phase, currentExerciseIndex, currentRound]);
 
-  // Auto-start countdown for time-based exercises when localSets are ready
+  // Auto-start subsequent time sets (set 1+) after advancing from a completed set.
+  // Set 0 is handled inline by the localSets build effect above.
   useEffect(() => {
-    if (phase !== "work" || !isTimeBased) return;
-    if (localSets.length === 0 || timeCountdownStarted) return;
-    const targetSec = Number(localSets[timeSetIndex]?.reps) || 0;
-    if (targetSec > 0) {
-      setTimeCountdownStarted(true);
-      workTimer.start(targetSec, "countdown");
-    }
-  }, [phase, isTimeBased, localSets, timeSetIndex, timeCountdownStarted]);
+    if (phase !== "work" || !isTimeBased || timeSetIndex === 0) return;
+    if (timeCountdownStarted) return;
+    const chosenDur = chosenTimeDurationsRef.current.get(currentExercise?.id) || 0;
+    if (chosenDur <= 0) return;
+    timeTargetRef.current = chosenDur;
+    setTimeCountdownStarted(true);
+    workTimer.start(chosenDur, "countdown");
+  }, [phase, isTimeBased, timeSetIndex, timeCountdownStarted]);
 
   // Pause/resume
   useEffect(() => {
@@ -327,6 +482,63 @@ export function CircuitTimer({
   }, [paused]);
 
   // ---------------------------------------------------------------------------
+  // Set rest timer (between individual sets)
+  // ---------------------------------------------------------------------------
+
+  const clearSetRest = useCallback(() => {
+    clearInterval(setRestIntervalRef.current);
+    setSetRestActive(false);
+    setSetRestSecondsLeft(0);
+  }, []);
+
+  const startSetRest = useCallback((totalSec) => {
+    clearInterval(setRestIntervalRef.current);
+    setRestTotalRef.current = totalSec;
+    setRestStartRef.current = Date.now();
+    setSetRestSecondsLeft(totalSec);
+    setSetRestActive(true);
+    let lastBeep = 0;
+    setRestIntervalRef.current = setInterval(() => {
+      const elapsed = (Date.now() - setRestStartRef.current) / 1000;
+      const remaining = Math.max(0, Math.ceil(setRestTotalRef.current - elapsed));
+      setSetRestSecondsLeft(remaining);
+      if (remaining <= 3 && remaining > 0 && remaining !== lastBeep) {
+        lastBeep = remaining;
+        if (timerSoundEnabled) playTimerSound("beep");
+        navigator.vibrate?.(10);
+      }
+      if (remaining <= 0) {
+        clearInterval(setRestIntervalRef.current);
+        setSetRestActive(false);
+        if (timerSoundEnabled) playTimerSound(timerSoundType || "chime");
+        navigator.vibrate?.([100, 50, 100]);
+      }
+    }, 250);
+  }, [timerSoundEnabled, timerSoundType]);
+
+  const adjustSetRest = useCallback((delta) => {
+    const newTotal = setRestTotalRef.current + delta;
+    if (newTotal <= 0) {
+      clearSetRest();
+      return;
+    }
+    setRestTotalRef.current = newTotal;
+    const elapsed = (Date.now() - setRestStartRef.current) / 1000;
+    const remaining = Math.max(0, Math.ceil(newTotal - elapsed));
+    if (remaining <= 0) {
+      clearSetRest();
+    } else {
+      setSetRestSecondsLeft(remaining);
+    }
+  }, [clearSetRest]);
+
+  // Clear set rest on phase/exercise/round change or unmount
+  useEffect(() => {
+    clearSetRest();
+    return () => clearInterval(setRestIntervalRef.current);
+  }, [phase, currentExerciseIndex, currentRound]);
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
@@ -336,32 +548,69 @@ export function CircuitTimer({
     const reps = Number(s.reps) || 0;
     if (reps <= 0) return;
     const weight = s.weight.trim();
-    onCompleteSet(currentExercise.id, setIdx, { reps, weight }, workout.id);
+    const offset = setIndexOffsetRef.current;
+    onCompleteSet(currentExercise.id, setIdx + offset, { reps, weight }, workout.id);
     setsLoggedRef.current += 1;
 
     // Auto-advance if all sets are now completed
     const savedSets = existingLogs?.[currentExercise?.id]?.sets;
     const allDone = localSets.every((_, idx) => {
       if (idx === setIdx) return true; // just completed this one
-      return savedSets && idx < savedSets.length && isSetCompleted(savedSets[idx]);
+      return savedSets && (idx + offset) < savedSets.length && isSetCompleted(savedSets[idx + offset]);
     });
     if (allDone) {
+      clearSetRest();
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = setTimeout(() => {
         dispatch({ type: "DONE_SET" });
       }, 1500);
+    } else if (restBetweenExercises > 0) {
+      startSetRest(restBetweenExercises);
     }
-  }, [localSets, currentExercise, workout.id, onCompleteSet, existingLogs]);
+  }, [localSets, currentExercise, workout.id, onCompleteSet, existingLogs, restBetweenExercises, clearSetRest, startSetRest]);
 
   const handleUncompleteSet = useCallback((setIdx) => {
     if (!currentExercise) return;
     clearTimeout(autoAdvanceRef.current);
-    onUncompleteSet(currentExercise.id, setIdx);
-  }, [currentExercise, onUncompleteSet]);
+    clearSetRest();
+    onUncompleteSet(currentExercise.id, setIdx + setIndexOffsetRef.current);
+  }, [currentExercise, onUncompleteSet, clearSetRest]);
 
   const handleNext = useCallback(() => {
+    if (!currentExercise) return;
     const isLastExercise = currentExerciseIndex >= exercises.length - 1;
     const isLastRound = currentRound >= totalRounds;
+
+    const savedSets = existingLogsRef.current?.[currentExercise.id]?.sets;
+    const offset = setIndexOffsetRef.current;
+
+    if (isTimeBased) {
+      // For time-based exercises: stop the running timer and log elapsed time
+      if (workTimer.isRunning) {
+        const s = localSets[timeSetIndex];
+        const targetSec = Number(s?.reps) || 0;
+        const elapsed = targetSec - workTimer.seconds;
+        workTimer.stop();
+        if (elapsed > 0) {
+          const alreadyDone = savedSets && (timeSetIndex + offset) < savedSets.length && isSetCompleted(savedSets[timeSetIndex + offset]);
+          if (!alreadyDone) {
+            onCompleteSet(currentExercise.id, timeSetIndex + offset, { reps: elapsed, weight: "" }, workout.id);
+            setsLoggedRef.current += 1;
+          }
+        }
+      }
+    } else {
+      // Auto-complete all unchecked sets with valid reps
+      for (let i = 0; i < localSets.length; i++) {
+        const alreadyDone = savedSets && (i + offset) < savedSets.length && isSetCompleted(savedSets[i + offset]);
+        if (alreadyDone) continue;
+        const reps = Number(localSets[i].reps) || 0;
+        if (reps <= 0) continue;
+        const weight = localSets[i].weight?.trim() || "";
+        onCompleteSet(currentExercise.id, i + offset, { reps, weight }, workout.id);
+        setsLoggedRef.current += 1;
+      }
+    }
 
     if (isLastExercise && isLastRound) {
       if (timerSoundEnabled) {
@@ -370,18 +619,27 @@ export function CircuitTimer({
       }
     }
 
+    clearSetRest();
+    clearTimeout(autoAdvanceRef.current);
     dispatch({ type: "DONE_SET" });
-  }, [currentExerciseIndex, exercises.length, currentRound, totalRounds, timerSoundEnabled, timerSoundType]);
+  }, [currentExerciseIndex, exercises.length, currentRound, totalRounds, timerSoundEnabled, timerSoundType,
+    currentExercise, existingLogs, localSets, onCompleteSet, workout.id, isTimeBased, workTimer, timeSetIndex, clearSetRest]);
 
   // Start countdown for time-based exercise
   const handleStartTimeCountdown = useCallback((durationSec) => {
+    // Store chosen duration so subsequent rounds and remounts auto-start with it
+    if (currentExercise) {
+      chosenTimeDurationsRef.current.set(currentExercise.id, durationSec);
+      updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { duration: durationSec });
+    }
     // Update localSets with the chosen duration
     const updated = [...localSets];
     updated[timeSetIndex] = { ...updated[timeSetIndex], reps: String(durationSec) };
     setLocalSets(updated);
+    timeTargetRef.current = durationSec;
     setTimeCountdownStarted(true);
     workTimer.start(durationSec, "countdown");
-  }, [localSets, timeSetIndex, workTimer]);
+  }, [localSets, timeSetIndex, workTimer, dateKey]);
 
   const handleSkipRest = useCallback(() => {
     if (phase === "rest") {
@@ -536,6 +794,15 @@ export function CircuitTimer({
   if (phase === "config") {
     const est = estimateMinutes(exercises.length, totalRounds, restBetweenExercises, restBetweenRounds);
 
+    // Check which exercises have no logged data
+    const exercisesWithoutLogs = exercises.filter((ex) => {
+      const dayLog = existingLogs?.[ex.id];
+      const priorLog = findPrior?.(ex.id);
+      return !dayLog?.sets?.length && !priorLog?.sets?.length;
+    });
+    const noLogsAtAll = exercisesWithoutLogs.length === exercises.length;
+    const someWithoutLogs = exercisesWithoutLogs.length > 0 && !noLogsAtAll;
+
     const stepperRow = (label, value, min, max, step, onChange) => (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: 300, padding: "8px 0" }}>
         <span style={{ fontSize: 15, fontWeight: 600 }}>{label}</span>
@@ -579,6 +846,39 @@ export function CircuitTimer({
             <br />
             Est. ~{est} min
           </div>
+
+          {noLogsAtAll && (
+            <div style={{
+              marginTop: 12,
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "rgba(255,193,7,0.1)",
+              border: "1px solid rgba(255,193,7,0.25)",
+              fontSize: 13,
+              lineHeight: 1.5,
+              maxWidth: 300,
+              textAlign: "center",
+            }}>
+              No sets logged yet. You can fill in reps/weight as you go.
+            </div>
+          )}
+
+          {someWithoutLogs && (
+            <div style={{
+              marginTop: 12,
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "rgba(255,193,7,0.06)",
+              border: "1px solid rgba(255,193,7,0.15)",
+              fontSize: 12,
+              lineHeight: 1.5,
+              maxWidth: 300,
+              textAlign: "center",
+              opacity: 0.8,
+            }}>
+              No prior data for: {exercisesWithoutLogs.map((e) => e.name).join(", ")}
+            </div>
+          )}
 
           <button
             className="btn-press"
@@ -632,10 +932,11 @@ export function CircuitTimer({
       ? exercises[currentExerciseIndex + 1]?.name
       : currentRound < totalRounds ? exercises[0]?.name : null;
 
-    // Read saved sets from existingLogs to show checkmarks
+    // Read saved sets from existingLogs to show checkmarks (offset for re-run circuits)
     const savedSets = existingLogs?.[currentExercise?.id]?.sets;
+    const offset = setIndexOffsetRef.current;
     const firstUncompleted = localSets.findIndex((_, idx) =>
-      !(savedSets && idx < savedSets.length && isSetCompleted(savedSets[idx]))
+      !(savedSets && (idx + offset) < savedSets.length && isSetCompleted(savedSets[idx + offset]))
     );
 
     // --- Time-based exercise UI ---
@@ -643,7 +944,7 @@ export function CircuitTimer({
       const currentTimeSetData = localSets[timeSetIndex];
       const targetSec = Number(currentTimeSetData?.reps) || 0;
       const allTimeSetsCompleted = savedSets
-        ? localSets.every((_, idx) => idx < savedSets.length && isSetCompleted(savedSets[idx]))
+        ? localSets.every((_, idx) => (idx + offset) < savedSets.length && isSetCompleted(savedSets[idx + offset]))
         : false;
 
       // SVG ring for countdown
@@ -672,12 +973,35 @@ export function CircuitTimer({
               <div style={subText}>Set {timeSetIndex + 1} of {localSets.length}</div>
             )}
 
-            {/* No prior duration and countdown not started — show presets */}
-            {!timeCountdownStarted && targetSec <= 0 && (
+            {catalogEntry && (
+              <ExerciseDetailToggle
+                show={showExerciseDetail}
+                onToggle={() => setShowExerciseDetail((v) => !v)}
+                catalogEntry={catalogEntry}
+                colors={colors}
+              />
+            )}
+
+            {/* Duration not started — show presets */}
+            {!timeCountdownStarted && (() => {
+              // Use the most recent logged duration (last set with reps > 0)
+              const sessionLog = existingLogs?.[currentExercise.id];
+              const priorLog = findPrior?.(currentExercise.id);
+              const lastSessionSet = sessionLog?.sets?.filter(s => s.reps > 0).pop();
+              const lastPriorSet = priorLog?.sets?.slice().reverse().find(s => Number(s.reps) > 0);
+              const priorSec = Number(lastSessionSet?.reps) || Number(lastPriorSet?.reps) || 0;
+              return (
               <div style={{ marginTop: 8 }}>
+                {priorSec > 0 && (
+                  <div style={{ fontSize: 13, opacity: 0.5, marginBottom: 8 }}>
+                    Last time: {formatTimerDisplay(priorSec)}
+                  </div>
+                )}
                 <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 10, fontWeight: 600 }}>Select duration:</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
-                  {TIME_PRESETS.map((sec) => (
+                  {TIME_PRESETS.map((sec) => {
+                    const isLastUsed = sec === priorSec;
+                    return (
                     <button
                       key={sec}
                       className="btn-press"
@@ -687,12 +1011,17 @@ export function CircuitTimer({
                         fontSize: 15,
                         fontWeight: 700,
                         minWidth: 64,
+                        ...(isLastUsed ? {
+                          border: `2px solid ${colors?.accent || "#4fc3f7"}`,
+                          background: `${colors?.accent || "#4fc3f7"}22`,
+                        } : {}),
                       }}
                       onClick={() => handleStartTimeCountdown(sec)}
                     >
                       {formatTimerDisplay(sec)}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                   <span style={{ fontSize: 13, opacity: 0.5 }}>Custom:</span>
@@ -721,10 +1050,11 @@ export function CircuitTimer({
                   </button>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
-            {/* Has a target duration — show ring timer (auto-starts) */}
-            {(targetSec > 0 || timeCountdownStarted) && (
+            {/* Timer started — show ring timer */}
+            {timeCountdownStarted && (
               <>
                 <div style={{ position: "relative", width: 160, height: 160, margin: "8px 0" }}>
                   <svg width="160" height="160" style={{ transform: "rotate(-90deg)" }}>
@@ -747,33 +1077,82 @@ export function CircuitTimer({
                   </div>
                 </div>
 
-                {workTimer.isRunning ? null : !timeCountdownStarted ? (
-                  /* Auto-start should handle this, but fallback Go button */
-                  <button
-                    className="btn-press"
-                    style={{ ...primaryBtn, fontSize: 18 }}
-                    onClick={() => handleStartTimeCountdown(targetSec)}
-                  >
-                    Go
-                  </button>
-                ) : (
-                  /* Timer completed — auto-advancing */
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#2ecc71" }}>
-                    {timeSetIndex >= localSets.length - 1 ? "Done — advancing..." : "Set complete!"}
+                {workTimer.isRunning ? (
+                  /* Timer running — +/- 30s and skip */
+                  <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                    <button
+                      className="btn-press"
+                      style={{ ...secondaryBtn, fontSize: 14, padding: "8px 18px", opacity: workTimer.seconds <= 30 ? 0.3 : 1 }}
+                      disabled={workTimer.seconds <= 30}
+                      onClick={() => {
+                        const newRemaining = workTimer.seconds - 30;
+                        if (newRemaining <= 0) { handleNext(); return; }
+                        timeTargetRef.current = Math.max(1, timeTargetRef.current - 30);
+                        workTimer.start(newRemaining, "countdown");
+                      }}
+                    >
+                      &minus;30s
+                    </button>
+                    <button
+                      className="btn-press"
+                      style={{ ...secondaryBtn, fontSize: 14, padding: "8px 18px" }}
+                      onClick={() => {
+                        const newRemaining = workTimer.seconds + 30;
+                        timeTargetRef.current += 30;
+                        workTimer.start(newRemaining, "countdown");
+                      }}
+                    >
+                      +30s
+                    </button>
+                    <button
+                      className="btn-press"
+                      style={{ ...secondaryBtn, fontSize: 14, padding: "8px 18px" }}
+                      onClick={handleNext}
+                    >
+                      Skip
+                    </button>
                   </div>
+                ) : (
+                  /* Timer completed — add set or advance */
+                  <>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#2ecc71", marginBottom: 8 }}>
+                      Set complete!
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button
+                        className="btn-press"
+                        style={{ ...secondaryBtn, fontSize: 14, padding: "10px 20px" }}
+                        onClick={() => {
+                          const priorDur = timeTargetRef.current || 0;
+                          const newSets = [...localSets, { reps: String(priorDur || ""), weight: "" }];
+                          const newIdx = localSets.length;
+                          setLocalSets(newSets);
+                          setTimeSetIndex(newIdx);
+                          if (currentExercise) {
+                            perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+                            updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+                          }
+                          if (priorDur > 0) {
+                            setTimeCountdownStarted(true);
+                            workTimer.start(priorDur, "countdown");
+                          } else {
+                            setTimeCountdownStarted(false);
+                          }
+                        }}
+                      >
+                        + Add Set
+                      </button>
+                      <button
+                        className="btn-press"
+                        style={{ ...primaryBtn, fontSize: 14, padding: "10px 20px", minWidth: 0 }}
+                        onClick={handleNext}
+                      >
+                        {currentExerciseIndex >= exercises.length - 1 && currentRound >= totalRounds ? "Finish \u2713" : "Next \u2192"}
+                      </button>
+                    </div>
+                  </>
                 )}
               </>
-            )}
-
-            {/* Skip ahead button — always available (auto-advance also fires) */}
-            {!workTimer.isRunning && timeCountdownStarted && timeSetIndex >= localSets.length - 1 && (
-              <button
-                className="btn-press"
-                style={{ ...secondaryBtn, fontSize: 13, marginTop: 4 }}
-                onClick={handleNext}
-              >
-                {currentExerciseIndex >= exercises.length - 1 && currentRound >= totalRounds ? "Finish Now" : "Skip Ahead"}
-              </button>
             )}
 
             {nextText && <div style={{ ...subText, marginTop: 8 }}>Next: {nextText}</div>}
@@ -813,6 +1192,15 @@ export function CircuitTimer({
           <div style={{ textAlign: "center", marginBottom: 12, paddingTop: 8 }}>
             <div style={exerciseNameStyle}>{currentExercise?.name}</div>
             <div style={{ ...subText, marginTop: 4 }}>{formatTime(workTimer.seconds)}</div>
+
+            {catalogEntry && (
+              <ExerciseDetailToggle
+                show={showExerciseDetail}
+                onToggle={() => setShowExerciseDetail((v) => !v)}
+                catalogEntry={catalogEntry}
+                colors={colors}
+              />
+            )}
           </div>
 
           {/* Set header row */}
@@ -834,7 +1222,7 @@ export function CircuitTimer({
           {/* Set rows */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {localSets.map((s, i) => {
-              const isSaved = savedSets && i < savedSets.length && isSetCompleted(savedSets[i]);
+              const isSaved = savedSets && (i + offset) < savedSets.length && isSetCompleted(savedSets[i + offset]);
               const isNext = i === firstUncompleted;
               return (
                 <div key={i} style={{
@@ -949,12 +1337,63 @@ export function CircuitTimer({
               }}
               onClick={() => {
                 const last = localSets[localSets.length - 1] || { reps: "", weight: "" };
-                setLocalSets([...localSets, { reps: last.reps, weight: last.weight }]);
+                const newSets = [...localSets, { reps: last.reps, weight: last.weight }];
+                setLocalSets(newSets);
+                if (currentExercise) {
+                  perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+                  updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+                }
               }}
             >
               + Add Set
             </button>
           </div>
+
+          {/* Inline set rest timer */}
+          {setRestActive && (
+            <div style={{
+              margin: "12px 0",
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: `${colors?.accent || "#4fc3f7"}15`,
+              border: `1px solid ${colors?.accent || "#4fc3f7"}40`,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}>
+              <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.7, whiteSpace: "nowrap" }}>Rest</span>
+              <div style={{ flex: 1, height: 4, borderRadius: 2, background: colors?.border || "#333", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  borderRadius: 2,
+                  background: colors?.accent || "#4fc3f7",
+                  width: `${setRestTotalRef.current > 0 ? Math.max(0, Math.min(100, ((setRestTotalRef.current - setRestSecondsLeft) / setRestTotalRef.current) * 100)) : 0}%`,
+                  transition: "width 0.25s linear",
+                }} />
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 36, textAlign: "center" }}>
+                {formatTime(setRestSecondsLeft)}
+              </span>
+              <button
+                style={{ background: "none", border: "none", color: colors?.text || "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "2px 6px", fontFamily: "inherit", opacity: 0.6 }}
+                onClick={() => adjustSetRest(-15)}
+              >
+                &minus;15
+              </button>
+              <button
+                style={{ background: "none", border: "none", color: colors?.text || "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "2px 6px", fontFamily: "inherit", opacity: 0.6 }}
+                onClick={() => adjustSetRest(15)}
+              >
+                +15
+              </button>
+              <button
+                style={{ background: "none", border: "none", color: colors?.text || "#fff", fontSize: 16, cursor: "pointer", padding: "2px 6px", fontFamily: "inherit", opacity: 0.5 }}
+                onClick={clearSetRest}
+              >
+                &times;
+              </button>
+            </div>
+          )}
 
           {/* Next / advance button */}
           <div style={{ textAlign: "center", marginTop: 16 }}>
@@ -964,8 +1403,8 @@ export function CircuitTimer({
               onClick={handleNext}
             >
               {currentExerciseIndex >= exercises.length - 1 && currentRound >= totalRounds
-                ? "Finish"
-                : "Next"}
+                ? "Log All & Finish \u2713"
+                : "Log All & Next \u2192"}
             </button>
             {nextText && <div style={{ ...subText, marginTop: 8 }}>Next: {nextText}</div>}
           </div>
@@ -1146,6 +1585,58 @@ function PauseOverlay({ onResume }) {
         Paused
       </div>
       <div style={{ fontSize: 14, color: "#fff", opacity: 0.6 }}>Tap to resume</div>
+    </div>
+  );
+}
+
+function ExerciseDetailToggle({ show, onToggle, catalogEntry, colors }) {
+  const hasMuscles = catalogEntry.muscles?.primary?.length > 0;
+  return (
+    <div style={{ marginTop: 8, width: "100%" }}>
+      <button
+        style={{
+          background: "none",
+          border: "none",
+          color: colors?.accent || "#4fc3f7",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          padding: "4px 8px",
+          fontFamily: "inherit",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          margin: "0 auto",
+        }}
+        onClick={onToggle}
+      >
+        <span style={{
+          display: "inline-block",
+          transform: show ? "rotate(90deg)" : "rotate(0deg)",
+          transition: "transform 0.2s",
+          fontSize: 10,
+        }}>&#9654;</span>
+        {show ? "Hide exercise" : "Show exercise"}
+      </button>
+      {show && (
+        <div style={{ marginTop: 8 }}>
+          {catalogEntry.gifUrl && (
+            <ExerciseGif
+              gifUrl={catalogEntry.gifUrl}
+              exerciseName={catalogEntry.name}
+              colors={colors}
+              size={160}
+            />
+          )}
+          {hasMuscles && (
+            <BodyDiagram
+              highlightedMuscles={catalogEntry.muscles.primary}
+              secondaryMuscles={catalogEntry.muscles.secondary || []}
+              colors={colors}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
