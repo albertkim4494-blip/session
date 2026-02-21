@@ -500,7 +500,13 @@ export function CircuitTimer({
   // Stable ref for handleNext so voice effect doesn't re-run on every handleNext change
   const handleNextRef = useRef(null);
 
+  // Restart timer ref for voice recognition (clearable)
+  const voiceRestartRef = useRef(null);
+
   // Voice recognition effect
+  // Uses continuous=false + restart-on-end pattern because continuous=true
+  // is broken on Android Chrome (Chromium bug 40324711): stops after ~3-7s
+  // of silence and plays system beep sounds on restart.
   useEffect(() => {
     if (!voiceActive || !hasSpeechRecognition) return;
     if (phase !== "work" && phase !== "get-ready") {
@@ -509,15 +515,11 @@ export function CircuitTimer({
         try { recognitionRef.current.abort(); } catch {}
         recognitionRef.current = null;
       }
+      clearTimeout(voiceRestartRef.current);
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognitionRef.current = recognition;
+    let cancelled = false;
 
     const showFeedback = (text) => {
       setVoiceFeedback(text);
@@ -525,64 +527,81 @@ export function CircuitTimer({
       voiceFeedbackTimerRef.current = setTimeout(() => setVoiceFeedback(""), 1500);
     };
 
-    recognition.onresult = (event) => {
-      const now = Date.now();
-      if (now - voiceCooldownRef.current < 1000) return;
+    const startRecognition = () => {
+      if (cancelled) return;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+      recognitionRef.current = recognition;
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (!event.results[i].isFinal) continue;
-        const transcript = event.results[i][0].transcript.toLowerCase().trim();
+      recognition.onresult = (event) => {
+        const now = Date.now();
+        if (now - voiceCooldownRef.current < 1000) return;
 
-        // Match commands — first match wins
-        if (/\b(next|skip|done)\b/.test(transcript)) {
-          voiceCooldownRef.current = now;
-          showFeedback("Next \u2192");
-          handleNextRef.current?.();
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (!event.results[i].isFinal) continue;
+          const transcript = event.results[i][0].transcript.toLowerCase().trim();
+
+          if (/\b(next|skip|done)\b/.test(transcript)) {
+            voiceCooldownRef.current = now;
+            showFeedback("Next \u2192");
+            handleNextRef.current?.();
+            return;
+          }
+          if (/\b(add set|another set)\b/.test(transcript)) {
+            voiceCooldownRef.current = now;
+            showFeedback("+ Add Set");
+            addSetViaVoiceRef.current?.();
+            return;
+          }
+          if (/\bpause\b/.test(transcript)) {
+            voiceCooldownRef.current = now;
+            showFeedback("Paused");
+            if (!paused) dispatch({ type: "TOGGLE_PAUSE" });
+            return;
+          }
+          if (/\b(resume|continue)\b/.test(transcript)) {
+            voiceCooldownRef.current = now;
+            showFeedback("Resumed");
+            if (paused) dispatch({ type: "TOGGLE_PAUSE" });
+            return;
+          }
+        }
+      };
+
+      recognition.onend = () => {
+        // Create a new instance after a short delay — Android silently fails
+        // when reusing the same SpeechRecognition instance after onend.
+        if (!cancelled) {
+          voiceRestartRef.current = setTimeout(startRecognition, 300);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === "no-speech" || event.error === "network") {
+          // Transient — onend will restart
           return;
         }
-        if (/\b(add set|another set)\b/.test(transcript)) {
-          voiceCooldownRef.current = now;
-          showFeedback("+ Add Set");
-          addSetViaVoiceRef.current?.();
-          return;
+        if (event.error === "not-allowed" || event.error === "service-not-allowed" || event.error === "aborted") {
+          cancelled = true;
+          setVoiceActive(false);
         }
-        if (/\bpause\b/.test(transcript)) {
-          voiceCooldownRef.current = now;
-          showFeedback("Paused");
-          if (!paused) dispatch({ type: "TOGGLE_PAUSE" });
-          return;
-        }
-        if (/\b(resume|continue)\b/.test(transcript)) {
-          voiceCooldownRef.current = now;
-          showFeedback("Resumed");
-          if (paused) dispatch({ type: "TOGGLE_PAUSE" });
-          return;
-        }
-      }
+      };
+
+      try { recognition.start(); } catch {}
     };
 
-    recognition.onend = () => {
-      // Chrome stops continuous recognition periodically — restart if still active
-      if (voiceActive && (phase === "work" || phase === "get-ready")) {
-        try { recognition.start(); } catch {}
-      }
-    };
-
-    recognition.onerror = (event) => {
-      if (event.error === "no-speech" || event.error === "network") {
-        // Transient — onend will restart
-        return;
-      }
-      if (event.error === "not-allowed" || event.error === "aborted") {
-        setVoiceActive(false);
-      }
-    };
-
-    try { recognition.start(); } catch {}
+    startRecognition();
 
     return () => {
-      try { recognition.abort(); } catch {}
-      recognitionRef.current = null;
+      cancelled = true;
+      clearTimeout(voiceRestartRef.current);
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+        recognitionRef.current = null;
+      }
     };
   }, [voiceActive, phase]);
 
@@ -593,6 +612,7 @@ export function CircuitTimer({
         try { recognitionRef.current.abort(); } catch {}
       }
       clearTimeout(voiceFeedbackTimerRef.current);
+      clearTimeout(voiceRestartRef.current);
     };
   }, []);
 
@@ -1066,9 +1086,20 @@ export function CircuitTimer({
           <button
             className="btn-press"
             style={{ ...primaryBtn, marginTop: 16 }}
-            onClick={() => {
+            onClick={async () => {
               saveConfig({ rounds: totalRounds, restBetweenExercises, restBetweenRounds });
-              if (voiceEnabled) setVoiceActive(true);
+              if (voiceEnabled) {
+                // Pre-grant mic permission via getUserMedia — on Android PWAs,
+                // SpeechRecognition may not trigger its own permission prompt.
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                  stream.getTracks().forEach((t) => t.stop());
+                  setVoiceActive(true);
+                } catch {
+                  // Permission denied — start without voice
+                  setVoiceEnabled(false);
+                }
+              }
               dispatch({ type: "START" });
             }}
           >
