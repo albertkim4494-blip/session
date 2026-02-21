@@ -470,17 +470,9 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
                             title: "Enable microphone?",
                             message: "Voice input uses your microphone to convert speech to text when logging sets. Your browser will ask for permission.",
                             confirmText: "Enable",
-                            onConfirm: async () => {
+                            onConfirm: () => {
                               dispatch({ type: "CLOSE_CONFIRM" });
-                              if (navigator.mediaDevices) {
-                                try {
-                                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                                  stream.getTracks().forEach((t) => t.stop());
-                                  onUpdatePreference?.("voiceInput", true);
-                                } catch (_) {
-                                  // Permission denied — don't enable
-                                }
-                              }
+                              onUpdatePreference?.("voiceInput", true);
                             },
                           },
                         });
