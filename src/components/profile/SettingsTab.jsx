@@ -471,6 +471,7 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
                             message: "Voice input uses your microphone to convert speech to text when logging sets. Your browser will ask for permission.",
                             confirmText: "Enable",
                             onConfirm: async () => {
+                              dispatch({ type: "CLOSE_CONFIRM" });
                               if (navigator.mediaDevices) {
                                 try {
                                   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
