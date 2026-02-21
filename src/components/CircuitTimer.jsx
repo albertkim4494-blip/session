@@ -168,6 +168,10 @@ export function CircuitTimer({
   // Track total sets logged
   const setsLoggedRef = useRef(0);
 
+  // Auto-advance timer ref (clearable)
+  const autoAdvanceRef = useRef(null);
+  useEffect(() => () => clearTimeout(autoAdvanceRef.current), []);
+
   // Multi-set state for work phase — array of { reps, weight }
   const [localSets, setLocalSets] = useState([]);
 
@@ -239,9 +243,15 @@ export function CircuitTimer({
     if (timerSoundEnabled) playTimerSound(timerSoundType || "chime");
     navigator.vibrate?.([100, 50, 100]);
     setTimeCountdownStarted(false);
-    // Advance to next set if exists
+    // Advance to next time set, or auto-advance to next exercise
     if (timeSetIndex < localSets.length - 1) {
       setTimeSetIndex((prev) => prev + 1);
+    } else {
+      // Last time set done — auto-advance after brief pause
+      clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = setTimeout(() => {
+        dispatch({ type: "DONE_SET" });
+      }, 1200);
     }
   }, [currentExercise, isTimeBased, localSets, timeSetIndex, onCompleteSet, workout.id, timerSoundEnabled, timerSoundType]);
 
@@ -263,21 +273,33 @@ export function CircuitTimer({
 
   // Phase-driven timer starts
   useEffect(() => {
+    clearTimeout(autoAdvanceRef.current);
     if (phase === "get-ready") {
       lastBeepRef.current = 0;
       navigator.vibrate?.(10);
       getReadyTimer.start(GET_READY_SEC, "countdown");
     } else if (phase === "work") {
-      // For regular exercises, start stopwatch. Time-based waits for user to tap Go.
       if (!isTimeBased) {
         workTimer.start(0, "stopwatch");
       }
+      // Time-based auto-start is handled by a separate effect below
     } else if (phase === "rest") {
       restTimer.start(restBetweenExercises, "countdown");
     } else if (phase === "round-rest") {
       roundRestTimer.start(restBetweenRounds, "countdown");
     }
   }, [phase, currentExerciseIndex, currentRound]);
+
+  // Auto-start countdown for time-based exercises when localSets are ready
+  useEffect(() => {
+    if (phase !== "work" || !isTimeBased) return;
+    if (localSets.length === 0 || timeCountdownStarted) return;
+    const targetSec = Number(localSets[timeSetIndex]?.reps) || 0;
+    if (targetSec > 0) {
+      setTimeCountdownStarted(true);
+      workTimer.start(targetSec, "countdown");
+    }
+  }, [phase, isTimeBased, localSets, timeSetIndex, timeCountdownStarted]);
 
   // Pause/resume
   useEffect(() => {
@@ -311,10 +333,24 @@ export function CircuitTimer({
     const weight = s.weight.trim();
     onCompleteSet(currentExercise.id, setIdx, { reps, weight }, workout.id);
     setsLoggedRef.current += 1;
-  }, [localSets, currentExercise, workout.id, onCompleteSet]);
+
+    // Auto-advance if all sets are now completed
+    const savedSets = existingLogs?.[currentExercise?.id]?.sets;
+    const allDone = localSets.every((_, idx) => {
+      if (idx === setIdx) return true; // just completed this one
+      return savedSets && idx < savedSets.length && isSetCompleted(savedSets[idx]);
+    });
+    if (allDone) {
+      clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = setTimeout(() => {
+        dispatch({ type: "DONE_SET" });
+      }, 1500);
+    }
+  }, [localSets, currentExercise, workout.id, onCompleteSet, existingLogs]);
 
   const handleUncompleteSet = useCallback((setIdx) => {
     if (!currentExercise) return;
+    clearTimeout(autoAdvanceRef.current);
     onUncompleteSet(currentExercise.id, setIdx);
   }, [currentExercise, onUncompleteSet]);
 
@@ -360,6 +396,7 @@ export function CircuitTimer({
   }, []);
 
   const confirmStop = useCallback(() => {
+    clearTimeout(autoAdvanceRef.current);
     setShowStopConfirm(false);
     onClose();
   }, [onClose]);
@@ -605,7 +642,7 @@ export function CircuitTimer({
         : false;
 
       // SVG ring for countdown
-      const CIRCUMFERENCE = 2 * Math.PI * 52;
+      const CIRCUMFERENCE = 2 * Math.PI * 60;
       const displaySec = workTimer.isRunning || workTimer.seconds > 0 ? workTimer.seconds : targetSec;
       const timerTarget = workTimer.target || targetSec || 1;
       const progress = timeCountdownStarted && timerTarget > 0
@@ -669,16 +706,16 @@ export function CircuitTimer({
               </div>
             )}
 
-            {/* Has a target duration — show ring timer */}
+            {/* Has a target duration — show ring timer (auto-starts) */}
             {(targetSec > 0 || timeCountdownStarted) && (
               <>
-                <div style={{ position: "relative", width: 140, height: 140, margin: "8px 0" }}>
-                  <svg width="140" height="140" style={{ transform: "rotate(-90deg)" }}>
-                    <circle cx="70" cy="70" r="52" fill="none" stroke={colors?.border || "#333"} strokeWidth="6" />
+                <div style={{ position: "relative", width: 160, height: 160, margin: "8px 0" }}>
+                  <svg width="160" height="160" style={{ transform: "rotate(-90deg)" }}>
+                    <circle cx="80" cy="80" r="60" fill="none" stroke={colors?.border || "#333"} strokeWidth="7" />
                     <circle
-                      cx="70" cy="70" r="52" fill="none"
+                      cx="80" cy="80" r="60" fill="none"
                       stroke={colors?.accent || "#4fc3f7"}
-                      strokeWidth="6" strokeLinecap="round"
+                      strokeWidth="7" strokeLinecap="round"
                       strokeDasharray={CIRCUMFERENCE}
                       strokeDashoffset={dashOffset}
                       style={{ transition: "stroke-dashoffset 0.3s linear" }}
@@ -687,13 +724,14 @@ export function CircuitTimer({
                   <div style={{
                     position: "absolute", inset: 0,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 32, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                    fontSize: 36, fontWeight: 700, fontVariantNumeric: "tabular-nums",
                   }}>
                     {formatTimerDisplay(displaySec)}
                   </div>
                 </div>
 
-                {!timeCountdownStarted ? (
+                {workTimer.isRunning ? null : !timeCountdownStarted ? (
+                  /* Auto-start should handle this, but fallback Go button */
                   <button
                     className="btn-press"
                     style={{ ...primaryBtn, fontSize: 18 }}
@@ -701,25 +739,23 @@ export function CircuitTimer({
                   >
                     Go
                   </button>
-                ) : workTimer.isRunning ? (
-                  <div style={{ fontSize: 13, opacity: 0.5, fontWeight: 600 }}>In progress...</div>
                 ) : (
-                  /* Timer completed for this set */
+                  /* Timer completed — auto-advancing */
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#2ecc71" }}>
-                    Set complete!
+                    {timeSetIndex >= localSets.length - 1 ? "Done — advancing..." : "Set complete!"}
                   </div>
                 )}
               </>
             )}
 
-            {/* Show Next when all time sets are completed (or timer finished for single set) */}
-            {(allTimeSetsCompleted || (!workTimer.isRunning && timeCountdownStarted && timeSetIndex >= localSets.length - 1)) && (
+            {/* Skip ahead button — always available (auto-advance also fires) */}
+            {!workTimer.isRunning && timeCountdownStarted && timeSetIndex >= localSets.length - 1 && (
               <button
                 className="btn-press"
-                style={{ ...primaryBtn, fontSize: 16, marginTop: 8 }}
+                style={{ ...secondaryBtn, fontSize: 13, marginTop: 4 }}
                 onClick={handleNext}
               >
-                {currentExerciseIndex >= exercises.length - 1 && currentRound >= totalRounds ? "Finish" : "Next"}
+                {currentExerciseIndex >= exercises.length - 1 && currentRound >= totalRounds ? "Finish Now" : "Skip Ahead"}
               </button>
             )}
 
