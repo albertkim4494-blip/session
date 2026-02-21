@@ -1,4 +1,4 @@
-import React, { useReducer, useEffect, useRef, useCallback, useMemo, useState } from "react";
+import { useReducer, useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { useTimer } from "../hooks/useTimer";
 import { playTimerSound } from "../lib/timerSounds";
 import { parseScheme } from "../lib/workoutGenerator";
@@ -92,11 +92,10 @@ function circuitReducer(state, action) {
         currentExerciseIndex: 0,
         currentRound: 1,
         paused: false,
-        workElapsed: 0,
         totalStartTime: Date.now(),
       };
     case "BEGIN_WORK":
-      return { ...state, phase: "work", workElapsed: 0 };
+      return { ...state, phase: "work" };
     case "DONE_SET": {
       const { exerciseCount, totalRounds } = state;
       const isLastExercise = state.currentExerciseIndex >= exerciseCount - 1;
@@ -115,7 +114,6 @@ function circuitReducer(state, action) {
         ...state,
         phase: "work",
         currentExerciseIndex: state.currentExerciseIndex + 1,
-        workElapsed: 0,
       };
     case "ROUND_REST_DONE":
       return {
@@ -123,7 +121,6 @@ function circuitReducer(state, action) {
         phase: "work",
         currentExerciseIndex: 0,
         currentRound: state.currentRound + 1,
-        workElapsed: 0,
       };
     case "TOGGLE_PAUSE":
       return { ...state, paused: !state.paused };
@@ -163,6 +160,10 @@ function estimateMinutes(exercises, rounds, restEx, restRound) {
 
 const TIME_PRESETS = [30, 45, 60, 90, 120, 180];
 
+// Static catalog lookup — built once at module load
+const catalogMap = new Map();
+for (const entry of EXERCISE_CATALOG) catalogMap.set(entry.id, entry);
+
 // ---------------------------------------------------------------------------
 // CircuitTimer Component
 // ---------------------------------------------------------------------------
@@ -174,7 +175,6 @@ export function CircuitTimer({
   onUncompleteSet,
   onClose,
   colors,
-  styles,
   timerSoundEnabled,
   timerSoundType,
   findPrior,
@@ -192,7 +192,6 @@ export function CircuitTimer({
     restBetweenRounds: savedCfg.restBetweenRounds,
     exerciseCount: exercises.length,
     paused: false,
-    workElapsed: 0,
     totalStartTime: null,
     totalEndTime: null,
   });
@@ -237,11 +236,6 @@ export function CircuitTimer({
 
   // Collapsible exercise detail (GIF + body diagram)
   const [showExerciseDetail, setShowExerciseDetail] = useState(false);
-  const catalogMap = useMemo(() => {
-    const m = new Map();
-    for (const entry of EXERCISE_CATALOG) m.set(entry.id, entry);
-    return m;
-  }, []);
   const catalogEntry = currentExercise?.catalogId ? catalogMap.get(currentExercise.catalogId) : null;
 
   // Is current exercise time-based?
@@ -277,7 +271,6 @@ export function CircuitTimer({
     // --- Determine numSets (stable across re-runs) ---
     // Priority: in-memory ref → localStorage cache → scheme → priorLog → template → 1
     // The cache prevents dayLog.sets.length from growing (3→6→9) across remounts.
-    const isTimeEx = currentExercise.unit === "sec";
     const inMemCount = perRunSetCountRef.current.get(exId);
     let numSets;
     if (inMemCount != null) {
@@ -298,7 +291,7 @@ export function CircuitTimer({
     const sets = [];
     let autoStartDur = 0;
 
-    if (isTimeEx) {
+    if (isTimeBased) {
       // Merge in-memory + cached chosen duration
       const chosenDur = chosenTimeDurationsRef.current.get(exId) || cachedDuration;
 
@@ -350,7 +343,7 @@ export function CircuitTimer({
     timeTargetRef.current = Number(sets[0]?.reps) || 0;
 
     // --- Auto-start time-based (inline to avoid race conditions) ---
-    if (isTimeEx && autoStartDur > 0 && phase === "work") {
+    if (isTimeBased && autoStartDur > 0 && phase === "work") {
       if (!chosenTimeDurationsRef.current.has(exId)) {
         chosenTimeDurationsRef.current.set(exId, autoStartDur);
         updateCircuitRunCache(dateKey, workout.id, exId, { duration: autoStartDur });
@@ -465,7 +458,7 @@ export function CircuitTimer({
   useEffect(() => {
     if (phase === "work") {
       if (paused && workTimer.isRunning) workTimer.stop();
-      else if (!paused && !workTimer.isRunning && phase === "work" && (timeCountdownStarted || !isTimeBased)) workTimer.toggle();
+      else if (!paused && !workTimer.isRunning && (timeCountdownStarted || !isTimeBased)) workTimer.toggle();
     }
     if (phase === "rest") {
       if (paused && restTimer.isRunning) restTimer.stop();
@@ -547,7 +540,7 @@ export function CircuitTimer({
     if (!s) return;
     const reps = Number(s.reps) || 0;
     if (reps <= 0) return;
-    const weight = s.weight.trim();
+    const weight = (s.weight || "").trim();
     const offset = setIndexOffsetRef.current;
     onCompleteSet(currentExercise.id, setIdx + offset, { reps, weight }, workout.id);
     setsLoggedRef.current += 1;
@@ -943,9 +936,6 @@ export function CircuitTimer({
     if (isTimeBased) {
       const currentTimeSetData = localSets[timeSetIndex];
       const targetSec = Number(currentTimeSetData?.reps) || 0;
-      const allTimeSetsCompleted = savedSets
-        ? localSets.every((_, idx) => (idx + offset) < savedSets.length && isSetCompleted(savedSets[idx + offset]))
-        : false;
 
       // SVG ring for countdown
       const CIRCUMFERENCE = 2 * Math.PI * 60;

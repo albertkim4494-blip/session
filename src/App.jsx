@@ -1093,9 +1093,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       buffer++;
     };
 
-    const ensureEntries = () => {
+    const ensureEntries = (e) => {
       if (exiting) {
-        // User interacted — cancel exit, re-enable back interception
+        // Only cancel exit on deliberate taps (click), not pointerdown.
+        // Back gestures fire pointerdown on the screen edge before the back
+        // action is processed — cancelling exit there would swallow the press.
+        if (e.type !== "click") return;
         exiting = false;
         setupWatcher();
         while (buffer < 5) push();
