@@ -248,9 +248,12 @@ export function CircuitTimer({
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceFeedback, setVoiceFeedback] = useState("");
+  const [voiceError, setVoiceError] = useState("");
   const recognitionRef = useRef(null);
   const voiceCooldownRef = useRef(0);
   const voiceFeedbackTimerRef = useRef(null);
+  const pausedRef = useRef(false);
+  pausedRef.current = paused;
 
   // Is current exercise time-based?
   const isTimeBased = currentExercise?.unit === "sec";
@@ -507,6 +510,8 @@ export function CircuitTimer({
   // Uses continuous=false + restart-on-end pattern because continuous=true
   // is broken on Android Chrome (Chromium bug 40324711): stops after ~3-7s
   // of silence and plays system beep sounds on restart.
+  const consecutiveErrorsRef = useRef(0);
+
   useEffect(() => {
     if (!voiceActive || !hasSpeechRecognition) return;
     if (phase !== "work" && phase !== "get-ready") {
@@ -520,6 +525,8 @@ export function CircuitTimer({
     }
 
     let cancelled = false;
+    consecutiveErrorsRef.current = 0;
+    setVoiceError("");
 
     const showFeedback = (text) => {
       setVoiceFeedback(text);
@@ -532,11 +539,12 @@ export function CircuitTimer({
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.interimResults = true;
       recognition.lang = "en-US";
       recognitionRef.current = recognition;
 
       recognition.onresult = (event) => {
+        consecutiveErrorsRef.current = 0;
         const now = Date.now();
         if (now - voiceCooldownRef.current < 1000) return;
 
@@ -559,13 +567,13 @@ export function CircuitTimer({
           if (/\bpause\b/.test(transcript)) {
             voiceCooldownRef.current = now;
             showFeedback("Paused");
-            if (!paused) dispatch({ type: "TOGGLE_PAUSE" });
+            if (!pausedRef.current) dispatch({ type: "TOGGLE_PAUSE" });
             return;
           }
           if (/\b(resume|continue)\b/.test(transcript)) {
             voiceCooldownRef.current = now;
             showFeedback("Resumed");
-            if (paused) dispatch({ type: "TOGGLE_PAUSE" });
+            if (pausedRef.current) dispatch({ type: "TOGGLE_PAUSE" });
             return;
           }
         }
@@ -580,17 +588,45 @@ export function CircuitTimer({
       };
 
       recognition.onerror = (event) => {
-        if (event.error === "no-speech" || event.error === "network") {
+        if (event.error === "no-speech") {
           // Transient — onend will restart
           return;
         }
-        if (event.error === "not-allowed" || event.error === "service-not-allowed" || event.error === "aborted") {
+        if (event.error === "network") {
+          consecutiveErrorsRef.current += 1;
+          if (consecutiveErrorsRef.current >= 3) {
+            cancelled = true;
+            setVoiceError("No network");
+            setVoiceActive(false);
+          }
+          return;
+        }
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
           cancelled = true;
+          setVoiceError("Mic denied");
           setVoiceActive(false);
+        }
+        if (event.error === "aborted") {
+          // Only count as fatal if we didn't abort it ourselves
+          if (!cancelled) {
+            consecutiveErrorsRef.current += 1;
+            if (consecutiveErrorsRef.current >= 5) {
+              cancelled = true;
+              setVoiceError("Not supported");
+              setVoiceActive(false);
+            }
+          }
         }
       };
 
-      try { recognition.start(); } catch {}
+      try {
+        recognition.start();
+      } catch (e) {
+        // .start() can throw on some Android WebViews
+        cancelled = true;
+        setVoiceError("Not supported");
+        setVoiceActive(false);
+      }
     };
 
     startRecognition();
@@ -1180,7 +1216,7 @@ export function CircuitTimer({
             >
               {paused ? "Resume" : "Pause"}
             </button>
-            {voiceActive && <VoiceIndicator colors={colors} feedback={voiceFeedback} />}
+            {(voiceActive || voiceError) && <VoiceIndicator colors={colors} feedback={voiceFeedback} error={voiceError} />}
             <span>Round {currentRound}/{totalRounds}</span>
           </div>
           <div style={center}>
@@ -1448,7 +1484,7 @@ export function CircuitTimer({
           >
             {paused ? "Resume" : "Pause"}
           </button>
-          {voiceActive && <VoiceIndicator colors={colors} feedback={voiceFeedback} />}
+          {(voiceActive || voiceError) && <VoiceIndicator colors={colors} feedback={voiceFeedback} error={voiceError} />}
           <span>Round {currentRound}/{totalRounds}</span>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "0 16px 16px" }}>
@@ -1828,21 +1864,23 @@ export function CircuitTimer({
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function VoiceIndicator({ colors, feedback }) {
+function VoiceIndicator({ colors, feedback, error }) {
+  const indicatorColor = error ? "#e53935" : (colors?.accent || "#4fc3f7");
   return (
     <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 4 }}>
       <svg
         width="14" height="14" viewBox="0 0 24 24" fill="none"
-        stroke={colors?.accent || "#4fc3f7"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-        style={{ animation: "micPulse 1.5s ease-in-out infinite", flexShrink: 0 }}
+        stroke={indicatorColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        style={{ animation: error ? "none" : "micPulse 1.5s ease-in-out infinite", flexShrink: 0 }}
       >
         <rect x="9" y="1" width="6" height="11" rx="3" />
         <path d="M19 10v2a7 7 0 01-14 0v-2" />
         <line x1="12" y1="19" x2="12" y2="23" />
         <line x1="8" y1="23" x2="16" y2="23" />
+        {error && <line x1="4" y1="4" x2="20" y2="20" />}
       </svg>
-      <span style={{ fontSize: 11, fontWeight: 600, color: colors?.accent || "#4fc3f7", whiteSpace: "nowrap" }}>
-        Listening
+      <span style={{ fontSize: 11, fontWeight: 600, color: indicatorColor, whiteSpace: "nowrap" }}>
+        {error || "Listening"}
       </span>
       {feedback && (
         <div style={{
