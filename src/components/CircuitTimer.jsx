@@ -389,12 +389,17 @@ export function CircuitTimer({
     }
     if (timerSoundEnabled) playTimerSound(timerSoundType || "chime");
     navigator.vibrate?.([100, 50, 100]);
-    // Advance to next time set, or wait for user to choose
+    // Advance to next time set, or auto-advance after last set
     if (timeSetIndex < localSets.length - 1) {
       setTimeCountdownStarted(false);
       setTimeSetIndex((prev) => prev + 1);
+    } else {
+      // Last timed set done — auto-advance like regular exercises
+      clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = setTimeout(() => {
+        dispatch({ type: "DONE_SET" });
+      }, 1500);
     }
-    // Last set: don't auto-advance — let user choose "Another Set" or "Next"
   }, [currentExercise, isTimeBased, localSets, timeSetIndex, onCompleteSet, workout.id, timerSoundEnabled, timerSoundType]);
 
   const getReadyTimer = useTimer(onGetReadyComplete);
@@ -1068,78 +1073,88 @@ export function CircuitTimer({
                 </div>
 
                 {workTimer.isRunning ? (
-                  /* Timer running — +/- 30s and skip */
-                  <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                    <button
-                      className="btn-press"
-                      style={{ ...secondaryBtn, fontSize: 14, padding: "8px 18px", opacity: workTimer.seconds <= 30 ? 0.3 : 1 }}
-                      disabled={workTimer.seconds <= 30}
-                      onClick={() => {
-                        const newRemaining = workTimer.seconds - 30;
-                        if (newRemaining <= 0) { handleNext(); return; }
-                        timeTargetRef.current = Math.max(1, timeTargetRef.current - 30);
-                        workTimer.start(newRemaining, "countdown");
-                      }}
-                    >
-                      &minus;30s
-                    </button>
-                    <button
-                      className="btn-press"
-                      style={{ ...secondaryBtn, fontSize: 14, padding: "8px 18px" }}
-                      onClick={() => {
-                        const newRemaining = workTimer.seconds + 30;
-                        timeTargetRef.current += 30;
-                        workTimer.start(newRemaining, "countdown");
-                      }}
-                    >
-                      +30s
-                    </button>
-                    <button
-                      className="btn-press"
-                      style={{ ...secondaryBtn, fontSize: 14, padding: "8px 18px" }}
-                      onClick={handleNext}
-                    >
-                      Skip
-                    </button>
-                  </div>
-                ) : (
-                  /* Timer completed — add set or advance */
+                  /* Timer running — +/- 30s, skip, and add set */
                   <>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#2ecc71", marginBottom: 8 }}>
-                      Set complete!
-                    </div>
-                    <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                       <button
                         className="btn-press"
-                        style={{ ...secondaryBtn, fontSize: 14, padding: "10px 20px" }}
+                        style={{ ...secondaryBtn, fontSize: 14, padding: "8px 18px", opacity: workTimer.seconds <= 30 ? 0.3 : 1 }}
+                        disabled={workTimer.seconds <= 30}
                         onClick={() => {
-                          const priorDur = timeTargetRef.current || 0;
-                          const newSets = [...localSets, { reps: String(priorDur || ""), weight: "" }];
-                          const newIdx = localSets.length;
-                          setLocalSets(newSets);
-                          setTimeSetIndex(newIdx);
-                          if (currentExercise) {
-                            perRunSetCountRef.current.set(currentExercise.id, newSets.length);
-                            updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
-                          }
-                          if (priorDur > 0) {
-                            setTimeCountdownStarted(true);
-                            workTimer.start(priorDur, "countdown");
-                          } else {
-                            setTimeCountdownStarted(false);
-                          }
+                          const newRemaining = workTimer.seconds - 30;
+                          if (newRemaining <= 0) { handleNext(); return; }
+                          timeTargetRef.current = Math.max(1, timeTargetRef.current - 30);
+                          workTimer.start(newRemaining, "countdown");
                         }}
                       >
-                        + Add Set
+                        &minus;30s
                       </button>
                       <button
                         className="btn-press"
-                        style={{ ...primaryBtn, fontSize: 14, padding: "10px 20px", minWidth: 0 }}
+                        style={{ ...secondaryBtn, fontSize: 14, padding: "8px 18px" }}
+                        onClick={() => {
+                          const newRemaining = workTimer.seconds + 30;
+                          timeTargetRef.current += 30;
+                          workTimer.start(newRemaining, "countdown");
+                        }}
+                      >
+                        +30s
+                      </button>
+                      <button
+                        className="btn-press"
+                        style={{ ...secondaryBtn, fontSize: 14, padding: "8px 18px" }}
                         onClick={handleNext}
                       >
-                        {currentExerciseIndex >= exercises.length - 1 && currentRound >= totalRounds ? "Finish \u2713" : "Next \u2192"}
+                        Skip
                       </button>
                     </div>
+                    <button
+                      className="btn-press"
+                      style={{ ...secondaryBtn, fontSize: 13, padding: "8px 18px", opacity: 0.7, marginTop: 4 }}
+                      onClick={() => {
+                        clearTimeout(autoAdvanceRef.current);
+                        const priorDur = timeTargetRef.current || 0;
+                        const newSets = [...localSets, { reps: String(priorDur || ""), weight: "" }];
+                        setLocalSets(newSets);
+                        if (currentExercise) {
+                          perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+                          updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+                        }
+                      }}
+                    >
+                      + Add Set
+                    </button>
+                  </>
+                ) : (
+                  /* Timer completed — brief auto-advance state */
+                  <>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#2ecc71", marginBottom: 8 }}>
+                      &#10003; Set complete!
+                    </div>
+                    <button
+                      className="btn-press"
+                      style={{ ...secondaryBtn, fontSize: 14, padding: "10px 20px" }}
+                      onClick={() => {
+                        clearTimeout(autoAdvanceRef.current);
+                        const priorDur = timeTargetRef.current || 0;
+                        const newSets = [...localSets, { reps: String(priorDur || ""), weight: "" }];
+                        const newIdx = localSets.length;
+                        setLocalSets(newSets);
+                        setTimeSetIndex(newIdx);
+                        if (currentExercise) {
+                          perRunSetCountRef.current.set(currentExercise.id, newSets.length);
+                          updateCircuitRunCache(dateKey, workout.id, currentExercise.id, { sets: newSets.length });
+                        }
+                        if (priorDur > 0) {
+                          setTimeCountdownStarted(true);
+                          workTimer.start(priorDur, "countdown");
+                        } else {
+                          setTimeCountdownStarted(false);
+                        }
+                      }}
+                    >
+                      + Add Set
+                    </button>
                   </>
                 )}
               </>
