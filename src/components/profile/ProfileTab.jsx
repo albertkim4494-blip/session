@@ -121,13 +121,13 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     }
 
     // Request mic permission via getUserMedia, then release immediately.
-    // SpeechRecognition manages its own audio capture — on Android only
-    // one consumer can use the mic at a time.
+    // SpeechRecognition manages its own audio capture — mobile devices
+    // only allow one consumer to use the mic at a time.
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((t) => t.stop());
     } catch (_) {
-      setMicError("Mic access denied");
+      setMicError("Mic permission denied \u2014 enable in Settings \u2192 App Permissions");
       return;
     }
 
@@ -153,7 +153,7 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
       setListeningField(null);
       recognitionRef.current = null;
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        setMicError("Mic access denied");
+        setMicError("Mic permission denied \u2014 enable in Settings \u2192 App Permissions");
       } else if (event.error === "network") {
         setMicError("No network for speech");
       } else if (event.error !== "no-speech" && event.error !== "aborted") {

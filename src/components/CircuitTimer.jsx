@@ -508,10 +508,9 @@ export function CircuitTimer({
   const voiceRestartRef = useRef(null);
 
   // Voice recognition effect
-  // On Android Chrome, SpeechRecognition uses Google's cloud speech service.
   // IMPORTANT: Release any getUserMedia stream BEFORE starting recognition —
-  // Android only allows one mic consumer at a time. SpeechRecognition manages
-  // its own audio capture internally.
+  // mobile devices only allow one mic consumer at a time. SpeechRecognition
+  // manages its own audio capture internally.
   const consecutiveErrorsRef = useRef(0);
   const commandFiredRef = useRef(false);
 
@@ -627,7 +626,7 @@ export function CircuitTimer({
         }
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
           cancelled = true;
-          setVoiceError("Mic denied");
+          setVoiceError("Mic permission denied \u2014 enable in Settings \u2192 App Permissions");
           setVoiceActive(false);
         }
       };
@@ -1090,7 +1089,7 @@ export function CircuitTimer({
                           setVoiceError("");
                           try {
                             if (!navigator.mediaDevices?.getUserMedia) {
-                              setVoiceError("Mic not available on this browser");
+                              setVoiceError("Microphone not available on this device");
                               return;
                             }
                             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1099,9 +1098,9 @@ export function CircuitTimer({
                             setVoiceEnabled(true);
                           } catch (e) {
                             if (e.name === "NotAllowedError") {
-                              setVoiceError("Mic blocked \u2014 open Chrome \u2192 Site settings \u2192 Microphone \u2192 Allow");
+                              setVoiceError("Mic permission denied \u2014 enable in Settings \u2192 App Permissions");
                             } else {
-                              setVoiceError("Mic not available");
+                              setVoiceError("Microphone not available");
                             }
                           }
                         }}
