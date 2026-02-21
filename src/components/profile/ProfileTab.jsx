@@ -58,8 +58,10 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
   const [editingInfo, setEditingInfo] = useState(false);
   const [editingTraining, setEditingTraining] = useState(false);
   const [listeningField, setListeningField] = useState(null);
+  const [micError, setMicError] = useState("");
   const statsConfigRef = useRef(null);
   const recognitionRef = useRef(null);
+  const micStreamRef = useRef(null);
 
   useEffect(() => {
     if (!showStatsConfig) return;
@@ -72,11 +74,15 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
     return () => document.removeEventListener("mousedown", handler);
   }, [showStatsConfig]);
 
-  // Cleanup speech recognition on unmount
+  // Cleanup speech recognition + mic stream on unmount
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch (_) {}
+      }
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
       }
     };
   }, []);
@@ -93,9 +99,10 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
   const isMetric = preferences?.measurementSystem === "metric";
   const weightUnit = isMetric ? "kg" : "lbs";
 
-  // Voice input toggle
-  const toggleListening = useCallback((field) => {
+  // Voice input toggle — with getUserMedia pre-flight for Android PWA compat
+  const toggleListening = useCallback(async (field) => {
     if (!hasSpeechRecognition) return;
+    setMicError("");
 
     // If already listening on this field, stop
     if (listeningField === field) {
@@ -103,6 +110,10 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
         try { recognitionRef.current.stop(); } catch (_) {}
       }
       setListeningField(null);
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
       return;
     }
 
@@ -111,35 +122,75 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
       try { recognitionRef.current.abort(); } catch (_) {}
     }
 
+    // Pre-grant mic permission via getUserMedia — Android PWAs may not
+    // trigger the SpeechRecognition permission prompt on their own.
+    // Keep the stream open while recognition runs (some Android devices
+    // need an active stream for SpeechRecognition to receive audio).
+    try {
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (_) {
+      setMicError("Mic access denied");
+      return;
+    }
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.lang = navigator.language || "en-US";
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript;
-      if (transcript) {
-        // Read current value from modalState and append
-        const currentVal = modalState[field] || "";
-        const separator = currentVal && !currentVal.endsWith(" ") ? " " : "";
-        update(field, currentVal + separator + transcript);
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (!event.results[i].isFinal) continue;
+        const transcript = event.results[i][0]?.transcript;
+        if (transcript) {
+          const currentVal = modalState[field] || "";
+          const separator = currentVal && !currentVal.endsWith(" ") ? " " : "";
+          update(field, currentVal + separator + transcript);
+        }
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
       setListeningField(null);
       recognitionRef.current = null;
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setMicError("Mic access denied");
+      } else if (event.error === "network") {
+        setMicError("No network for speech");
+      } else if (event.error !== "no-speech" && event.error !== "aborted") {
+        setMicError("Voice not available");
+      }
     };
 
     recognition.onend = () => {
       setListeningField(null);
       recognitionRef.current = null;
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
     };
 
     recognitionRef.current = recognition;
     setListeningField(field);
-    recognition.start();
+    try {
+      recognition.start();
+    } catch (_) {
+      setListeningField(null);
+      setMicError("Voice not available");
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
+    }
   }, [listeningField, modalState, update]);
 
   // Read-only display value helper
@@ -151,6 +202,30 @@ export function ProfileTab({ modalState, dispatch, profile, session, styles, col
       {/* Mic pulse animation */}
       {hasSpeechRecognition && listeningField && (
         <style>{`@keyframes micPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
+      )}
+
+      {/* Mic error banner */}
+      {micError && (
+        <div style={{
+          padding: "8px 12px",
+          borderRadius: 10,
+          background: "rgba(229,57,53,0.1)",
+          border: "1px solid rgba(229,57,53,0.3)",
+          fontSize: 12,
+          color: "#e53935",
+          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <rect x="9" y="1" width="6" height="11" rx="3" />
+            <path d="M19 10v2a7 7 0 01-14 0v-2" />
+            <line x1="4" y1="4" x2="20" y2="20" />
+          </svg>
+          {micError}
+          <button onClick={() => setMicError("")} style={{ marginLeft: "auto", background: "none", border: "none", color: "#e53935", cursor: "pointer", fontSize: 16, padding: "0 2px", fontFamily: "inherit" }}>&times;</button>
+        </div>
       )}
 
       {/* Avatar Hero */}

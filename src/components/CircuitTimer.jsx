@@ -250,6 +250,7 @@ export function CircuitTimer({
   const [voiceFeedback, setVoiceFeedback] = useState("");
   const [voiceError, setVoiceError] = useState("");
   const recognitionRef = useRef(null);
+  const micStreamRef = useRef(null);
   const voiceCooldownRef = useRef(0);
   const voiceFeedbackTimerRef = useRef(null);
   const pausedRef = useRef(false);
@@ -638,14 +639,26 @@ export function CircuitTimer({
         try { recognitionRef.current.abort(); } catch {}
         recognitionRef.current = null;
       }
+      // Release mic stream when voice is deactivated or phase changes
+      // to non-listening (rest/complete) — keeps stream only during work/get-ready
+      if (phase !== "work" && phase !== "get-ready") {
+        if (micStreamRef.current) {
+          micStreamRef.current.getTracks().forEach((t) => t.stop());
+          micStreamRef.current = null;
+        }
+      }
     };
   }, [voiceActive, phase]);
 
-  // Stop voice on unmount
+  // Stop voice + release mic stream on unmount
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch {}
+      }
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
       }
       clearTimeout(voiceFeedbackTimerRef.current);
       clearTimeout(voiceRestartRef.current);
@@ -1127,9 +1140,10 @@ export function CircuitTimer({
               if (voiceEnabled) {
                 // Pre-grant mic permission via getUserMedia — on Android PWAs,
                 // SpeechRecognition may not trigger its own permission prompt.
+                // Keep stream open — some Android devices need an active
+                // MediaStream for SpeechRecognition to receive audio.
                 try {
-                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                  stream.getTracks().forEach((t) => t.stop());
+                  micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
                   setVoiceActive(true);
                 } catch {
                   // Permission denied — start without voice
