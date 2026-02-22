@@ -1143,23 +1143,34 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let watcher = null;
     let cwWorking = false;
     let exiting = false;
+    let exitTimer = null;
 
     const prepareExit = () => {
       exiting = true;
       cwWorking = false;
+      if (watcher) { try { watcher.destroy(); } catch (_) {} watcher = null; }
       // Drain history buffer so next back goes straight to OS
       if (buffer > 0) { history.go(-buffer); buffer = 0; }
       // Re-enable after 2.5s if user doesn't exit
-      setTimeout(() => {
+      clearTimeout(exitTimer);
+      exitTimer = setTimeout(() => {
         if (!exiting) return;
-        exiting = false;
-        setupWatcher();
-        while (buffer < 5) push();
+        cancelExit();
       }, 2500);
+    };
+
+    const cancelExit = () => {
+      exiting = false;
+      clearTimeout(exitTimer);
+      setupWatcher();
+      // Wait for any pending popstate events to settle before pushing
+      setTimeout(() => { while (buffer < 5) push(); }, 50);
     };
 
     const setupWatcher = () => {
       if (!hasCW) return;
+      // Destroy any existing watcher first to prevent duplicates
+      if (watcher) { try { watcher.destroy(); } catch (_) {} watcher = null; }
       try {
         watcher = new CloseWatcher();
         watcher.addEventListener("close", () => {
@@ -1190,9 +1201,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         // Back gestures fire pointerdown on the screen edge before the back
         // action is processed — cancelling exit there would swallow the press.
         if (e.type !== "click") return;
-        exiting = false;
-        setupWatcher();
-        while (buffer < 5) push();
+        cancelExit();
         return;
       }
       if (!initialized) {
@@ -1212,9 +1221,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (exiting) return;
       if (location.hash === lastHash) return;
       const now = Date.now();
-      if (now - lastBackTime < 300) return;
+      if (now - lastBackTime < 200) return;
       lastBackTime = now;
       buffer = Math.max(0, buffer - 1);
+      lastHash = location.hash; // Sync to prevent stale hash checks
       // Only handle via history if CloseWatcher is NOT active
       if (!cwWorking) {
         const result = handleBackRef.current?.();
@@ -1226,6 +1236,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     window.addEventListener("hashchange", onBack);
 
     return () => {
+      clearTimeout(exitTimer);
       watcher?.destroy();
       document.removeEventListener("pointerdown", ensureEntries);
       document.removeEventListener("click", ensureEntries);
