@@ -144,6 +144,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   ensureAnimations();
   const [state, setState] = useState(() => loadState());
   const [dataReady, setDataReady] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
   const cloudSaver = useRef(null);
   const [tab, setTab] = useState(() => sessionStorage.getItem("wt_tab") || "train");
   const tabRef = useRef("train");
@@ -482,6 +483,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     };
   }, [session.user.id]);
 
+  // Minimum 2-second splash on cold start
+  useEffect(() => {
+    const t = setTimeout(() => setSplashDone(true), 2000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Fetch user profile
   useEffect(() => {
     let cancelled = false;
@@ -584,14 +591,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const todaySessionIds = state.todaySessions?.[dateKey] || EMPTY_ARRAY;
 
+  const isToday = dateKey === yyyyMmDd(new Date());
+
   const todayProgramWorkouts = useMemo(() => {
     if (todaySessionIds.length === 0) return EMPTY_ARRAY;
     return todaySessionIds
       .map(id => effectiveWorkouts.find(w => w.id === id))
       .filter(Boolean);
   }, [todaySessionIds, effectiveWorkouts]);
-
-  const hasTodaySessions = todayProgramWorkouts.length > 0 || dailyWorkoutsToday.length > 0;
 
   const workoutById = useMemo(() => {
     const m = new Map();
@@ -624,6 +631,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [modals.log.isOpen]);
 
   const logsForDate = state.logsByDate[dateKey] ?? EMPTY_OBJ;
+
+  // For non-today dates, auto-detect program workouts that have logs (backward compat)
+  const logDetectedWorkouts = useMemo(() => {
+    if (isToday) return EMPTY_ARRAY;
+    if (!logsForDate || Object.keys(logsForDate).length === 0) return EMPTY_ARRAY;
+    const loggedExIds = new Set(Object.keys(logsForDate));
+    const already = new Set(todaySessionIds);
+    return effectiveWorkouts.filter(w => !already.has(w.id) && w.exercises.some(ex => loggedExIds.has(ex.id)));
+  }, [isToday, logsForDate, todaySessionIds, effectiveWorkouts]);
+
+  // Combine explicitly-added sessions + auto-detected from logs
+  const displayedProgramWorkouts = useMemo(() => {
+    if (logDetectedWorkouts.length === 0) return todayProgramWorkouts;
+    if (todayProgramWorkouts.length === 0) return logDetectedWorkouts;
+    return [...todayProgramWorkouts, ...logDetectedWorkouts];
+  }, [todayProgramWorkouts, logDetectedWorkouts]);
+
+  const hasSessions = displayedProgramWorkouts.length > 0 || dailyWorkoutsToday.length > 0;
 
   const summaryRange = useMemo(() => {
     // Shift the anchor date by offset periods
@@ -2575,18 +2600,29 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // RENDER
   // ---------------------------------------------------------------------------
 
-  if (!dataReady) {
+  if (!dataReady || !splashDone) {
     return (
       <div style={{
-        minHeight: "100dvh",
+        fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+        background: colors.appBg,
+        color: colors.text,
+        height: "100dvh",
+        width: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: colors.appBg,
-        color: colors.text,
-        opacity: 0.5,
       }}>
-        Loading your workouts...
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center",
+          textAlign: "center", gap: 8,
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
+            {getTimeGreeting()}
+          </div>
+          <div style={{ fontSize: 14, opacity: 0.5 }}>
+            Ready to start a session?
+          </div>
+        </div>
       </div>
     );
   }
@@ -2681,7 +2717,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   }
                   const setter = tab === "train" ? setCollapsedToday : setCollapsedSummary;
                   const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                  const allCards = tab === "train" ? [...todayProgramWorkouts, ...dailyWorkoutsToday] : progressWorkouts;
+                  const allCards = tab === "train" ? [...displayedProgramWorkouts, ...dailyWorkoutsToday] : progressWorkouts;
                   const allCollapsed = allCards.every((w) => collapsed.has(w.id));
                   return (
                     <button
@@ -2785,7 +2821,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {trainSearchOpen && trainSearch.trim() && tab !== "social" && (() => {
             const q = trainSearch.trim().toLowerCase();
             const results = [];
-            for (const w of [...todayProgramWorkouts, ...dailyWorkoutsToday]) {
+            for (const w of [...displayedProgramWorkouts, ...dailyWorkoutsToday]) {
               for (const ex of w.exercises) {
                 if (ex.name.toLowerCase().includes(q)) {
                   results.push({ workout: w, exercise: ex });
@@ -2891,29 +2927,39 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             <div key="train" style={{
               ...styles.section,
               animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)",
-              ...(hasTodaySessions ? {} : { flex: 1, justifyContent: "center" }),
+              ...(isToday && !hasSessions ? { flex: 1, justifyContent: "center" } : {}),
             }}>
-              {!hasTodaySessions ? (
-                /* HERO STATE: centered greeting, no sessions */
+              {isToday && !hasSessions ? (
+                /* HERO STATE: centered greeting, today only, no sessions */
                 <div style={{
                   display: "flex", flexDirection: "column", alignItems: "center",
                   justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 8,
                 }}>
                   <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
-                    {getTimeGreeting(profile?.display_name || profile?.username)}
+                    {getTimeGreeting()}
                   </div>
                   <div style={{ fontSize: 14, opacity: 0.5 }}>
                     Ready to start a session?
                   </div>
                 </div>
+              ) : !isToday && !hasSessions ? (
+                /* NON-TODAY EMPTY: no logs or sessions */
+                <div style={{
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  textAlign: "center", padding: "48px 20px", gap: 8,
+                }}>
+                  <div style={{ fontSize: 14, opacity: 0.45 }}>
+                    No sessions logged.
+                  </div>
+                </div>
               ) : (
-                /* COMPACT STATE: greeting at top, then session cards */
+                /* HAS SESSIONS: header + cards */
                 <>
                   <div style={{ fontSize: 20, fontWeight: 700, padding: "4px 0 8px" }}>
-                    {getTimeGreeting(profile?.display_name || profile?.username)}
+                    {isToday ? "Today\u2019s sessions" : "Sessions logged"}
                   </div>
-                  <CoachNudge insights={coachInsights} colors={colors} />
-                  {/* Session cards — newest first (reverse insertion order) */}
+                  {isToday && <CoachNudge insights={coachInsights} colors={colors} />}
+                  {/* Explicitly added sessions (with remove button) — newest first */}
                   {[...todayProgramWorkouts].reverse().map((w) => (
                     <WorkoutCard
                       key={w.id}
@@ -2938,6 +2984,30 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onPromoteOverride={(origExId) => promoteOverride(w.id, origExId)}
                       onRemoveFromToday={() => removeSessionFromToday(w.id)}
                       highlightBorder={highlightCardId === w.id}
+                    />
+                  ))}
+                  {/* Auto-detected workouts from logs (no remove button) */}
+                  {logDetectedWorkouts.map((w) => (
+                    <WorkoutCard
+                      key={w.id}
+                      workout={w}
+                      collapsed={collapsedToday.has(w.id)}
+                      onToggle={() => toggleCollapse(setCollapsedToday, w.id)}
+                      logsForDate={logsForDate}
+                      openLog={openLog}
+                      deleteLogForExercise={deleteLogForExercise}
+                      styles={styles}
+                      findPrior={findPriorForExercise}
+                      colors={colors}
+                      onToggleRestTimer={toggleWorkoutRestTimer}
+                      globalRestEnabled={state.preferences?.restTimerEnabled !== false}
+                      weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
+                      onStartCircuit={(w) => setCircuitWorkout(w)}
+                      onSwapExercise={(exId) => openSwapExercise(w.id, exId, false)}
+                      onSkipExercise={(exId) => skipExercise(w.id, exId, false)}
+                      overrides={todayOverrides[w.id] || null}
+                      onUndoOverride={(origExId) => undoOverride(w.id, origExId)}
+                      onPromoteOverride={(origExId) => promoteOverride(w.id, origExId)}
                     />
                   ))}
                   {[...dailyWorkoutsToday].reverse().map((w) => (

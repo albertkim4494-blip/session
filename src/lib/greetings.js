@@ -162,13 +162,12 @@ const STREAK_MILESTONES = [
 // Time-based greeting (hero / compact)
 // ---------------------------------------------------------------------------
 
-export function getTimeGreeting(displayName) {
+export function getTimeGreeting() {
   const h = new Date().getHours();
-  const base = h >= 5 && h < 12 ? "Good morning"
-    : h >= 12 && h < 17 ? "Good afternoon"
-    : h >= 17 && h < 22 ? "Good evening"
-    : "Still going";
-  return displayName ? `${base}, ${displayName}.` : `${base}.`;
+  return h >= 5 && h < 12 ? "Good morning."
+    : h >= 12 && h < 17 ? "Good afternoon."
+    : h >= 17 && h < 22 ? "Good evening."
+    : "Still going.";
 }
 
 // ---------------------------------------------------------------------------
