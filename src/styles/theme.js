@@ -1009,13 +1009,13 @@ export function getStyles(colors) {
 
     fabPanel: {
       position: "fixed",
+      top: 64,
       bottom: "calc(140px + env(safe-area-inset-bottom, 0px))",
       right: "max(20px, calc(50vw - 360px))",
       left: "max(20px, calc(50vw - 360px))",
-      maxHeight: "calc(100dvh - 240px)",
       background: colors.cardBg,
       border: `1px solid rgba(0,0,0,0.06)`,
-      borderRadius: 18,
+      borderRadius: "0 0 18px 18px",
       boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
       overflow: "hidden",
       display: "flex",
