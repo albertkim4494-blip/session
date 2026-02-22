@@ -93,6 +93,7 @@ function ensureAnimations() {
 @keyframes fabPanelIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes cardInsert { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes highlightPulse { 0%,100% { box-shadow: none; } 50% { box-shadow: inset 0 0 0 2px var(--hl-color, #D97706); } }
+@keyframes fabGlow { 0%,100% { box-shadow: 0 4px 16px rgba(0,0,0,0.15); } 50% { box-shadow: 0 4px 24px var(--fab-glow, rgba(217,119,6,0.45)); } }
 .btn-press { transition: transform 0.15s ease, opacity 0.15s ease; }
 .btn-press:active { transform: scale(0.97); opacity: 0.85; }
 @media (hover: hover) {
@@ -3843,6 +3844,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               opacity: fabOpen ? 0 : fabVisible ? 1 : 0.3,
               transform: fabOpen ? "scale(0)" : "scale(1)",
               pointerEvents: fabOpen ? "none" : "auto",
+              "--fab-glow": colors.accent + "70",
+              ...((!fabOpen && !hasSessions) ? { animation: "fabGlow 2.5s ease-in-out infinite" } : {}),
             }} onClick={() => setFabOpen(true)} aria-label="Add workout to today">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 strokeWidth="2.5" strokeLinecap="round">
