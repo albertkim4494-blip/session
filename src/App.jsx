@@ -3839,6 +3839,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </div>
               </>
             )}
+            {!fabOpen && !hasSessions && (
+              <div style={{
+                position: "fixed",
+                bottom: "calc(88px + env(safe-area-inset-bottom, 0px))",
+                right: "max(88px, calc(50vw - 302px))",
+                background: colors.cardBg,
+                color: colors.accent,
+                fontSize: 13,
+                fontWeight: 600,
+                padding: "8px 14px",
+                borderRadius: 12,
+                boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+                opacity: fabVisible ? 1 : 0.3,
+                transition: "opacity 0.3s ease",
+                pointerEvents: "none",
+                zIndex: 40,
+                fontFamily: "inherit",
+              }}>
+                Start session
+              </div>
+            )}
             <button style={{
               ...styles.fab,
               opacity: fabOpen ? 0 : fabVisible ? 1 : 0.3,
