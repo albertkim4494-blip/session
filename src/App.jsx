@@ -59,7 +59,7 @@ import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
 import { buildCatalogMap, isBodyweightOnly } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
-import { selectAcknowledgment, selectSetCompletionToast } from "./lib/greetings";
+import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 
@@ -90,6 +90,9 @@ function ensureAnimations() {
 @keyframes timerPulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
 @keyframes setBreathe { 0%{box-shadow:0 0 0 0 rgba(46,204,113,0.35)} 50%{box-shadow:0 0 0 4px rgba(46,204,113,0.15)} 100%{box-shadow:0 0 0 0 rgba(46,204,113,0)} }
 @keyframes micPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+@keyframes fabPanelIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes cardInsert { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes highlightPulse { 0%,100% { box-shadow: none; } 50% { box-shadow: inset 0 0 0 2px var(--hl-color, #D97706); } }
 .btn-press { transition: transform 0.15s ease, opacity 0.15s ease; }
 .btn-press:active { transform: scale(0.97); opacity: 0.85; }
 @media (hover: hover) {
@@ -161,6 +164,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [reorderExercises, setReorderExercises] = useState(false);
   const [trainSearch, setTrainSearch] = useState("");
   const [trainSearchOpen, setTrainSearchOpen] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+  const [highlightCardId, setHighlightCardId] = useState(null);
+  const [fabVisible, setFabVisible] = useState(true);
 
   const [collapsedToday, setCollapsedToday] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_today"))); } catch { return new Set(); }
@@ -576,6 +582,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }, [workouts, todayOverrides]);
 
+  const todaySessionIds = state.todaySessions?.[dateKey] || EMPTY_ARRAY;
+
+  const todayProgramWorkouts = useMemo(() => {
+    if (todaySessionIds.length === 0) return EMPTY_ARRAY;
+    return todaySessionIds
+      .map(id => effectiveWorkouts.find(w => w.id === id))
+      .filter(Boolean);
+  }, [todaySessionIds, effectiveWorkouts]);
+
+  const hasTodaySessions = todayProgramWorkouts.length > 0 || dailyWorkoutsToday.length > 0;
+
   const workoutById = useMemo(() => {
     const m = new Map();
     for (const w of effectiveWorkouts) m.set(w.id, w);
@@ -939,6 +956,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   useEffect(() => {
     sessionStorage.setItem("wt_tab", tab);
+  }, [tab]);
+
+  // Close FAB when switching tabs
+  useEffect(() => { setFabOpen(false); }, [tab]);
+
+  // FAB scroll-fade effect
+  useEffect(() => {
+    if (tab !== "train") return;
+    const el = bodyRef.current;
+    if (!el) return;
+    let timer = null;
+    const onScroll = () => {
+      setFabVisible(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => setFabVisible(true), 300);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => { el.removeEventListener("scroll", onScroll); clearTimeout(timer); };
   }, [tab]);
 
   useEffect(() => {
@@ -2364,6 +2399,42 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }, [dateKey, workoutById]);
 
+  // ===== TODAY SESSION HANDLERS =====
+
+  function addSessionToToday(workoutId) {
+    const existing = state.todaySessions?.[dateKey] || [];
+    if (existing.includes(workoutId)) {
+      setFabOpen(false);
+      highlightAndScrollToCard(workoutId);
+      return;
+    }
+    updateState((st) => {
+      if (!st.todaySessions) st.todaySessions = {};
+      if (!st.todaySessions[dateKey]) st.todaySessions[dateKey] = [];
+      st.todaySessions[dateKey].push(workoutId);
+      return st;
+    });
+    setFabOpen(false);
+  }
+
+  function removeSessionFromToday(workoutId) {
+    updateState((st) => {
+      if (!st.todaySessions?.[dateKey]) return st;
+      st.todaySessions[dateKey] = st.todaySessions[dateKey].filter(id => id !== workoutId);
+      if (st.todaySessions[dateKey].length === 0) delete st.todaySessions[dateKey];
+      return st;
+    });
+  }
+
+  function highlightAndScrollToCard(workoutId) {
+    setHighlightCardId(workoutId);
+    setTimeout(() => {
+      const el = document.getElementById(`today-card-${workoutId}`);
+      if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 50);
+    setTimeout(() => setHighlightCardId(null), 1500);
+  }
+
   // ===== SESSION OVERRIDE HANDLERS (swap / skip / undo / promote) =====
 
   const skipExercise = useCallback((workoutId, exerciseId, isDaily) => {
@@ -2547,11 +2618,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   aria-label="Pick date"
                   type="button"
                 >
-                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.55, textTransform: "uppercase" }}>
-                    {new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" })}
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>
-                    {formatDateLabel(dateKey)}
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>
+                    {new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, {
+                      weekday: "short", month: "short", day: "numeric"
+                    })}
                   </div>
                 </button>
                 <button
@@ -2611,7 +2681,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   }
                   const setter = tab === "train" ? setCollapsedToday : setCollapsedSummary;
                   const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                  const allCards = tab === "train" ? [...effectiveWorkouts, ...dailyWorkoutsToday] : progressWorkouts;
+                  const allCards = tab === "train" ? [...todayProgramWorkouts, ...dailyWorkoutsToday] : progressWorkouts;
                   const allCollapsed = allCards.every((w) => collapsed.has(w.id));
                   return (
                     <button
@@ -2715,7 +2785,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {trainSearchOpen && trainSearch.trim() && tab !== "social" && (() => {
             const q = trainSearch.trim().toLowerCase();
             const results = [];
-            for (const w of [...effectiveWorkouts, ...dailyWorkoutsToday]) {
+            for (const w of [...todayProgramWorkouts, ...dailyWorkoutsToday]) {
               for (const ex of w.exercises) {
                 if (ex.name.toLowerCase().includes(q)) {
                   results.push({ workout: w, exercise: ex });
@@ -2818,38 +2888,36 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           {/* TODAY TAB */}
           {tab === "train" ? (
-            <div key="train" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
-              <CoachNudge insights={coachInsights} colors={colors} />
-              {effectiveWorkouts.length === 0 && dailyWorkoutsToday.length === 0 ? (
+            <div key="train" style={{
+              ...styles.section,
+              animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)",
+              ...(hasTodaySessions ? {} : { flex: 1, justifyContent: "center" }),
+            }}>
+              {!hasTodaySessions ? (
+                /* HERO STATE: centered greeting, no sessions */
                 <div style={{
-                  ...styles.card,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  textAlign: "center",
-                  padding: "32px 20px",
-                  gap: 12,
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 8,
                 }}>
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}>
-                    <path d="M4 12h16" /><rect x="2" y="8" width="4" height="8" rx="1" /><rect x="18" y="8" width="4" height="8" rx="1" /><rect x="6" y="6" width="3" height="12" rx="1" /><rect x="15" y="6" width="3" height="12" rx="1" />
-                  </svg>
-                  <div style={{ fontWeight: 600, fontSize: 16 }}>No workouts yet</div>
-                  <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
-                    Head to the <b>Program</b> tab to create your program, or generate one with AI.
+                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
+                    {getTimeGreeting(profile?.display_name || profile?.username)}
                   </div>
-                  <button
-                    className="btn-press"
-                    style={{ ...styles.primaryBtn, marginTop: 4, padding: "10px 20px" }}
-                    onClick={() => setTab("program")}
-                  >
-                    Go to Program
-                  </button>
+                  <div style={{ fontSize: 14, opacity: 0.5 }}>
+                    Ready to start a session?
+                  </div>
                 </div>
               ) : (
+                /* COMPACT STATE: greeting at top, then session cards */
                 <>
-                  {effectiveWorkouts.map((w) => (
+                  <div style={{ fontSize: 20, fontWeight: 700, padding: "4px 0 8px" }}>
+                    {getTimeGreeting(profile?.display_name || profile?.username)}
+                  </div>
+                  <CoachNudge insights={coachInsights} colors={colors} />
+                  {/* Session cards — newest first (reverse insertion order) */}
+                  {[...todayProgramWorkouts].reverse().map((w) => (
                     <WorkoutCard
                       key={w.id}
+                      cardId={`today-card-${w.id}`}
                       workout={w}
                       collapsed={collapsedToday.has(w.id)}
                       onToggle={() => toggleCollapse(setCollapsedToday, w.id)}
@@ -2868,9 +2936,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       overrides={todayOverrides[w.id] || null}
                       onUndoOverride={(origExId) => undoOverride(w.id, origExId)}
                       onPromoteOverride={(origExId) => promoteOverride(w.id, origExId)}
+                      onRemoveFromToday={() => removeSessionFromToday(w.id)}
+                      highlightBorder={highlightCardId === w.id}
                     />
                   ))}
-                  {dailyWorkoutsToday.map((w) => (
+                  {[...dailyWorkoutsToday].reverse().map((w) => (
                     <WorkoutCard
                       key={w.id}
                       workout={w}
@@ -2893,24 +2963,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onSkipExercise={(exId) => deleteDailyExercise(w.id, exId)}
                     />
                   ))}
-                  <button
-                    style={{
-                      ...styles.secondaryBtn,
-                      width: "100%",
-                      marginTop: 4,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                    }}
-                    onClick={openGenerateToday}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
-                      <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
-                      <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
-                    </svg>
-                    Generate Workout for Today
-                  </button>
                 </>
               )}
             </div>
@@ -3665,6 +3717,74 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             </div>
           ) : null}
         </div>
+
+        {/* FAB + Panel for Today tab */}
+        {tab === "train" && (
+          <>
+            {fabOpen && (
+              <>
+                <div style={{ position: "fixed", inset: 0, zIndex: 39 }}
+                  onClick={() => setFabOpen(false)} />
+                <div style={{
+                  ...styles.fabPanel,
+                  animation: "fabPanelIn 0.2s ease-out",
+                }}>
+                  <div style={{
+                    padding: "14px 16px", fontWeight: 700, fontSize: 15,
+                    borderBottom: "1px solid rgba(0,0,0,0.06)",
+                  }}>
+                    Add to today
+                  </div>
+                  <div style={{ maxHeight: "calc(60vh - 50px)", overflowY: "auto", padding: "8px 12px" }}>
+                    {workouts.map((w) => {
+                      const alreadyOn = (state.todaySessions?.[dateKey] || []).includes(w.id);
+                      return (
+                        <button key={w.id} style={{
+                          width: "100%", textAlign: "left", padding: "12px 14px",
+                          borderRadius: 14, border: `1px solid ${alreadyOn ? colors.accentBorder : colors.border}`,
+                          background: alreadyOn ? colors.accentBg : "transparent",
+                          color: colors.text, fontWeight: 600, fontSize: 14,
+                          marginBottom: 8, cursor: "pointer", fontFamily: "inherit",
+                        }} onClick={() => addSessionToToday(w.id)}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span>{w.name}</span>
+                            {alreadyOn && <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 400 }}>Added</span>}
+                          </div>
+                          <div style={{ fontSize: 12, opacity: 0.45, marginTop: 2, fontWeight: 400 }}>
+                            {w.exercises.length} exercise{w.exercises.length !== 1 ? "s" : ""} · {w.category || "Workout"}
+                          </div>
+                        </button>
+                      );
+                    })}
+                    <button style={{
+                      width: "100%", textAlign: "left", padding: "12px 14px",
+                      borderRadius: 14, border: `1px solid ${colors.border}`,
+                      background: "transparent", color: colors.text, fontWeight: 600, fontSize: 14,
+                      cursor: "pointer", fontFamily: "inherit",
+                      display: "flex", alignItems: "center", gap: 8,
+                    }} onClick={() => { setFabOpen(false); openGenerateToday(); }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                        <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z"/>
+                      </svg>
+                      Generate workout for today
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            <button style={{
+              ...styles.fab,
+              opacity: fabOpen ? 0 : fabVisible ? 1 : 0.3,
+              transform: fabOpen ? "scale(0)" : "scale(1)",
+              pointerEvents: fabOpen ? "none" : "auto",
+            }} onClick={() => setFabOpen(true)} aria-label="Add workout to today">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+          </>
+        )}
 
         {/* Bottom navigation */}
         <div style={styles.nav}>
@@ -5660,7 +5780,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride, cardId, onRemoveFromToday, highlightBorder }) {
   const cat = (workout.category || "Workout").trim();
 
   // Compute rest timer state from exercises: all on, all off, or mixed
@@ -5680,13 +5800,33 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
   const timerOpacity = allOn ? 0.8 : mixed ? 0.45 : 0.25;
 
   return (
-    <div className="card-hover" style={styles.card}>
+    <div id={cardId} className="card-hover" style={{
+      ...styles.card,
+      borderRadius: 18,
+      ...(highlightBorder ? {
+        boxShadow: `inset 0 0 0 2px ${colors.accent}`,
+        transition: "box-shadow 0.5s ease",
+      } : {}),
+    }}>
       <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
           {overrides && <span style={{ fontSize: 11, opacity: 0.5, fontStyle: "italic" }}>(modified)</span>}
         </div>
+        {onRemoveFromToday && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemoveFromToday(); }}
+            style={{ background: "transparent", border: "none", cursor: "pointer",
+              padding: 4, color: "inherit", opacity: 0.45, display: "flex", alignItems: "center" }}
+            aria-label="Remove from today"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        )}
         {daily && onDelete && (
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}

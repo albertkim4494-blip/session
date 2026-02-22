@@ -79,6 +79,7 @@ export function makeDefaultState() {
     },
     customExercises: [],
     dailyWorkouts: {},
+    todaySessions: {},
     sessionOverrides: {},
     logsByDate: {},
     preferences: {
@@ -124,6 +125,7 @@ export function normalizeState(st) {
         }))
       : [],
     dailyWorkouts: st.dailyWorkouts && typeof st.dailyWorkouts === "object" ? st.dailyWorkouts : {},
+    todaySessions: st.todaySessions && typeof st.todaySessions === "object" ? st.todaySessions : {},
     sessionOverrides: st.sessionOverrides && typeof st.sessionOverrides === "object" ? st.sessionOverrides : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
@@ -154,13 +156,18 @@ export function normalizeState(st) {
     next.preferences.equipment = ["full_gym"];
   }
 
-  // Clean up sessionOverrides older than 30 days
+  // Clean up sessionOverrides and todaySessions older than 30 days
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffKey = cutoff.toISOString().slice(0, 10);
   if (next.sessionOverrides) {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
-    const cutoffKey = cutoff.toISOString().slice(0, 10);
     for (const dk of Object.keys(next.sessionOverrides)) {
       if (dk < cutoffKey) delete next.sessionOverrides[dk];
+    }
+  }
+  if (next.todaySessions) {
+    for (const dk of Object.keys(next.todaySessions)) {
+      if (dk < cutoffKey) delete next.todaySessions[dk];
     }
   }
 
