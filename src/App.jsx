@@ -629,7 +629,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const logDetectedWorkouts = useMemo(() => {
     if (isToday) return EMPTY_ARRAY;
     if (!logsForDate || Object.keys(logsForDate).length === 0) return EMPTY_ARRAY;
-    const loggedExIds = new Set(Object.keys(logsForDate));
+    // Only count exercises that have at least one completed set
+    const loggedExIds = new Set(
+      Object.keys(logsForDate).filter(exId => {
+        const exLog = logsForDate[exId];
+        return exLog?.sets && Array.isArray(exLog.sets) && exLog.sets.some(isSetCompleted);
+      })
+    );
+    if (loggedExIds.size === 0) return EMPTY_ARRAY;
     const already = new Set(todaySessionIds);
     return effectiveWorkouts.filter(w => !already.has(w.id) && w.exercises.some(ex => loggedExIds.has(ex.id)));
   }, [isToday, logsForDate, todaySessionIds, effectiveWorkouts]);
