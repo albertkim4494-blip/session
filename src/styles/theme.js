@@ -991,7 +991,7 @@ export function getStyles(colors) {
     fab: {
       position: "fixed",
       bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
-      right: 20,
+      right: "max(20px, calc(50vw - 360px))",
       width: 60,
       height: 60,
       borderRadius: 999,
@@ -1010,7 +1010,7 @@ export function getStyles(colors) {
     fabPanel: {
       position: "fixed",
       bottom: "calc(140px + env(safe-area-inset-bottom, 0px))",
-      right: 20,
+      right: "max(20px, calc(50vw - 360px))",
       width: "calc(100% - 40px)",
       maxWidth: 340,
       maxHeight: "60vh",
