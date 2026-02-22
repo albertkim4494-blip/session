@@ -3790,8 +3790,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           <>
             {fabOpen && (
               <>
-                <div style={{ position: "fixed", inset: 0, zIndex: 39 }}
-                  onClick={() => setFabOpen(false)} />
+                <div style={{
+                  position: "fixed", inset: 0, zIndex: 39,
+                  backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+                  background: "rgba(0,0,0,0.15)",
+                }} onClick={() => setFabOpen(false)} />
                 <div style={{
                   ...styles.fabPanel,
                   animation: "fabPanelIn 0.2s ease-out",
