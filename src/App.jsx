@@ -91,8 +91,6 @@ function ensureAnimations() {
 @keyframes setBreathe { 0%{box-shadow:0 0 0 0 rgba(46,204,113,0.35)} 50%{box-shadow:0 0 0 4px rgba(46,204,113,0.15)} 100%{box-shadow:0 0 0 0 rgba(46,204,113,0)} }
 @keyframes micPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 @keyframes fabPanelIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes cardInsert { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes highlightPulse { 0%,100% { box-shadow: none; } 50% { box-shadow: inset 0 0 0 2px var(--hl-color, #D97706); } }
 @keyframes fabGlow { 0%,100% { box-shadow: 0 4px 16px rgba(0,0,0,0.15); } 50% { box-shadow: 0 0 28px 8px var(--fab-glow, rgba(217,119,6,0.6)), 0 4px 16px rgba(0,0,0,0.15); } }
 .btn-press { transition: transform 0.15s ease, opacity 0.15s ease; }
 .btn-press:active { transform: scale(0.97); opacity: 0.85; }
@@ -984,8 +982,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     sessionStorage.setItem("wt_tab", tab);
   }, [tab]);
 
-  // Close FAB when switching tabs
-  useEffect(() => { setFabOpen(false); }, [tab]);
+  // Close FAB when switching tabs or dates
+  useEffect(() => { setFabOpen(false); }, [tab, dateKey]);
 
   // FAB scroll-fade effect
   useEffect(() => {
@@ -2043,6 +2041,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           onConfirm: () => {
             updateState((st) => {
               st.program.workouts = st.program.workouts.filter((x) => x.id !== workoutId);
+              // Purge deleted workout from todaySessions
+              if (st.todaySessions) {
+                for (const dk of Object.keys(st.todaySessions)) {
+                  st.todaySessions[dk] = st.todaySessions[dk].filter(id => id !== workoutId);
+                  if (st.todaySessions[dk].length === 0) delete st.todaySessions[dk];
+                }
+              }
               return st;
             });
             if (manageWorkoutId === workoutId) setManageWorkoutId(null);
@@ -2919,7 +2924,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             </div>
           )}
 
-          {/* TODAY TAB */}
+          {/* SESSIONS TAB */}
           {tab === "train" ? (
             <div key="train" style={{
               ...styles.section,
@@ -3259,7 +3264,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </svg>
                   <div style={{ fontWeight: 600, fontSize: 16 }}>No data yet</div>
                   <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
-                    Log a session on the <b>Today</b> tab and your history will show up here.
+                    Log a session on the <b>Sessions</b> tab and your history will show up here.
                   </div>
                 </div>
               ) : (
@@ -3785,7 +3790,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           ) : null}
         </div>
 
-        {/* FAB + Panel for Today tab */}
+        {/* FAB + Panel for Sessions tab */}
         {tab === "train" && (
           <>
             {fabOpen && (
@@ -3807,6 +3812,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     Add Session
                   </div>
                   <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+                    {workouts.length === 0 && (
+                      <div style={{ padding: "16px 4px", fontSize: 13, opacity: 0.5, textAlign: "center" }}>
+                        No workouts yet. Create one in the Plans tab or generate one below.
+                      </div>
+                    )}
                     {workouts.map((w) => {
                       const alreadyOn = (state.todaySessions?.[dateKey] || []).includes(w.id);
                       return (
