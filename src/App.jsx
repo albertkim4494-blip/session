@@ -144,7 +144,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   ensureAnimations();
   const [state, setState] = useState(() => loadState());
   const [dataReady, setDataReady] = useState(false);
-  const [splashDone, setSplashDone] = useState(false);
   const cloudSaver = useRef(null);
   const [tab, setTab] = useState(() => sessionStorage.getItem("wt_tab") || "train");
   const tabRef = useRef("train");
@@ -482,12 +481,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       cloudSaver.current?.cancel();
     };
   }, [session.user.id]);
-
-  // Minimum 2-second splash on cold start
-  useEffect(() => {
-    const t = setTimeout(() => setSplashDone(true), 2000);
-    return () => clearTimeout(t);
-  }, []);
 
   // Fetch user profile
   useEffect(() => {
@@ -2600,29 +2593,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // RENDER
   // ---------------------------------------------------------------------------
 
-  if (!dataReady || !splashDone) {
+  if (!dataReady) {
     return (
-      <div style={styles.app}>
-        <div style={styles.content}>
-          {/* Invisible top bar spacer — matches real top bar height */}
-          <div style={styles.topBar} aria-hidden="true">
-            <div style={{ height: 36 }} />
-          </div>
-          {/* Body with greeting in same position as Today tab hero */}
-          <div style={styles.body}>
-            <div style={{
-              display: "flex", flexDirection: "column", alignItems: "center",
-              justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 8,
-            }}>
-              <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
-                {getTimeGreeting()}
-              </div>
-            </div>
-          </div>
-          {/* Invisible nav spacer — matches real bottom nav height */}
-          <div style={styles.nav} aria-hidden="true">
-            <div style={{ height: 42 }} />
-          </div>
+      <div style={{
+        fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+        background: colors.appBg,
+        color: colors.text,
+        height: "100dvh",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+      }}>
+        <img src="/icons/icon-192.png" alt="" width={80} height={80} style={{ borderRadius: 20 }} />
+        <div style={{
+          position: "fixed",
+          bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
+          fontSize: 13,
+          opacity: 0.35,
+        }}>
+          Loading your workouts...
         </div>
       </div>
     );
