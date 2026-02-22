@@ -642,9 +642,27 @@ export function CircuitTimer({
 
     startRecognition();
 
+    // Restart recognition when app returns from background (screen unlock, tab focus)
+    // Mobile browsers kill SpeechRecognition when the page is suspended and the
+    // onend handler may not fire reliably, leaving voice dead on wake.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && !cancelled) {
+        // Kill any stale recognition and restart fresh
+        clearTimeout(voiceRestartRef.current);
+        if (recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch {}
+          recognitionRef.current = null;
+        }
+        consecutiveErrorsRef.current = 0;
+        voiceRestartRef.current = setTimeout(startRecognition, 300);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       cancelled = true;
       clearTimeout(voiceRestartRef.current);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch {}
         recognitionRef.current = null;
