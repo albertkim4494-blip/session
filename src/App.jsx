@@ -3839,7 +3839,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </div>
               </>
             )}
-            {!fabOpen && !hasSessions && (
+            {!fabOpen && (
               <div style={{
                 position: "fixed",
                 bottom: "calc(88px + env(safe-area-inset-bottom, 0px))",
@@ -3857,7 +3857,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 zIndex: 40,
                 fontFamily: "inherit",
               }}>
-                Start session
+                Add session
               </div>
             )}
             <button style={{
