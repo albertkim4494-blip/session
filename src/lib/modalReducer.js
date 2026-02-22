@@ -88,6 +88,10 @@ export const initialModalState = {
     isOpen: false,
     workoutId: null,
     query: "",
+    swapMode: false,
+    swapExerciseId: null,
+    swapExerciseName: null,
+    swapIsDaily: false,
   },
   billing: {
     isOpen: false,
@@ -297,6 +301,10 @@ export function modalReducer(state, action) {
           isOpen: true,
           workoutId: action.payload.workoutId,
           query: "",
+          swapMode: action.payload.swapMode || false,
+          swapExerciseId: action.payload.swapExerciseId || null,
+          swapExerciseName: action.payload.swapExerciseName || null,
+          swapIsDaily: action.payload.swapIsDaily || false,
         },
       };
 

@@ -558,12 +558,30 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return result;
   }, [workouts]);
 
+  const todayOverrides = state.sessionOverrides?.[dateKey] || EMPTY_OBJ;
+
+  const effectiveWorkouts = useMemo(() => {
+    if (!Object.keys(todayOverrides).length) return workouts;
+    return workouts.map((w) => {
+      const ov = todayOverrides[w.id];
+      if (!ov) return w;
+      const exercises = [];
+      for (const ex of w.exercises) {
+        const o = ov[ex.id];
+        if (!o) { exercises.push(ex); continue; }
+        if (o.type === "skip") continue;
+        if (o.type === "swap") exercises.push(o.replacement);
+      }
+      return { ...w, exercises };
+    });
+  }, [workouts, todayOverrides]);
+
   const workoutById = useMemo(() => {
     const m = new Map();
-    for (const w of workouts) m.set(w.id, w);
+    for (const w of effectiveWorkouts) m.set(w.id, w);
     for (const w of dailyWorkoutsToday) m.set(w.id, w);
     return m;
-  }, [workouts, dailyWorkoutsToday]);
+  }, [effectiveWorkouts, dailyWorkoutsToday]);
 
   const fullCatalog = useMemo(() => [...EXERCISE_CATALOG, ...(state.customExercises || [])], [state.customExercises]);
   const catalogMap = useMemo(() => buildCatalogMap(fullCatalog), [fullCatalog]);
@@ -641,6 +659,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       }
     }
     const result = [...workouts];
+    // Include swap replacements from sessionOverrides so summaries reflect actual work
+    const swapExercises = [];
+    for (const [date, wOverrides] of Object.entries(state.sessionOverrides || {})) {
+      if (!inRangeInclusive(date, summaryRange.start, summaryRange.end)) continue;
+      for (const ov of Object.values(wOverrides)) {
+        for (const o of Object.values(ov)) {
+          if (o.type === "swap" && o.replacement) swapExercises.push(o.replacement);
+        }
+      }
+    }
+    if (swapExercises.length > 0) {
+      result.push({ id: "__swaps__", name: "Swapped Exercises", category: "Swap", exercises: swapExercises });
+    }
     if (dailyExercises.length > 0) {
       result.push({ id: "__daily__", name: "Daily Workouts", category: "Daily", exercises: dailyExercises });
     }
@@ -648,7 +679,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       result.push({ id: "__coach__", name: "Coach Suggestions", category: "Coach", exercises: coachExercises });
     }
     return result;
-  }, [workouts, state.dailyWorkouts, summaryRange]);
+  }, [workouts, state.dailyWorkouts, state.sessionOverrides, summaryRange]);
 
   const summaryStats = useMemo(() => {
     // Build exercise ID → name/unit maps from all workout sources
@@ -2333,6 +2364,100 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }, [dateKey, workoutById]);
 
+  // ===== SESSION OVERRIDE HANDLERS (swap / skip / undo / promote) =====
+
+  const skipExercise = useCallback((workoutId, exerciseId, isDaily) => {
+    if (isDaily) {
+      deleteDailyExercise(workoutId, exerciseId);
+      return;
+    }
+    const w = workoutById.get(workoutId);
+    const ex = w?.exercises?.find(e => e.id === exerciseId);
+    updateState((st) => {
+      if (!st.sessionOverrides) st.sessionOverrides = {};
+      if (!st.sessionOverrides[dateKey]) st.sessionOverrides[dateKey] = {};
+      if (!st.sessionOverrides[dateKey][workoutId]) st.sessionOverrides[dateKey][workoutId] = {};
+      st.sessionOverrides[dateKey][workoutId][exerciseId] = { type: "skip" };
+      return st;
+    });
+    showToast(`${ex?.name || "Exercise"} skipped for today`);
+  }, [dateKey, workoutById, deleteDailyExercise, showToast]);
+
+  const openSwapExercise = useCallback((workoutId, exerciseId, isDaily) => {
+    const w = workoutById.get(workoutId);
+    const ex = w?.exercises?.find(e => e.id === exerciseId);
+    dispatchModal({
+      type: "OPEN_CATALOG_BROWSE",
+      payload: {
+        workoutId,
+        swapMode: true,
+        swapExerciseId: exerciseId,
+        swapExerciseName: ex?.name || "",
+        swapIsDaily: isDaily,
+      },
+    });
+  }, [workoutById]);
+
+  const undoOverride = useCallback((workoutId, originalExerciseId) => {
+    const ov = state.sessionOverrides?.[dateKey]?.[workoutId]?.[originalExerciseId];
+    const replacementId = ov?.type === "swap" ? ov.replacement?.id : null;
+    updateState((st) => {
+      const wOv = st.sessionOverrides?.[dateKey]?.[workoutId];
+      if (!wOv) return st;
+      delete wOv[originalExerciseId];
+      if (Object.keys(wOv).length === 0) delete st.sessionOverrides[dateKey][workoutId];
+      if (Object.keys(st.sessionOverrides[dateKey] || {}).length === 0) delete st.sessionOverrides[dateKey];
+      // Clear logs for the replacement exercise
+      if (replacementId && st.logsByDate[dateKey]?.[replacementId]) {
+        delete st.logsByDate[dateKey][replacementId];
+      }
+      return st;
+    });
+    showToast("Change undone");
+  }, [dateKey, state.sessionOverrides, showToast]);
+
+  const promoteOverride = useCallback((workoutId, originalExerciseId) => {
+    const ov = state.sessionOverrides?.[dateKey]?.[workoutId]?.[originalExerciseId];
+    if (!ov || ov.type !== "swap") return;
+    const replacement = ov.replacement;
+    const originalName = ov.originalName || "Original";
+    dispatchModal({
+      type: "OPEN_CONFIRM",
+      payload: {
+        title: "Update program?",
+        message: `Replace "${originalName}" with "${replacement.name}" in your program? This changes all future sessions.`,
+        confirmText: "Confirm",
+        onConfirm: () => {
+          updateState((st) => {
+            // Find and replace in program template
+            const w = st.program.workouts.find(x => x.id === workoutId);
+            if (w) {
+              const idx = w.exercises.findIndex(e => e.id === originalExerciseId);
+              if (idx !== -1) {
+                w.exercises[idx] = { ...replacement, id: originalExerciseId };
+              }
+            }
+            // Remove the override
+            const wOv = st.sessionOverrides?.[dateKey]?.[workoutId];
+            if (wOv) {
+              delete wOv[originalExerciseId];
+              if (Object.keys(wOv).length === 0) delete st.sessionOverrides[dateKey][workoutId];
+              if (Object.keys(st.sessionOverrides[dateKey] || {}).length === 0) delete st.sessionOverrides[dateKey];
+            }
+            // Migrate logs from replacement id to original id
+            if (st.logsByDate[dateKey]?.[replacement.id]) {
+              st.logsByDate[dateKey][originalExerciseId] = st.logsByDate[dateKey][replacement.id];
+              delete st.logsByDate[dateKey][replacement.id];
+            }
+            return st;
+          });
+          dispatchModal({ type: "CLOSE_CONFIRM" });
+          showToast("Exercise updated in program");
+        },
+      },
+    });
+  }, [dateKey, state.sessionOverrides, showToast]);
+
   const saveProfile = useCallback(async (updates) => {
     try {
       const { error } = await supabase
@@ -2486,7 +2611,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   }
                   const setter = tab === "train" ? setCollapsedToday : setCollapsedSummary;
                   const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                  const allCards = tab === "train" ? [...workouts, ...dailyWorkoutsToday] : progressWorkouts;
+                  const allCards = tab === "train" ? [...effectiveWorkouts, ...dailyWorkoutsToday] : progressWorkouts;
                   const allCollapsed = allCards.every((w) => collapsed.has(w.id));
                   return (
                     <button
@@ -2590,7 +2715,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {trainSearchOpen && trainSearch.trim() && tab !== "social" && (() => {
             const q = trainSearch.trim().toLowerCase();
             const results = [];
-            for (const w of [...workouts, ...dailyWorkoutsToday]) {
+            for (const w of [...effectiveWorkouts, ...dailyWorkoutsToday]) {
               for (const ex of w.exercises) {
                 if (ex.name.toLowerCase().includes(q)) {
                   results.push({ workout: w, exercise: ex });
@@ -2695,7 +2820,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {tab === "train" ? (
             <div key="train" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
               <CoachNudge insights={coachInsights} colors={colors} />
-              {workouts.length === 0 && dailyWorkoutsToday.length === 0 ? (
+              {effectiveWorkouts.length === 0 && dailyWorkoutsToday.length === 0 ? (
                 <div style={{
                   ...styles.card,
                   display: "flex",
@@ -2722,7 +2847,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </div>
               ) : (
                 <>
-                  {workouts.map((w) => (
+                  {effectiveWorkouts.map((w) => (
                     <WorkoutCard
                       key={w.id}
                       workout={w}
@@ -2738,6 +2863,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       globalRestEnabled={state.preferences?.restTimerEnabled !== false}
                       weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
                       onStartCircuit={(w) => setCircuitWorkout(w)}
+                      onSwapExercise={(exId) => openSwapExercise(w.id, exId, false)}
+                      onSkipExercise={(exId) => skipExercise(w.id, exId, false)}
+                      overrides={todayOverrides[w.id] || null}
+                      onUndoOverride={(origExId) => undoOverride(w.id, origExId)}
+                      onPromoteOverride={(origExId) => promoteOverride(w.id, origExId)}
                     />
                   ))}
                   {dailyWorkoutsToday.map((w) => (
@@ -2759,6 +2889,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       globalRestEnabled={state.preferences?.restTimerEnabled !== false}
                       weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
                       onStartCircuit={(w) => setCircuitWorkout(w)}
+                      onSwapExercise={(exId) => openSwapExercise(w.id, exId, true)}
+                      onSkipExercise={(exId) => deleteDailyExercise(w.id, exId)}
                     />
                   ))}
                   <button
@@ -4802,6 +4934,52 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           });
         }}
         onAddExercise={(entry, workoutIdOrIds, userEx) => {
+          // --- Swap mode: replace exercise for today ---
+          if (modals.catalogBrowse.swapMode) {
+            const { swapExerciseId, swapExerciseName, swapIsDaily } = modals.catalogBrowse;
+            const wId = modals.catalogBrowse.workoutId;
+            let newEx;
+            if (userEx) {
+              newEx = { id: uid("ex"), name: userEx.name, unit: userEx.unit || "reps" };
+              if (userEx.catalogId) newEx.catalogId = userEx.catalogId;
+              if (userEx.customUnitAbbr) newEx.customUnitAbbr = userEx.customUnitAbbr;
+              if (userEx.customUnitAllowDecimal) newEx.customUnitAllowDecimal = userEx.customUnitAllowDecimal;
+            } else {
+              newEx = { id: uid("ex"), name: entry.name, unit: entry.defaultUnit, catalogId: entry.id };
+              if (isBodyweightOnly(entry)) newEx.bodyweight = true;
+            }
+
+            if (swapIsDaily) {
+              // Daily workout: replace exercise in-place
+              updateState((st) => {
+                const dayWs = st.dailyWorkouts?.[dateKey];
+                if (!dayWs) return st;
+                const wk = dayWs.find(dw => dw.id === wId);
+                if (!wk) return st;
+                const idx = wk.exercises.findIndex(e => e.id === swapExerciseId);
+                if (idx !== -1) wk.exercises[idx] = newEx;
+                return st;
+              });
+            } else {
+              // Program workout: write swap override
+              updateState((st) => {
+                if (!st.sessionOverrides) st.sessionOverrides = {};
+                if (!st.sessionOverrides[dateKey]) st.sessionOverrides[dateKey] = {};
+                if (!st.sessionOverrides[dateKey][wId]) st.sessionOverrides[dateKey][wId] = {};
+                st.sessionOverrides[dateKey][wId][swapExerciseId] = {
+                  type: "swap",
+                  replacement: newEx,
+                  originalName: swapExerciseName || "",
+                };
+                return st;
+              });
+            }
+            dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
+            showToast(`Swapped to ${newEx.name}`);
+            return;
+          }
+
+          // --- Normal add mode ---
           if (!workoutIdOrIds) return;
           const ids = Array.isArray(workoutIdOrIds) ? workoutIdOrIds : [workoutIdOrIds];
           updateState((st) => {
@@ -5293,7 +5471,78 @@ function MoodPicker({ value, onChange, colors }) {
 // SUB-COMPONENTS - Extracted from render to avoid re-creation per render
 // ============================================================================
 
-function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme, weightLabel, colors }) {
+function ExerciseMenu({ isOverridden, onSwapExercise, onSkipExercise, onUndoOverride, onPromoteOverride, exerciseId, originalExerciseId, colors }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [open]);
+
+  const menuBtnStyle = {
+    display: "flex", alignItems: "center", gap: 8,
+    width: "100%", padding: "10px 12px", border: "none",
+    background: "transparent", color: colors?.text || "#fff",
+    fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+    textAlign: "left", borderRadius: 6,
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "flex" }}>
+      <button
+        style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "inherit", opacity: 0.35, display: "flex" }}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        aria-label="Exercise options"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute", right: 0, top: "100%", zIndex: 50,
+            background: colors?.cardBg || "#1a1a2e", border: `1px solid ${colors?.border || "#333"}`,
+            borderRadius: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+            minWidth: 170, overflow: "hidden",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {isOverridden ? (
+            <>
+              <button style={menuBtnStyle} onClick={() => { setOpen(false); onUndoOverride?.(originalExerciseId); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 109-9"/><path d="M3 3v6h6"/></svg>
+                Undo Swap
+              </button>
+              <button style={menuBtnStyle} onClick={() => { setOpen(false); onPromoteOverride?.(originalExerciseId); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12l7-7 7 7"/></svg>
+                Make Permanent
+              </button>
+            </>
+          ) : (
+            <>
+              <button style={menuBtnStyle} onClick={() => { setOpen(false); onSwapExercise?.(exerciseId); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3l4 4-4 4"/><path d="M20 7H4"/><path d="M8 21l-4-4 4-4"/><path d="M4 17h16"/></svg>
+                Swap Exercise
+              </button>
+              <button style={menuBtnStyle} onClick={() => { setOpen(false); onSkipExercise?.(exerciseId); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+                Skip Today
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme, weightLabel, colors, onSwapExercise, onSkipExercise, isOverridden, onUndoOverride, onPromoteOverride, originalExerciseId }) {
   const exLog = logsForDate[exercise.id] ?? null;
   const hasAnySets = !!exLog && Array.isArray(exLog.sets) && exLog.sets.length > 0;
   const exUnit = getUnit(exercise.unit, exercise);
@@ -5389,14 +5638,29 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
               </svg>
             </button>
           )}
+          {(onSwapExercise || isOverridden) && (
+            <ExerciseMenu
+              isOverridden={isOverridden}
+              onSwapExercise={onSwapExercise}
+              onSkipExercise={onSkipExercise}
+              onUndoOverride={onUndoOverride}
+              onPromoteOverride={onPromoteOverride}
+              exerciseId={exercise.id}
+              originalExerciseId={originalExerciseId}
+              colors={colors}
+            />
+          )}
         </div>
       </div>
+      {isOverridden && (
+        <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2, fontStyle: "italic" }}>Swapped for today</div>
+      )}
       {hasLog && setsText ? <div style={styles.exerciseSub}>{setsText}</div> : null}
     </div>
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride }) {
   const cat = (workout.category || "Workout").trim();
 
   // Compute rest timer state from exercises: all on, all off, or mixed
@@ -5421,6 +5685,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
+          {overrides && <span style={{ fontSize: 11, opacity: 0.5, fontStyle: "italic" }}>(modified)</span>}
         </div>
         {daily && onDelete && (
           <button
@@ -5503,22 +5768,42 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
           <div style={styles.emptyText}>No exercises yet.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {workout.exercises.map((ex) => (
-              <ExerciseRow
-                key={ex.id}
-                workoutId={workout.id}
-                exercise={ex}
-                logsForDate={logsForDate}
-                openLog={openLog}
-                deleteLogForExercise={deleteLogForExercise}
-                styles={styles}
-                findPrior={findPrior}
-                onDeleteExercise={onDeleteExercise ? (exId) => onDeleteExercise(exId) : undefined}
-                workoutScheme={workout.scheme}
-                weightLabel={weightLabel}
-                colors={colors}
-              />
-            ))}
+            {workout.exercises.map((ex) => {
+              // Detect if this exercise is a swap replacement
+              let isSwapReplacement = false;
+              let origExId = null;
+              if (overrides) {
+                for (const [origId, o] of Object.entries(overrides)) {
+                  if (o.type === "swap" && o.replacement?.id === ex.id) {
+                    isSwapReplacement = true;
+                    origExId = origId;
+                    break;
+                  }
+                }
+              }
+              return (
+                <ExerciseRow
+                  key={ex.id}
+                  workoutId={workout.id}
+                  exercise={ex}
+                  logsForDate={logsForDate}
+                  openLog={openLog}
+                  deleteLogForExercise={deleteLogForExercise}
+                  styles={styles}
+                  findPrior={findPrior}
+                  onDeleteExercise={onDeleteExercise ? (exId) => onDeleteExercise(exId) : undefined}
+                  workoutScheme={workout.scheme}
+                  weightLabel={weightLabel}
+                  colors={colors}
+                  onSwapExercise={!isSwapReplacement ? onSwapExercise : undefined}
+                  onSkipExercise={!isSwapReplacement ? onSkipExercise : undefined}
+                  isOverridden={isSwapReplacement}
+                  onUndoOverride={isSwapReplacement ? onUndoOverride : undefined}
+                  onPromoteOverride={isSwapReplacement ? onPromoteOverride : undefined}
+                  originalExerciseId={origExId}
+                />
+              );
+            })}
             {onStartCircuit && workout.exercises.length >= 2 && (
               <button
                 className="btn-press"

@@ -79,6 +79,7 @@ export function makeDefaultState() {
     },
     customExercises: [],
     dailyWorkouts: {},
+    sessionOverrides: {},
     logsByDate: {},
     preferences: {
       defaultRestSec: 90,
@@ -123,6 +124,7 @@ export function normalizeState(st) {
         }))
       : [],
     dailyWorkouts: st.dailyWorkouts && typeof st.dailyWorkouts === "object" ? st.dailyWorkouts : {},
+    sessionOverrides: st.sessionOverrides && typeof st.sessionOverrides === "object" ? st.sessionOverrides : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
   };
@@ -150,6 +152,16 @@ export function normalizeState(st) {
   }
   if (!Array.isArray(next.preferences.equipment)) {
     next.preferences.equipment = ["full_gym"];
+  }
+
+  // Clean up sessionOverrides older than 30 days
+  if (next.sessionOverrides) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffKey = cutoff.toISOString().slice(0, 10);
+    for (const dk of Object.keys(next.sessionOverrides)) {
+      if (dk < cutoffKey) delete next.sessionOverrides[dk];
+    }
   }
 
   migrateCompletedFlag(next);
