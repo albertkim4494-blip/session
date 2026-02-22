@@ -2606,7 +2606,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         alignItems: "center",
         justifyContent: "center",
       }}>
-        <img src="/icons/icon-192.png" alt="" width={80} height={80} style={{ borderRadius: 20 }} />
+        <img src="/icons/icon-192.png" alt="" width={192} height={192} />
         <div style={{
           position: "fixed",
           bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
