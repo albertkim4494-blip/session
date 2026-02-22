@@ -2602,25 +2602,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   if (!dataReady || !splashDone) {
     return (
-      <div style={{
-        fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-        background: colors.appBg,
-        color: colors.text,
-        height: "100dvh",
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}>
-        <div style={{
-          display: "flex", flexDirection: "column", alignItems: "center",
-          textAlign: "center", gap: 8,
-        }}>
-          <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
-            {getTimeGreeting()}
+      <div style={styles.app}>
+        <div style={styles.content}>
+          {/* Invisible top bar spacer — matches real top bar height */}
+          <div style={styles.topBar} aria-hidden="true">
+            <div style={{ height: 36 }} />
           </div>
-          <div style={{ fontSize: 14, opacity: 0.5 }}>
-            Ready to start a session?
+          {/* Body with greeting in same position as Today tab hero */}
+          <div style={styles.body}>
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "center",
+              justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 8,
+            }}>
+              <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
+                {getTimeGreeting()}
+              </div>
+            </div>
+          </div>
+          {/* Invisible nav spacer — matches real bottom nav height */}
+          <div style={styles.nav} aria-hidden="true">
+            <div style={{ height: 42 }} />
           </div>
         </div>
       </div>
