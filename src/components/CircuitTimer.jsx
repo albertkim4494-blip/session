@@ -15,6 +15,36 @@ import { BodyDiagram } from "./BodyDiagram";
 const hasSpeechRecognition = typeof window !== "undefined" &&
   !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
+const hasSpeechSynthesis = typeof window !== "undefined" && !!window.speechSynthesis;
+
+/** Announce text via TTS. Pauses SpeechRecognition to avoid mic conflict on Android. */
+function announceExercise(text, recognitionRef, voiceRestartRef, startRecognitionFn) {
+  if (!hasSpeechSynthesis || !text) return;
+  // Pause recognition — Android can't do TTS + mic simultaneously
+  if (recognitionRef.current) {
+    try { recognitionRef.current.abort(); } catch {}
+    recognitionRef.current = null;
+  }
+  clearTimeout(voiceRestartRef.current);
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.1;
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+  utterance.onend = () => {
+    // Resume recognition after TTS finishes
+    if (startRecognitionFn) {
+      voiceRestartRef.current = setTimeout(startRecognitionFn, 200);
+    }
+  };
+  utterance.onerror = () => {
+    if (startRecognitionFn) {
+      voiceRestartRef.current = setTimeout(startRecognitionFn, 200);
+    }
+  };
+  window.speechSynthesis.cancel(); // Clear any queued speech
+  window.speechSynthesis.speak(utterance);
+}
+
 // ---------------------------------------------------------------------------
 // localStorage config persistence
 // ---------------------------------------------------------------------------
@@ -253,6 +283,7 @@ export function CircuitTimer({
   const micStreamRef = useRef(null);
   const voiceCooldownRef = useRef(0);
   const voiceFeedbackTimerRef = useRef(null);
+  const startRecognitionRef = useRef(null);
   const pausedRef = useRef(false);
   pausedRef.current = paused;
 
@@ -451,9 +482,18 @@ export function CircuitTimer({
       lastBeepRef.current = 0;
       navigator.vibrate?.(10);
       getReadyTimer.start(INITIAL_GET_READY_SEC, "countdown");
+      // Announce exercise name via TTS when voice is active
+      if (voiceActive && currentExercise) {
+        announceExercise(currentExercise.name, recognitionRef, voiceRestartRef, startRecognitionRef.current);
+      }
     } else if (phase === "work") {
       if (!isTimeBased) {
         workTimer.start(0, "stopwatch");
+      }
+      // Announce exercise name on work entry (after rest/round-rest transitions)
+      // Skip for first exercise — already announced during get-ready
+      if (voiceActive && currentExercise && !(currentExerciseIndex === 0 && currentRound === 1)) {
+        announceExercise(currentExercise.name, recognitionRef, voiceRestartRef, startRecognitionRef.current);
       }
       // Time-based auto-start is handled by a separate effect below
     } else if (phase === "rest") {
@@ -579,6 +619,7 @@ export function CircuitTimer({
 
     const startRecognition = () => {
       if (cancelled) return;
+      startRecognitionRef.current = startRecognition;
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -686,6 +727,9 @@ export function CircuitTimer({
     return () => {
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch {}
+      }
+      if (hasSpeechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch {}
       }
       clearTimeout(voiceFeedbackTimerRef.current);
       clearTimeout(voiceRestartRef.current);
