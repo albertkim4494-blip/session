@@ -90,7 +90,7 @@ function ensureAnimations() {
 @keyframes timerPulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
 @keyframes setBreathe { 0%{box-shadow:0 0 0 0 rgba(46,204,113,0.35)} 50%{box-shadow:0 0 0 4px rgba(46,204,113,0.15)} 100%{box-shadow:0 0 0 0 rgba(46,204,113,0)} }
 @keyframes micPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-@keyframes fabPanelIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes fabPanelIn { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
 @keyframes cardInsert { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes highlightPulse { 0%,100% { box-shadow: none; } 50% { box-shadow: inset 0 0 0 2px var(--hl-color, #D97706); } }
 @keyframes fabGlow { 0%,100% { box-shadow: 0 4px 16px rgba(0,0,0,0.15); } 50% { box-shadow: 0 0 28px 8px var(--fab-glow, rgba(217,119,6,0.6)), 0 4px 16px rgba(0,0,0,0.15); } }
@@ -3790,19 +3790,29 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           <>
             {fabOpen && (
               <>
-                <div style={{ position: "fixed", inset: 0, zIndex: 39 }}
-                  onClick={() => setFabOpen(false)} />
                 <div style={{
                   ...styles.fabPanel,
+                  zIndex: 50,
                   animation: "fabPanelIn 0.2s ease-out",
                 }}>
                   <div style={{
-                    padding: "14px 16px", fontWeight: 700, fontSize: 15,
-                    borderBottom: "1px solid rgba(0,0,0,0.06)",
+                    padding: "16px 20px", fontWeight: 700, fontSize: 17,
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    borderBottom: `1px solid ${colors.border}`,
+                    flexShrink: 0,
                   }}>
-                    Add to today
+                    <span>Add Session</span>
+                    <button onClick={() => setFabOpen(false)} style={{
+                      background: "transparent", border: "none", cursor: "pointer",
+                      padding: 4, color: colors.text, opacity: 0.5, display: "flex",
+                    }} aria-label="Close">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
                   </div>
-                  <div style={{ maxHeight: "calc(60vh - 50px)", overflowY: "auto", padding: "8px 12px" }}>
+                  <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
                     {workouts.map((w) => {
                       const alreadyOn = (state.todaySessions?.[dateKey] || []).includes(w.id);
                       return (

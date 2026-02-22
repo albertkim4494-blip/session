@@ -1009,16 +1009,14 @@ export function getStyles(colors) {
 
     fabPanel: {
       position: "fixed",
-      bottom: "calc(140px + env(safe-area-inset-bottom, 0px))",
-      right: "max(20px, calc(50vw - 360px))",
-      width: "calc(100% - 40px)",
-      maxWidth: 340,
-      maxHeight: "60vh",
-      background: colors.cardBg,
-      border: `1px solid rgba(0,0,0,0.06)`,
-      borderRadius: 18,
-      boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: colors.appBg,
       overflow: "hidden",
+      display: "flex",
+      flexDirection: "column",
       zIndex: 41,
     },
 
