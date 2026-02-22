@@ -2597,8 +2597,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return (
       <div style={{
         fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-        background: colors.appBg,
-        color: colors.text,
+        background: "#E8E0D4",
+        color: "#3D3530",
         height: "100dvh",
         width: "100%",
         display: "flex",
