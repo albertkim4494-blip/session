@@ -2936,7 +2936,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     {getTimeGreeting()}
                   </div>
                   <div style={{ fontSize: 14, opacity: 0.5 }}>
-                    Ready to start a session?
+                    Tap + to start a session
                   </div>
                 </div>
               ) : !isToday && !hasSessions ? (
@@ -3841,21 +3841,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             )}
             <button style={{
               ...styles.fab,
-              width: "auto",
-              paddingLeft: 18,
-              paddingRight: 22,
-              gap: 8,
               opacity: fabOpen ? 0 : fabVisible ? 1 : 0.3,
               transform: fabOpen ? "scale(0)" : "scale(1)",
               pointerEvents: fabOpen ? "none" : "auto",
               "--fab-glow": colors.accent + "AA",
               ...((!fabOpen && !hasSessions) ? { animation: "fabGlow 2.5s ease-in-out infinite" } : {}),
             }} onClick={() => setFabOpen(true)} aria-label="Add workout to today">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 strokeWidth="2.5" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "inherit" }}>Add session</span>
             </button>
           </>
         )}
