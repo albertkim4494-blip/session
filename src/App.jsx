@@ -3839,39 +3839,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </div>
               </>
             )}
-            {!fabOpen && (
-              <div style={{
-                position: "fixed",
-                bottom: "calc(88px + env(safe-area-inset-bottom, 0px))",
-                right: "max(88px, calc(50vw - 302px))",
-                background: colors.cardBg,
-                color: colors.accent,
-                fontSize: 13,
-                fontWeight: 600,
-                padding: "8px 14px",
-                borderRadius: 12,
-                boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-                opacity: fabVisible ? 1 : 0.3,
-                transition: "opacity 0.3s ease",
-                pointerEvents: "none",
-                zIndex: 40,
-                fontFamily: "inherit",
-              }}>
-                Add session
-              </div>
-            )}
             <button style={{
               ...styles.fab,
+              width: "auto",
+              paddingLeft: 18,
+              paddingRight: 22,
+              gap: 8,
               opacity: fabOpen ? 0 : fabVisible ? 1 : 0.3,
               transform: fabOpen ? "scale(0)" : "scale(1)",
               pointerEvents: fabOpen ? "none" : "auto",
               "--fab-glow": colors.accent + "AA",
               ...((!fabOpen && !hasSessions) ? { animation: "fabGlow 2.5s ease-in-out infinite" } : {}),
             }} onClick={() => setFabOpen(true)} aria-label="Add workout to today">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 strokeWidth="2.5" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
+              <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "inherit" }}>Add session</span>
             </button>
           </>
         )}
