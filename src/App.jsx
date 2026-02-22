@@ -2601,15 +2601,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         color: "#3D3530",
         height: "100dvh",
         width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
       }}>
-        <img src="/icons/icon-192.png" alt="" width={192} height={192} />
         <div style={{
           position: "fixed",
           bottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
+          width: "100%",
+          textAlign: "center",
           fontSize: 13,
           opacity: 0.35,
         }}>
