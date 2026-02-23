@@ -82,7 +82,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "one arm row",
+      "single arm row",
+      "one arm db row"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -113,7 +117,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "kettlebell"
     ],
-    "aliases": [],
+    "aliases": [
+      "renegade row",
+      "plank row"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -206,7 +213,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "bodyweight row",
+      "australian pull-up",
+      "body row"
+    ],
     "tags": [
       "isolation",
       "pull",
@@ -238,7 +249,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db row",
+      "dumbbell row"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -269,7 +283,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "reverse grip row",
+      "yates row",
+      "underhand row"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -331,7 +349,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "bent over row",
+      "barbell row",
+      "bb row"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -362,7 +384,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "t-bar row",
+      "t bar row",
+      "landmine row"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -423,7 +449,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "seated row",
+      "cable row",
+      "seated cable row"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -614,7 +644,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "trx row",
+      "suspension row",
+      "ring row"
+    ],
     "tags": [
       "isolation",
       "pull",
@@ -646,7 +680,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "pendlay row",
+      "strict row"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -770,7 +807,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "machine row",
+      "seated machine row"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -862,7 +902,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "tricep pushdown",
+      "triceps pushdown",
+      "cable tricep pushdown"
+    ],
     "tags": [
       "isolation"
     ],
@@ -890,7 +934,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db skull crusher",
+      "dumbbell skull crusher",
+      "lying db extension"
+    ],
     "tags": [
       "isolation"
     ],
@@ -918,7 +966,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "tricep kickback",
+      "kickback",
+      "triceps kickback"
+    ],
     "tags": [
       "isolation"
     ],
@@ -948,7 +1000,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "ring dip",
+      "gymnastic ring dip"
+    ],
     "tags": [
       "isolation",
       "bodyweight"
@@ -977,7 +1032,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "overhead tricep extension",
+      "seated overhead extension",
+      "db overhead extension"
+    ],
     "tags": [
       "isolation"
     ],
@@ -1005,7 +1064,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "standing overhead extension",
+      "overhead extension"
+    ],
     "tags": [
       "isolation"
     ],
@@ -1035,7 +1097,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "close grip bench",
+      "cgbp",
+      "close grip bench press"
+    ],
     "tags": [
       "isolation"
     ],
@@ -1063,7 +1129,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "rope pushdown",
+      "tricep rope pushdown",
+      "rope tricep pushdown"
+    ],
     "tags": [
       "isolation"
     ],
@@ -1091,7 +1161,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "skull crusher",
+      "skull crushers",
+      "lying triceps extension",
+      "french press"
+    ],
     "tags": [
       "isolation"
     ],
@@ -1121,7 +1196,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "close grip push-up",
+      "triangle push-up",
+      "diamond pushup"
+    ],
     "tags": [
       "isolation",
       "bodyweight"
@@ -1152,7 +1231,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "bench dip",
+      "tricep dip",
+      "chair dip"
+    ],
     "tags": [
       "isolation",
       "bodyweight"
@@ -1185,7 +1268,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "hspu",
+      "handstand pushup",
+      "pike press"
+    ],
     "tags": [
       "isolation",
       "bodyweight"
@@ -1214,7 +1301,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable shrugs"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -1278,7 +1367,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "kettlebell"
     ],
-    "aliases": [],
+    "aliases": [
+      "sumo high pull",
+      "kb high pull"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -1307,7 +1399,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "shrug",
+      "shrugs",
+      "bb shrug"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -1336,7 +1432,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db shrug",
+      "dumbbell shrugs"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -1399,7 +1498,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "stability ball back extension",
+      "swiss ball back extension"
+    ],
     "tags": [
       "isolation",
       "pull",
@@ -1431,7 +1533,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "machine back extension"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -1462,7 +1566,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "upward dog",
+      "up dog",
+      "cobra stretch"
+    ],
     "tags": [
       "isolation",
       "pull",
@@ -1494,7 +1602,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "back extension",
+      "hyper extension",
+      "roman chair",
+      "45 degree back extension"
+    ],
     "tags": [
       "isolation",
       "pull",
@@ -1596,7 +1709,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "clean and press",
+      "clean & press",
+      "clean press"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -1657,7 +1774,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "smith bulgarian split squat",
+      "smith machine split squat"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -1692,7 +1812,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "overhead squat",
+      "ohs"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -1789,7 +1912,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "snatch high pull"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -1822,7 +1947,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "bulgarian split squat",
+      "db bulgarian",
+      "rear foot elevated split squat",
+      "bss"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -1887,7 +2017,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "split squat",
+      "static lunge"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -1981,7 +2114,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "leg extension",
+      "quad extension",
+      "leg extensions"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -2012,7 +2149,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "sissy squats"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -2046,7 +2185,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "goblet squat",
+      "db goblet squat"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -2077,7 +2219,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "leg press",
+      "machine leg press",
+      "45 degree leg press"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -2110,7 +2256,13 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "farmer walk",
+      "farmer carry",
+      "farmer's walk",
+      "farmers carry",
+      "loaded carry"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -2141,7 +2293,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "machine chest press",
+      "chest press machine",
+      "seated chest press"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -2271,7 +2427,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable fly",
+      "cable crossover",
+      "cable flye",
+      "cable chest fly"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -2398,7 +2559,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "incline bench",
+      "incline press",
+      "incline barbell press"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -2429,7 +2594,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "knee push-up",
+      "modified push-up",
+      "beginner push-up"
+    ],
     "tags": [
       "isolation",
       "push",
@@ -2527,7 +2696,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db bench press",
+      "flat db press",
+      "dumbbell press"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -2558,7 +2731,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "decline cable fly",
+      "low cable crossover"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -2591,7 +2767,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "plyometric push-up",
+      "explosive push-up",
+      "plyo pushup"
+    ],
     "tags": [
       "isolation",
       "push",
@@ -2623,7 +2803,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "dips",
+      "parallel bar dip",
+      "chest dips"
+    ],
     "tags": [
       "isolation",
       "push",
@@ -2655,7 +2839,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "svend press",
+      "plate squeeze press"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -2718,7 +2905,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db pullover",
+      "chest pullover"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -2840,7 +3030,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "feet elevated push-up",
+      "decline pushup"
+    ],
     "tags": [
       "isolation",
       "push",
@@ -2966,7 +3159,13 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "bench press",
+      "flat bench",
+      "bench",
+      "flat bench press",
+      "bb bench press"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -3124,7 +3323,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "pushup",
+      "push up",
+      "press up"
+    ],
     "tags": [
       "isolation",
       "push",
@@ -3156,7 +3359,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "low to high cable fly",
+      "incline cable fly"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -3315,7 +3521,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "decline db press",
+      "db decline press"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -3344,7 +3553,13 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "dumbbell flye",
+      "db fly",
+      "flat fly",
+      "chest fly",
+      "pec fly"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -3440,7 +3655,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "incline pushup",
+      "elevated push-up"
+    ],
     "tags": [
       "isolation",
       "push",
@@ -3535,7 +3753,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "wide push-up",
+      "wide pushup",
+      "wide grip push-up"
+    ],
     "tags": [
       "isolation",
       "push",
@@ -3629,7 +3851,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "incline fly",
+      "incline flye",
+      "db incline fly"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -3691,7 +3917,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "decline bench",
+      "decline press"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -3783,7 +4012,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "clapping push-up",
+      "clap pushup"
+    ],
     "tags": [
       "isolation",
       "push",
@@ -3848,7 +4080,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "incline db press",
+      "db incline press",
+      "incline dumbbell press"
+    ],
     "tags": [
       "isolation",
       "push"
@@ -3911,7 +4147,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "lat pulldown",
+      "lat pull down",
+      "pulldown",
+      "front pulldown"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -4036,7 +4277,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "pullup",
+      "pull up"
+    ],
     "tags": [
       "isolation",
       "pull",
@@ -4068,7 +4312,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable lat pulldown",
+      "wide grip pulldown",
+      "cable pulldown"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -4103,7 +4351,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "muscle-up",
+      "bar muscle up"
+    ],
     "tags": [
       "isolation",
       "pull",
@@ -4135,7 +4386,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "straight arm pulldown",
+      "straight arm pushdown",
+      "stiff arm pulldown"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -4261,7 +4516,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "chinup",
+      "chin up",
+      "underhand pull-up"
+    ],
     "tags": [
       "isolation",
       "pull",
@@ -4325,7 +4584,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "wide pull-up",
+      "wide pullup"
+    ],
     "tags": [
       "isolation",
       "pull",
@@ -4357,7 +4619,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "reverse grip pulldown",
+      "underhand pulldown",
+      "reverse pulldown"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -4482,7 +4748,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "weighted pullup",
+      "weighted chin-up"
+    ],
     "tags": [
       "isolation",
       "pull"
@@ -4575,7 +4844,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "leg curl",
+      "hamstring curl",
+      "seated leg curl",
+      "leg curls"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -4633,7 +4907,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "standing hamstring stretch",
+      "toe touch"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -4665,7 +4942,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "runner's stretch",
+      "hip flexor stretch"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -4698,7 +4978,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "ghr",
+      "glute ham raise",
+      "nordic curl"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -4732,7 +5016,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "kettlebell"
     ],
-    "aliases": [],
+    "aliases": [
+      "hang clean",
+      "kb hang clean"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -4763,7 +5050,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "straight leg deadlift",
+      "sldl",
+      "stiff legged deadlift"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -4792,7 +5083,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "good morning",
+      "good mornings",
+      "gm"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -4857,7 +5152,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "clean",
+      "power cleans"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -4890,7 +5188,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "world's greatest stretch",
+      "wgs"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -4924,7 +5225,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "kettlebell"
     ],
-    "aliases": [],
+    "aliases": [
+      "kb goblet squat",
+      "kettlebell squat"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -4955,7 +5259,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "single leg deadlift",
+      "one leg deadlift"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -4986,7 +5293,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "rdl",
+      "romanian deadlift",
+      "stiff leg deadlift"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5019,7 +5330,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "kettlebell"
     ],
-    "aliases": [],
+    "aliases": [
+      "turkish get up",
+      "tgu",
+      "turkish getup"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5052,7 +5367,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "kettlebell"
     ],
-    "aliases": [],
+    "aliases": [
+      "kb front squat"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5083,7 +5400,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db deadlift"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5116,7 +5435,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db snatch",
+      "dumbbell snatch"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5149,7 +5471,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "sumo deadlift",
+      "sumo dl",
+      "wide stance deadlift"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5182,7 +5508,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "curtsy lunge",
+      "curtsey lunge",
+      "crossover lunge"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -5214,7 +5544,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "banded hip thrust",
+      "band glute bridge"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -5248,7 +5581,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "jump squat barbell"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5281,7 +5616,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "bb lunge",
+      "barbell walking lunge"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5312,7 +5650,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable pull through",
+      "pull through",
+      "cable pull-through"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5345,7 +5687,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "reverse lunge",
+      "step back lunge"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5378,7 +5723,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "tire flips",
+      "tyre flip"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -5509,7 +5857,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "smith machine squat"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5540,7 +5890,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "weighted glute bridge",
+      "bb glute bridge"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5734,7 +6087,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "step up",
+      "step-up",
+      "box step up"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5799,7 +6156,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "squat",
+      "back squat",
+      "barbell squat",
+      "bb squat"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5832,7 +6194,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "hack squat",
+      "machine hack squat"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5865,7 +6230,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "bodyweight jump squat",
+      "squat jump"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -5899,7 +6267,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "barbell step up",
+      "weighted step up"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5930,7 +6301,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db rdl",
+      "dumbbell rdl"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -5963,7 +6337,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "one legged squat",
+      "assisted pistol squat"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -5999,7 +6376,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "front squat",
+      "front rack squat"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -6032,7 +6412,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "hex bar deadlift",
+      "trap bar dl"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -6065,7 +6448,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "pistol squat",
+      "pistol",
+      "single leg squat"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -6099,7 +6486,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "walking lunges",
+      "lunge walk"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -6135,7 +6525,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "zercher squat",
+      "zercher"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -6166,7 +6559,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "deadlift",
+      "conventional deadlift",
+      "dl"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -6197,7 +6594,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "glute bridge",
+      "bridge",
+      "hip bridge"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -6229,7 +6630,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "kettlebell"
     ],
-    "aliases": [],
+    "aliases": [
+      "kb swing",
+      "kettlebell swings",
+      "russian swing"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -6262,7 +6667,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "jump lunge",
+      "jumping lunge",
+      "split jump"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -6359,7 +6768,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db lunge",
+      "weighted lunge"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -6424,7 +6836,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "lunge",
+      "lunges",
+      "forward lunges"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -6458,7 +6874,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db clean",
+      "dumbbell power clean"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -6551,7 +6970,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "finger curl",
+      "grip training"
+    ],
     "tags": [
       "isolation"
     ],
@@ -6580,7 +7002,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "wrist curl",
+      "forearm curl"
+    ],
     "tags": [
       "isolation"
     ],
@@ -6609,7 +7034,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "reverse wrist curl",
+      "wrist extension"
+    ],
     "tags": [
       "isolation"
     ],
@@ -6783,7 +7211,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "seated lateral raise",
+      "seated side raise"
+    ],
     "tags": [
       "isolation"
     ],
@@ -6813,7 +7244,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "military press",
+      "strict press",
+      "barbell ohp"
+    ],
     "tags": [
       "isolation"
     ],
@@ -6904,7 +7339,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "reverse fly",
+      "rear delt fly",
+      "reverse flye",
+      "bent over fly"
+    ],
     "tags": [
       "isolation"
     ],
@@ -6933,7 +7373,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable reverse fly",
+      "cable rear delt fly",
+      "reverse cable fly"
+    ],
     "tags": [
       "isolation"
     ],
@@ -6967,7 +7411,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "thruster",
+      "thrusters",
+      "front squat to press"
+    ],
     "tags": [
       "isolation"
     ],
@@ -6997,7 +7445,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "upright row cable"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7027,7 +7477,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "smith machine shoulder press",
+      "smith press"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7057,7 +7510,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "upright row",
+      "bb upright row"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7119,7 +7575,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "kettlebell"
     ],
-    "aliases": [],
+    "aliases": [
+      "kb snatch",
+      "kettlebell snatch"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7148,7 +7607,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "rear delt raise",
+      "bent over lateral raise"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7206,7 +7668,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "lateral raise",
+      "side raise",
+      "side lateral raise",
+      "lat raise"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7235,7 +7702,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "band rear delt fly",
+      "resistance band reverse fly"
+    ],
     "tags": [
       "isolation",
       "bodyweight"
@@ -7265,7 +7735,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "arnold press",
+      "arnold shoulder press"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7295,7 +7768,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "push press",
+      "db push press"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7325,7 +7801,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "front raise",
+      "front delt raise"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7355,7 +7834,13 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "overhead press",
+      "ohp",
+      "shoulder press",
+      "db overhead press",
+      "standing press"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7385,7 +7870,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "battle ropes",
+      "battle rope",
+      "rope slams",
+      "rope waves"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7415,7 +7905,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "db upright row"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7445,7 +7937,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable side raise"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7590,7 +8084,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": ["face pull", "rope face pull", "cable rope face pull"],
+    "aliases": [
+      "face pull",
+      "rope face pull",
+      "cable rope face pull",
+      "face pulls"
+    ],
     "tags": [
       "compound",
       "pull"
@@ -7742,7 +8241,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "seated ohp",
+      "seated press",
+      "bb overhead press"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7771,7 +8274,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "machine reverse fly",
+      "pec deck reverse",
+      "rear delt machine"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7858,7 +8365,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "rear delt raise db",
+      "bent over raise"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7890,7 +8400,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "kettlebell"
     ],
-    "aliases": [],
+    "aliases": [
+      "kb thruster"
+    ],
     "tags": [
       "isolation"
     ],
@@ -7955,7 +8467,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "running",
+      "jog",
+      "jogging",
+      "treadmill"
+    ],
     "tags": [
       "isolation",
       "bodyweight",
@@ -8059,7 +8576,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "stairmaster",
+      "stair climber",
+      "step mill",
+      "stair stepper"
+    ],
     "tags": [
       "isolation",
       "cardio"
@@ -8094,7 +8616,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "skaters",
+      "speed skaters",
+      "lateral hops"
+    ],
     "tags": [
       "isolation",
       "bodyweight",
@@ -8130,7 +8656,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "high knees",
+      "high knee run"
+    ],
     "tags": [
       "isolation",
       "bodyweight",
@@ -8164,7 +8693,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "incline walk",
+      "treadmill incline",
+      "incline treadmill"
+    ],
     "tags": [
       "isolation",
       "cardio"
@@ -8197,7 +8730,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "mountain climbers",
+      "mt climber"
+    ],
     "tags": [
       "isolation",
       "bodyweight",
@@ -8235,7 +8771,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "burpees"
+    ],
     "tags": [
       "isolation",
       "bodyweight",
@@ -8271,7 +8809,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "skipping",
+      "skip rope",
+      "skipping rope"
+    ],
     "tags": [
       "isolation",
       "cardio"
@@ -8372,7 +8914,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "elliptical cross trainer"
+    ],
     "tags": [
       "isolation",
       "cardio"
@@ -8480,7 +9024,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "exercise bike",
+      "spin bike",
+      "cycling machine"
+    ],
     "tags": [
       "isolation",
       "cardio"
@@ -8515,7 +9063,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "elliptical machine",
+      "elliptical trainer"
+    ],
     "tags": [
       "isolation",
       "cardio"
@@ -8548,7 +9099,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "jumping jack",
+      "jumping jacks",
+      "star jumps"
+    ],
     "tags": [
       "isolation",
       "bodyweight",
@@ -8616,7 +9171,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "standing calf raise",
+      "calf raise",
+      "calf raises"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -8671,7 +9230,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "machine seated calf raise"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -8732,7 +9293,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "donkey calf",
+      "donkey raise"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -8791,7 +9355,9 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "seated calf raise"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -8819,7 +9385,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "bodyweight calf raise",
+      "bw calf raise"
+    ],
     "tags": [
       "isolation",
       "legs",
@@ -8908,7 +9477,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "leg press calf raise",
+      "calf press on leg press"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -8964,7 +9536,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "machine calf raise",
+      "standing machine calf raise"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -8993,7 +9568,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "incline curl",
+      "incline dumbbell curl",
+      "incline bicep curl"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9021,7 +9600,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "zottman curl",
+      "zottman curls"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9049,7 +9631,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "drag curl",
+      "body drag curl"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9077,7 +9662,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "concentration curl",
+      "seated concentration curl"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9107,7 +9695,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "biceps chin-up",
+      "close grip pull-up"
+    ],
     "tags": [
       "isolation",
       "bodyweight"
@@ -9136,7 +9727,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "preacher curl",
+      "scott curl",
+      "ez bar preacher curl"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9164,7 +9759,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "ez curl",
+      "ez bar curl",
+      "easy bar curl",
+      "cambered bar curl"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9192,7 +9792,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "bb curl",
+      "standing barbell curl",
+      "bicep curl barbell"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9220,7 +9824,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "bicep curl",
+      "db curl",
+      "dumbbell curl",
+      "bicep curls"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9248,7 +9857,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable bicep curl",
+      "cable curls"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9276,7 +9888,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "hammer curl",
+      "hammer curls",
+      "neutral grip curl"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9304,7 +9920,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "rope hammer curl",
+      "cable rope curl"
+    ],
     "tags": [
       "isolation"
     ],
@@ -9366,7 +9985,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "hip adduction",
+      "adduction machine",
+      "hip adductor",
+      "inner thigh machine"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -9456,7 +10080,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "side bends",
+      "weighted side bend"
+    ],
     "tags": [
       "isolation",
       "core"
@@ -9487,7 +10114,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "weighted plank",
+      "plank with plate"
+    ],
     "tags": [
       "isolation",
       "core"
@@ -9548,7 +10178,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "side plank incline",
+      "side plank hold incline"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -9580,7 +10213,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "pallof press",
+      "anti-rotation press",
+      "pallof"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -9640,7 +10277,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "reverse crunches",
+      "lower ab crunch"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -9671,7 +10311,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "parallel bar leg raise",
+      "knee raise on parallel bars"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -9701,7 +10344,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable crunch",
+      "cable crunches",
+      "rope crunch"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -9731,7 +10378,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable oblique",
+      "cable side bends"
+    ],
     "tags": [
       "isolation",
       "core"
@@ -9760,7 +10410,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "jackknife",
+      "v-up",
+      "pike crunch"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -9794,7 +10448,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "planche lean",
+      "pseudo planche"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -9922,7 +10579,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "inchworms",
+      "walk out"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -9982,7 +10642,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "hanging knee raise",
+      "leg raise",
+      "hanging leg raises"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10073,7 +10737,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "sit-up",
+      "situp",
+      "sit up"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10103,7 +10771,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "bicycle crunch",
+      "bicycles",
+      "bicycle kick",
+      "air bicycle"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10135,7 +10808,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "hip raise",
+      "reverse crunch hip raise",
+      "leg hip raise"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10197,7 +10874,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "dead bugs",
+      "opposite arm leg raise"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10227,7 +10907,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "v-sit",
+      "v sit",
+      "v-up hold"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10257,7 +10941,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "l-sit",
+      "l sit",
+      "l-sit hold"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10287,7 +10975,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "toes to bar",
+      "straight leg raise"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10319,7 +11010,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "plank rotation",
+      "plank twist"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10349,7 +11043,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "side bend",
+      "oblique bend"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10381,7 +11078,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "barbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "landmine twist",
+      "landmine rotation",
+      "landmine oblique"
+    ],
     "tags": [
       "isolation",
       "core"
@@ -10442,7 +11143,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "ab wheel"
     ],
-    "aliases": [],
+    "aliases": [
+      "ab wheel",
+      "ab roller",
+      "ab wheel rollout",
+      "rollout"
+    ],
     "tags": [
       "isolation",
       "core"
@@ -10535,7 +11241,12 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "crunches",
+      "crunch",
+      "basic crunch",
+      "floor crunch"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10666,7 +11377,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "cable"
     ],
-    "aliases": [],
+    "aliases": [
+      "cable woodchop",
+      "cable rotation",
+      "woodchopper"
+    ],
     "tags": [
       "isolation",
       "core"
@@ -10726,7 +11441,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "oblique crunch",
+      "side crunch",
+      "oblique crunches"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10821,7 +11540,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "shoulder taps",
+      "plank shoulder tap"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10853,7 +11575,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "dumbbell"
     ],
-    "aliases": [],
+    "aliases": [
+      "russian twist with weight",
+      "medicine ball russian twist"
+    ],
     "tags": [
       "isolation",
       "core"
@@ -10882,7 +11607,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "captain's chair",
+      "captains chair leg raise",
+      "roman chair leg raise"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -10976,7 +11705,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "cross crunch",
+      "crossover crunch",
+      "bicycle crunch on floor"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -11007,7 +11740,10 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "bodyweight"
     ],
-    "aliases": [],
+    "aliases": [
+      "russian twists",
+      "seated twist"
+    ],
     "tags": [
       "isolation",
       "core",
@@ -11038,7 +11774,11 @@ export const EXERCISE_CATALOG = [
     "equipment": [
       "machine"
     ],
-    "aliases": [],
+    "aliases": [
+      "hip abduction",
+      "abduction machine",
+      "hip abductor"
+    ],
     "tags": [
       "isolation",
       "legs"
@@ -11094,7 +11834,8 @@ export const EXERCISE_CATALOG = [
     ],
     "aliases": [
       "jerk",
-      "split jerk"
+      "split jerk",
+      "push jerks"
     ],
     "tags": [
       "compound",
@@ -11119,7 +11860,8 @@ export const EXERCISE_CATALOG = [
     ],
     "aliases": [
       "prowler push",
-      "sled drive"
+      "sled drive",
+      "prowler"
     ],
     "tags": [
       "compound",
@@ -11169,7 +11911,8 @@ export const EXERCISE_CATALOG = [
     "equipment": [],
     "aliases": [
       "hike",
-      "trail hike"
+      "trail hike",
+      "trail walk"
     ],
     "tags": [
       "cardio"
@@ -11192,13 +11935,16 @@ export const EXERCISE_CATALOG = [
     "equipment": [],
     "aliases": [
       "sprint",
-      "interval sprints"
+      "interval sprints",
+      "wind sprints",
+      "dashes"
     ],
     "tags": [
       "cardio",
       "hiit"
     ],
-    "movement": "cardio"
+    "movement": "cardio",
+    "gifUrl": "https://static.exercisedb.dev/media/Qoujh3Q.gif"
   },
   {
     "id": "sp-basketball",
@@ -12174,12 +12920,34 @@ export const EXERCISE_CATALOG = [
     "name": "Swimming",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["BACK", "ANTERIOR_DELT", "ABS", "QUADS", "HAMSTRINGS"],
-      "secondary": ["TRICEPS", "BICEPS", "CALVES", "GLUTES"]
+      "primary": [
+        "BACK",
+        "ANTERIOR_DELT",
+        "ABS",
+        "QUADS",
+        "HAMSTRINGS"
+      ],
+      "secondary": [
+        "TRICEPS",
+        "BICEPS",
+        "CALVES",
+        "GLUTES"
+      ]
     },
     "equipment": [],
-    "aliases": ["swim", "laps", "freestyle", "backstroke", "breaststroke", "butterfly", "open water"],
-    "tags": ["sport", "cardio"],
+    "aliases": [
+      "swim",
+      "laps",
+      "freestyle",
+      "backstroke",
+      "breaststroke",
+      "butterfly",
+      "open water"
+    ],
+    "tags": [
+      "sport",
+      "cardio"
+    ],
     "movement": "sport"
   },
   {
@@ -12187,12 +12955,32 @@ export const EXERCISE_CATALOG = [
     "name": "Cycling",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["QUADS", "HAMSTRINGS", "GLUTES", "CALVES"],
-      "secondary": ["ABS", "BACK"]
+      "primary": [
+        "QUADS",
+        "HAMSTRINGS",
+        "GLUTES",
+        "CALVES"
+      ],
+      "secondary": [
+        "ABS",
+        "BACK"
+      ]
     },
     "equipment": [],
-    "aliases": ["biking", "road cycling", "mountain biking", "mtb", "bike ride", "spinning", "indoor cycling", "bmx"],
-    "tags": ["sport", "cardio"],
+    "aliases": [
+      "biking",
+      "road cycling",
+      "mountain biking",
+      "mtb",
+      "bike ride",
+      "spinning",
+      "indoor cycling",
+      "bmx"
+    ],
+    "tags": [
+      "sport",
+      "cardio"
+    ],
     "movement": "sport"
   },
   {
@@ -12200,12 +12988,32 @@ export const EXERCISE_CATALOG = [
     "name": "Triathlon",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["QUADS", "HAMSTRINGS", "GLUTES", "BACK", "ANTERIOR_DELT"],
-      "secondary": ["CALVES", "ABS", "TRICEPS", "BICEPS"]
+      "primary": [
+        "QUADS",
+        "HAMSTRINGS",
+        "GLUTES",
+        "BACK",
+        "ANTERIOR_DELT"
+      ],
+      "secondary": [
+        "CALVES",
+        "ABS",
+        "TRICEPS",
+        "BICEPS"
+      ]
     },
     "equipment": [],
-    "aliases": ["tri", "ironman", "sprint triathlon", "olympic triathlon", "swim bike run"],
-    "tags": ["sport", "cardio"],
+    "aliases": [
+      "tri",
+      "ironman",
+      "sprint triathlon",
+      "olympic triathlon",
+      "swim bike run"
+    ],
+    "tags": [
+      "sport",
+      "cardio"
+    ],
     "movement": "sport"
   },
   {
@@ -12213,12 +13021,28 @@ export const EXERCISE_CATALOG = [
     "name": "Ice Hockey",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["QUADS", "GLUTES", "HAMSTRINGS", "ABS", "ANTERIOR_DELT"],
-      "secondary": ["CALVES", "BACK", "FOREARMS"]
+      "primary": [
+        "QUADS",
+        "GLUTES",
+        "HAMSTRINGS",
+        "ABS",
+        "ANTERIOR_DELT"
+      ],
+      "secondary": [
+        "CALVES",
+        "BACK",
+        "FOREARMS"
+      ]
     },
     "equipment": [],
-    "aliases": ["hockey on ice", "pond hockey", "shinny"],
-    "tags": ["sport"],
+    "aliases": [
+      "hockey on ice",
+      "pond hockey",
+      "shinny"
+    ],
+    "tags": [
+      "sport"
+    ],
     "movement": "sport"
   },
   {
@@ -12226,12 +13050,27 @@ export const EXERCISE_CATALOG = [
     "name": "Beach Volleyball",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["QUADS", "GLUTES", "ANTERIOR_DELT", "ABS", "CALVES"],
-      "secondary": ["HAMSTRINGS", "BACK", "FOREARMS"]
+      "primary": [
+        "QUADS",
+        "GLUTES",
+        "ANTERIOR_DELT",
+        "ABS",
+        "CALVES"
+      ],
+      "secondary": [
+        "HAMSTRINGS",
+        "BACK",
+        "FOREARMS"
+      ]
     },
     "equipment": [],
-    "aliases": ["sand volleyball", "beach volley"],
-    "tags": ["sport"],
+    "aliases": [
+      "sand volleyball",
+      "beach volley"
+    ],
+    "tags": [
+      "sport"
+    ],
     "movement": "sport"
   },
   {
@@ -12239,12 +13078,26 @@ export const EXERCISE_CATALOG = [
     "name": "Figure Skating",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["QUADS", "GLUTES", "HAMSTRINGS", "ABS", "CALVES"],
-      "secondary": ["BACK", "ANTERIOR_DELT"]
+      "primary": [
+        "QUADS",
+        "GLUTES",
+        "HAMSTRINGS",
+        "ABS",
+        "CALVES"
+      ],
+      "secondary": [
+        "BACK",
+        "ANTERIOR_DELT"
+      ]
     },
     "equipment": [],
-    "aliases": ["ice skating", "skating"],
-    "tags": ["sport"],
+    "aliases": [
+      "ice skating",
+      "skating"
+    ],
+    "tags": [
+      "sport"
+    ],
     "movement": "sport"
   },
   {
@@ -12252,12 +13105,27 @@ export const EXERCISE_CATALOG = [
     "name": "Speed Skating",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["QUADS", "GLUTES", "HAMSTRINGS", "CALVES", "ABS"],
-      "secondary": ["BACK"]
+      "primary": [
+        "QUADS",
+        "GLUTES",
+        "HAMSTRINGS",
+        "CALVES",
+        "ABS"
+      ],
+      "secondary": [
+        "BACK"
+      ]
     },
     "equipment": [],
-    "aliases": ["short track", "long track", "inline skating"],
-    "tags": ["sport", "cardio"],
+    "aliases": [
+      "short track",
+      "long track",
+      "inline skating"
+    ],
+    "tags": [
+      "sport",
+      "cardio"
+    ],
     "movement": "sport"
   },
   {
@@ -12265,12 +13133,24 @@ export const EXERCISE_CATALOG = [
     "name": "Curling",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["QUADS", "GLUTES", "HAMSTRINGS", "ABS"],
-      "secondary": ["ANTERIOR_DELT", "BACK"]
+      "primary": [
+        "QUADS",
+        "GLUTES",
+        "HAMSTRINGS",
+        "ABS"
+      ],
+      "secondary": [
+        "ANTERIOR_DELT",
+        "BACK"
+      ]
     },
     "equipment": [],
-    "aliases": ["curling match"],
-    "tags": ["sport"],
+    "aliases": [
+      "curling match"
+    ],
+    "tags": [
+      "sport"
+    ],
     "movement": "sport"
   },
   {
@@ -12278,12 +13158,26 @@ export const EXERCISE_CATALOG = [
     "name": "Sailing",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["ABS", "BACK", "ANTERIOR_DELT", "FOREARMS"],
-      "secondary": ["QUADS", "BICEPS"]
+      "primary": [
+        "ABS",
+        "BACK",
+        "ANTERIOR_DELT",
+        "FOREARMS"
+      ],
+      "secondary": [
+        "QUADS",
+        "BICEPS"
+      ]
     },
     "equipment": [],
-    "aliases": ["sail", "yachting", "dinghy sailing"],
-    "tags": ["sport"],
+    "aliases": [
+      "sail",
+      "yachting",
+      "dinghy sailing"
+    ],
+    "tags": [
+      "sport"
+    ],
     "movement": "sport"
   },
   {
@@ -12291,12 +13185,30 @@ export const EXERCISE_CATALOG = [
     "name": "Weightlifting (Olympic)",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["QUADS", "GLUTES", "BACK", "ANTERIOR_DELT", "HAMSTRINGS"],
-      "secondary": ["ABS", "TRICEPS", "CALVES", "FOREARMS"]
+      "primary": [
+        "QUADS",
+        "GLUTES",
+        "BACK",
+        "ANTERIOR_DELT",
+        "HAMSTRINGS"
+      ],
+      "secondary": [
+        "ABS",
+        "TRICEPS",
+        "CALVES",
+        "FOREARMS"
+      ]
     },
     "equipment": [],
-    "aliases": ["olympic lifting", "oly lifting", "snatch practice", "clean and jerk practice"],
-    "tags": ["sport"],
+    "aliases": [
+      "olympic lifting",
+      "oly lifting",
+      "snatch practice",
+      "clean and jerk practice"
+    ],
+    "tags": [
+      "sport"
+    ],
     "movement": "sport"
   },
   {
@@ -12304,12 +13216,27 @@ export const EXERCISE_CATALOG = [
     "name": "Archery",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["BACK", "ANTERIOR_DELT", "FOREARMS", "ABS"],
-      "secondary": ["BICEPS", "TRICEPS"]
+      "primary": [
+        "BACK",
+        "ANTERIOR_DELT",
+        "FOREARMS",
+        "ABS"
+      ],
+      "secondary": [
+        "BICEPS",
+        "TRICEPS"
+      ]
     },
     "equipment": [],
-    "aliases": ["bow", "recurve", "compound bow", "target archery"],
-    "tags": ["sport"],
+    "aliases": [
+      "bow",
+      "recurve",
+      "compound bow",
+      "target archery"
+    ],
+    "tags": [
+      "sport"
+    ],
     "movement": "sport"
   },
   {
@@ -12317,12 +13244,26 @@ export const EXERCISE_CATALOG = [
     "name": "Diving",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["ABS", "QUADS", "ANTERIOR_DELT", "BACK", "GLUTES"],
-      "secondary": ["HAMSTRINGS", "CALVES"]
+      "primary": [
+        "ABS",
+        "QUADS",
+        "ANTERIOR_DELT",
+        "BACK",
+        "GLUTES"
+      ],
+      "secondary": [
+        "HAMSTRINGS",
+        "CALVES"
+      ]
     },
     "equipment": [],
-    "aliases": ["springboard diving", "platform diving"],
-    "tags": ["sport"],
+    "aliases": [
+      "springboard diving",
+      "platform diving"
+    ],
+    "tags": [
+      "sport"
+    ],
     "movement": "sport"
   },
   {
@@ -12330,12 +13271,28 @@ export const EXERCISE_CATALOG = [
     "name": "Biathlon",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["QUADS", "HAMSTRINGS", "GLUTES", "ABS", "BACK"],
-      "secondary": ["CALVES", "ANTERIOR_DELT", "FOREARMS"]
+      "primary": [
+        "QUADS",
+        "HAMSTRINGS",
+        "GLUTES",
+        "ABS",
+        "BACK"
+      ],
+      "secondary": [
+        "CALVES",
+        "ANTERIOR_DELT",
+        "FOREARMS"
+      ]
     },
     "equipment": [],
-    "aliases": ["ski and shoot", "cross country shooting"],
-    "tags": ["sport", "cardio"],
+    "aliases": [
+      "ski and shoot",
+      "cross country shooting"
+    ],
+    "tags": [
+      "sport",
+      "cardio"
+    ],
     "movement": "sport"
   },
   {
@@ -12343,12 +13300,31 @@ export const EXERCISE_CATALOG = [
     "name": "Kayaking",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["BACK", "ANTERIOR_DELT", "ABS", "BICEPS", "FOREARMS"],
-      "secondary": ["TRICEPS", "QUADS"]
+      "primary": [
+        "BACK",
+        "ANTERIOR_DELT",
+        "ABS",
+        "BICEPS",
+        "FOREARMS"
+      ],
+      "secondary": [
+        "TRICEPS",
+        "QUADS"
+      ]
     },
     "equipment": [],
-    "aliases": ["canoeing", "canoe", "kayak", "paddling", "canoe sprint", "kayak slalom"],
-    "tags": ["sport", "cardio"],
+    "aliases": [
+      "canoeing",
+      "canoe",
+      "kayak",
+      "paddling",
+      "canoe sprint",
+      "kayak slalom"
+    ],
+    "tags": [
+      "sport",
+      "cardio"
+    ],
     "movement": "sport"
   },
   {
@@ -12356,22 +13332,53 @@ export const EXERCISE_CATALOG = [
     "name": "Bowling",
     "defaultUnit": "min",
     "muscles": {
-      "primary": ["ANTERIOR_DELT", "FOREARMS", "ABS"],
-      "secondary": ["QUADS", "BACK"]
+      "primary": [
+        "ANTERIOR_DELT",
+        "FOREARMS",
+        "ABS"
+      ],
+      "secondary": [
+        "QUADS",
+        "BACK"
+      ]
     },
     "equipment": [],
-    "aliases": ["ten pin bowling", "bowling league"],
-    "tags": ["sport"],
+    "aliases": [
+      "ten pin bowling",
+      "bowling league"
+    ],
+    "tags": [
+      "sport"
+    ],
     "movement": "sport"
   },
   {
     "id": "edb-uOV3Itw",
     "name": "Triceps Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["TRICEPS"], "secondary": ["ANTERIOR_DELT"], "targetRaw": ["triceps"], "secondaryRaw": ["shoulders"] },
-    "equipment": ["bodyweight"],
+    "muscles": {
+      "primary": [
+        "TRICEPS"
+      ],
+      "secondary": [
+        "ANTERIOR_DELT"
+      ],
+      "targetRaw": [
+        "triceps"
+      ],
+      "secondaryRaw": [
+        "shoulders"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/uOV3Itw.gif"
   },
@@ -12379,10 +13386,31 @@ export const EXERCISE_CATALOG = [
     "id": "edb-QoHIhPl",
     "name": "Behind Head Chest Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["CHEST"], "secondary": ["ANTERIOR_DELT","TRICEPS"], "targetRaw": ["pectorals"], "secondaryRaw": ["shoulders","triceps"] },
-    "equipment": ["machine"],
+    "muscles": {
+      "primary": [
+        "CHEST"
+      ],
+      "secondary": [
+        "ANTERIOR_DELT",
+        "TRICEPS"
+      ],
+      "targetRaw": [
+        "pectorals"
+      ],
+      "secondaryRaw": [
+        "shoulders",
+        "triceps"
+      ]
+    },
+    "equipment": [
+      "machine"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/QoHIhPl.gif"
   },
@@ -12390,10 +13418,28 @@ export const EXERCISE_CATALOG = [
     "id": "edb-x2chWLO",
     "name": "Neck Side Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["BACK"], "secondary": [], "targetRaw": ["levator scapulae"], "secondaryRaw": ["trapezius","sternocleidomastoid"] },
-    "equipment": ["bodyweight"],
+    "muscles": {
+      "primary": [
+        "BACK"
+      ],
+      "secondary": [],
+      "targetRaw": [
+        "levator scapulae"
+      ],
+      "secondaryRaw": [
+        "trapezius",
+        "sternocleidomastoid"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/x2chWLO.gif"
   },
@@ -12401,10 +13447,31 @@ export const EXERCISE_CATALOG = [
     "id": "edb-JbC2iaV",
     "name": "Spine Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["BACK"], "secondary": ["HAMSTRINGS","GLUTES"], "targetRaw": ["spine"], "secondaryRaw": ["hamstrings","glutes"] },
-    "equipment": ["bodyweight"],
+    "muscles": {
+      "primary": [
+        "BACK"
+      ],
+      "secondary": [
+        "HAMSTRINGS",
+        "GLUTES"
+      ],
+      "targetRaw": [
+        "spine"
+      ],
+      "secondaryRaw": [
+        "hamstrings",
+        "glutes"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/JbC2iaV.gif"
   },
@@ -12412,10 +13479,31 @@ export const EXERCISE_CATALOG = [
     "id": "edb-isofgzg",
     "name": "Roller Back Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["BACK"], "secondary": ["HAMSTRINGS","GLUTES"], "targetRaw": ["spine"], "secondaryRaw": ["hamstrings","glutes"] },
-    "equipment": ["ab wheel"],
+    "muscles": {
+      "primary": [
+        "BACK"
+      ],
+      "secondary": [
+        "HAMSTRINGS",
+        "GLUTES"
+      ],
+      "targetRaw": [
+        "spine"
+      ],
+      "secondaryRaw": [
+        "hamstrings",
+        "glutes"
+      ]
+    },
+    "equipment": [
+      "ab wheel"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/isofgzg.gif"
   },
@@ -12423,10 +13511,31 @@ export const EXERCISE_CATALOG = [
     "id": "edb-1jXLYEw",
     "name": "Standing Lateral Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["BACK"], "secondary": ["ANTERIOR_DELT","OBLIQUES"], "targetRaw": ["lats"], "secondaryRaw": ["shoulders","obliques"] },
-    "equipment": ["bodyweight"],
+    "muscles": {
+      "primary": [
+        "BACK"
+      ],
+      "secondary": [
+        "ANTERIOR_DELT",
+        "OBLIQUES"
+      ],
+      "targetRaw": [
+        "lats"
+      ],
+      "secondaryRaw": [
+        "shoulders",
+        "obliques"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/1jXLYEw.gif"
   },
@@ -12434,10 +13543,31 @@ export const EXERCISE_CATALOG = [
     "id": "edb-QFmz6ch",
     "name": "Seated Lower Back Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["BACK"], "secondary": ["GLUTES","HAMSTRINGS"], "targetRaw": ["lats"], "secondaryRaw": ["glutes","hamstrings"] },
-    "equipment": ["bodyweight"],
+    "muscles": {
+      "primary": [
+        "BACK"
+      ],
+      "secondary": [
+        "GLUTES",
+        "HAMSTRINGS"
+      ],
+      "targetRaw": [
+        "lats"
+      ],
+      "secondaryRaw": [
+        "glutes",
+        "hamstrings"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/QFmz6ch.gif"
   },
@@ -12445,10 +13575,31 @@ export const EXERCISE_CATALOG = [
     "id": "edb-xGgAGPm",
     "name": "Chair Leg Extended Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["QUADS"], "secondary": ["HAMSTRINGS","CALVES"], "targetRaw": ["quads"], "secondaryRaw": ["hamstrings","calves"] },
-    "equipment": ["bodyweight"],
+    "muscles": {
+      "primary": [
+        "QUADS"
+      ],
+      "secondary": [
+        "HAMSTRINGS",
+        "CALVES"
+      ],
+      "targetRaw": [
+        "quads"
+      ],
+      "secondaryRaw": [
+        "hamstrings",
+        "calves"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/xGgAGPm.gif"
   },
@@ -12456,10 +13607,29 @@ export const EXERCISE_CATALOG = [
     "id": "edb-sU5BrfP",
     "name": "Leg Up Hamstring Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["HAMSTRINGS"], "secondary": ["GLUTES"], "targetRaw": ["hamstrings"], "secondaryRaw": ["glutes"] },
-    "equipment": ["bodyweight"],
+    "muscles": {
+      "primary": [
+        "HAMSTRINGS"
+      ],
+      "secondary": [
+        "GLUTES"
+      ],
+      "targetRaw": [
+        "hamstrings"
+      ],
+      "secondaryRaw": [
+        "glutes"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/sU5BrfP.gif"
   },
@@ -12467,10 +13637,29 @@ export const EXERCISE_CATALOG = [
     "id": "edb-yn0LjwL",
     "name": "Assisted Lying Glutes Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["GLUTES"], "secondary": ["HAMSTRINGS"], "targetRaw": ["glutes"], "secondaryRaw": ["hamstrings"] },
-    "equipment": ["machine"],
+    "muscles": {
+      "primary": [
+        "GLUTES"
+      ],
+      "secondary": [
+        "HAMSTRINGS"
+      ],
+      "targetRaw": [
+        "glutes"
+      ],
+      "secondaryRaw": [
+        "hamstrings"
+      ]
+    },
+    "equipment": [
+      "machine"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/yn0LjwL.gif"
   },
@@ -12478,10 +13667,29 @@ export const EXERCISE_CATALOG = [
     "id": "edb-DeDThfG",
     "name": "Seated Glute Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["GLUTES"], "secondary": ["HAMSTRINGS"], "targetRaw": ["glutes"], "secondaryRaw": ["hamstrings"] },
-    "equipment": ["bodyweight"],
+    "muscles": {
+      "primary": [
+        "GLUTES"
+      ],
+      "secondary": [
+        "HAMSTRINGS"
+      ],
+      "targetRaw": [
+        "glutes"
+      ],
+      "secondaryRaw": [
+        "hamstrings"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/DeDThfG.gif"
   },
@@ -12489,10 +13697,29 @@ export const EXERCISE_CATALOG = [
     "id": "edb-17bqEXD",
     "name": "Seated Calf Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["CALVES"], "secondary": ["HAMSTRINGS"], "targetRaw": ["calves"], "secondaryRaw": ["hamstrings"] },
-    "equipment": ["bodyweight"],
+    "muscles": {
+      "primary": [
+        "CALVES"
+      ],
+      "secondary": [
+        "HAMSTRINGS"
+      ],
+      "targetRaw": [
+        "calves"
+      ],
+      "secondaryRaw": [
+        "hamstrings"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/17bqEXD.gif"
   },
@@ -12500,10 +13727,29 @@ export const EXERCISE_CATALOG = [
     "id": "edb-1LVFcEn",
     "name": "Calf Stretch With Rope",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["CALVES"], "secondary": ["HAMSTRINGS"], "targetRaw": ["calves"], "secondaryRaw": ["hamstrings"] },
-    "equipment": ["cable"],
+    "muscles": {
+      "primary": [
+        "CALVES"
+      ],
+      "secondary": [
+        "HAMSTRINGS"
+      ],
+      "targetRaw": [
+        "calves"
+      ],
+      "secondaryRaw": [
+        "hamstrings"
+      ]
+    },
+    "equipment": [
+      "cable"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/1LVFcEn.gif"
   },
@@ -12511,11 +13757,443 @@ export const EXERCISE_CATALOG = [
     "id": "edb-hC6oYY5",
     "name": "Assisted Side Lying Adductor Stretch",
     "defaultUnit": "sec",
-    "muscles": { "primary": ["QUADS"], "secondary": ["HAMSTRINGS","GLUTES"], "targetRaw": ["adductors"], "secondaryRaw": ["hamstrings","glutes"] },
-    "equipment": ["machine"],
+    "muscles": {
+      "primary": [
+        "QUADS"
+      ],
+      "secondary": [
+        "HAMSTRINGS",
+        "GLUTES"
+      ],
+      "targetRaw": [
+        "adductors"
+      ],
+      "secondaryRaw": [
+        "hamstrings",
+        "glutes"
+      ]
+    },
+    "equipment": [
+      "machine"
+    ],
     "aliases": [],
-    "tags": ["stretch","flexibility","bodyweight"],
+    "tags": [
+      "stretch",
+      "flexibility",
+      "bodyweight"
+    ],
     "movement": "stretch",
     "gifUrl": "https://static.exercisedb.dev/media/hC6oYY5.gif"
+  },
+  {
+    "id": "custom-plank",
+    "name": "Plank",
+    "defaultUnit": "sec",
+    "muscles": {
+      "primary": [
+        "ABS"
+      ],
+      "secondary": [
+        "ANTERIOR_DELT",
+        "GLUTES"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "front plank",
+      "forearm plank",
+      "plank hold",
+      "elbow plank"
+    ],
+    "tags": [
+      "isometric",
+      "bodyweight",
+      "core"
+    ],
+    "movement": "core",
+    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/02/plank.gif"
+  },
+  {
+    "id": "custom-side-plank",
+    "name": "Side Plank",
+    "defaultUnit": "sec",
+    "muscles": {
+      "primary": [
+        "OBLIQUES"
+      ],
+      "secondary": [
+        "ABS",
+        "GLUTES"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "side plank hold",
+      "lateral plank"
+    ],
+    "tags": [
+      "isometric",
+      "bodyweight",
+      "core"
+    ],
+    "movement": "core",
+    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2023/01/Side-Plank-Rotation.gif"
+  },
+  {
+    "id": "custom-barbell-hip-thrust",
+    "name": "Barbell Hip Thrust",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "GLUTES"
+      ],
+      "secondary": [
+        "HAMSTRINGS",
+        "QUADS"
+      ]
+    },
+    "equipment": [
+      "barbell"
+    ],
+    "aliases": [
+      "hip thrust",
+      "hip thrusts",
+      "bb hip thrust",
+      "weighted hip thrust"
+    ],
+    "tags": [
+      "compound",
+      "glute"
+    ],
+    "movement": "legs",
+    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Hip-Thrust.gif"
+  },
+  {
+    "id": "custom-box-jump",
+    "name": "Box Jump",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "QUADS"
+      ],
+      "secondary": [
+        "GLUTES",
+        "CALVES",
+        "HAMSTRINGS"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "box jumps",
+      "plyo box jump"
+    ],
+    "tags": [
+      "plyometric",
+      "explosive",
+      "bodyweight"
+    ],
+    "movement": "legs",
+    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2015/07/The-Box-Jump.gif"
+  },
+  {
+    "id": "custom-wall-sit",
+    "name": "Wall Sit",
+    "defaultUnit": "sec",
+    "muscles": {
+      "primary": [
+        "QUADS"
+      ],
+      "secondary": [
+        "GLUTES",
+        "CALVES"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "wall squat",
+      "wall sit hold"
+    ],
+    "tags": [
+      "isometric",
+      "bodyweight"
+    ],
+    "movement": "legs"
+  },
+  {
+    "id": "custom-hollow-body-hold",
+    "name": "Hollow Body Hold",
+    "defaultUnit": "sec",
+    "muscles": {
+      "primary": [
+        "ABS"
+      ],
+      "secondary": [
+        "QUADS"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "hollow hold",
+      "hollow body",
+      "hollow position"
+    ],
+    "tags": [
+      "isometric",
+      "bodyweight",
+      "core"
+    ],
+    "movement": "core"
+  },
+  {
+    "id": "custom-dead-hang",
+    "name": "Dead Hang",
+    "defaultUnit": "sec",
+    "muscles": {
+      "primary": [
+        "FOREARMS"
+      ],
+      "secondary": [
+        "BACK",
+        "BICEPS"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "hanging",
+      "bar hang",
+      "passive hang"
+    ],
+    "tags": [
+      "isometric",
+      "bodyweight",
+      "grip"
+    ],
+    "movement": "pull"
+  },
+  {
+    "id": "custom-rack-pull",
+    "name": "Barbell Rack Pull",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "BACK",
+        "HAMSTRINGS"
+      ],
+      "secondary": [
+        "GLUTES",
+        "FOREARMS"
+      ]
+    },
+    "equipment": [
+      "barbell"
+    ],
+    "aliases": [
+      "rack pull",
+      "rack pulls",
+      "block pull"
+    ],
+    "tags": [
+      "compound",
+      "pull"
+    ],
+    "movement": "pull",
+    "gifUrl": "https://static.exercisedb.dev/media/za9Ni4z.gif"
+  },
+  {
+    "id": "custom-reverse-curl",
+    "name": "Barbell Reverse Curl",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "FOREARMS"
+      ],
+      "secondary": [
+        "BICEPS"
+      ]
+    },
+    "equipment": [
+      "barbell"
+    ],
+    "aliases": [
+      "reverse curl",
+      "reverse curls",
+      "overhand curl"
+    ],
+    "tags": [
+      "isolation"
+    ],
+    "movement": "pull",
+    "gifUrl": "https://static.exercisedb.dev/media/xNrS20v.gif"
+  },
+  {
+    "id": "custom-floor-press",
+    "name": "Dumbbell Floor Press",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "CHEST"
+      ],
+      "secondary": [
+        "TRICEPS",
+        "ANTERIOR_DELT"
+      ]
+    },
+    "equipment": [
+      "dumbbell"
+    ],
+    "aliases": [
+      "floor press",
+      "db floor press"
+    ],
+    "tags": [
+      "compound",
+      "push"
+    ],
+    "movement": "push"
+  },
+  {
+    "id": "custom-clamshell",
+    "name": "Clamshell",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "GLUTES"
+      ],
+      "secondary": []
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "clamshells",
+      "banded clamshell"
+    ],
+    "tags": [
+      "isolation",
+      "bodyweight",
+      "activation"
+    ],
+    "movement": "legs",
+    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/05/Side-Lying-Clam.gif"
+  },
+  {
+    "id": "custom-fire-hydrant",
+    "name": "Fire Hydrant",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "GLUTES"
+      ],
+      "secondary": [
+        "ABS"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "fire hydrants",
+      "dirty dog"
+    ],
+    "tags": [
+      "isolation",
+      "bodyweight",
+      "activation"
+    ],
+    "movement": "legs",
+    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/02/Fire-Hydrant.gif"
+  },
+  {
+    "id": "custom-donkey-kick",
+    "name": "Donkey Kick",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "GLUTES"
+      ],
+      "secondary": [
+        "HAMSTRINGS"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "donkey kicks",
+      "glute kickback"
+    ],
+    "tags": [
+      "isolation",
+      "bodyweight",
+      "activation"
+    ],
+    "movement": "legs",
+    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/02/Donkey-Kicks.gif"
+  },
+  {
+    "id": "custom-bodyweight-hip-thrust",
+    "name": "Hip Thrust",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "GLUTES"
+      ],
+      "secondary": [
+        "HAMSTRINGS",
+        "QUADS"
+      ]
+    },
+    "equipment": [
+      "bodyweight"
+    ],
+    "aliases": [
+      "bodyweight hip thrust",
+      "bw hip thrust"
+    ],
+    "tags": [
+      "compound",
+      "bodyweight",
+      "glute"
+    ],
+    "movement": "legs",
+    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2022/04/bodyweight-hip-thrust.gif"
+  },
+  {
+    "id": "custom-band-face-pull",
+    "name": "Band Face Pull",
+    "defaultUnit": "reps",
+    "muscles": {
+      "primary": [
+        "POSTERIOR_DELT"
+      ],
+      "secondary": [
+        "BACK"
+      ]
+    },
+    "equipment": [
+      "band"
+    ],
+    "aliases": [
+      "banded face pull",
+      "resistance band face pull"
+    ],
+    "tags": [
+      "isolation",
+      "pull"
+    ],
+    "movement": "pull",
+    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2022/05/Face-pull.gif"
   }
 ];
