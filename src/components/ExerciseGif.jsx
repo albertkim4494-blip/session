@@ -17,7 +17,7 @@ function hexToHue(hex) {
   return h;
 }
 
-export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
+export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200, bgColor }) {
   const [status, setStatus] = useState("loading"); // "loading" | "loaded" | "error"
   const imgRef = useRef(null);
 
@@ -73,8 +73,8 @@ export function ExerciseGif({ gifUrl, exerciseName, colors, size = 200 }) {
           borderRadius: 12,
           overflow: "hidden",
           position: "relative",
-          // Match modal card bg so blend mode has the right backdrop
-          background: colors?.cardBg || (isDark ? "#161b22" : "#ffffff"),
+          // Match the container's actual background so blend mode works correctly
+          background: bgColor || colors?.cardBg || (isDark ? "#161b22" : "#ffffff"),
         }}
       >
         {/* Loading skeleton */}

@@ -2133,6 +2133,7 @@ function ExerciseDetailToggle({ show, onToggle, catalogEntry, colors }) {
               exerciseName={catalogEntry.name}
               colors={colors}
               size={160}
+              bgColor={colors?.appBg}
             />
           )}
           {hasMuscles && (
