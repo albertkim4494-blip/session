@@ -279,6 +279,7 @@ export function CircuitTimer({
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceFeedback, setVoiceFeedback] = useState("");
   const [voiceError, setVoiceError] = useState("");
+  const [micRecoveryNeeded, setMicRecoveryNeeded] = useState(false);
   const recognitionRef = useRef(null);
   const micStreamRef = useRef(null);
   const voiceCooldownRef = useRef(0);
@@ -482,21 +483,30 @@ export function CircuitTimer({
       lastBeepRef.current = 0;
       navigator.vibrate?.(10);
       getReadyTimer.start(INITIAL_GET_READY_SEC, "countdown");
+      // Announce first exercise during get-ready (coach pattern: name → countdown → go)
+      if (voiceActive && currentExercise) {
+        announceExercise(currentExercise.name, recognitionRef, voiceRestartRef, startRecognitionRef.current);
+      }
     } else if (phase === "work") {
       if (!isTimeBased) {
         workTimer.start(0, "stopwatch");
-      }
-      // Announce exercise name via TTS when voice is active
-      if (voiceActive && currentExercise) {
-        announceExercise(currentExercise.name, recognitionRef, voiceRestartRef, startRecognitionRef.current);
       }
       // Time-based auto-start is handled by a separate effect below
     } else if (phase === "rest") {
       lastBeepRef.current = 0;
       restTimer.start(Math.max(MIN_TRANSITION_SEC, restBetweenExercises), "countdown");
+      // Announce next exercise at start of rest (coach pattern: "Next: X" → rest → beeps → go)
+      if (voiceActive) {
+        const nextEx = exercises[currentExerciseIndex + 1];
+        if (nextEx) announceExercise(nextEx.name, recognitionRef, voiceRestartRef, startRecognitionRef.current);
+      }
     } else if (phase === "round-rest") {
       lastBeepRef.current = 0;
       roundRestTimer.start(Math.max(MIN_TRANSITION_SEC, restBetweenRounds), "countdown");
+      // Announce first exercise of next round
+      if (voiceActive && exercises[0]) {
+        announceExercise(exercises[0].name, recognitionRef, voiceRestartRef, startRecognitionRef.current);
+      }
     }
   }, [phase, currentExerciseIndex, currentRound]);
 
@@ -662,7 +672,7 @@ export function CircuitTimer({
         }
         if (event.error === "not-allowed" || event.error === "service-not-allowed") {
           cancelled = true;
-          setVoiceError("Mic permission denied \u2014 enable in Settings \u2192 App Permissions");
+          setMicRecoveryNeeded(true);
           setVoiceActive(false);
         }
       };
@@ -711,9 +721,12 @@ export function CircuitTimer({
   if (voiceActive) voiceWasUsedRef.current = true;
 
   useEffect(() => {
-    if (phase === "complete" && voiceActive) {
-      setVoiceActive(false);
-      setVoiceEnabled(false);
+    if (phase === "complete") {
+      if (voiceActive) {
+        setVoiceActive(false);
+        setVoiceEnabled(false);
+      }
+      setMicRecoveryNeeded(false);
     }
   }, [phase, voiceActive]);
 
@@ -729,6 +742,19 @@ export function CircuitTimer({
       clearTimeout(voiceFeedbackTimerRef.current);
       clearTimeout(voiceRestartRef.current);
     };
+  }, []);
+
+  // Mic recovery after screen lock — re-request permission
+  const handleMicRecovery = useCallback(async () => {
+    setVoiceError("");
+    setMicRecoveryNeeded(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      setVoiceActive(true);
+    } catch {
+      setVoiceError("Mic permission denied \u2014 enable in Settings \u2192 App Permissions");
+    }
   }, []);
 
   // Add-set helper ref for voice commands (avoids closure staleness)
@@ -1067,6 +1093,31 @@ export function CircuitTimer({
   };
 
   // ---------------------------------------------------------------------------
+  // Mic recovery banner (shared across active circuit phases)
+  // ---------------------------------------------------------------------------
+  const micRecoveryBanner = micRecoveryNeeded ? (
+    <button
+      onClick={handleMicRecovery}
+      style={{
+        width: "100%", padding: "10px 16px",
+        background: "rgba(255,193,7,0.12)", border: "none",
+        borderBottom: "1px solid rgba(255,193,7,0.25)",
+        color: colors?.text || "#fff", fontSize: 13, fontWeight: 600,
+        cursor: "pointer", display: "flex", alignItems: "center",
+        justifyContent: "center", gap: 8, fontFamily: "inherit",
+        flexShrink: 0,
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFC107" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="1" width="6" height="11" rx="3" />
+        <path d="M19 10v2a7 7 0 01-14 0v-2" />
+        <line x1="4" y1="4" x2="20" y2="20" />
+      </svg>
+      Mic turned off — tap to re-enable
+    </button>
+  ) : null;
+
+  // ---------------------------------------------------------------------------
   // Config phase
   // ---------------------------------------------------------------------------
   if (phase === "config") {
@@ -1261,6 +1312,7 @@ export function CircuitTimer({
           <span>Round {currentRound}/{totalRounds}</span>
           <span>Exercise {currentExerciseIndex + 1}/{exercises.length}</span>
         </div>
+        {micRecoveryBanner}
         <div style={center}>
           <div style={phaseLabel}>Get Ready</div>
           <div style={bigNumber}>{getReadyTimer.seconds}</div>
@@ -1320,6 +1372,7 @@ export function CircuitTimer({
             {(voiceActive || voiceError) && <VoiceIndicator colors={colors} feedback={voiceFeedback} error={voiceError} />}
             <span>Round {currentRound}/{totalRounds}</span>
           </div>
+          {micRecoveryBanner}
           <div style={center}>
             <div style={exerciseNameStyle}>{currentExercise?.name}</div>
             {localSets.length > 1 && (
@@ -1588,6 +1641,7 @@ export function CircuitTimer({
           {(voiceActive || voiceError) && <VoiceIndicator colors={colors} feedback={voiceFeedback} error={voiceError} />}
           <span>Round {currentRound}/{totalRounds}</span>
         </div>
+        {micRecoveryBanner}
         <div style={{ flex: 1, overflow: "auto", padding: "0 16px 16px" }}>
           <div style={{ textAlign: "center", marginBottom: 12, paddingTop: 8 }}>
             <div style={exerciseNameStyle}>{currentExercise?.name}</div>
@@ -1852,6 +1906,7 @@ export function CircuitTimer({
               : isGetReadyZone ? "Get Ready" : "Rest"}
           </span>
         </div>
+        {micRecoveryBanner}
         <div style={center}>
           {/* Show "GET READY" prominently when entering final 3s */}
           {isGetReadyZone && (
