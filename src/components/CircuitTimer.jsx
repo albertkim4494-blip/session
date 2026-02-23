@@ -482,17 +482,12 @@ export function CircuitTimer({
       lastBeepRef.current = 0;
       navigator.vibrate?.(10);
       getReadyTimer.start(INITIAL_GET_READY_SEC, "countdown");
-      // Announce exercise name via TTS when voice is active
-      if (voiceActive && currentExercise) {
-        announceExercise(currentExercise.name, recognitionRef, voiceRestartRef, startRecognitionRef.current);
-      }
     } else if (phase === "work") {
       if (!isTimeBased) {
         workTimer.start(0, "stopwatch");
       }
-      // Announce exercise name on work entry (after rest/round-rest transitions)
-      // Skip for first exercise — already announced during get-ready
-      if (voiceActive && currentExercise && !(currentExerciseIndex === 0 && currentRound === 1)) {
+      // Announce exercise name via TTS when voice is active
+      if (voiceActive && currentExercise) {
         announceExercise(currentExercise.name, recognitionRef, voiceRestartRef, startRecognitionRef.current);
       }
       // Time-based auto-start is handled by a separate effect below
