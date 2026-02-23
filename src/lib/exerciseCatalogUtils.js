@@ -320,11 +320,12 @@ export function resolveExerciseDisplay(exercise, catalogMap) {
  * @param {string} [filters.uiMuscleGroup] - single UI muscle group key ("CHEST", "LEGS", etc.)
  * @param {string[]} [filters.uiMuscleGroups] - multiple UI muscle group keys (union / OR)
  * @param {Set} [filters.equipment] - equipment strings to require (entry must have at least one)
+ * @param {Set} [filters.movements] - movement categories to include (entry.movement must be in set)
  * @param {"exercise"|"stretch"|"sport"} [filters.typeFilter] - filter by exercise type
  * @param {string} [filters.sportId] - specific catalog entry id for a sport
  * @returns {Array} filtered catalog entries
  */
-export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, muscles, equipment, typeFilter, sportId } = {}) {
+export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, muscles, equipment, movements, typeFilter, sportId } = {}) {
   // Build combined target muscle set from individual muscles, UI groups, or single group
   let targetMuscles = null;
   if (muscles?.length > 0) {
@@ -335,13 +336,15 @@ export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, muscles,
   } else if (uiMuscleGroup) {
     targetMuscles = new Set(getMusclesForUiGroup(uiMuscleGroup));
   }
-  return catalog.filter((entry) => {
+  const result = catalog.filter((entry) => {
     if (sportId && entry.id !== sportId) return false;
     // Type filter: "exercise" excludes sport+stretch+custom, "stretch" only stretch, "sport" only sport, "custom" only custom
     if (typeFilter === "exercise" && (entry.movement === "sport" || entry.movement === "stretch" || entry.custom)) return false;
     if (typeFilter === "stretch" && entry.movement !== "stretch") return false;
     if (typeFilter === "sport" && entry.movement !== "sport") return false;
     if (typeFilter === "custom" && !entry.custom) return false;
+    // Movement filter (multi-select Set)
+    if (movements?.size > 0 && !movements.has(entry.movement)) return false;
     if (targetMuscles) {
       // Sport entries have no muscles — let them through when typeFilter=sport
       if (typeFilter !== "sport") {
@@ -352,6 +355,16 @@ export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, muscles,
     if (equipment?.size > 0 && !(entry.equipment || []).some(e => equipment.has(e))) return false;
     return true;
   });
+  // When filtering by muscles, sort primary-muscle matches first
+  if (targetMuscles) {
+    result.sort((a, b) => {
+      const aPri = (a.muscles?.primary || []).some(m => targetMuscles.has(m));
+      const bPri = (b.muscles?.primary || []).some(m => targetMuscles.has(m));
+      if (aPri !== bPri) return aPri ? -1 : 1;
+      return 0;
+    });
+  }
+  return result;
 }
 
 /**

@@ -866,7 +866,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/3ZflifB.gif"
   },
   {
@@ -894,7 +894,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/mpKZGWz.gif"
   },
   {
@@ -922,7 +922,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/W6PxUkg.gif"
   },
   {
@@ -953,7 +953,7 @@ export const EXERCISE_CATALOG = [
       "isolation",
       "bodyweight"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/ezTvXcr.gif"
   },
   {
@@ -981,7 +981,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/kont8Ut.gif"
   },
   {
@@ -1009,7 +1009,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/PdmaD0N.gif"
   },
   {
@@ -1039,7 +1039,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/J6Dx1Mu.gif"
   },
   {
@@ -1067,7 +1067,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/dU605di.gif"
   },
   {
@@ -1095,7 +1095,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/h8LFzo9.gif"
   },
   {
@@ -1126,7 +1126,7 @@ export const EXERCISE_CATALOG = [
       "isolation",
       "bodyweight"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/soIB2rj.gif"
   },
   {
@@ -1157,7 +1157,7 @@ export const EXERCISE_CATALOG = [
       "isolation",
       "bodyweight"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/X6C6i5Y.gif"
   },
   {
@@ -1190,7 +1190,7 @@ export const EXERCISE_CATALOG = [
       "isolation",
       "bodyweight"
     ],
-    "movement": "arms",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/rQxwMxO.gif"
   },
   {
@@ -6555,7 +6555,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/mtXengz.gif"
   },
   {
@@ -6584,7 +6584,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/82LxxkW.gif"
   },
   {
@@ -6613,7 +6613,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/LsZkfU6.gif"
   },
   {
@@ -6643,7 +6643,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/bd5b860.gif"
   },
   {
@@ -6670,7 +6670,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/awG04cF.gif"
   },
   {
@@ -6699,7 +6699,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/FWdVhcW.gif"
   },
   {
@@ -6728,7 +6728,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/bmBf7LN.gif"
   },
   {
@@ -6758,7 +6758,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/u2X71Np.gif"
   },
   {
@@ -6787,7 +6787,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/hxyTtWj.gif"
   },
   {
@@ -6817,7 +6817,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/wdRZISl.gif"
   },
   {
@@ -6849,7 +6849,7 @@ export const EXERCISE_CATALOG = [
       "isolation",
       "bodyweight"
     ],
-    "movement": "shoulders",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/tc5dYrf.gif"
   },
   {
@@ -6879,7 +6879,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/xMjBKwn.gif"
   },
   {
@@ -6908,7 +6908,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/EAs3xL9.gif"
   },
   {
@@ -6937,7 +6937,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/aqvSOQE.gif"
   },
   {
@@ -6971,7 +6971,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/f7Y9eDZ.gif"
   },
   {
@@ -7001,7 +7001,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/cALKspW.gif"
   },
   {
@@ -7031,7 +7031,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/xUwnBMT.gif"
   },
   {
@@ -7061,7 +7061,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/UDlhcO8.gif"
   },
   {
@@ -7091,7 +7091,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/QfAKy1G.gif"
   },
   {
@@ -7123,7 +7123,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/aXcUyKb.gif"
   },
   {
@@ -7152,7 +7152,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/v1qBec9.gif"
   },
   {
@@ -7182,7 +7182,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/BkxB8LW.gif"
   },
   {
@@ -7210,7 +7210,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/DsgkuIt.gif"
   },
   {
@@ -7240,7 +7240,7 @@ export const EXERCISE_CATALOG = [
       "isolation",
       "bodyweight"
     ],
-    "movement": "shoulders",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/sTfvVsG.gif"
   },
   {
@@ -7269,7 +7269,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/Xy4jlWA.gif"
   },
   {
@@ -7299,7 +7299,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/FS63wTN.gif"
   },
   {
@@ -7329,7 +7329,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/3eGE2JC.gif"
   },
   {
@@ -7359,7 +7359,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/A6wtbuL.gif"
   },
   {
@@ -7389,7 +7389,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/RJa4tCo.gif"
   },
   {
@@ -7419,7 +7419,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/ainizkb.gif"
   },
   {
@@ -7449,7 +7449,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/goJ6ezq.gif"
   },
   {
@@ -7510,7 +7510,7 @@ export const EXERCISE_CATALOG = [
       "isolation",
       "bodyweight"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/TFA88iB.gif"
   },
   {
@@ -7540,7 +7540,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/znQUdHY.gif"
   },
   {
@@ -7571,7 +7571,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/wqNPGCg.gif"
   },
   {
@@ -7625,7 +7625,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/PzQanLE.gif"
   },
   {
@@ -7656,7 +7656,7 @@ export const EXERCISE_CATALOG = [
       "isolation",
       "bodyweight"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/peAeMR3.gif"
   },
   {
@@ -7686,7 +7686,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/b2Uoz54.gif"
   },
   {
@@ -7716,7 +7716,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/67n3r98.gif"
   },
   {
@@ -7746,7 +7746,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/kTbSH9h.gif"
   },
   {
@@ -7775,7 +7775,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/myfUsKf.gif"
   },
   {
@@ -7804,7 +7804,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/EKXOMEh.gif"
   },
   {
@@ -7833,7 +7833,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/dRTfGZT.gif"
   },
   {
@@ -7862,7 +7862,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/mu5Guxt.gif"
   },
   {
@@ -7894,7 +7894,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "shoulders",
+    "movement": "push",
     "gifUrl": "https://static.exercisedb.dev/media/yWxMvB5.gif"
   },
   {
@@ -8997,7 +8997,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/F3xgbjF.gif"
   },
   {
@@ -9025,7 +9025,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/kXaIn5A.gif"
   },
   {
@@ -9053,7 +9053,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/IENzBdA.gif"
   },
   {
@@ -9081,7 +9081,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/gvsWLQw.gif"
   },
   {
@@ -9112,7 +9112,7 @@ export const EXERCISE_CATALOG = [
       "isolation",
       "bodyweight"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/guT8YnS.gif"
   },
   {
@@ -9140,7 +9140,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/qOgPVf6.gif"
   },
   {
@@ -9168,7 +9168,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/6TG6x2w.gif"
   },
   {
@@ -9196,7 +9196,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/25GPyDY.gif"
   },
   {
@@ -9224,7 +9224,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/NbVPDMW.gif"
   },
   {
@@ -9252,7 +9252,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/G08RZcQ.gif"
   },
   {
@@ -9280,7 +9280,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/slDvUAU.gif"
   },
   {
@@ -9308,7 +9308,7 @@ export const EXERCISE_CATALOG = [
     "tags": [
       "isolation"
     ],
-    "movement": "arms",
+    "movement": "pull",
     "gifUrl": "https://static.exercisedb.dev/media/HPlPoQA.gif"
   },
   {
@@ -11100,7 +11100,7 @@ export const EXERCISE_CATALOG = [
       "compound",
       "olympic"
     ],
-    "movement": "shoulders"
+    "movement": "push"
   },
   {
     "id": "custom-sled-push",

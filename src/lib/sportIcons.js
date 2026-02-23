@@ -63,11 +63,26 @@ const SPORT_ICON_MAP = {
 };
 
 /**
- * Get the URL for a sport icon by exercise name.
+ * All available sport icon file slugs, sorted alphabetically.
+ * Each entry is { slug, label, url }.
+ */
+export const SPORT_ICONS = Object.entries(SPORT_ICON_MAP)
+  .map(([name, file]) => ({
+    slug: file,
+    label: name.replace(/\b\w/g, (c) => c.toUpperCase()),
+    url: `/sport-icons/${file}.svg`,
+  }))
+  .sort((a, b) => a.label.localeCompare(b.label));
+
+/**
+ * Get the URL for a sport icon.
+ * Checks explicit sportIcon slug first, then falls back to name-based lookup.
  * @param {string} sportName - The sport name (case-insensitive)
+ * @param {string} [sportIcon] - Explicit icon slug override (e.g. "basketball")
  * @returns {string|null} URL path to the SVG icon, or null
  */
-export function getSportIconUrl(sportName) {
+export function getSportIconUrl(sportName, sportIcon) {
+  if (sportIcon) return `/sport-icons/${sportIcon}.svg`;
   if (!sportName) return null;
   const key = sportName.toLowerCase().trim();
   const file = SPORT_ICON_MAP[key];

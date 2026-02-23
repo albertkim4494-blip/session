@@ -5118,6 +5118,47 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         logsByDate={state.logsByDate}
         targetWorkoutId={modals.catalogBrowse.workoutId}
         backOverrideRef={backOverrideRef}
+        onUpdateCustomExercise={(updatedEntry) => {
+          updateState((st) => {
+            if (!st.customExercises) return st;
+            const idx = st.customExercises.findIndex((e) => e.id === updatedEntry.id);
+            if (idx === -1) return st;
+            st.customExercises[idx] = {
+              ...st.customExercises[idx],
+              name: updatedEntry.name,
+              muscles: updatedEntry.muscles,
+              equipment: updatedEntry.equipment,
+              movement: updatedEntry.movement,
+              gifUrl: updatedEntry.gifUrl,
+              sportIcon: updatedEntry.sportIcon || undefined,
+            };
+            return st;
+          });
+          showToast("Exercise updated");
+        }}
+        onSaveAsNew={(newEntry) => {
+          const newId = "custom_" + uid("ex");
+          updateState((st) => {
+            if (!st.customExercises) st.customExercises = [];
+            st.customExercises.push({
+              id: newId,
+              name: newEntry.name,
+              defaultUnit: newEntry.defaultUnit || "reps",
+              muscles: newEntry.muscles || { primary: [] },
+              equipment: newEntry.equipment || [],
+              tags: newEntry.tags || [],
+              movement: newEntry.movement || "",
+              gifUrl: newEntry.gifUrl || null,
+              sportIcon: newEntry.sportIcon || undefined,
+              aliases: [],
+              custom: true,
+            });
+            return st;
+          });
+          showToast(`"${newEntry.name}" saved`);
+          return newId;
+        }}
+        session={session}
         onDeleteCustomExercise={(entry) => {
           // Count usages across program workouts and daily workouts
           let usages = 0;
@@ -5762,7 +5803,7 @@ function ExerciseMenu({ isOverridden, onSwapExercise, onSkipExercise, onUndoOver
   );
 }
 
-function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme, weightLabel, colors, onSwapExercise, onSkipExercise, isOverridden, onUndoOverride, onPromoteOverride, originalExerciseId }) {
+function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme, weightLabel, colors, onSwapExercise, onSkipExercise, isOverridden, onUndoOverride, onPromoteOverride, originalExerciseId, sportIcon }) {
   const exLog = logsForDate[exercise.id] ?? null;
   const hasAnySets = !!exLog && Array.isArray(exLog.sets) && exLog.sets.length > 0;
   const exUnit = getUnit(exercise.unit, exercise);
@@ -5813,9 +5854,9 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
-          {getSportIconUrl(exercise.name) && (
+          {getSportIconUrl(exercise.name, sportIcon) && (
             <img
-              src={getSportIconUrl(exercise.name)}
+              src={getSportIconUrl(exercise.name, sportIcon)}
               alt=""
               style={{
                 width: 18, height: 18, objectFit: "contain", flexShrink: 0,
@@ -6041,6 +6082,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
                   onUndoOverride={isSwapReplacement ? onUndoOverride : undefined}
                   onPromoteOverride={isSwapReplacement ? onPromoteOverride : undefined}
                   originalExerciseId={origExId}
+                  sportIcon={ex.catalogId ? catalogMap.get(ex.catalogId)?.sportIcon : undefined}
                 />
               );
             })}

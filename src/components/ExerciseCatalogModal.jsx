@@ -7,11 +7,22 @@ import { getSportIconUrl } from "../lib/sportIcons";
 import { BodyDiagram, SLUG_TO_MUSCLES } from "./BodyDiagram";
 import { MUSCLE_LABELS, UI_MUSCLE_GROUPS, UI_GROUP_CONFIG, muscleToUiGroup } from "../lib/muscleGroups";
 
-const TYPE_CHIPS = [
-  { key: "exercise", label: "Exercise" },
+const MOVEMENT_CHIPS = [
+  { key: "push", label: "Push" },
+  { key: "pull", label: "Pull" },
+  { key: "legs", label: "Legs" },
+  { key: "core", label: "Core" },
+  { key: "cardio", label: "Cardio" },
   { key: "stretch", label: "Stretch" },
   { key: "sport", label: "Sport" },
-  { key: "custom", label: "Custom" },
+];
+const EQUIPMENT_CHIPS = [
+  { key: "bodyweight", label: "Bodyweight" },
+  { key: "barbell", label: "Barbell" },
+  { key: "dumbbell", label: "Dumbbell" },
+  { key: "kettlebell", label: "Kettlebell" },
+  { key: "cable", label: "Cable" },
+  { key: "machine", label: "Machine" },
 ];
 
 function collectUserExercises(workouts) {
@@ -69,14 +80,15 @@ function BackArrow() {
 }
 
 export function ExerciseCatalogModal({
-  open, onClose, onAddExercise, onCustomExercise, onDeleteCustomExercise,
+  open, onClose, onAddExercise, onCustomExercise, onDeleteCustomExercise, onUpdateCustomExercise, onSaveAsNew,
   styles, colors, workouts, logsByDate,
-  targetWorkoutId, catalog, backOverrideRef,
+  targetWorkoutId, catalog, backOverrideRef, session,
 }) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState("home"); // "home" | "list"
   const [selectedMuscles, setSelectedMuscles] = useState(new Set());
-  const [typeFilter, setTypeFilter] = useState("exercise"); // "exercise" | "stretch" | "sport"
+  const [movementFilter, setMovementFilter] = useState(new Set());
+  const [equipFilter, setEquipFilter] = useState(new Set());
   const [hoveredMuscles, setHoveredMuscles] = useState(new Set());
   const [activeGroups, setActiveGroups] = useState(new Set()); // which UI groups are expanded
   const [detailEntry, setDetailEntry] = useState(null);
@@ -96,7 +108,8 @@ export function ExerciseCatalogModal({
       setQuery("");
       setView("home");
       setSelectedMuscles(new Set());
-      setTypeFilter("exercise");
+      setMovementFilter(new Set());
+      setEquipFilter(new Set());
       setHoveredMuscles(new Set());
       setActiveGroups(new Set());
       setDetailEntry(null);
@@ -114,7 +127,8 @@ export function ExerciseCatalogModal({
     setView("home");
     setQuery("");
     setSelectedMuscles(new Set());
-    setTypeFilter("exercise");
+    setMovementFilter(new Set());
+    setEquipFilter(new Set());
     setHoveredMuscles(new Set());
     setActiveGroups(new Set());
   }, []);
@@ -162,18 +176,26 @@ export function ExerciseCatalogModal({
   const filteredCatalog = useMemo(() => {
     const filters = {};
     if (selectedMuscles.size > 0) filters.muscles = [...selectedMuscles];
-    if (typeFilter) filters.typeFilter = typeFilter;
+    if (movementFilter.size > 0) filters.movements = movementFilter;
+    if (equipFilter.size > 0) filters.equipment = equipFilter;
     return filterCatalog(src, filters);
-  }, [src, selectedMuscles, typeFilter]);
+  }, [src, selectedMuscles, movementFilter, equipFilter]);
 
   const catalogResults = useMemo(() => {
-    return catalogSearch(filteredCatalog, query, { limit: Infinity });
+    const results = catalogSearch(filteredCatalog, query, { limit: Infinity });
+    // Custom exercises first, preserve search ranking within each group
+    const custom = results.filter((r) => r.custom);
+    const catalog = results.filter((r) => !r.custom);
+    return [...custom, ...catalog];
   }, [filteredCatalog, query]);
 
   // Home search: filter full catalog (no muscle/type filters) when typing on home screen
   const homeSearchResults = useMemo(() => {
     if (view !== "home" || !query.trim()) return [];
-    return catalogSearch(src, query, { limit: 30 });
+    const results = catalogSearch(src, query, { limit: 30 });
+    const custom = results.filter((r) => r.custom);
+    const catalog = results.filter((r) => !r.custom);
+    return [...custom, ...catalog];
   }, [src, query, view]);
 
   const catalogNameSet = useMemo(
@@ -559,7 +581,7 @@ export function ExerciseCatalogModal({
 
   // --- Render a single exercise result button ---
   const renderExerciseBtn = (entry) => {
-    const sportIcon = !entry.gifUrl ? getSportIconUrl(entry.name) : null;
+    const sportIcon = !entry.gifUrl ? getSportIconUrl(entry.name, entry.sportIcon) : null;
     return (
       <button
         key={entry.id}
@@ -633,7 +655,22 @@ export function ExerciseCatalogModal({
           <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>Catalog</div>
         )}
 
-        {catalogResults.map(renderExerciseBtn)}
+        {(() => {
+          const custom = catalogResults.filter((r) => r.custom);
+          const catalog = catalogResults.filter((r) => !r.custom);
+          return (
+            <>
+              {custom.length > 0 && (
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>My Exercises</div>
+              )}
+              {custom.map(renderExerciseBtn)}
+              {custom.length > 0 && catalog.length > 0 && (
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>Catalog</div>
+              )}
+              {catalog.map(renderExerciseBtn)}
+            </>
+          );
+        })()}
       </div>
     );
   };
@@ -662,7 +699,22 @@ export function ExerciseCatalogModal({
               No exercises found.
             </div>
           )}
-          {homeSearchResults.map(renderExerciseBtn)}
+          {(() => {
+            const custom = homeSearchResults.filter((r) => r.custom);
+            const catalog = homeSearchResults.filter((r) => !r.custom);
+            return (
+              <>
+                {custom.length > 0 && (
+                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>My Exercises</div>
+                )}
+                {custom.map(renderExerciseBtn)}
+                {custom.length > 0 && catalog.length > 0 && (
+                  <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>Catalog</div>
+                )}
+                {catalog.map(renderExerciseBtn)}
+              </>
+            );
+          })()}
         </div>
       ) : (
         /* Browse by muscle group */
@@ -836,18 +888,60 @@ export function ExerciseCatalogModal({
         aria-label="Search exercises"
       />
 
-      {/* Row 1: Type filter chips (single-select) */}
-      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-        {TYPE_CHIPS.map((t) => (
+      {/* Movement filter chips (multi-select, horizontal scroll) */}
+      <div style={{ display: "flex", gap: 6, flexShrink: 0, overflowX: "auto", flexWrap: "nowrap", WebkitOverflowScrolling: "touch" }}>
+        {MOVEMENT_CHIPS.map((t) => (
           <button
             key={t.key}
-            style={chipStyle(typeFilter === t.key)}
-            aria-pressed={typeFilter === t.key}
-            onClick={() => setTypeFilter(typeFilter === t.key ? null : t.key)}
+            className="btn-press"
+            style={chipStyle(movementFilter.has(t.key))}
+            aria-pressed={movementFilter.has(t.key)}
+            onClick={() => setMovementFilter((prev) => {
+              const next = new Set(prev);
+              if (next.has(t.key)) next.delete(t.key); else next.add(t.key);
+              return next;
+            })}
           >
             {t.label}
           </button>
         ))}
+        {movementFilter.size > 0 && (
+          <button
+            className="btn-press"
+            style={{ ...chipStyle(false), opacity: 0.5, fontSize: 10 }}
+            onClick={() => setMovementFilter(new Set())}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Equipment filter chips (multi-select, horizontal scroll) */}
+      <div style={{ display: "flex", gap: 6, flexShrink: 0, overflowX: "auto", flexWrap: "nowrap", WebkitOverflowScrolling: "touch" }}>
+        {EQUIPMENT_CHIPS.map((t) => (
+          <button
+            key={t.key}
+            className="btn-press"
+            style={chipStyle(equipFilter.has(t.key))}
+            aria-pressed={equipFilter.has(t.key)}
+            onClick={() => setEquipFilter((prev) => {
+              const next = new Set(prev);
+              if (next.has(t.key)) next.delete(t.key); else next.add(t.key);
+              return next;
+            })}
+          >
+            {t.label}
+          </button>
+        ))}
+        {equipFilter.size > 0 && (
+          <button
+            className="btn-press"
+            style={{ ...chipStyle(false), opacity: 0.5, fontSize: 10 }}
+            onClick={() => setEquipFilter(new Set())}
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Results */}
@@ -899,6 +993,19 @@ export function ExerciseCatalogModal({
           navAnimRef.current = null;
           setDetailEntry(null);
         } : undefined}
+        onUpdateCustomExercise={onUpdateCustomExercise ? (updatedEntry) => {
+          onUpdateCustomExercise(updatedEntry);
+          setDetailEntry(updatedEntry);
+        } : undefined}
+        onSaveAsNew={onSaveAsNew ? (newEntry) => {
+          const newId = onSaveAsNew(newEntry);
+          // Find the newly created entry from the catalog to show it
+          const created = { ...newEntry, id: newId, custom: true };
+          setDetailEntry(created);
+          return newId;
+        } : undefined}
+        catalog={src}
+        session={session}
         workouts={workouts}
         styles={styles}
         colors={colors}
