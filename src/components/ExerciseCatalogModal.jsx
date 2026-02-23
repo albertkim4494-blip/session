@@ -651,20 +651,17 @@ export function ExerciseCatalogModal({
           </button>
         ))}
 
-        {hasUserResults && catalogResults.length > 0 && !q && (
-          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>Catalog</div>
-        )}
-
         {(() => {
           const custom = catalogResults.filter((r) => r.custom);
           const catalog = catalogResults.filter((r) => !r.custom);
+          const showHeaders = custom.length > 0 && catalog.length > 0;
           return (
             <>
-              {custom.length > 0 && (
+              {showHeaders && (
                 <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>My Exercises</div>
               )}
               {custom.map(renderExerciseBtn)}
-              {custom.length > 0 && catalog.length > 0 && (
+              {showHeaders && (
                 <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>Catalog</div>
               )}
               {catalog.map(renderExerciseBtn)}
@@ -702,13 +699,14 @@ export function ExerciseCatalogModal({
           {(() => {
             const custom = homeSearchResults.filter((r) => r.custom);
             const catalog = homeSearchResults.filter((r) => !r.custom);
+            const showHeaders = custom.length > 0 && catalog.length > 0;
             return (
               <>
-                {custom.length > 0 && (
+                {showHeaders && (
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>My Exercises</div>
                 )}
                 {custom.map(renderExerciseBtn)}
-                {custom.length > 0 && catalog.length > 0 && (
+                {showHeaders && (
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, padding: "6px 2px 0" }}>Catalog</div>
                 )}
                 {catalog.map(renderExerciseBtn)}

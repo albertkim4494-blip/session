@@ -38,6 +38,8 @@ function compressImage(file) {
 }
 
 export async function uploadExerciseImage(file, userId, exerciseId) {
+  if (!userId) throw new Error("Not signed in");
+  if (!exerciseId) throw new Error("Exercise ID is required");
   const isGif = file.type === "image/gif";
 
   let blob, ext;

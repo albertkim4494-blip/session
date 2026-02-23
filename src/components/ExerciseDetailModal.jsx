@@ -137,6 +137,11 @@ export function ExerciseDetailModal({
     if (!trimmed) { setNameError("Name is required"); return; }
     if (isNameTaken(trimmed, entry.id)) { setNameError("Name already exists"); return; }
     const updated = buildDraft();
+    // Clean up storage if image was removed
+    if (entry.gifUrl && !updated.gifUrl) {
+      const userId = session?.user?.id;
+      if (userId) removeExerciseImage(userId, entry.id).catch(() => {});
+    }
     onUpdateCustomExercise(updated);
     setEditing(false);
   };
@@ -193,10 +198,8 @@ export function ExerciseDetailModal({
 
   const handleRemoveImage = () => {
     setDraftGifUrl(null);
-    const userId = session?.user?.id;
-    if (userId) {
-      removeExerciseImage(userId, entry.id).catch(() => {});
-    }
+    // Storage cleanup deferred to save handlers — removing during draft editing
+    // would destroy the original image if the user cancels.
   };
 
   // --- Styles ---
@@ -750,8 +753,8 @@ export function ExerciseDetailModal({
           {hasMuscles && (
             <>
               <BodyDiagram
-                highlightedMuscles={entry.muscles.primary}
-                secondaryMuscles={entry.muscles.secondary || []}
+                highlightedMuscles={entry.muscles?.primary || []}
+                secondaryMuscles={entry.muscles?.secondary || []}
                 colors={colors}
               />
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

@@ -11834,7 +11834,6 @@ export const EXERCISE_CATALOG = [
     ],
     "aliases": [
       "jerk",
-      "split jerk",
       "push jerks"
     ],
     "tags": [
@@ -13813,7 +13812,7 @@ export const EXERCISE_CATALOG = [
       "core"
     ],
     "movement": "core",
-    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/02/plank.gif"
+    "gifUrl": null
   },
   {
     "id": "custom-side-plank",
@@ -13841,7 +13840,7 @@ export const EXERCISE_CATALOG = [
       "core"
     ],
     "movement": "core",
-    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2023/01/Side-Plank-Rotation.gif"
+    "gifUrl": null
   },
   {
     "id": "custom-barbell-hip-thrust",
@@ -13860,8 +13859,7 @@ export const EXERCISE_CATALOG = [
       "barbell"
     ],
     "aliases": [
-      "hip thrust",
-      "hip thrusts",
+      "barbell hip thrusts",
       "bb hip thrust",
       "weighted hip thrust"
     ],
@@ -13870,7 +13868,7 @@ export const EXERCISE_CATALOG = [
       "glute"
     ],
     "movement": "legs",
-    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Hip-Thrust.gif"
+    "gifUrl": null
   },
   {
     "id": "custom-box-jump",
@@ -13899,7 +13897,7 @@ export const EXERCISE_CATALOG = [
       "bodyweight"
     ],
     "movement": "legs",
-    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2015/07/The-Box-Jump.gif"
+    "gifUrl": null
   },
   {
     "id": "custom-wall-sit",
@@ -14086,7 +14084,7 @@ export const EXERCISE_CATALOG = [
       "activation"
     ],
     "movement": "legs",
-    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/05/Side-Lying-Clam.gif"
+    "gifUrl": null
   },
   {
     "id": "custom-fire-hydrant",
@@ -14113,7 +14111,7 @@ export const EXERCISE_CATALOG = [
       "activation"
     ],
     "movement": "legs",
-    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/02/Fire-Hydrant.gif"
+    "gifUrl": null
   },
   {
     "id": "custom-donkey-kick",
@@ -14131,8 +14129,7 @@ export const EXERCISE_CATALOG = [
       "bodyweight"
     ],
     "aliases": [
-      "donkey kicks",
-      "glute kickback"
+      "donkey kicks"
     ],
     "tags": [
       "isolation",
@@ -14140,7 +14137,7 @@ export const EXERCISE_CATALOG = [
       "activation"
     ],
     "movement": "legs",
-    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2021/02/Donkey-Kicks.gif"
+    "gifUrl": null
   },
   {
     "id": "custom-bodyweight-hip-thrust",
@@ -14168,7 +14165,7 @@ export const EXERCISE_CATALOG = [
       "glute"
     ],
     "movement": "legs",
-    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2022/04/bodyweight-hip-thrust.gif"
+    "gifUrl": null
   },
   {
     "id": "custom-band-face-pull",
@@ -14194,6 +14191,6 @@ export const EXERCISE_CATALOG = [
       "pull"
     ],
     "movement": "pull",
-    "gifUrl": "https://fitnessprogramer.com/wp-content/uploads/2022/05/Face-pull.gif"
+    "gifUrl": null
   }
 ];

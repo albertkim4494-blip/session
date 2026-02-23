@@ -66,10 +66,15 @@ const SPORT_ICON_MAP = {
  * All available sport icon file slugs, sorted alphabetically.
  * Each entry is { slug, label, url }.
  */
+const LABEL_OVERRIDES = {
+  "mma training": "MMA Training",
+  "brazilian jiu-jitsu": "Brazilian Jiu-Jitsu",
+};
+
 export const SPORT_ICONS = Object.entries(SPORT_ICON_MAP)
   .map(([name, file]) => ({
     slug: file,
-    label: name.replace(/\b\w/g, (c) => c.toUpperCase()),
+    label: LABEL_OVERRIDES[name] || name.replace(/\b\w/g, (c) => c.toUpperCase()),
     url: `/sport-icons/${file}.svg`,
   }))
   .sort((a, b) => a.label.localeCompare(b.label));

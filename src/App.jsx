@@ -3003,6 +3003,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onPromoteOverride={(origExId) => promoteOverride(w.id, origExId)}
                       onRemoveFromToday={() => removeSessionFromToday(w.id)}
                       highlightBorder={highlightCardId === w.id}
+                      catalogMap={catalogMap}
                     />
                   ))}
                   {/* Auto-detected workouts from logs (no remove button) */}
@@ -3027,6 +3028,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       overrides={todayOverrides[w.id] || null}
                       onUndoOverride={(origExId) => undoOverride(w.id, origExId)}
                       onPromoteOverride={(origExId) => promoteOverride(w.id, origExId)}
+                      catalogMap={catalogMap}
                     />
                   ))}
                   {[...dailyWorkoutsToday].reverse().map((w) => (
@@ -3050,6 +3052,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onStartCircuit={(w) => setCircuitWorkout(w)}
                       onSwapExercise={(exId) => openSwapExercise(w.id, exId, true)}
                       onSkipExercise={(exId) => deleteDailyExercise(w.id, exId)}
+                      catalogMap={catalogMap}
                     />
                   ))}
                 </>
@@ -5922,7 +5925,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride, cardId, onRemoveFromToday, highlightBorder }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride, cardId, onRemoveFromToday, highlightBorder, catalogMap }) {
   const cat = (workout.category || "Workout").trim();
 
   // Compute rest timer state from exercises: all on, all off, or mixed
