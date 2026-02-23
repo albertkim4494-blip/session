@@ -209,7 +209,11 @@ export function ExerciseCatalogModal({
       const next = idx + dir;
       return (next >= 0 && next < list.length) ? list[next] : null;
     },
-    swap: (entry) => setDetailEntry(entry),
+    swap: (entry) => {
+      setDetailEntry(entry);
+      // Scroll detail body to top so new exercise starts at top
+      if (detailBodyRef.current) detailBodyRef.current.scrollTop = 0;
+    },
   };
 
   // Vertical swipe down from body (scrolled to top) — previous exercise
