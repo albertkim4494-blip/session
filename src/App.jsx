@@ -2456,6 +2456,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       st.todaySessions[dateKey].push(workoutId);
       return st;
     });
+    setCollapsedToday((prev) => new Set(prev).add(workoutId));
     setFabOpen(false);
   }
 
