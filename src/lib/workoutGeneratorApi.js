@@ -25,7 +25,7 @@ function uid(prefix) {
 function buildCatalogPayload(catalog, equipment) {
   return catalog
     .filter((e) => exerciseFitsEquipment(e, equipment))
-    .filter((e) => e.tags && !e.tags.includes("sport")) // exclude sport entries from exercise selection
+    .filter((e) => e.tags && !e.tags.includes("sport") && e.movement !== "stretch") // exclude sport/stretch entries from exercise selection
     .map((e) => ({
       id: e.id,
       name: e.name,
@@ -95,8 +95,11 @@ function buildHistorySummary(state, catalog, weightLabel = "lb") {
         0
       );
 
+      const isSport = info.unit === "min" || info.unit === "hrs";
       const weightStr = maxWeight > 0 ? ` @ ${maxWeight} ${weightLabel}` : "";
-      let line = `${dateKey}: ${info.name} — ${setCount} sets, ${totalReps} ${info.unit}${weightStr}`;
+      let line = isSport
+        ? `${dateKey}: [SPORT] ${info.name} — ${totalReps} ${info.unit}`
+        : `${dateKey}: ${info.name} — ${setCount} sets, ${totalReps} ${info.unit}${weightStr}`;
 
       // Include RPE data if present (from completed sets only)
       const rpes = completedSets.map((s) => Number(s.targetRpe)).filter((v) => v > 0);

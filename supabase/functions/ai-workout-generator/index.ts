@@ -74,7 +74,7 @@ function buildProgramPrompt(payload: {
     .map((e) => `${e.id} | ${e.name} | ${e.muscles} | ${e.tags} | ${e.unit || "reps"}`)
     .join("\n");
 
-  const exerciseCount = Math.max(3, Math.min(Math.round(duration / 7), 10));
+  const exerciseCount = duration <= 15 ? 2 : duration <= 30 ? Math.min(4, Math.max(3, Math.round(duration / 8))) : Math.max(4, Math.min(10, Math.round(duration / 7)));
 
   const sportDayCount = Array.isArray(sportDays) ? sportDays.length : 0;
   const sportDayList = Array.isArray(sportDays) ? sportDays.join(", ") : "";
@@ -114,6 +114,7 @@ ${sportSection}${sportBioSection}
 
 TRAINING HISTORY (last 14 days):
 ${history || "No recent training data."}
+Lines prefixed with [SPORT] are sport activities — do NOT include them as exercises. Use them only for understanding training load and muscle fatigue.
 
 EXERCISE CATALOG (pick ONLY from these by catalogId):
 id | name | muscles | tags | unit
@@ -143,7 +144,7 @@ RULES:
 3. No duplicate exercises within a single day.
 4. Vary exercises across days — don't repeat the same exercise on multiple days unless necessary.
 5. Order: compounds first, then isolation, then accessories/core.
-6. Each lifting day should have ~${exerciseCount} exercises to fill ~${duration} minutes.
+6. Each lifting day should have ~${exerciseCount} exercises to fill ~${duration} minutes.${duration <= 15 ? " This is a quick session — pick only compound movements, no isolation." : ""}
 7. Give each day a descriptive name (e.g. "Push", "Upper Hypertrophy", "Legs & Glutes").
 
 Return ONLY valid JSON, no markdown fences, no explanation.
@@ -221,7 +222,7 @@ function buildTodayPrompt(payload: {
 
   const goal = (profile.goal as string) || "General Fitness";
   const dur = duration || 60;
-  const exerciseCount = Math.max(2, Math.min(Math.round(dur / 7), 10));
+  const exerciseCount = dur <= 15 ? 2 : dur <= 30 ? Math.min(4, Math.max(3, Math.round(dur / 8))) : Math.max(4, Math.min(10, Math.round(dur / 7)));
 
   // Sport biomechanics instruction (when profile.sports exists)
   let sportBioSection = "";
@@ -249,6 +250,7 @@ ${recencyLines}
 
 TRAINING HISTORY (last 14 days):
 ${history || "No recent training data."}
+Lines prefixed with [SPORT] are sport activities — do NOT include them as exercises. Use them only for understanding training load and muscle fatigue.
 
 EXERCISE CATALOG (pick ONLY from these by catalogId):
 id | name | muscles | tags | unit
@@ -308,7 +310,7 @@ RULES:
    - If the user has health conditions or is a beginner, lean toward fewer sets (2-3) with moderate intensity.
 4. No duplicate exercises.
 5. Order: compounds first, then isolation, then accessories.
-6. Pick ~${exerciseCount} exercises to fit within ~${dur} minutes (including warm-up and rest between sets).
+6. Pick ~${exerciseCount} exercises to fit within ~${dur} minutes (including warm-up and rest between sets).${dur <= 15 ? " This is a quick session — pick only compound movements, no isolation." : ""}
 7. Give the workout a descriptive name (e.g. "Pull", "Upper Body", "Chest & Shoulders").
 8. List the primary target muscle groups (use keys like CHEST, BACK, QUADS, etc.).
 

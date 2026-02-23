@@ -2373,6 +2373,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         profile,
         catalog: fullCatalog,
         todayKey: dateKey,
+        duration: dur,
       });
       dispatchModal({
         type: "UPDATE_GENERATE_TODAY",

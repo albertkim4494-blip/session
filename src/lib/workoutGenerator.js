@@ -76,8 +76,9 @@ export const SET_REP_SCHEMES = {
  */
 function exerciseCountFromDuration(duration) {
   const mins = duration || 60;
-  const count = Math.round(mins / 7);
-  return Math.max(3, Math.min(count, 10));
+  if (mins <= 15) return 2;
+  if (mins <= 30) return Math.min(4, Math.max(3, Math.round(mins / 8)));
+  return Math.max(4, Math.min(10, Math.round(mins / 7)));
 }
 
 // All muscle keys used across splits
@@ -109,7 +110,8 @@ function shuffle(arr) {
  * Pick exercises for a workout targeting specific muscle groups.
  */
 function pickExercisesForWorkout(muscles, equipment, goal, catalog, duration) {
-  const available = catalog.filter((e) => exerciseFitsEquipment(e, equipment));
+  const available = catalog.filter((e) => exerciseFitsEquipment(e, equipment))
+    .filter((e) => !e.tags?.includes("sport") && e.movement !== "stretch");
   const targetCount = exerciseCountFromDuration(duration);
 
   const picked = [];
@@ -295,7 +297,7 @@ export function analyzeMuscleRecency(state, catalog) {
 /**
  * Generate a single workout for today based on muscle recency.
  */
-export function generateTodayWorkout({ state, equipment, profile, catalog, todayKey }) {
+export function generateTodayWorkout({ state, equipment, profile, catalog, todayKey, duration }) {
   const recency = analyzeMuscleRecency(state, catalog);
 
   // Find muscles not trained in 2+ days (or never trained)
@@ -329,12 +331,13 @@ export function generateTodayWorkout({ state, equipment, profile, catalog, today
   // Pick goal from profile if available, otherwise defaults
   const goal = profile?.goal || "General Fitness";
 
+  const dur = duration || 60;
   const exercises = pickExercisesForWorkout(
     targetMuscles,
     equipment,
     goal,
     catalog,
-    60 // default 60 min for today workouts
+    dur
   );
 
   // Build a coach note based on why these muscles were chosen
@@ -345,7 +348,7 @@ export function generateTodayWorkout({ state, equipment, profile, catalog, today
     TRICEPS: "triceps", BICEPS: "biceps", ABS: "abs",
   };
   const muscleNames = [...new Set(targetMuscles.map((m) => muscleLabels[m] || m.toLowerCase()))];
-  const note = `Targeting ${muscleNames.join(", ")} — these haven't been worked recently.`;
+  const note = `~${dur} min session targeting ${muscleNames.join(", ")} — these haven't been worked recently.`;
 
   return {
     id: generateId("w"),
