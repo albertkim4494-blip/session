@@ -2284,6 +2284,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
 
     if (workoutIdOrIds === "__today__") {
+      let coachWId = null;
       updateState((st) => {
         if (!st.dailyWorkouts) st.dailyWorkouts = {};
         if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
@@ -2292,11 +2293,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           coachWorkout = { id: uid("w"), name: "Coach Suggestions", category: "Coach", source: "coach", exercises: [] };
           st.dailyWorkouts[dateKey].push(coachWorkout);
         }
+        coachWId = coachWorkout.id;
         const newEx = { id: uid("ex"), name: exerciseName, unit: "reps" };
         if (matchedCatalogId) newEx.catalogId = matchedCatalogId;
         coachWorkout.exercises.push(newEx);
         return st;
       });
+      if (coachWId) setCollapsedToday((prev) => new Set(prev).add(coachWId));
       dispatchModal({ type: "CLOSE_ADD_SUGGESTION" });
       showToast(`Added "${exerciseName}" for today`);
       return;
@@ -2385,6 +2388,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       st.dailyWorkouts[dateKey].push({ ...workout, source: "generate_today" });
       return st;
     });
+    setCollapsedToday((prev) => new Set(prev).add(workout.id));
     dispatchModal({ type: "CLOSE_GENERATE_TODAY" });
   }
 
