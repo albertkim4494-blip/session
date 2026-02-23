@@ -156,25 +156,47 @@ function transformExercises(aiExercises, catalogMap) {
   const diagnostics = { dropped: 0, reasons: [] };
   if (!Array.isArray(aiExercises)) return { exercises: [], diagnostics };
 
+  // Build name→entry lookup for fallback matching
+  const nameMap = new Map();
+  for (const [, entry] of catalogMap) {
+    nameMap.set(entry.name.toLowerCase(), entry);
+  }
+
   const exercises = [];
+  const usedIds = new Set();
   for (const e of aiExercises) {
-    if (!e.catalogId) {
+    let entry = null;
+
+    // Try catalogId first
+    if (e.catalogId && catalogMap.has(e.catalogId)) {
+      entry = catalogMap.get(e.catalogId);
+    }
+
+    // Fallback: match by name if catalogId missing or invalid
+    if (!entry && e.name) {
+      const byName = nameMap.get(e.name.toLowerCase());
+      if (byName) {
+        diagnostics.reasons.push(`Recovered ${e.name}: bad catalogId "${e.catalogId}", matched by name`);
+        entry = byName;
+      }
+    }
+
+    if (!entry) {
       diagnostics.dropped++;
-      diagnostics.reasons.push(`Dropped ${e.name || "unknown"}: missing catalogId`);
+      diagnostics.reasons.push(`Dropped ${e.name || e.catalogId || "unknown"}: not found in catalog`);
       continue;
     }
-    if (!catalogMap.has(e.catalogId)) {
-      diagnostics.dropped++;
-      diagnostics.reasons.push(`Dropped ${e.name || e.catalogId}: catalogId not in catalog`);
-      continue;
-    }
-    const entry = catalogMap.get(e.catalogId);
+
+    // Skip duplicates
+    if (usedIds.has(entry.id)) continue;
+    usedIds.add(entry.id);
+
     exercises.push({
       id: uid("ex"),
-      name: entry.name, // use catalog name, not AI's
+      name: entry.name,
       unit: entry.defaultUnit,
-      catalogId: e.catalogId,
-      scheme: e.scheme || null, // per-exercise scheme from AI
+      catalogId: entry.id,
+      scheme: e.scheme || null,
     });
   }
 
@@ -325,7 +347,7 @@ export async function generateProgramAI({
       if (diagnostics.dropped > 0) {
         console.warn(`[AI program] ${w.name}: dropped ${diagnostics.dropped} exercises`, diagnostics.reasons);
       }
-      if (exercises.length < 3) hasSparseWorkout = true;
+      if (exercises.length < 2) hasSparseWorkout = true;
       return {
         id: uid("w"),
         name: w.name || "Workout",
@@ -400,7 +422,8 @@ export async function generateTodayAI({
       console.warn(`[AI today] dropped ${diagnostics.dropped} exercises`, diagnostics.reasons);
     }
 
-    if (exercises.length < 3) {
+    const minRequired = (duration || 60) <= 15 ? 1 : 2;
+    if (exercises.length < minRequired) {
       recordAiEvent("ai_empty_workout", "today");
       return { success: false, error: "AI output too sparse after catalog validation" };
     }

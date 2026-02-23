@@ -339,9 +339,19 @@ const SCHEME_RE = /^(\d+)x(\d+(-\d+)?s?)$/;
 function normalizeScheme(scheme: string): string | null {
   if (!scheme || typeof scheme !== "string") return null;
   if (scheme === "sport") return "sport";
-  // Light repair: collapse whitespace around 'x'
-  const cleaned = scheme.trim().replace(/\s*x\s*/gi, "x").toLowerCase();
+  // Strip trailing text the AI sometimes adds (e.g. "3x10 reps", "3x8 each side")
+  let cleaned = scheme.trim()
+    .replace(/\s*(reps?|each|per side|each side|per leg|each leg|seconds?)[\s.]*/gi, "")
+    .replace(/\s*x\s*/gi, "x")
+    .toLowerCase()
+    .replace(/[^0-9xs\-]/g, ""); // remove any remaining non-scheme chars
   if (SCHEME_RE.test(cleaned)) return cleaned;
+  // Last resort: extract first NxN pattern from the string
+  const match = scheme.match(/(\d+)\s*x\s*(\d+(?:-\d+)?s?)/i);
+  if (match) {
+    const extracted = `${match[1]}x${match[2].toLowerCase()}`;
+    if (SCHEME_RE.test(extracted)) return extracted;
+  }
   return null;
 }
 
@@ -387,6 +397,30 @@ function validateExercise(
   return null;
 }
 
+/**
+ * Filter exercises array in-place: keep valid ones, drop bad ones.
+ * Returns count of dropped exercises.
+ */
+function filterValidExercises(
+  exercises: Array<Record<string, unknown>>,
+  prefix: string
+): number {
+  let dropped = 0;
+  const valid: Array<Record<string, unknown>> = [];
+  for (let ei = 0; ei < exercises.length; ei++) {
+    const err = validateExercise(exercises[ei], ei, prefix);
+    if (err) {
+      console.log(JSON.stringify({ event: "ai_exercise_skipped", ...err }));
+      dropped++;
+    } else {
+      valid.push(exercises[ei]);
+    }
+  }
+  exercises.length = 0;
+  valid.forEach((e) => exercises.push(e));
+  return dropped;
+}
+
 function validateWorkoutOutput(
   parsed: Record<string, unknown>,
   mode: string
@@ -405,21 +439,26 @@ function validateWorkoutOutput(
       if (!w.name || typeof w.name !== "string" || !w.name.trim()) {
         w.name = `Day ${wi + 1}`;
       }
-      if (!Array.isArray(w.exercises) || w.exercises.length < 2) {
+      if (!Array.isArray(w.exercises)) {
         return {
           error: "validation_failed",
           code: "TOO_FEW_EXERCISES",
           field: `workouts[${wi}].exercises`,
-          reason: `Workout "${w.name}" has fewer than 2 exercises`,
+          reason: `Workout "${w.name}" has no exercises`,
         };
       }
-      for (let ei = 0; ei < w.exercises.length; ei++) {
-        const err = validateExercise(
-          w.exercises[ei] as Record<string, unknown>,
-          ei,
-          `workouts[${wi}]`
-        );
-        if (err) return err;
+      // Filter out bad exercises instead of failing on first bad one
+      const dropped = filterValidExercises(w.exercises, `workouts[${wi}]`);
+      if (dropped > 0) {
+        console.log(JSON.stringify({ event: "ai_exercises_filtered", workout: w.name, dropped, remaining: w.exercises.length }));
+      }
+      if (w.exercises.length < 2) {
+        return {
+          error: "validation_failed",
+          code: "TOO_FEW_EXERCISES",
+          field: `workouts[${wi}].exercises`,
+          reason: `Workout "${w.name}" has fewer than 2 valid exercises after filtering`,
+        };
       }
     }
   } else if (mode === "today") {
@@ -429,21 +468,26 @@ function validateWorkoutOutput(
     if (!Array.isArray(parsed.targetMuscles)) {
       parsed.targetMuscles = [];
     }
-    if (!Array.isArray(parsed.exercises) || parsed.exercises.length < 2) {
+    if (!Array.isArray(parsed.exercises)) {
       return {
         error: "validation_failed",
         code: "TOO_FEW_EXERCISES",
         field: "exercises",
-        reason: "Today's workout must have at least 2 exercises",
+        reason: "Today's workout has no exercises",
       };
     }
-    for (let ei = 0; ei < parsed.exercises.length; ei++) {
-      const err = validateExercise(
-        parsed.exercises[ei] as Record<string, unknown>,
-        ei,
-        "today"
-      );
-      if (err) return err;
+    // Filter out bad exercises instead of failing on first bad one
+    const dropped = filterValidExercises(parsed.exercises as Array<Record<string, unknown>>, "today");
+    if (dropped > 0) {
+      console.log(JSON.stringify({ event: "ai_exercises_filtered", mode: "today", dropped, remaining: (parsed.exercises as unknown[]).length }));
+    }
+    if ((parsed.exercises as unknown[]).length < 1) {
+      return {
+        error: "validation_failed",
+        code: "TOO_FEW_EXERCISES",
+        field: "exercises",
+        reason: "Today's workout has no valid exercises after filtering",
+      };
     }
   }
   return null;
