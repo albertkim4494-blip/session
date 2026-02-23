@@ -5158,6 +5158,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           showToast(`"${newEntry.name}" saved`);
           return newId;
         }}
+        catalog={fullCatalog}
         session={session}
         onDeleteCustomExercise={(entry) => {
           // Count usages across program workouts and daily workouts
