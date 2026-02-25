@@ -3,7 +3,6 @@ import React, { useState } from "react";
 const COLUMNS = [
   { key: "name", label: "Exercise", align: "left" },
   { key: "sessions", label: "Sessions", align: "right" },
-  { key: "totalSets", label: "Sets", align: "right" },
   { key: "totalReps", label: "Reps", align: "right" },
   { key: "maxWeight", label: "Best", align: "right" },
 ];
@@ -90,7 +89,7 @@ export function ExerciseListTable({ exercises, colors, styles, weightLabel }) {
                 }}
                 onClick={() => handleSort(col.key)}
               >
-                {col.label === "Reps" && sortKey !== "totalReps" ? col.label : col.label}
+                {col.label}
                 {arrow(col.key)}
               </th>
             ))}
@@ -99,11 +98,10 @@ export function ExerciseListTable({ exercises, colors, styles, weightLabel }) {
         <tbody>
           {sorted.map((ex) => (
             <tr key={ex.id}>
-              <td style={{ ...tdStyle, fontWeight: 600, paddingLeft: 14, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <td style={{ ...tdStyle, fontWeight: 600, paddingLeft: 14, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {ex.name}
               </td>
               <td style={{ ...tdStyle, textAlign: "right" }}>{ex.sessions}</td>
-              <td style={{ ...tdStyle, textAlign: "right" }}>{ex.totalSets}</td>
               <td style={{ ...tdStyle, textAlign: "right" }}>
                 {ex.totalReps}{" "}
                 <span style={{ fontSize: 10, opacity: 0.5 }}>{ex.unitAbbr}</span>

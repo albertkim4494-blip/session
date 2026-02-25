@@ -718,8 +718,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }
       }
     }
+    // Include session-added exercises (exercises added to a workout for a specific day)
+    const addedExercises = [];
+    for (const [date, wAdds] of Object.entries(state.sessionAdditions || {})) {
+      if (!inRangeInclusive(date, summaryRange.start, summaryRange.end)) continue;
+      for (const adds of Object.values(wAdds)) {
+        if (Array.isArray(adds)) addedExercises.push(...adds);
+      }
+    }
     if (swapExercises.length > 0) {
       result.push({ id: "__swaps__", name: "Swapped Exercises", category: "Swap", exercises: swapExercises });
+    }
+    if (addedExercises.length > 0) {
+      result.push({ id: "__added__", name: "Session Additions", category: "Added", exercises: addedExercises });
     }
     if (dailyExercises.length > 0) {
       result.push({ id: "__daily__", name: "Daily Workouts", category: "Daily", exercises: dailyExercises });
@@ -728,7 +739,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       result.push({ id: "__coach__", name: "Coach Suggestions", category: "Coach", exercises: coachExercises });
     }
     return result;
-  }, [workouts, state.dailyWorkouts, state.sessionOverrides, summaryRange]);
+  }, [workouts, state.dailyWorkouts, state.sessionOverrides, state.sessionAdditions, summaryRange]);
 
   const summaryStats = useMemo(() => {
     // Build exercise ID → name/unit maps from all workout sources
