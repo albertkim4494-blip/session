@@ -3,7 +3,6 @@ import { Modal } from "./Modal";
 import { useSwipe } from "../hooks/useSwipe";
 import { isValidBirthdateString, computeAge } from "../lib/validation";
 import { validateDisplayName } from "../lib/userIdentity";
-import { getColors } from "../styles/theme";
 import { ProfileTab } from "./profile/ProfileTab";
 import { SettingsTab } from "./profile/SettingsTab";
 
@@ -49,13 +48,6 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
     return { ...preferences, ...pendingPrefs };
   }, [preferences, pendingPrefs]);
 
-  // Compute preview colors if theme was changed
-  const effectiveColors = useMemo(() => {
-    if (pendingPrefs.theme && pendingPrefs.theme !== (preferences?.theme || "dark")) {
-      return getColors(pendingPrefs.theme);
-    }
-    return colors;
-  }, [pendingPrefs.theme, preferences?.theme, colors]);
 
   const swipeHandlers = useSwipe({
     onSwipeLeft: () => setActiveTab("settings"),
@@ -144,9 +136,9 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
       {error && (
         <div style={{
           fontSize: 12,
-          color: effectiveColors?.dangerText || "#f87171",
-          background: effectiveColors?.dangerBg || "rgba(248,113,113,0.1)",
-          border: `1px solid ${effectiveColors?.dangerBorder || "rgba(248,113,113,0.3)"}`,
+          color: colors?.dangerText || "#f87171",
+          background: colors?.dangerBg || "rgba(248,113,113,0.1)",
+          border: `1px solid ${colors?.dangerBorder || "rgba(248,113,113,0.3)"}`,
           borderRadius: 8,
           padding: "6px 10px",
         }}>
@@ -174,7 +166,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
       flex: 1,
       padding: 3,
       borderRadius: 10,
-      background: effectiveColors?.cardAltBg || "rgba(255,255,255,0.06)",
+      background: colors?.cardAltBg || "rgba(255,255,255,0.06)",
       gap: 2,
     }}>
       {TABS.map((t) => {
@@ -186,10 +178,10 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
             style={{
               flex: 1,
               padding: "6px 0",
-              background: active ? (effectiveColors?.cardBg || "#161b22") : "transparent",
+              background: active ? (colors?.cardBg || "#161b22") : "transparent",
               border: "none",
               borderRadius: 8,
-              color: effectiveColors?.text || "#e8eef7",
+              color: colors?.text || "#e8eef7",
               opacity: active ? 1 : 0.5,
               fontSize: 13,
               fontWeight: 600,
@@ -230,7 +222,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
             profile={profile}
             session={session}
             styles={styles}
-            colors={effectiveColors}
+            colors={colors}
             summaryStats={summaryStats}
             preferences={effectivePreferences}
             onUpdatePreference={stagePreference}
@@ -242,7 +234,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
             preferences={effectivePreferences}
             onUpdatePreference={stagePreference}
             styles={styles}
-            colors={effectiveColors}
+            colors={colors}
           />
         )}
       </div>
@@ -264,8 +256,8 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
         >
           <div
             style={{
-              background: effectiveColors?.cardBg || "#161b22",
-              border: `1px solid ${effectiveColors?.border || "rgba(255,255,255,0.10)"}`,
+              background: colors?.cardBg || "#161b22",
+              border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
               borderRadius: 14,
               padding: "20px 24px",
               maxWidth: 300,
@@ -274,10 +266,10 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
             }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8, color: effectiveColors?.text || "#e8eef7" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8, color: colors?.text || "#e8eef7" }}>
               Discard unsaved changes?
             </div>
-            <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 16, color: effectiveColors?.text || "#e8eef7" }}>
+            <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 16, color: colors?.text || "#e8eef7" }}>
               You have unsaved changes that will be lost.
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
