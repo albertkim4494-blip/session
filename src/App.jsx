@@ -4114,6 +4114,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 if (hExObj) break;
               }
             }
+            if (!hExObj) {
+              for (const dateAdds of Object.values(state.sessionAdditions || {})) {
+                for (const exArr of Object.values(dateAdds || {})) {
+                  hExObj = exArr.find((e) => e.id === hEx);
+                  if (hExObj) break;
+                }
+                if (hExObj) break;
+              }
+            }
           }
           const hRestOn = hExObj?.restTimer !== undefined ? hExObj.restTimer : state.preferences?.restTimerEnabled !== false;
 
