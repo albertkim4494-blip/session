@@ -23,7 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-.claude/
+.claude/*
+!.claude/skills/
 nul
 exercisedb_*.json
 
