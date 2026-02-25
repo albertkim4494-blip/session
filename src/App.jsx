@@ -1416,7 +1416,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }
       }
 
-      const normalizedSets = sets.map((s) => {
+      const existingSets = existing?.sets;
+      const normalizedSets = sets.map((s, i) => {
         const isBW = String(s.weight).toUpperCase() === "BW";
         return {
           reps: s.reps,
@@ -1425,6 +1426,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           targetPace: s.targetPace || "",
           targetCustom: s.targetCustom || "",
           targetIntensity: s.targetIntensity || "",
+          completed: !!(existingSets?.[i] && isSetCompleted(existingSets[i])),
         };
       });
 
@@ -1480,13 +1482,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         return result;
       };
 
-      const existingEntry = st.logsByDate[dateKey]?.[logCtx.exerciseId];
-
-      // Save all modal sets, preserving completion flags from checkmarks
-      const allSets = (Array.isArray(modals.log.sets) ? modals.log.sets : []).map((modalSet, i) => {
+      // Save all modal sets, including completion flags from modal state
+      const allSets = (Array.isArray(modals.log.sets) ? modals.log.sets : []).map((modalSet) => {
         const cleaned = cleanSet(modalSet);
-        const wasCompleted = existingEntry?.sets?.[i] && isSetCompleted(existingEntry.sets[i]);
-        return { ...cleaned, completed: !!wasCompleted };
+        return { ...cleaned, completed: !!modalSet.completed };
       });
 
       st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
@@ -1756,33 +1755,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       // Haptic feedback
       navigator.vibrate?.(10);
 
-      updateState((st) => {
-        st.logsByDate[dateKey] = st.logsByDate[dateKey] ?? {};
-        const entry = st.logsByDate[dateKey][exerciseId] ?? { sets: [] };
-        if (!Array.isArray(entry.sets)) entry.sets = [];
-        while (entry.sets.length <= setIndex) entry.sets.push({ reps: 0, weight: "", completed: false });
-        const savedSet = { reps: setData.reps, weight: setData.weight, completed: true };
-        if (setData.targetRpe) savedSet.targetRpe = setData.targetRpe;
-        if (setData.targetPace) savedSet.targetPace = setData.targetPace;
-        if (setData.targetCustom) savedSet.targetCustom = setData.targetCustom;
-        if (setData.targetIntensity) savedSet.targetIntensity = setData.targetIntensity;
-        entry.sets[setIndex] = savedSet;
-        st.logsByDate[dateKey][exerciseId] = entry;
-        return st;
-      });
+      // Stage completion in modal state (not persisted until Save)
+      dispatchModal({ type: "COMPLETE_LOG_SET", payload: { setIndex } });
 
-      // Smart toast — compute context after state update
+      // Smart toast — compute context using modal state for current exercise, persisted state for others
       const workout = workoutById.get(workoutId);
       const exercises = workout?.exercises || [];
 
-      // Check if the whole workout is complete after this set
+      // For current exercise: modal sets with this set marked completed
+      const modalSets = [...(modals.log.sets || [])];
+      while (modalSets.length <= setIndex) modalSets.push({ reps: 0, weight: "", completed: false });
+      modalSets[setIndex] = { ...modalSets[setIndex], completed: true };
+
+      // Build combined day logs: persisted state for other exercises, modal state for current
       const updatedDayLogs = { ...state.logsByDate[dateKey] };
-      // Include the set we just saved
-      const updatedEntry = { ...(updatedDayLogs[exerciseId] || { sets: [] }) };
-      const updatedSets = [...(updatedEntry.sets || [])];
-      while (updatedSets.length <= setIndex) updatedSets.push({ reps: 0, weight: "", completed: false });
-      updatedSets[setIndex] = { reps: setData.reps, weight: setData.weight, completed: true };
-      updatedDayLogs[exerciseId] = { ...updatedEntry, sets: updatedSets };
+      updatedDayLogs[exerciseId] = { sets: modalSets };
 
       const isWorkoutComplete = exercises.length > 0 && exercises.every((ex) => {
         const exLog = updatedDayLogs[ex.id];
@@ -1800,11 +1787,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         (eid) => updatedDayLogs[eid]?.sets?.some((s) => isSetCompleted(s))
       ).length;
 
-      // Compute totalSets from today's template (updatedSets includes template slots)
+      // Compute totalSets from today's template
       const prior = findMostRecentLogBefore(exerciseId, dateKey);
       const schemeStr = exercises.find((e) => e.id === exerciseId)?.scheme || workout?.scheme || null;
       const schemeParsed = schemeStr ? parseScheme(schemeStr) : null;
-      const totalSets = Math.max(updatedSets.length, prior?.sets?.length || 0, schemeParsed?.sets || 0, modalSetCount || 0);
+      const totalSets = Math.max(modalSets.length, prior?.sets?.length || 0, schemeParsed?.sets || 0, modalSetCount || 0);
 
       const toastObj = selectSetCompletionToast({
         exerciseId,
@@ -1822,7 +1809,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       toastTimerRef.current = setTimeout(() => setToast(null), isWorkoutComplete ? 3500 : 2000);
 
       // Rest timer decision
-      const completedSetsCount = updatedSets.filter((s) => isSetCompleted(s)).length;
+      const completedSetsCount = modalSets.filter((s) => isSetCompleted(s)).length;
       const hasMoreSets = completedSetsCount < totalSets;
       const exerciseObj = exercises.find((e) => e.id === exerciseId) || findExerciseById(state, exerciseId);
       const exRestEnabled = exerciseObj?.restTimer !== undefined
@@ -1843,27 +1830,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }
       }
     },
-    [dateKey, state.logsByDate, state.preferences, workoutById, autoStartTimer]
+    [dateKey, state.logsByDate, state.preferences, workoutById, autoStartTimer, modals.log.sets]
   );
 
   const uncompleteSet = useCallback(
     (exerciseId, setIndex) => {
-      updateState((st) => {
-        const dayLogs = st.logsByDate[dateKey];
-        if (!dayLogs?.[exerciseId]) return st;
-        const entry = dayLogs[exerciseId];
-        if (!Array.isArray(entry.sets) || setIndex >= entry.sets.length) return st;
-        entry.sets[setIndex] = { ...entry.sets[setIndex], completed: false };
-        return st;
-      });
-  
+      // Stage uncompletion in modal state (not persisted until Save)
+      dispatchModal({ type: "UNCOMPLETE_LOG_SET", payload: { setIndex } });
+
       setRestTimer((prev) =>
         prev.active && prev.exerciseId === exerciseId && prev.completedSetIndex === setIndex
           ? { ...prev, active: false }
           : prev
       );
     },
-    [dateKey]
+    []
   );
 
   const toggleExerciseTarget = useCallback(
@@ -4233,12 +4214,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {(() => {
-              const ss = state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets;
-              const firstUncompleted = modals.log.sets.findIndex((_, idx) => !(ss && idx < ss.length && isSetCompleted(ss[idx])));
+              const firstUncompleted = modals.log.sets.findIndex((ms) => !ms.completed);
               return modals.log.sets.map((s, i) => {
               const isBW = String(s.weight).toUpperCase() === "BW";
-              const savedSets = ss;
-              const isSetSaved = savedSets && i < savedSets.length && isSetCompleted(savedSets[i]);
+              const isSetSaved = !!s.completed;
               const isNextSet = i === firstUncompleted;
               const showRestAfter = restTimer.active && restTimer.exerciseId === logCtx?.exerciseId && restTimer.completedSetIndex === i;
               return (
@@ -4767,7 +4746,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {isTimerEligible(logUnit.key) && (
             <ExerciseTimer
               sets={modals.log.sets}
-              savedSets={state.logsByDate[dateKey]?.[logCtx?.exerciseId]?.sets || []}
+              savedSets={modals.log.sets}
               onTimerComplete={(setIndex, seconds) => {
                 const newSets = [...modals.log.sets];
                 newSets[setIndex] = { ...newSets[setIndex], reps: seconds };

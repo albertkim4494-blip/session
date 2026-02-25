@@ -182,6 +182,23 @@ export function modalReducer(state, action) {
         log: { ...state.log, mood: action.payload },
       };
 
+    case "COMPLETE_LOG_SET": {
+      const { setIndex } = action.payload;
+      const newSets = [...state.log.sets];
+      while (newSets.length <= setIndex) newSets.push({ reps: 0, weight: "", completed: false });
+      newSets[setIndex] = { ...newSets[setIndex], completed: true };
+      return { ...state, log: { ...state.log, sets: newSets } };
+    }
+
+    case "UNCOMPLETE_LOG_SET": {
+      const { setIndex } = action.payload;
+      const newSets = [...state.log.sets];
+      if (setIndex < newSets.length) {
+        newSets[setIndex] = { ...newSets[setIndex], completed: false };
+      }
+      return { ...state, log: { ...state.log, sets: newSets } };
+    }
+
     case "CLOSE_LOG":
       return {
         ...state,
