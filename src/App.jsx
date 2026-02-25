@@ -1753,11 +1753,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId, modalSetCount) => {
-      // DEBUG: immediate toast to verify completeSet is called
-      setToast("DEBUG:completeSet");
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), 8000);
-
       // Haptic feedback
       navigator.vibrate?.(10);
 
@@ -1775,8 +1770,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         st.logsByDate[dateKey][exerciseId] = entry;
         return st;
       });
-
-      try {
 
       // Smart toast — compute context after state update
       const workout = workoutById.get(workoutId);
@@ -1813,7 +1806,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const schemeParsed = schemeStr ? parseScheme(schemeStr) : null;
       const totalSets = Math.max(updatedSets.length, prior?.sets?.length || 0, schemeParsed?.sets || 0, modalSetCount || 0);
 
-      const toast = selectSetCompletionToast({
+      const toastObj = selectSetCompletionToast({
         exerciseId,
         setData,
         setIndex,
@@ -1833,11 +1826,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         : state.preferences?.restTimerEnabled !== false;
       const willFire = exRestEnabled && !isWorkoutComplete && hasMoreSets;
 
-      // DEBUG: show timer decision in toast (temporary — remove after diagnosing phone issue)
-      const dbg = `[T:${willFire?"Y":"N"} en=${exRestEnabled} wk=${isWorkoutComplete} more=${hasMoreSets} c=${completedSetsCount}/${totalSets} obj=${!!exerciseObj} rt=${exerciseObj?.restTimer} added=${!!exerciseObj?._addedForToday}]`;
-      setToast(`${toast} ${dbg}`);
+      // DEBUG: append timer info to toast message (temporary)
+      const dbg = `T:${willFire?"Y":"N"} en=${exRestEnabled} more=${hasMoreSets} rt=${exerciseObj?.restTimer}`;
+      setToast({ ...toastObj, message: `${toastObj?.message || "Set saved"} | ${dbg}` });
       clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), 5000);
+      toastTimerRef.current = setTimeout(() => setToast(null), 6000);
 
       if (willFire) {
         const exName = exerciseObj?.name || "";
@@ -1850,12 +1843,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (autoStartTimer) {
           setTimeout(() => setAutoStartSignal((s) => s + 1), 100);
         }
-      }
-
-      } catch (err) {
-        setToast(`ERROR: ${err.message}`);
-        clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => setToast(null), 10000);
       }
     },
     [dateKey, state.logsByDate, state.preferences, workoutById, autoStartTimer]
@@ -4287,11 +4274,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       WebkitTapHighlightColor: "transparent",
                     }}
                     onClick={() => {
-                      // DEBUG: surface click state
-                      setToast(`TAP: saved=${isSetSaved} reps=${s.reps} i=${i}`);
-                      clearTimeout(toastTimerRef.current);
-                      toastTimerRef.current = setTimeout(() => setToast(null), 8000);
-
                       if (isSetSaved) {
                         uncompleteSet(logCtx.exerciseId, i);
                       } else {
