@@ -1817,6 +1817,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         exercisesDoneToday,
       });
 
+      setToast(toastObj);
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToast(null), isWorkoutComplete ? 3500 : 2000);
+
       // Rest timer decision
       const completedSetsCount = updatedSets.filter((s) => isSetCompleted(s)).length;
       const hasMoreSets = completedSetsCount < totalSets;
@@ -1824,15 +1828,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const exRestEnabled = exerciseObj?.restTimer !== undefined
         ? exerciseObj.restTimer
         : state.preferences?.restTimerEnabled !== false;
-      const willFire = exRestEnabled && !isWorkoutComplete && hasMoreSets;
-
-      // DEBUG: append timer info to toast message (temporary)
-      const dbg = `T:${willFire?"Y":"N"} en=${exRestEnabled} more=${hasMoreSets} rt=${exerciseObj?.restTimer}`;
-      setToast({ ...toastObj, message: `${toastObj?.message || "Set saved"} | ${dbg}` });
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), 6000);
-
-      if (willFire) {
+      // Fire rest timer if enabled and there are more sets (even if workout is "complete" —
+      // historical data can make isWorkoutComplete true prematurely)
+      if (exRestEnabled && hasMoreSets) {
         const exName = exerciseObj?.name || "";
         const learnedKey = exName.toLowerCase().trim();
         const learnedRest = state.preferences?.exerciseRestTimes?.[learnedKey];
