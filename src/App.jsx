@@ -1474,6 +1474,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           if (found) { logExercise = found; break; }
         }
       }
+      if (!logExercise) {
+        for (const dateAdds of Object.values(st.sessionAdditions || {})) {
+          for (const exArr of Object.values(dateAdds || {})) {
+            const found = exArr.find((e) => e.id === logCtx.exerciseId);
+            if (found) { logExercise = found; break; }
+          }
+          if (logExercise) break;
+        }
+      }
       const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
 
       const cleanSet = (s) => {
@@ -1893,6 +1902,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             for (const ex of wk.exercises || []) toggle(ex);
           }
         }
+        for (const key of Object.keys(st.sessionAdditions || {})) {
+          for (const exArr of Object.values(st.sessionAdditions[key] || {})) {
+            for (const ex of exArr) toggle(ex);
+          }
+        }
         return st;
       });
     },
@@ -1912,6 +1926,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         for (const key of Object.keys(st.dailyWorkouts || {})) {
           for (const wk of st.dailyWorkouts[key]) {
             for (const ex of wk.exercises || []) toggle(ex);
+          }
+        }
+        for (const key of Object.keys(st.sessionAdditions || {})) {
+          for (const exArr of Object.values(st.sessionAdditions[key] || {})) {
+            for (const ex of exArr) toggle(ex);
           }
         }
         return st;
@@ -4047,6 +4066,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             for (const wk of dailyWs) {
               const found = (wk.exercises || []).find((e) => e.id === logCtx?.exerciseId);
               if (found) { logExercise = found; break; }
+            }
+          }
+          if (!logExercise) {
+            for (const dateAdds of Object.values(state.sessionAdditions || {})) {
+              for (const exArr of Object.values(dateAdds || {})) {
+                const found = exArr.find((e) => e.id === logCtx?.exerciseId);
+                if (found) { logExercise = found; break; }
+              }
+              if (logExercise) break;
             }
           }
           const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
