@@ -80,8 +80,6 @@ export function CoachInsightsCard({
     }
   }, [hero?.headline]);
 
-  if (!loading && !hasInsights && !error) return null;
-
   const accentColor = hero ? (SEVERITY_COLORS[hero.severity] || "#6b7280") : "#6b7280";
 
   return (
@@ -128,6 +126,30 @@ export function CoachInsightsCard({
       {loading && !hasInsights && (
         <div style={{ padding: "12px 0", textAlign: "center", opacity: 0.5, fontSize: 14 }}>
           Analyzing your workouts...
+        </div>
+      )}
+
+      {/* Empty state — no insights yet */}
+      {!loading && !hasInsights && !error && (
+        <div style={{ fontSize: 14, opacity: 0.6, lineHeight: 1.5 }}>
+          {onRefresh ? (
+            <>
+              Tap{" "}
+              <button
+                onClick={onRefresh}
+                style={{
+                  background: "transparent", border: "none", color: colors.text,
+                  fontWeight: 700, fontSize: 14, cursor: "pointer", padding: 0,
+                  textDecoration: "underline", opacity: 0.9,
+                }}
+              >
+                Refresh
+              </button>
+              {" "}to get a personalized suggestion for today.
+            </>
+          ) : (
+            "Log a workout to get personalized coaching tips."
+          )}
         </div>
       )}
 
