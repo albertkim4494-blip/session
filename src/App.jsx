@@ -1830,6 +1830,22 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const exRestEnabled = exerciseObj?.restTimer !== undefined
         ? exerciseObj.restTimer
         : state.preferences?.restTimerEnabled !== false;
+      console.log("[REST_TIMER_DEBUG]", JSON.stringify({
+        exerciseId, workoutId, setIndex,
+        exercisesLen: exercises.length,
+        exerciseObjFound: !!exerciseObj,
+        exerciseObjName: exerciseObj?.name,
+        restTimerProp: exerciseObj?.restTimer,
+        exRestEnabled,
+        isWorkoutComplete,
+        hasMoreSets,
+        completedSetsCount,
+        totalSets,
+        modalSetCount,
+        globalRestEnabled: state.preferences?.restTimerEnabled,
+        willFire: exRestEnabled && !isWorkoutComplete && hasMoreSets,
+        addedForToday: exerciseObj?._addedForToday,
+      }));
       if (exRestEnabled && !isWorkoutComplete && hasMoreSets) {
         const exName = exerciseObj?.name || "";
         const learnedKey = exName.toLowerCase().trim();
