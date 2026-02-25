@@ -1818,19 +1818,22 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         exercisesDoneToday,
       });
 
-      setToast(toast);
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), isWorkoutComplete ? 3500 : 2000);
-
-      // Start rest timer if enabled for this workout, workout isn't complete, and there are more sets to do
+      // Rest timer decision
       const completedSetsCount = updatedSets.filter((s) => isSetCompleted(s)).length;
       const hasMoreSets = completedSetsCount < totalSets;
-      // Fallback to state search if not found in workoutById (belt-and-suspenders for session additions)
       const exerciseObj = exercises.find((e) => e.id === exerciseId) || findExerciseById(state, exerciseId);
       const exRestEnabled = exerciseObj?.restTimer !== undefined
         ? exerciseObj.restTimer
         : state.preferences?.restTimerEnabled !== false;
-      if (exRestEnabled && !isWorkoutComplete && hasMoreSets) {
+      const willFire = exRestEnabled && !isWorkoutComplete && hasMoreSets;
+
+      // DEBUG: show timer decision in toast (temporary — remove after diagnosing phone issue)
+      const dbg = `[T:${willFire?"Y":"N"} en=${exRestEnabled} wk=${isWorkoutComplete} more=${hasMoreSets} c=${completedSetsCount}/${totalSets} obj=${!!exerciseObj} rt=${exerciseObj?.restTimer} added=${!!exerciseObj?._addedForToday}]`;
+      setToast(`${toast} ${dbg}`);
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToast(null), 5000);
+
+      if (willFire) {
         const exName = exerciseObj?.name || "";
         const learnedKey = exName.toLowerCase().trim();
         const learnedRest = state.preferences?.exerciseRestTimes?.[learnedKey];
@@ -1838,7 +1841,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         setRestTimer({ active: true, exerciseId, exerciseName: exName, restSec, completedSetIndex: setIndex });
       } else {
         setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
-        // No rest timer — fire auto-start signal directly for the next set
         if (autoStartTimer) {
           setTimeout(() => setAutoStartSignal((s) => s + 1), 100);
         }
