@@ -1388,7 +1388,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (scheme) {
           sets = Array.from({ length: scheme.sets }, () => ({ reps: scheme.reps, weight: "", targetRpe: "", targetPace: "", targetCustom: "", targetIntensity: "" }));
         } else {
-          sets = [{ reps: 0, weight: "", targetRpe: "", targetPace: "", targetCustom: "", targetIntensity: "" }];
+          const emptySet = () => ({ reps: 0, weight: "", targetRpe: "", targetPace: "", targetCustom: "", targetIntensity: "" });
+          sets = [emptySet(), emptySet(), emptySet()];
         }
       }
 
