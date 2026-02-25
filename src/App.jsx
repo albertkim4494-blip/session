@@ -1770,7 +1770,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         st.logsByDate[dateKey][exerciseId] = entry;
         return st;
       });
-  
+
+      try {
 
       // Smart toast — compute context after state update
       const workout = workoutById.get(workoutId);
@@ -1844,6 +1845,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (autoStartTimer) {
           setTimeout(() => setAutoStartSignal((s) => s + 1), 100);
         }
+      }
+
+      } catch (err) {
+        setToast(`ERROR: ${err.message}`);
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), 10000);
       }
     },
     [dateKey, state.logsByDate, state.preferences, workoutById, autoStartTimer]
