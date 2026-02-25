@@ -4287,6 +4287,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       WebkitTapHighlightColor: "transparent",
                     }}
                     onClick={() => {
+                      // DEBUG: surface click state
+                      setToast(`TAP: saved=${isSetSaved} reps=${s.reps} i=${i}`);
+                      clearTimeout(toastTimerRef.current);
+                      toastTimerRef.current = setTimeout(() => setToast(null), 8000);
+
                       if (isSetSaved) {
                         uncompleteSet(logCtx.exerciseId, i);
                       } else {
