@@ -33,7 +33,7 @@ import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { ProfileModal } from "./components/ProfileModal";
 import { ChangeUsernameModal } from "./components/profile/ChangeUsernameModal";
 import { ChangePasswordModal } from "./components/profile/ChangePasswordModal";
-import { CoachInsightsCard, AddSuggestedExerciseModal } from "./components/CoachInsights";
+import { CoachInsightsCard, CoachHeroInsight, AddSuggestedExerciseModal } from "./components/CoachInsights";
 import { TimeRangeControl } from "./components/TimeRangeControl";
 import { ExerciseListTable } from "./components/ExerciseListTable";
 import { ExerciseCatalogSection } from "./components/ExerciseCatalogSection";
@@ -3044,7 +3044,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 /* HERO STATE: centered greeting, today only, no sessions */
                 <div style={{
                   display: "flex", flexDirection: "column", alignItems: "center",
-                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 16,
+                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 20,
                 }}>
                   <div>
                     <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
@@ -3054,18 +3054,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       Tap + to start a session
                     </div>
                   </div>
-                  <div style={{ width: "100%", textAlign: "left" }}>
-                    <CoachInsightsCard
-                      insights={coachInsights}
-                      onAddExercise={handleAddSuggestion}
-                      styles={styles}
-                      colors={colors}
-                      loading={coachLoading}
-                      error={coachError}
-                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                      onRefresh={handleCoachRefresh}
-                    />
-                  </div>
+                  <CoachHeroInsight
+                    insights={coachInsights}
+                    onAddExercise={handleAddSuggestion}
+                    colors={colors}
+                    loading={coachLoading}
+                    error={coachError}
+                    userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                    onRefresh={handleCoachRefresh}
+                  />
                 </div>
               ) : !isToday && !hasSessions ? (
                 /* NON-TODAY EMPTY: no logs or sessions */

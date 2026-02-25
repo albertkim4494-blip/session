@@ -31,7 +31,140 @@ function ensureAnimation() {
 }
 
 // ---------------------------------------------------------------------------
-// CoachInsightsCard — Hero-style insight card for Progress tab
+// CoachHeroInsight — Lightweight inline insight for the sessions hero state
+// ---------------------------------------------------------------------------
+export function CoachHeroInsight({
+  insights,
+  onAddExercise,
+  colors,
+  loading,
+  error,
+  onRefresh,
+  userExerciseNames,
+}) {
+  const hasInsights = insights.length > 0;
+
+  const existingNames = new Set(
+    (userExerciseNames || []).map((n) => n.toLowerCase())
+  );
+
+  const topRaw = selectTopInsight(insights);
+  const hero = topRaw ? normalizeInsight(topRaw) : null;
+  if (hero && hero.cta && existingNames.has(hero.cta.exercise.toLowerCase())) {
+    hero.cta = null;
+  }
+
+  useEffect(() => { ensureAnimation(); }, []);
+
+  // Loading shimmer
+  if (loading && !hasInsights) {
+    return (
+      <div style={{
+        textAlign: "center", opacity: 0.4, fontSize: 14, padding: "8px 0",
+        animation: "coachFadeIn 0.4s ease-out",
+      }}>
+        Thinking...
+      </div>
+    );
+  }
+
+  // Error — subtle inline
+  if (error && !hasInsights) {
+    return (
+      <div style={{ textAlign: "center", opacity: 0.4, fontSize: 13, padding: "8px 0" }}>
+        {error}
+      </div>
+    );
+  }
+
+  // Empty — prompt to refresh
+  if (!hasInsights) {
+    return onRefresh ? (
+      <div style={{
+        textAlign: "center", padding: "8px 0",
+        animation: "coachFadeIn 0.4s ease-out",
+      }}>
+        <button
+          onClick={onRefresh}
+          style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            color: colors.text, opacity: 0.45, fontSize: 14, padding: 0,
+            display: "inline-flex", alignItems: "center", gap: 5,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+            <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+            <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+          </svg>
+          <span style={{ textDecoration: "underline" }}>Get a suggestion for today</span>
+        </button>
+      </div>
+    ) : null;
+  }
+
+  // Has insight — render inline
+  const accentColor = SEVERITY_COLORS[hero?.severity] || "#6b7280";
+
+  return (
+    <div style={{
+      textAlign: "center", padding: "4px 0",
+      animation: "coachFadeIn 0.5s ease-out",
+      opacity: loading ? 0.5 : 1,
+      transition: "opacity 0.3s",
+    }}>
+      <div style={{
+        display: "inline-flex", alignItems: "center", gap: 5,
+        fontSize: 13, opacity: 0.45, marginBottom: 8,
+      }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+          <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+          <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+        </svg>
+        Coach
+      </div>
+      {hero && (
+        <div>
+          <div style={{
+            fontSize: 15, lineHeight: 1.5, opacity: 0.7,
+            maxWidth: 320, margin: "0 auto",
+          }}>
+            {hero.detail}
+          </div>
+          {hero.cta && (
+            <button
+              onClick={() => onAddExercise(hero.cta.exercise)}
+              className="btn-press"
+              style={{
+                marginTop: 12, padding: "8px 18px", fontSize: 13, fontWeight: 700,
+                borderRadius: 10, border: `1px solid ${colors.border}`,
+                background: colors.cardBg, color: colors.text,
+                cursor: "pointer",
+                boxShadow: colors.shadow,
+              }}
+            >
+              + Add {hero.cta.exercise}
+            </button>
+          )}
+        </div>
+      )}
+      {onRefresh && !loading && (
+        <button
+          onClick={onRefresh}
+          style={{
+            background: "transparent", border: "none", color: colors.text,
+            opacity: 0.3, fontSize: 11, cursor: "pointer", padding: "8px 6px 0",
+            textDecoration: "underline",
+          }}
+        >
+          Refresh
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CoachInsightsCard — Full insight card for sessions tab (has sessions state)
 // ---------------------------------------------------------------------------
 export function CoachInsightsCard({
   insights,
