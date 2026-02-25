@@ -964,9 +964,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       setCoachError(null);
     }
 
-    // 3. Once-per-day auto-fetch: only hit the API if we haven't fetched today
+    // 3. Once-per-session auto-fetch: fetch once per app launch (sessionStorage clears on restart)
     const today = new Date().toISOString().slice(0, 10);
-    const lastAutoDate = localStorage.getItem(autoDateKey);
+    const lastAutoDate = sessionStorage.getItem(autoDateKey);
     if (lastAutoDate === today) return; // Already fetched today — use cached insights
 
     // 4. Fetch from AI
@@ -992,7 +992,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           }));
         } catch {}
         // Mark today as auto-fetched (even if coachApi returned from its own cache)
-        try { localStorage.setItem(autoDateKey, today); } catch {}
+        try { sessionStorage.setItem(autoDateKey, today); } catch {}
       })
       .catch((err) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
@@ -3044,7 +3044,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 /* HERO STATE: centered greeting, today only, no sessions */
                 <div style={{
                   display: "flex", flexDirection: "column", alignItems: "center",
-                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 32,
+                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 32, paddingTop: "8vh",
                 }}>
                   <div>
                     <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
