@@ -1753,6 +1753,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const completeSet = useCallback(
     (exerciseId, setIndex, setData, workoutId, modalSetCount) => {
+      // DEBUG: immediate toast to verify completeSet is called
+      setToast("DEBUG:completeSet");
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToast(null), 8000);
+
       // Haptic feedback
       navigator.vibrate?.(10);
 
