@@ -33,7 +33,9 @@ import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { ProfileModal } from "./components/ProfileModal";
 import { ChangeUsernameModal } from "./components/profile/ChangeUsernameModal";
 import { ChangePasswordModal } from "./components/profile/ChangePasswordModal";
-import { CoachInsightsCard, CoachNudge, AddSuggestedExerciseModal } from "./components/CoachInsights";
+import { CoachInsightsCard, AddSuggestedExerciseModal } from "./components/CoachInsights";
+import { TimeRangeControl } from "./components/TimeRangeControl";
+import { ExerciseListTable } from "./components/ExerciseListTable";
 import { ExerciseCatalogSection } from "./components/ExerciseCatalogSection";
 import { ExerciseCatalogModal } from "./components/ExerciseCatalogModal";
 import { GenerateWizardModal } from "./components/GenerateWizardModal";
@@ -170,10 +172,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [collapsedToday, setCollapsedToday] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_today"))); } catch { return new Set(); }
   });
-  const [collapsedSummary, setCollapsedSummary] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("wt_collapsed_summary"))); } catch { return new Set(); }
-  });
-
   // Target config popover state
   const [showTargetConfig, setShowTargetConfig] = useState(false);
   const [showStatsConfig, setShowStatsConfig] = useState(false);
@@ -878,6 +876,30 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     };
   }, [state.logsByDate, progressWorkouts]);
 
+  // Flat exercise list for progress tab (replaces per-workout SummaryBlock)
+  const flatExerciseList = useMemo(() => {
+    const seen = new Map();
+    for (const w of progressWorkouts) {
+      for (const ex of w.exercises || []) {
+        if (!seen.has(ex.id)) {
+          const exUnit = getUnit(ex.unit, ex);
+          const s = computeExerciseSummary(ex.id, summaryRange.start, summaryRange.end, exUnit);
+          seen.set(ex.id, {
+            id: ex.id,
+            name: ex.name,
+            sessions: s.sessions,
+            totalSets: s.totalSets,
+            totalReps: s.totalReps,
+            maxWeight: s.maxWeight,
+            unitAbbr: exUnit.abbr,
+            unitKey: exUnit.key,
+          });
+        }
+      }
+    }
+    return [...seen.values()];
+  }, [progressWorkouts, summaryRange, state.logsByDate]);
+
   const loggedDaysInMonth = useMemo(() => {
     const set = new Set();
     const prefix = modals.datePicker.monthCursor + "-";
@@ -894,19 +916,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return set;
   }, [state.logsByDate, modals.datePicker.monthCursor]);
 
-  // AI Coach signature
+  // AI Coach signature (decoupled from time range — always analyzes all history)
   const { signature: coachSignature } = useMemo(
-    () => computeCoachSignature(state, summaryRange),
-    [state.logsByDate, state.program.workouts, summaryRange]
+    () => computeCoachSignature(state),
+    [state.logsByDate, state.program.workouts]
   );
 
   // AI Coach — once-per-day auto-fetch, cached insights otherwise
+  // Coach always analyzes last 90 days (decoupled from progress tab time range)
   useEffect(() => {
     if (!dataReady || !profile) return;
 
     const userId = session.user.id;
-    const cacheKey = `wt_coach_v2:${userId}:${summaryMode}:${dateKey}`;
+    const cacheKey = `wt_coach_v2:${userId}:${dateKey}`;
     const autoDateKey = "wt_coach_last_auto_date";
+
+    // Fixed 90-day range for coach analysis
+    const coachEnd = dateKey;
+    const coachStart = addDays(coachEnd, -90);
+    const coachDateRange = { start: coachStart, end: coachEnd };
 
     // 1. Try localStorage persisted cache — always show cached insights immediately
     try {
@@ -936,11 +964,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     setCoachLoading(true);
 
-    const userExNames = workouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
     const filteredCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
-    const coachOpts = { catalog: filteredCatalog, userExerciseNames: userExNames };
+    const coachOpts = { catalog: filteredCatalog };
 
-    fetchCoachInsights({ profile, state, dateRange: summaryRange, catalog: filteredCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
+    fetchCoachInsights({ profile, state, dateRange: coachDateRange, catalog: filteredCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
       .then(({ insights, fromCache }) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
@@ -960,7 +987,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (cancelled || coachReqIdRef.current !== reqId) return;
         console.error("AI Coach error:", err);
         if (coachInsights.length === 0) {
-          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange, catalogMap);
+          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDateRange, catalogMap);
           setCoachInsights(detectImbalancesNormalized(analysis, coachOpts));
         }
         const detail = err?.message || String(err);
@@ -1013,10 +1040,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   useEffect(() => {
     localStorage.setItem("wt_collapsed_today", JSON.stringify([...collapsedToday]));
   }, [collapsedToday]);
-
-  useEffect(() => {
-    localStorage.setItem("wt_collapsed_summary", JSON.stringify([...collapsedSummary]));
-  }, [collapsedSummary]);
 
   useEffect(() => {
     localStorage.setItem("wt_collapsed_manage", JSON.stringify([...collapsedManage]));
@@ -2291,6 +2314,45 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }
 
+  const handleCoachRefresh = useCallback(() => {
+    if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) {
+      showToast("Daily refresh limit reached \u2014 insights update automatically each day");
+      return;
+    }
+    incrementDailyRefresh();
+    const reqId = ++coachReqIdRef.current;
+    setCoachLoading(true);
+    setCoachError(null);
+    const refreshExNames = progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
+    const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
+    const coachEnd = dateKey;
+    const coachStart = addDays(coachEnd, -90);
+    fetchCoachInsights({ profile, state, dateRange: { start: coachStart, end: coachEnd }, options: { forceRefresh: true }, catalog: refreshCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
+      .then(({ insights }) => {
+        if (coachReqIdRef.current !== reqId) return;
+        setCoachInsights(insights);
+        coachLastSignatureRef.current = coachSignature;
+        coachLastFetchRef.current = Date.now();
+        coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
+        const cacheKey = `wt_coach_v2:${session.user.id}:${dateKey}`;
+        try { localStorage.setItem(cacheKey, JSON.stringify({ insights, signature: coachSignature, createdAt: Date.now() })); } catch {}
+      })
+      .catch((err) => {
+        if (coachReqIdRef.current !== reqId) return;
+        console.error("AI Coach refresh error:", err);
+        if (coachInsights.length === 0) {
+          const coachDR = { start: addDays(dateKey, -90), end: dateKey };
+          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDR, catalogMap);
+          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, userExerciseNames: refreshExNames }));
+        }
+        const detail = err?.message || String(err);
+        setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
+      })
+      .finally(() => {
+        if (coachReqIdRef.current === reqId) setCoachLoading(false);
+      });
+  }, [progressWorkouts, fullCatalog, equipment, dateKey, profile, state, coachSignature, coachInsights, session?.user?.id, catalogMap]);
+
   const confirmAddSuggestion = useCallback((workoutIdOrIds, exerciseName) => {
     // Look up catalogId by name
     const nameLower = exerciseName.toLowerCase();
@@ -2734,7 +2796,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </div>
           ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {(tab === "train" || tab === "progress" || tab === "program") && workouts.length > 0 && (() => {
+                {(tab === "train" || tab === "program") && workouts.length > 0 && (() => {
                   if (tab === "program") {
                     const sections = ["programs", "data"];
                     const allCollapsed = sections.every((s) => collapsedManage.has(s));
@@ -2753,9 +2815,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       </button>
                     );
                   }
-                  const setter = tab === "train" ? setCollapsedToday : setCollapsedSummary;
-                  const collapsed = tab === "train" ? collapsedToday : collapsedSummary;
-                  const allCards = tab === "train" ? [...displayedProgramWorkouts, ...dailyWorkoutsToday] : progressWorkouts;
+                  const setter = setCollapsedToday;
+                  const collapsed = collapsedToday;
+                  const allCards = [...displayedProgramWorkouts, ...dailyWorkoutsToday];
                   const allCollapsed = allCards.every((w) => collapsed.has(w.id));
                   return (
                     <button
@@ -2971,13 +3033,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 /* HERO STATE: centered greeting, today only, no sessions */
                 <div style={{
                   display: "flex", flexDirection: "column", alignItems: "center",
-                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 8,
+                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 16,
                 }}>
-                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
-                    {getTimeGreeting()}
+                  <div>
+                    <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
+                      {getTimeGreeting()}
+                    </div>
+                    <div style={{ fontSize: 14, opacity: 0.5, marginTop: 8 }}>
+                      Tap + to start a session
+                    </div>
                   </div>
-                  <div style={{ fontSize: 14, opacity: 0.5 }}>
-                    Tap + to start a session
+                  <div style={{ width: "100%", textAlign: "left" }}>
+                    <CoachInsightsCard
+                      insights={coachInsights}
+                      onAddExercise={handleAddSuggestion}
+                      styles={styles}
+                      colors={colors}
+                      loading={coachLoading}
+                      error={coachError}
+                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                      onRefresh={handleCoachRefresh}
+                    />
                   </div>
                 </div>
               ) : !isToday && !hasSessions ? (
@@ -2996,7 +3072,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <div style={{ fontSize: 20, fontWeight: 700, padding: "4px 0 8px" }}>
                     {isToday ? "Today\u2019s sessions" : "Sessions logged"}
                   </div>
-                  {isToday && <CoachNudge insights={coachInsights} colors={colors} />}
+                  {isToday && (
+                    <CoachInsightsCard
+                      insights={coachInsights}
+                      onAddExercise={handleAddSuggestion}
+                      styles={styles}
+                      colors={colors}
+                      loading={coachLoading}
+                      error={coachError}
+                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                      onRefresh={handleCoachRefresh}
+                    />
+                  )}
                   {/* Explicitly added sessions (with remove button) — newest first */}
                   {[...todayProgramWorkouts].reverse().map((w) => (
                     <WorkoutCard
@@ -3090,21 +3177,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {tab === "progress" ? (
             <div key="progress" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
               <div style={{ position: "sticky", top: -14, zIndex: 10, background: colors.appBg, marginTop: -14, paddingTop: 14, paddingBottom: 6, marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16 }}>
-                <PillTabs
-                  styles={styles}
+                <TimeRangeControl
                   value={summaryMode}
-                  onChange={(v) => { setSummaryMode(v); setSummaryOffset(0); }}
-                  tabs={[
-                    { value: "week", label: "Week" },
-                    { value: "month", label: "Month" },
-                    { value: "year", label: "Year" },
-                    { value: "all", label: "All" },
-                  ]}
+                  onChange={setSummaryMode}
+                  offset={summaryOffset}
+                  onOffsetChange={setSummaryOffset}
+                  dateLabel={`${formatDateLabel(summaryRange.start)} \u2013 ${formatDateLabel(summaryRange.end)}`}
+                  colors={colors}
                 />
               </div>
               {(() => {
-                const pctLogged = summaryStats.total > 0 ? Math.round((summaryStats.logged / summaryStats.total) * 100) : 0;
-                const navBtnStyle = { background: "transparent", border: "none", color: colors.text, cursor: "pointer", padding: "4px 8px", fontSize: 18, fontWeight: 700, lineHeight: 1 };
                 const formatNum = (n) => n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : n.toLocaleString();
                 const weightUnit = getWeightLabel(state.preferences?.measurementSystem);
                 const selectedStats = state.preferences?.progressStats || ["totalReps"];
@@ -3152,64 +3234,48 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
                 const topRowCols = statBadges.length === 1 ? "1fr 1fr 1fr" : "1fr 1fr";
                 return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, position: "relative" }}>
-                      {summaryMode !== "all" && (
-                        <button style={{ ...navBtnStyle, opacity: 0.5 }} onClick={() => setSummaryOffset((o) => o - 1)} aria-label="Previous period">‹</button>
-                      )}
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 13, fontWeight: 700 }}>
-                          {formatDateLabel(summaryRange.start)} {"\u2013"} {formatDateLabel(summaryRange.end)}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, position: "relative" }}>
+                    {/* Gear icon — absolutely positioned */}
+                    <div ref={statsConfigRef} style={{ position: "absolute", right: 0, top: 0, zIndex: 5 }}>
+                      <button
+                        onClick={() => setShowStatsConfig((v) => !v)}
+                        style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: colors.text, opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
+                        aria-label="Configure stats"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001.08 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z" />
+                        </svg>
+                      </button>
+                      {showStatsConfig && (
+                        <div style={{
+                          position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 50,
+                          background: colors.appBg, border: `1px solid ${colors.border}`,
+                          borderRadius: 10, padding: "10px 14px", minWidth: 160,
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                          display: "flex", flexDirection: "column", gap: 6,
+                        }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 2 }}>Show Highlights</div>
+                          {[
+                            { key: "totalReps", label: "Top Exercise" },
+                            { key: "volume", label: `Volume (${weightUnit})` },
+                            { key: "topLift", label: `Top Lift (${weightUnit})` },
+                          ].map((opt) => (
+                            <label key={opt.key} style={{
+                              display: "flex", alignItems: "center", gap: 8,
+                              fontSize: 13, color: colors.text, cursor: "pointer",
+                              whiteSpace: "nowrap",
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedStats.includes(opt.key)}
+                                onChange={() => toggleStat(opt.key)}
+                                style={{ accentColor: colors.primaryBg }}
+                              />
+                              {opt.label}
+                            </label>
+                          ))}
                         </div>
-                      </div>
-                      {summaryMode !== "all" && (
-                        <button style={{ ...navBtnStyle, opacity: summaryOffset >= 0 ? 0.15 : 0.5 }} onClick={() => { if (summaryOffset < 0) setSummaryOffset((o) => o + 1); }} disabled={summaryOffset >= 0} aria-label="Next period">›</button>
                       )}
-                      {summaryOffset !== 0 && summaryMode !== "all" && (
-                        <button style={{ background: "transparent", border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.text, opacity: 0.6, cursor: "pointer", padding: "2px 8px", fontSize: 11, fontWeight: 700, marginLeft: 4 }} onClick={() => setSummaryOffset(0)}>Today</button>
-                      )}
-                      {/* Gear icon — absolutely positioned so it doesn't shift the centered date */}
-                      <div ref={statsConfigRef} style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", zIndex: 5 }}>
-                        <button
-                          onClick={() => setShowStatsConfig((v) => !v)}
-                          style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: colors.text, opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
-                          aria-label="Configure stats"
-                        >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001.08 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z" />
-                          </svg>
-                        </button>
-                        {showStatsConfig && (
-                          <div style={{
-                            position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 50,
-                            background: colors.appBg, border: `1px solid ${colors.border}`,
-                            borderRadius: 10, padding: "10px 14px", minWidth: 160,
-                            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                            display: "flex", flexDirection: "column", gap: 6,
-                          }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 2 }}>Show Highlights</div>
-                            {[
-                              { key: "totalReps", label: "Top Exercise" },
-                              { key: "volume", label: `Volume (${weightUnit})` },
-                              { key: "topLift", label: `Top Lift (${weightUnit})` },
-                            ].map((opt) => (
-                              <label key={opt.key} style={{
-                                display: "flex", alignItems: "center", gap: 8,
-                                fontSize: 13, color: colors.text, cursor: "pointer",
-                                whiteSpace: "nowrap",
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={selectedStats.includes(opt.key)}
-                                  onChange={() => toggleStat(opt.key)}
-                                  style={{ accentColor: colors.primaryBg }}
-                                />
-                                {opt.label}
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
                     </div>
                     {/* Stats grid — row 1: Sessions + Days Active (+ 1 stat if only 1 selected) */}
                     <div>
@@ -3238,64 +3304,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         {statBadges}
                       </div>
                     )}
-                    {/* Progress bar */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ flex: 1, height: 6, borderRadius: 4, background: colors.cardAltBg, overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: 4, width: `${pctLogged}%`, background: pctLogged >= 80 ? "#2ecc71" : pctLogged >= 40 ? "#f59e0b" : colors.primaryBg, transition: "width 0.3s ease" }} />
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, whiteSpace: "nowrap" }}>{summaryStats.logged}/{summaryStats.total} days</span>
-                    </div>
                   </div>
                 );
               })()}
-              <CoachInsightsCard
-                insights={coachInsights}
-                onAddExercise={handleAddSuggestion}
-                styles={styles}
-                colors={colors}
-                loading={coachLoading}
-                error={coachError}
-                userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                onRefresh={() => {
-                  // Rate limit manual refreshes
-                  if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) {
-                    showToast("Daily refresh limit reached \u2014 insights update automatically each day");
-                    return;
-                  }
-                  incrementDailyRefresh();
 
-                  const reqId = ++coachReqIdRef.current;
-                  setCoachLoading(true);
-                  setCoachError(null);
-                  const refreshExNames = progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
-                  const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
-                  fetchCoachInsights({ profile, state, dateRange: summaryRange, options: { forceRefresh: true }, catalog: refreshCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
-                    .then(({ insights }) => {
-                      if (coachReqIdRef.current !== reqId) return;
-                      setCoachInsights(insights);
-                      coachLastSignatureRef.current = coachSignature;
-                      coachLastFetchRef.current = Date.now();
-                      coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
-                      const cacheKey = `wt_coach_v2:${session.user.id}:${summaryMode}:${dateKey}`;
-                      try { localStorage.setItem(cacheKey, JSON.stringify({ insights, signature: coachSignature, createdAt: Date.now() })); } catch {}
-                    })
-                    .catch((err) => {
-                      if (coachReqIdRef.current !== reqId) return;
-                      console.error("AI Coach refresh error:", err);
-                      if (coachInsights.length === 0) {
-                        const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, summaryRange, catalogMap);
-                        setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, userExerciseNames: refreshExNames }));
-                      }
-                      const detail = err?.message || String(err);
-                      setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
-                    })
-                    .finally(() => {
-                      if (coachReqIdRef.current === reqId) setCoachLoading(false);
-                    });
-                }}
-              />
-
-              {summaryStats.logged === 0 && !coachLoading && coachInsights.length === 0 ? (
+              {summaryStats.logged === 0 ? (
                 <div style={{
                   ...styles.card,
                   display: "flex",
@@ -3314,18 +3327,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </div>
                 </div>
               ) : (
-                progressWorkouts.map((w) => (
-                  <SummaryBlock
-                    key={w.id}
-                    workout={w}
-                    collapsed={collapsedSummary.has(w.id)}
-                    onToggle={() => toggleCollapse(setCollapsedSummary, w.id)}
-                    summaryRange={summaryRange}
-                    computeExerciseSummary={computeExerciseSummary}
-                    styles={styles}
-                    colors={colors}
-                  />
-                ))
+                <ExerciseListTable
+                  exercises={flatExerciseList}
+                  colors={colors}
+                  styles={styles}
+                  weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
+                />
               )}
             </div>
           ) : null}
@@ -6201,79 +6208,3 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
   );
 }
 
-function SummaryBlock({ workout, collapsed, onToggle, summaryRange, computeExerciseSummary, styles, colors }) {
-  const cat = (workout.category || "Workout").trim();
-
-  // Pre-compute summaries to split active vs inactive
-  const exSummaries = workout.exercises.map((ex) => {
-    const exUnit = getUnit(ex.unit, ex);
-    const s = computeExerciseSummary(ex.id, summaryRange.start, summaryRange.end, exUnit);
-    return { ex, exUnit, s };
-  });
-  const active = exSummaries.filter((e) => e.s.sessions > 0);
-  const inactiveCount = exSummaries.length - active.length;
-
-  return (
-    <div className="card-hover" style={styles.card}>
-      <div style={collapsed ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader} onClick={onToggle}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-          <div style={styles.cardTitle}>{workout.name}</div>
-          <span style={styles.tagMuted}>{cat}</span>
-        </div>
-        {active.length > 0 && (
-          <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.45, whiteSpace: "nowrap" }}>
-            {active.length}/{exSummaries.length}
-          </span>
-        )}
-        <span style={styles.collapseToggle}>
-            {collapsed ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
-            )}
-          </span>
-      </div>
-
-      {!collapsed && (
-        workout.exercises.length === 0 ? (
-          <div style={styles.emptyText}>No exercises yet.</div>
-        ) : active.length === 0 ? (
-          <div style={{ fontSize: 13, opacity: 0.5, padding: "4px 0" }}>No activity this period</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {active.map(({ ex, exUnit, s }) => {
-              const strength = exUnit.key === "reps";
-              return (
-                <div key={ex.id} style={{
-                  ...styles.summaryRow,
-                  flexDirection: "column",
-                  alignItems: "stretch",
-                  gap: 6,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ ...styles.exerciseName, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 }}>{ex.name}</div>
-                    <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, whiteSpace: "nowrap", marginLeft: 8 }}>
-                      {s.sessions}x
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <span style={styles.summaryChip}>{s.totalReps} {exUnit.abbr}</span>
-                    <span style={{ ...styles.summaryChip, background: "transparent", border: `1px solid ${colors.border}`, color: colors.text }}>{s.totalSets} sets</span>
-                    {strength && s.maxWeight !== "\u2014" && (
-                      <span style={{ ...styles.summaryChip, background: "transparent", border: `1px solid ${colors.border}`, color: colors.text }}>Best: {s.maxWeight}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {inactiveCount > 0 && (
-              <div style={{ fontSize: 12, opacity: 0.4, padding: "4px 2px" }}>
-                {inactiveCount} exercise{inactiveCount !== 1 ? "s" : ""} with no activity
-              </div>
-            )}
-          </div>
-        )
-      )}
-    </div>
-  );
-}

@@ -7,10 +7,10 @@ export const COACH_CHANGE_THRESHOLD = 0.15; // 15% change in reps to trigger ref
 
 /**
  * Compute a stable signature for the AI Coach that only changes when
- * workout data actually changes meaningfully within the given date range.
+ * workout data actually changes meaningfully (across ALL history).
  * Returns { signature, totalSets, totalReps, loggedDays } for threshold comparison.
  */
-export function computeCoachSignature(state, summaryRange) {
+export function computeCoachSignature(state) {
   const workouts = state?.program?.workouts || [];
   const logsByDate = state?.logsByDate || {};
   let totalSets = 0;
@@ -29,7 +29,6 @@ export function computeCoachSignature(state, summaryRange) {
 
   for (const dateKey of Object.keys(logsByDate)) {
     if (!isValidDateKey(dateKey)) continue;
-    if (dateKey < summaryRange.start || dateKey > summaryRange.end) continue;
     const dayLogs = logsByDate[dateKey];
     if (!dayLogs || typeof dayLogs !== "object") continue;
     let dayHasData = false;
@@ -49,6 +48,6 @@ export function computeCoachSignature(state, summaryRange) {
   }
 
   // Still include totalSets in signature for change detection (covers all activity types)
-  const signature = `${summaryRange.start}|${summaryRange.end}|${loggedDays}|${totalSets}|${totalReps}|${exerciseNames.length}`;
+  const signature = `${loggedDays}|${totalSets}|${totalReps}|${exerciseNames.length}`;
   return { signature, totalSets, totalReps, loggedDays };
 }

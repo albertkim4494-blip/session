@@ -229,33 +229,6 @@ function CompactInsight({ item, onAddExercise, colors }) {
 }
 
 // ---------------------------------------------------------------------------
-// CoachNudge — Single-line coach presence for the Train tab
-// ---------------------------------------------------------------------------
-export function CoachNudge({ insights, colors }) {
-  const topRaw = selectTopInsight(insights || []);
-  const hero = topRaw ? normalizeInsight(topRaw) : null;
-
-  if (!hero) return null;
-
-  return (
-    <div style={{
-      fontSize: 13,
-      lineHeight: 1.4,
-      padding: "8px 12px",
-      borderRadius: 8,
-      background: `${SEVERITY_COLORS[hero.severity] || "#6b7280"}12`,
-      border: `1px solid ${SEVERITY_COLORS[hero.severity] || "#6b7280"}30`,
-      color: colors.text,
-      opacity: 0.85,
-      animation: "coachFadeIn 0.4s ease-out",
-    }}>
-      <span style={{ fontWeight: 700 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none" style={{ verticalAlign: -1, marginRight: 3 }}><path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" /><path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" /></svg>Coach: </span>
-      {hero.detail}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // AddSuggestedExerciseModal
 // ---------------------------------------------------------------------------
 export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCancel, onConfirm, styles, colors }) {
