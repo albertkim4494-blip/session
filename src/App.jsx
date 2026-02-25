@@ -4121,8 +4121,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             const el = e.target;
             if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") {
               setTimeout(() => {
-                el.scrollIntoView({ block: "center", behavior: "smooth" });
-              }, 120);
+                el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              }, 300);
             }
           };
 
