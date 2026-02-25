@@ -564,22 +564,32 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [workouts]);
 
   const todayOverrides = state.sessionOverrides?.[dateKey] || EMPTY_OBJ;
+  const todayAdditions = state.sessionAdditions?.[dateKey] || EMPTY_OBJ;
 
   const effectiveWorkouts = useMemo(() => {
-    if (!Object.keys(todayOverrides).length) return workouts;
+    const hasOverrides = Object.keys(todayOverrides).length > 0;
+    const hasAdditions = Object.keys(todayAdditions).length > 0;
+    if (!hasOverrides && !hasAdditions) return workouts;
     return workouts.map((w) => {
       const ov = todayOverrides[w.id];
-      if (!ov) return w;
-      const exercises = [];
-      for (const ex of w.exercises) {
-        const o = ov[ex.id];
-        if (!o) { exercises.push(ex); continue; }
-        if (o.type === "skip") continue;
-        if (o.type === "swap") exercises.push(o.replacement);
+      const adds = todayAdditions[w.id];
+      if (!ov && !adds) return w;
+      let exercises = w.exercises;
+      if (ov) {
+        exercises = [];
+        for (const ex of w.exercises) {
+          const o = ov[ex.id];
+          if (!o) { exercises.push(ex); continue; }
+          if (o.type === "skip") continue;
+          if (o.type === "swap") exercises.push(o.replacement);
+        }
+      }
+      if (adds && adds.length > 0) {
+        exercises = [...exercises, ...adds];
       }
       return { ...w, exercises };
     });
-  }, [workouts, todayOverrides]);
+  }, [workouts, todayOverrides, todayAdditions]);
 
   const todaySessionIds = state.todaySessions?.[dateKey] || EMPTY_ARRAY;
 
@@ -2083,6 +2093,63 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     [workoutById]
   );
 
+  const addExerciseForToday = useCallback((workoutId, isDaily) => {
+    dispatchModal({
+      type: "OPEN_CATALOG_BROWSE",
+      payload: { workoutId, sessionAddMode: true, sessionAddIsDaily: isDaily },
+    });
+  }, []);
+
+  const removeSessionAddition = useCallback((workoutId, exerciseId) => {
+    updateState((st) => {
+      const adds = st.sessionAdditions?.[dateKey]?.[workoutId];
+      if (!adds) return st;
+      st.sessionAdditions[dateKey][workoutId] = adds.filter(ex => ex.id !== exerciseId);
+      if (st.sessionAdditions[dateKey][workoutId].length === 0) delete st.sessionAdditions[dateKey][workoutId];
+      if (Object.keys(st.sessionAdditions[dateKey] || {}).length === 0) delete st.sessionAdditions[dateKey];
+      // Clear logs for the removed exercise
+      if (st.logsByDate[dateKey]?.[exerciseId]) {
+        delete st.logsByDate[dateKey][exerciseId];
+      }
+      return st;
+    });
+    showToast("Exercise removed");
+  }, [dateKey, showToast]);
+
+  const promoteSessionAddition = useCallback((workoutId, exerciseId) => {
+    const adds = state.sessionAdditions?.[dateKey]?.[workoutId];
+    const ex = adds?.find(e => e.id === exerciseId);
+    if (!ex) return;
+    dispatchModal({
+      type: "OPEN_CONFIRM",
+      payload: {
+        title: "Add to plan?",
+        message: `Add "${ex.name}" to this workout permanently? It will appear in all future sessions.`,
+        confirmText: "Add to Plan",
+        onConfirm: () => {
+          updateState((st) => {
+            // Add to program workout (without _addedForToday flag)
+            const w = st.program.workouts.find(x => x.id === workoutId);
+            if (w) {
+              const { _addedForToday, ...cleanEx } = ex;
+              w.exercises.push(cleanEx);
+            }
+            // Remove from sessionAdditions
+            const sAdds = st.sessionAdditions?.[dateKey]?.[workoutId];
+            if (sAdds) {
+              st.sessionAdditions[dateKey][workoutId] = sAdds.filter(e => e.id !== exerciseId);
+              if (st.sessionAdditions[dateKey][workoutId].length === 0) delete st.sessionAdditions[dateKey][workoutId];
+              if (Object.keys(st.sessionAdditions[dateKey] || {}).length === 0) delete st.sessionAdditions[dateKey];
+            }
+            return st;
+          });
+          dispatchModal({ type: "CLOSE_CONFIRM" });
+          showToast("Exercise added to plan");
+        },
+      },
+    });
+  }, [dateKey, state.sessionAdditions, showToast]);
+
   const openEditExercise = useCallback(
     (workoutId, exerciseId) => {
       const w = workoutById.get(workoutId);
@@ -3004,6 +3071,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onRemoveFromToday={() => removeSessionFromToday(w.id)}
                       highlightBorder={highlightCardId === w.id}
                       catalogMap={catalogMap}
+                      onAddExercise={() => addExerciseForToday(w.id, false)}
+                      onRemoveSessionAddition={(exId) => removeSessionAddition(w.id, exId)}
+                      onPromoteSessionAddition={(exId) => promoteSessionAddition(w.id, exId)}
                     />
                   ))}
                   {/* Auto-detected workouts from logs (no remove button) */}
@@ -3029,6 +3099,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onUndoOverride={(origExId) => undoOverride(w.id, origExId)}
                       onPromoteOverride={(origExId) => promoteOverride(w.id, origExId)}
                       catalogMap={catalogMap}
+                      onAddExercise={() => addExerciseForToday(w.id, false)}
+                      onRemoveSessionAddition={(exId) => removeSessionAddition(w.id, exId)}
+                      onPromoteSessionAddition={(exId) => promoteSessionAddition(w.id, exId)}
                     />
                   ))}
                   {[...dailyWorkoutsToday].reverse().map((w) => (
@@ -3053,6 +3126,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onSwapExercise={(exId) => openSwapExercise(w.id, exId, true)}
                       onSkipExercise={(exId) => deleteDailyExercise(w.id, exId)}
                       catalogMap={catalogMap}
+                      onAddExercise={() => addExerciseForToday(w.id, true)}
                     />
                   ))}
                 </>
@@ -5244,6 +5318,46 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             return;
           }
 
+          // --- Session add mode: add exercise for today only ---
+          if (modals.catalogBrowse.sessionAddMode) {
+            const wId = modals.catalogBrowse.workoutId;
+            const isDaily = modals.catalogBrowse.sessionAddIsDaily;
+            let newEx;
+            if (userEx) {
+              newEx = { id: uid("ex"), name: userEx.name, unit: userEx.unit || "reps", _addedForToday: true };
+              if (userEx.catalogId) newEx.catalogId = userEx.catalogId;
+              if (userEx.customUnitAbbr) newEx.customUnitAbbr = userEx.customUnitAbbr;
+              if (userEx.customUnitAllowDecimal) newEx.customUnitAllowDecimal = userEx.customUnitAllowDecimal;
+            } else {
+              newEx = { id: uid("ex"), name: entry.name, unit: entry.defaultUnit, catalogId: entry.id, _addedForToday: true };
+              if (isBodyweightOnly(entry)) newEx.bodyweight = true;
+            }
+
+            if (isDaily) {
+              // Daily workout: push directly into the daily workout exercises
+              updateState((st) => {
+                const dayWs = st.dailyWorkouts?.[dateKey];
+                if (!dayWs) return st;
+                const wk = dayWs.find(dw => dw.id === wId);
+                if (!wk) return st;
+                wk.exercises.push(newEx);
+                return st;
+              });
+            } else {
+              // Program workout: add to sessionAdditions
+              updateState((st) => {
+                if (!st.sessionAdditions) st.sessionAdditions = {};
+                if (!st.sessionAdditions[dateKey]) st.sessionAdditions[dateKey] = {};
+                if (!st.sessionAdditions[dateKey][wId]) st.sessionAdditions[dateKey][wId] = [];
+                st.sessionAdditions[dateKey][wId].push(newEx);
+                return st;
+              });
+            }
+            dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
+            showToast(`${newEx.name} added for today`);
+            return;
+          }
+
           // --- Normal add mode ---
           if (!workoutIdOrIds) return;
           const ids = Array.isArray(workoutIdOrIds) ? workoutIdOrIds : [workoutIdOrIds];
@@ -5736,7 +5850,7 @@ function MoodPicker({ value, onChange, colors }) {
 // SUB-COMPONENTS - Extracted from render to avoid re-creation per render
 // ============================================================================
 
-function ExerciseMenu({ isOverridden, onSwapExercise, onSkipExercise, onUndoOverride, onPromoteOverride, exerciseId, originalExerciseId, colors }) {
+function ExerciseMenu({ isOverridden, isSessionAdded, onSwapExercise, onSkipExercise, onUndoOverride, onPromoteOverride, onRemoveSessionAddition, onPromoteSessionAddition, exerciseId, originalExerciseId, colors }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
 
@@ -5778,7 +5892,18 @@ function ExerciseMenu({ isOverridden, onSwapExercise, onSkipExercise, onUndoOver
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {isOverridden ? (
+          {isSessionAdded ? (
+            <>
+              <button style={menuBtnStyle} onClick={() => { setOpen(false); onRemoveSessionAddition?.(exerciseId); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+                Remove
+              </button>
+              <button style={menuBtnStyle} onClick={() => { setOpen(false); onPromoteSessionAddition?.(exerciseId); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12l7-7 7 7"/></svg>
+                Keep in Plan
+              </button>
+            </>
+          ) : isOverridden ? (
             <>
               <button style={menuBtnStyle} onClick={() => { setOpen(false); onUndoOverride?.(originalExerciseId); }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 109-9"/><path d="M3 3v6h6"/></svg>
@@ -5807,7 +5932,7 @@ function ExerciseMenu({ isOverridden, onSwapExercise, onSkipExercise, onUndoOver
   );
 }
 
-function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme, weightLabel, colors, onSwapExercise, onSkipExercise, isOverridden, onUndoOverride, onPromoteOverride, originalExerciseId, sportIcon }) {
+function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForExercise, styles, findPrior, onDeleteExercise, workoutScheme, weightLabel, colors, onSwapExercise, onSkipExercise, isOverridden, onUndoOverride, onPromoteOverride, originalExerciseId, sportIcon, isSessionAdded, onRemoveSessionAddition, onPromoteSessionAddition }) {
   const exLog = logsForDate[exercise.id] ?? null;
   const hasAnySets = !!exLog && Array.isArray(exLog.sets) && exLog.sets.length > 0;
   const exUnit = getUnit(exercise.unit, exercise);
@@ -5903,13 +6028,16 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
               </svg>
             </button>
           )}
-          {(onSwapExercise || isOverridden) && (
+          {(onSwapExercise || isOverridden || isSessionAdded) && (
             <ExerciseMenu
               isOverridden={isOverridden}
+              isSessionAdded={isSessionAdded}
               onSwapExercise={onSwapExercise}
               onSkipExercise={onSkipExercise}
               onUndoOverride={onUndoOverride}
               onPromoteOverride={onPromoteOverride}
+              onRemoveSessionAddition={onRemoveSessionAddition}
+              onPromoteSessionAddition={onPromoteSessionAddition}
               exerciseId={exercise.id}
               originalExerciseId={originalExerciseId}
               colors={colors}
@@ -5920,12 +6048,15 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
       {isOverridden && (
         <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2, fontStyle: "italic" }}>Swapped for today</div>
       )}
+      {isSessionAdded && (
+        <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2, fontStyle: "italic" }}>Added for today</div>
+      )}
       {hasLog && setsText ? <div style={styles.exerciseSub}>{setsText}</div> : null}
     </div>
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride, cardId, onRemoveFromToday, highlightBorder, catalogMap }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride, cardId, onRemoveFromToday, highlightBorder, catalogMap, onAddExercise, onRemoveSessionAddition, onPromoteSessionAddition }) {
   const cat = (workout.category || "Workout").trim();
 
   // Compute rest timer state from exercises: all on, all off, or mixed
@@ -5990,6 +6121,20 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
+        {onAddExercise && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAddExercise(); }}
+            style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              padding: 4, color: "inherit", opacity: 0.45, display: "flex", alignItems: "center",
+            }}
+            aria-label="Add exercise for today"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
           </button>
         )}
@@ -6066,6 +6211,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
                   }
                 }
               }
+              const isSessionAdded = !!ex._addedForToday;
               return (
                 <ExerciseRow
                   key={ex.id}
@@ -6080,13 +6226,16 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
                   workoutScheme={workout.scheme}
                   weightLabel={weightLabel}
                   colors={colors}
-                  onSwapExercise={!isSwapReplacement ? onSwapExercise : undefined}
-                  onSkipExercise={!isSwapReplacement ? onSkipExercise : undefined}
+                  onSwapExercise={!isSwapReplacement && !isSessionAdded ? onSwapExercise : undefined}
+                  onSkipExercise={!isSwapReplacement && !isSessionAdded ? onSkipExercise : undefined}
                   isOverridden={isSwapReplacement}
                   onUndoOverride={isSwapReplacement ? onUndoOverride : undefined}
                   onPromoteOverride={isSwapReplacement ? onPromoteOverride : undefined}
                   originalExerciseId={origExId}
                   sportIcon={ex.catalogId ? catalogMap.get(ex.catalogId)?.sportIcon : undefined}
+                  isSessionAdded={isSessionAdded}
+                  onRemoveSessionAddition={isSessionAdded ? onRemoveSessionAddition : undefined}
+                  onPromoteSessionAddition={isSessionAdded ? onPromoteSessionAddition : undefined}
                 />
               );
             })}

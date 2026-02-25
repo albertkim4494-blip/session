@@ -81,6 +81,7 @@ export function makeDefaultState() {
     dailyWorkouts: {},
     todaySessions: {},
     sessionOverrides: {},
+    sessionAdditions: {},
     logsByDate: {},
     preferences: {
       defaultRestSec: 90,
@@ -127,6 +128,7 @@ export function normalizeState(st) {
     dailyWorkouts: st.dailyWorkouts && typeof st.dailyWorkouts === "object" ? st.dailyWorkouts : {},
     todaySessions: st.todaySessions && typeof st.todaySessions === "object" ? st.todaySessions : {},
     sessionOverrides: st.sessionOverrides && typeof st.sessionOverrides === "object" ? st.sessionOverrides : {},
+    sessionAdditions: st.sessionAdditions && typeof st.sessionAdditions === "object" ? st.sessionAdditions : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
   };
@@ -168,6 +170,11 @@ export function normalizeState(st) {
   if (next.todaySessions) {
     for (const dk of Object.keys(next.todaySessions)) {
       if (dk < cutoffKey) delete next.todaySessions[dk];
+    }
+  }
+  if (next.sessionAdditions) {
+    for (const dk of Object.keys(next.sessionAdditions)) {
+      if (dk < cutoffKey) delete next.sessionAdditions[dk];
     }
   }
 

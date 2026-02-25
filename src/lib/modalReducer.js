@@ -92,6 +92,8 @@ export const initialModalState = {
     swapExerciseId: null,
     swapExerciseName: null,
     swapIsDaily: false,
+    sessionAddMode: false,
+    sessionAddIsDaily: false,
   },
   billing: {
     isOpen: false,
@@ -305,6 +307,8 @@ export function modalReducer(state, action) {
           swapExerciseId: action.payload.swapExerciseId || null,
           swapExerciseName: action.payload.swapExerciseName || null,
           swapIsDaily: action.payload.swapIsDaily || false,
+          sessionAddMode: action.payload.sessionAddMode || false,
+          sessionAddIsDaily: action.payload.sessionAddIsDaily || false,
         },
       };
 
