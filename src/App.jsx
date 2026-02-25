@@ -1936,6 +1936,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             for (const ex of wk.exercises || []) toggle(ex);
           }
         }
+        for (const key of Object.keys(st.sessionAdditions || {})) {
+          for (const exArr of Object.values(st.sessionAdditions[key] || {})) {
+            for (const ex of exArr) toggle(ex);
+          }
+        }
         return st;
       });
     },
@@ -1949,9 +1954,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         const findWk = (wk) => wk.id === workoutId;
         const wk = st.program.workouts.find(findWk)
           || Object.values(st.dailyWorkouts || {}).flat().find(findWk);
-        if (!wk) return st;
+        // Collect session additions for this workout to include in the toggle
+        const allDateAdds = Object.values(st.sessionAdditions || {});
+        const addedExercises = allDateAdds.flatMap(dateObj => dateObj[workoutId] || []);
+        if (!wk && addedExercises.length === 0) return st;
         // Compute current state: are any exercises enabled?
-        const anyOn = wk.exercises.some((ex) =>
+        const allExercises = [...(wk?.exercises || []), ...addedExercises];
+        const anyOn = allExercises.some((ex) =>
           ex.restTimer !== undefined ? ex.restTimer : globalEnabled
         );
         // If any are on → turn all off. If all off → turn all on.
@@ -1964,6 +1973,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         for (const key of Object.keys(st.dailyWorkouts || {})) {
           for (const w of st.dailyWorkouts[key]) setAll(w);
         }
+        for (const ex of addedExercises) ex.restTimer = newVal;
         return st;
       });
     },
