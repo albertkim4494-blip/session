@@ -14,7 +14,7 @@ import {
   endOfWeekSunday, endOfMonth, endOfYear,
   inRangeInclusive, isValidDateKey,
 } from "./lib/dateUtils";
-import { uid, loadState, normalizeState, persistState, makeDefaultState, safeParse, migrateCompletedFlag } from "./lib/stateUtils";
+import { uid, loadState, normalizeState, persistState, makeDefaultState, safeParse, migrateCompletedFlag, findExerciseById, forEachExercise } from "./lib/stateUtils";
 import {
   validateExerciseName, validateWorkoutName,
   toNumberOrNull, formatMaxWeight,
@@ -1462,27 +1462,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const logCtx = modals.log.context;
 
     updateState((st) => {
-      let logExercise = null;
-      for (const wk of st.program.workouts) {
-        const found = wk.exercises.find((e) => e.id === logCtx.exerciseId);
-        if (found) { logExercise = found; break; }
-      }
-      if (!logExercise) {
-        const dailyWs = Object.values(st.dailyWorkouts || {}).flat();
-        for (const wk of dailyWs) {
-          const found = (wk.exercises || []).find((e) => e.id === logCtx.exerciseId);
-          if (found) { logExercise = found; break; }
-        }
-      }
-      if (!logExercise) {
-        for (const dateAdds of Object.values(st.sessionAdditions || {})) {
-          for (const exArr of Object.values(dateAdds || {})) {
-            const found = exArr.find((e) => e.id === logCtx.exerciseId);
-            if (found) { logExercise = found; break; }
-          }
-          if (logExercise) break;
-        }
-      }
+      const logExercise = findExerciseById(st, logCtx.exerciseId);
       const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
 
       const cleanSet = (s) => {
@@ -1845,7 +1825,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       // Start rest timer if enabled for this workout, workout isn't complete, and there are more sets to do
       const completedSetsCount = updatedSets.filter((s) => isSetCompleted(s)).length;
       const hasMoreSets = completedSetsCount < totalSets;
-      const exerciseObj = exercises.find((e) => e.id === exerciseId);
+      // Fallback to state search if not found in workoutById (belt-and-suspenders for session additions)
+      const exerciseObj = exercises.find((e) => e.id === exerciseId) || findExerciseById(state, exerciseId);
       const exRestEnabled = exerciseObj?.restTimer !== undefined
         ? exerciseObj.restTimer
         : state.preferences?.restTimerEnabled !== false;
@@ -1889,24 +1870,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const toggleExerciseTarget = useCallback(
     (exerciseId, targetKey) => {
       updateState((st) => {
-        const toggle = (ex) => {
+        forEachExercise(st, (ex) => {
           if (ex.id !== exerciseId) return;
           const cur = ex.targets || [];
           ex.targets = cur.includes(targetKey) ? cur.filter((t) => t !== targetKey) : [...cur, targetKey];
-        };
-        for (const wk of st.program.workouts) {
-          for (const ex of wk.exercises) toggle(ex);
-        }
-        for (const key of Object.keys(st.dailyWorkouts || {})) {
-          for (const wk of st.dailyWorkouts[key]) {
-            for (const ex of wk.exercises || []) toggle(ex);
-          }
-        }
-        for (const key of Object.keys(st.sessionAdditions || {})) {
-          for (const exArr of Object.values(st.sessionAdditions[key] || {})) {
-            for (const ex of exArr) toggle(ex);
-          }
-        }
+        });
         return st;
       });
     },
@@ -1916,23 +1884,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const toggleExerciseBodyweight = useCallback(
     (exerciseId) => {
       updateState((st) => {
-        const toggle = (ex) => {
+        forEachExercise(st, (ex) => {
           if (ex.id !== exerciseId) return;
           ex.bodyweight = !ex.bodyweight;
-        };
-        for (const wk of st.program.workouts) {
-          for (const ex of wk.exercises) toggle(ex);
-        }
-        for (const key of Object.keys(st.dailyWorkouts || {})) {
-          for (const wk of st.dailyWorkouts[key]) {
-            for (const ex of wk.exercises || []) toggle(ex);
-          }
-        }
-        for (const key of Object.keys(st.sessionAdditions || {})) {
-          for (const exArr of Object.values(st.sessionAdditions[key] || {})) {
-            for (const ex of exArr) toggle(ex);
-          }
-        }
+        });
         return st;
       });
     },
@@ -1943,24 +1898,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     (exerciseId) => {
       updateState((st) => {
         const globalEnabled = st.preferences?.restTimerEnabled !== false;
-        const toggle = (ex) => {
+        forEachExercise(st, (ex) => {
           if (ex.id !== exerciseId) return;
           const current = ex.restTimer !== undefined ? ex.restTimer : globalEnabled;
           ex.restTimer = !current;
-        };
-        for (const wk of st.program.workouts) {
-          for (const ex of wk.exercises) toggle(ex);
-        }
-        for (const key of Object.keys(st.dailyWorkouts || {})) {
-          for (const wk of st.dailyWorkouts[key]) {
-            for (const ex of wk.exercises || []) toggle(ex);
-          }
-        }
-        for (const key of Object.keys(st.sessionAdditions || {})) {
-          for (const exArr of Object.values(st.sessionAdditions[key] || {})) {
-            for (const ex of exArr) toggle(ex);
-          }
-        }
+        });
         return st;
       });
     },
@@ -4056,27 +3998,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         {modals.log.isOpen && (() => {
           const logCtx = modals.log.context;
           const closeLog = () => { setShowTargetConfig(false); setPacePopoverIdx(null); setRpePopoverIdx(null); setLogFlipped(false); setLogFlipAngle(0); dispatchModal({ type: "CLOSE_LOG" }); };
-          let logExercise = null;
-          for (const wk of state.program.workouts) {
-            const found = wk.exercises.find((e) => e.id === logCtx?.exerciseId);
-            if (found) { logExercise = found; break; }
-          }
-          if (!logExercise) {
-            const dailyWs = Object.values(state.dailyWorkouts || {}).flat();
-            for (const wk of dailyWs) {
-              const found = (wk.exercises || []).find((e) => e.id === logCtx?.exerciseId);
-              if (found) { logExercise = found; break; }
-            }
-          }
-          if (!logExercise) {
-            for (const dateAdds of Object.values(state.sessionAdditions || {})) {
-              for (const exArr of Object.values(dateAdds || {})) {
-                const found = exArr.find((e) => e.id === logCtx?.exerciseId);
-                if (found) { logExercise = found; break; }
-              }
-              if (logExercise) break;
-            }
-          }
+          const logExercise = findExerciseById(state, logCtx?.exerciseId);
           const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
           const logScheme = logCtx?.scheme;
           const showWeight = logUnit.key === "reps" && !logExercise?.bodyweight;
@@ -4131,28 +4053,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           // Rest timer toggle state for front header
           const hEx = logCtx?.exerciseId;
-          let hExObj = null;
-          if (hEx) {
-            for (const wk of state.program.workouts) {
-              hExObj = wk.exercises.find((e) => e.id === hEx);
-              if (hExObj) break;
-            }
-            if (!hExObj) {
-              for (const wk of Object.values(state.dailyWorkouts || {}).flat()) {
-                hExObj = (wk.exercises || []).find((e) => e.id === hEx);
-                if (hExObj) break;
-              }
-            }
-            if (!hExObj) {
-              for (const dateAdds of Object.values(state.sessionAdditions || {})) {
-                for (const exArr of Object.values(dateAdds || {})) {
-                  hExObj = exArr.find((e) => e.id === hEx);
-                  if (hExObj) break;
-                }
-                if (hExObj) break;
-              }
-            }
-          }
+          const hExObj = hEx ? findExerciseById(state, hEx) : null;
           const hRestOn = hExObj?.restTimer !== undefined ? hExObj.restTimer : state.preferences?.restTimerEnabled !== false;
 
           // Close button SVG (shared)

@@ -24,6 +24,48 @@ export function migrateCompletedFlag(st) {
   }
 }
 
+/**
+ * Find an exercise by ID across all state locations:
+ * program workouts, daily workouts, and session additions.
+ */
+export function findExerciseById(st, exerciseId) {
+  for (const wk of (st.program?.workouts || [])) {
+    const found = (wk.exercises || []).find((e) => e.id === exerciseId);
+    if (found) return found;
+  }
+  for (const wk of Object.values(st.dailyWorkouts || {}).flat()) {
+    const found = (wk.exercises || []).find((e) => e.id === exerciseId);
+    if (found) return found;
+  }
+  for (const dateAdds of Object.values(st.sessionAdditions || {})) {
+    for (const exArr of Object.values(dateAdds || {})) {
+      const found = exArr.find((e) => e.id === exerciseId);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Apply a callback to every exercise across all state locations.
+ * Used for toggling properties on a matching exercise by ID.
+ */
+export function forEachExercise(st, callback) {
+  for (const wk of (st.program?.workouts || [])) {
+    for (const ex of (wk.exercises || [])) callback(ex);
+  }
+  for (const key of Object.keys(st.dailyWorkouts || {})) {
+    for (const wk of st.dailyWorkouts[key]) {
+      for (const ex of (wk.exercises || [])) callback(ex);
+    }
+  }
+  for (const key of Object.keys(st.sessionAdditions || {})) {
+    for (const exArr of Object.values(st.sessionAdditions[key] || {})) {
+      for (const ex of exArr) callback(ex);
+    }
+  }
+}
+
 export function safeParse(json, fallback) {
   try {
     const v = JSON.parse(json);
