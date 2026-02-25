@@ -1762,7 +1762,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [modals.log.isOpen]);
 
   const completeSet = useCallback(
-    (exerciseId, setIndex, setData, workoutId) => {
+    (exerciseId, setIndex, setData, workoutId, modalSetCount) => {
       // Haptic feedback
       navigator.vibrate?.(10);
 
@@ -1815,7 +1815,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const prior = findMostRecentLogBefore(exerciseId, dateKey);
       const schemeStr = exercises.find((e) => e.id === exerciseId)?.scheme || workout?.scheme || null;
       const schemeParsed = schemeStr ? parseScheme(schemeStr) : null;
-      const totalSets = Math.max(updatedSets.length, prior?.sets?.length || 0, schemeParsed?.sets || 0);
+      const totalSets = Math.max(updatedSets.length, prior?.sets?.length || 0, schemeParsed?.sets || 0, modalSetCount || 0);
 
       const toast = selectSetCompletionToast({
         exerciseId,
@@ -4354,7 +4354,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           if (s.targetPace) setPayload.targetPace = s.targetPace;
                           if (s.targetCustom) setPayload.targetCustom = s.targetCustom;
                           if (s.targetIntensity) setPayload.targetIntensity = s.targetIntensity;
-                          completeSet(logCtx.exerciseId, i, setPayload, logCtx.workoutId);
+                          completeSet(logCtx.exerciseId, i, setPayload, logCtx.workoutId, modals.log.sets.length);
                         }
                       }
                     }}
@@ -4843,7 +4843,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 const newSets = [...modals.log.sets];
                 newSets[setIndex] = { ...newSets[setIndex], reps: seconds };
                 dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
-                completeSet(logCtx.exerciseId, setIndex, { reps: seconds, weight: "" }, logCtx.workoutId);
+                completeSet(logCtx.exerciseId, setIndex, { reps: seconds, weight: "" }, logCtx.workoutId, modals.log.sets.length);
               }}
               colors={colors}
               styles={styles}
