@@ -465,10 +465,6 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
           </div>
         </div>
       </div>
-
-      <div style={{ textAlign: "center", opacity: 0.25, fontSize: 11, paddingTop: 8 }}>
-        Build {typeof __BUILD_ID__ !== "undefined" ? __BUILD_ID__ : "dev"}
-      </div>
     </div>
   );
 }
