@@ -1216,8 +1216,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       exiting = false;
       clearTimeout(exitTimer);
       setupWatcher();
-      // Wait for any pending popstate events to settle before pushing
-      setTimeout(() => { while (buffer < 5) push(); }, 50);
+      // Only replenish history buffer if CloseWatcher is not active (fallback)
+      if (!cwWorking) {
+        setTimeout(() => { while (buffer < 5) push(); }, 50);
+      }
     };
 
     const setupWatcher = () => {
@@ -1262,10 +1264,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (!initialized) {
         initialized = true;
         history.replaceState(null, "", location.pathname + location.search);
-        while (buffer < 5) push();
-        return;
       }
-      if (buffer < 5) push();
+      // Only push history entries when CloseWatcher is NOT active (fallback).
+      // When CW works, history entries are unnecessary and create exit issues
+      // because history.go(-buffer) races with the user's next back press.
+      if (!cwWorking && buffer < 5) push();
     };
 
     document.addEventListener("pointerdown", ensureEntries, { passive: true });
