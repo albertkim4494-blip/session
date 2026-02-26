@@ -456,9 +456,15 @@ export function detectImbalancesNormalized(analysis, opts) {
       (sum, [name]) => sum + (durationByActivity[name] || 0), 0
     );
 
-    // Pain mentions → recovery insight
+    // Pain mentions → recovery insight (only last 14 days — older pain notes are stale)
+    const painCutoff = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 14);
+      return d.toISOString().slice(0, 10);
+    })();
     const recentPain = (signals.notesSignals?.painMentions || [])
-      .filter((p) => p.confidence === "high" || p.confidence === "med");
+      .filter((p) => p.confidence === "high" || p.confidence === "med")
+      .filter((p) => p.date >= painCutoff);
     if (recentPain.length > 0 && insights.length < 3) {
       insights.push({
         type: "RECOVERY",

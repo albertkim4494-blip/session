@@ -499,21 +499,32 @@ ${logSummary}
 ${catalogSection}${fatigueSection}${recentHistorySection}${olderHistorySection}${adherenceSection}${coachingHistorySection}
 Analyze this data and return JSON insights.`;
 
+    const openaiBody = JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      temperature: 0.7,
+      max_tokens: maxTokens,
+    });
+
+    console.log(JSON.stringify({
+      event: "ai_request",
+      feature: "coach",
+      model,
+      systemPromptLen: systemPrompt.length,
+      userMessageLen: userMessage.length,
+      bodyLen: openaiBody.length,
+    }));
+
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.7,
-        max_tokens: maxTokens,
-      }),
+      body: openaiBody,
     });
 
     if (!openaiRes.ok) {
@@ -559,9 +570,11 @@ Analyze this data and return JSON insights.`;
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("Edge function error:", err);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errStack = err instanceof Error ? err.stack : undefined;
+    console.error("Edge function error:", errMsg, errStack);
     return new Response(
-      JSON.stringify({ error: "Internal error" }),
+      JSON.stringify({ error: "Internal error", detail: errMsg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
