@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       estimated1RMTrends,
       fatigueTrend,
       adherence,
-      previousInsights,
+      coachingHistory,
       muscleSetsSummary,
       muscleVolumeSummary, // legacy, ignored if muscleSetsSummary present
       muscleVolumeDetail, // detailed breakdown: "chest: 7 sets — Bench Press ×4 (02-12), Cable Fly ×3 (02-14)"
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     // Validate and resolve model + max_tokens
     const ALLOWED_MODELS = new Set(["gpt-4o", "gpt-4o-mini"]);
     const model = ALLOWED_MODELS.has(modelHint) ? modelHint : "gpt-4o-mini";
-    const maxTokens = model === "gpt-4o" ? 1000 : 800;
+    const maxTokens = model === "gpt-4o" ? 1200 : 1000;
 
     const wUnit = weightUnit || "lb";
 
@@ -187,18 +187,26 @@ Deno.serve(async (req) => {
       adherenceSection = `\nADHERENCE (last 30 days):\n  Sessions: ${adherence.sessionsLast30 ?? "?"}\n  Average: ${adherence.sessionsPerWeek ?? "?"} sessions/week\n`;
     }
 
-    // Build anti-repetition section (enhanced with shown counts and date ranges)
-    let antiRepetitionSection = "";
-    if (previousInsights && Array.isArray(previousInsights.titles) && previousInsights.titles.length > 0) {
-      const lines = previousInsights.titles.map((t: string, i: number) => {
-        const count = previousInsights.shownCounts?.[i];
-        const range = previousInsights.dateRanges?.[i];
-        let line = `  - ${t}`;
-        if (count > 1) line += ` (shown ${count}x)`;
-        if (range) line += ` [${range}]`;
-        return line;
-      });
-      antiRepetitionSection = `\nPREVIOUS RECOMMENDATIONS (do NOT repeat these topics — especially those shown 2+ times, unless the underlying data has materially changed since they were last shown):\n${lines.join("\n")}\n`;
+    // Build coaching history section for continuity and anti-repetition
+    let coachingHistorySection = "";
+    if (coachingHistory && Array.isArray(coachingHistory.entries) && coachingHistory.entries.length > 0) {
+      const entryLines: string[] = [];
+      for (const entry of coachingHistory.entries) {
+        let line = `- ${entry.lastShown} [${entry.type}, shown ${entry.shownCount}x]: "${entry.title}"`;
+        if (entry.message) line += `\n  Message: "${entry.message.slice(0, 200)}"`;
+        if (Array.isArray(entry.suggestions) && entry.suggestions.length > 0) {
+          line += `\n  Suggestions: ${entry.suggestions.map((s: { exercise?: string }) => s.exercise || "unknown").join(", ")}`;
+        }
+        // Attach follow-up if available
+        const followUp = (coachingHistory.followUps || []).find(
+          (f: { title: string }) => f.title === entry.title
+        );
+        if (followUp && Array.isArray(followUp.followUp) && followUp.followUp.length > 0) {
+          line += `\n  Follow-up: ${followUp.followUp.join(" ")}`;
+        }
+        entryLines.push(line);
+      }
+      coachingHistorySection = `\nYOUR PREVIOUS COACHING NOTES (you said these — build on them, don't repeat verbatim):\n${entryLines.join("\n\n")}\n`;
     }
 
     // Build muscle sets section (primary-only working set counts — the standard volume metric)
@@ -238,13 +246,28 @@ Factor sport demands into ALL recommendations. Prioritize complementary work, an
 `;
     }
 
-    const systemPrompt = `You are this person's personal coach. Not a generic fitness bot — their coach. You know their profile, you see their logs, and you talk to them like a real human who's been watching their training.
+    const systemPrompt = `You are a performance coach with long-term memory of this athlete's training history.
 
-Write like a person, not a template. Be direct. Be warm. Use "you" and "your." Reference their actual numbers, their actual exercises, what they actually did in the date range. No filler, no corporate-speak, no "Great job maintaining consistency!" generic nonsense. Say something only if you actually mean it based on their data.
-- IMPORTANT: Use the date range label provided (e.g. "this week", "this month"). The date range start/end dates are the source of truth — only discuss data that falls within those dates.
+Your job: analyze structured training data, identify the highest leverage variable affecting progress, and provide actionable coaching for TODAY.
+
+You are not a cheerleader. You are not a generic fitness assistant. You are a performance strategist tracking trends over time.
+
+Write like a person, not a template. Be direct. Be warm. Use "you" and "your." Reference their actual numbers, their actual exercises, what they actually did. No filler, no corporate-speak, no "Great job maintaining consistency!" generic nonsense. Say something only if you actually mean it based on their data.
+
+INTERNAL REASONING (do this before generating output):
+- What is the single highest leverage variable right now?
+- Is the athlete trending upward, flat, or unstable?
+- Is this a programming issue or a compliance issue?
+- What should they focus on TODAY?
+
+ANALYSIS WINDOWS:
+- PRIMARY WINDOW = most recent 2–3 weeks. This drives your analysis.
+- CONTEXT WINDOW = full date range provided. Use for trends and long-term narrative.
+- If trends conflict between windows, prioritize the primary window.
+- Focus on advice for TODAY. The date range label is "${dateRange?.label || "today"}".
 
 SPECIFICITY REQUIREMENTS — every insight MUST follow these:
-- Reference the date range naturally using the label: "${dateRange?.label || "This week"}" — do NOT include the actual start/end dates in parentheses. The user already sees the date range in the app UI. Just say "This week" or "This month", not "This week (2026-02-15 to 2026-02-20)".
+- Frame advice for TODAY. Do not include raw date ranges in your output — the user sees them in the app UI. Use natural time references like "this week", "recently", or "over the last few weeks".
 - When citing muscle volume, name the SPECIFIC EXERCISES that contributed: "7 chest sets — 4 from bench press, 3 from cable fly" NOT just "7 sets of chest"
 - When citing numbers, give context: "3 sets of back across 1 session" not just "3 sets of back"
 - When recommending changes, be concrete: "Add 3 sets of barbell rows to your next pull day" not "consider more back work"
@@ -263,6 +286,12 @@ VOICE & TONE:
 - Reference their specific numbers, exercises, dates. Never be vague.
 - NEVER use the word "only" about their effort. Never be condescending.
 - SPARSE DATA (fewer than 4 logged sessions in the date range): Lead with encouragement and one actionable tip. Do NOT default to recovery/overtraining/fatigue warnings — someone with 2-3 sessions is just getting started, not overtraining. Only mention recovery if their notes or mood explicitly mention pain or exhaustion. Focus on what they DID do, not what could go wrong.
+
+TONE CALIBRATION (adjust based on trend):
+- If improving: Confident, momentum-driven. Reinforce execution. "This is working. Keep pushing."
+- If plateauing: Direct, strategic, focused. "Time to change variables. Here's what to try."
+- If regressing: Simplify, reduce overwhelm. Prioritize recovery or reset. "Let's strip back and rebuild."
+- Avoid hype unless supported by data.
 
 UNDERSTANDING THE WHOLE PERSON:
 - Read the "About" field carefully. It tells you WHO this person is — their health conditions, experience level, injuries, limitations, lifestyle context.
@@ -385,9 +414,31 @@ BEGINNER-SPECIFIC GUIDANCE:
   * Suggest technique cues or rep quality before ever suggesting heavier loads.
 - Intermediate/Advanced lifters: progressive overload advice IS appropriate when you see clear stalls with good volume.
 
-ANTI-REPETITION:
-- If previous recommendations are listed below, do NOT repeat those topics. Find new angles each time.
-- Vary your insight types — don't always return the same mix.
+COACHING CONTINUITY:
+- You have history with this person. Reference previous observations when relevant.
+- If the user acted on your advice and improved, acknowledge execution: "You added rows like I suggested — your back volume doubled."
+- If they didn't act on advice, gently revisit with a new angle — don't just repeat the same thing.
+- If a metric you flagged has changed (better or worse), call it out.
+- Build on threads: "Previously I noticed X. Now I'm seeing Y."
+- Do NOT repeat prior phrasing verbatim. Do NOT restate resolved issues. Focus on evolution.
+- If coaching history is provided below, use it to inform your response — but only reference insights that are relevant to current data.
+
+ESCALATION LOGIC (when an issue persists across multiple coaching cycles):
+- shownCount 1 = Suggestion: "You might want to try..."
+- shownCount 2 = Clear directive: "Add 3 sets of rows to your next pull day."
+- shownCount 3+ = Direct instruction with exact implementation: "On your next Pull day, do Barbell Rows 4×8 at 135 before lat pulldowns."
+- Escalate clarity and specificity, not volume. Do not repeat the same wording across stages.
+
+BEHAVIORAL PATTERNS:
+- If follow-up data shows the user consistently acts on advice → increase progression complexity, suggest more nuanced programming changes.
+- If follow-up data shows the user ignores suggestions → simplify, make the next action extremely specific and low-friction.
+- Do NOT mention these patterns to the user. Use them silently to calibrate your coaching style.
+
+PRIORITIZATION:
+- Return insights ranked by impact on progress.
+- If one bottleneck blocks multiple goals, prioritize that.
+- Avoid minor optimizations if a major plateau or regression exists.
+- Distinguish between programming issues (wrong exercises, wrong volume) and compliance issues (not following through).
 
 RESPONSE FORMAT:
 - Return ONLY valid JSON, no markdown, no explanation outside the JSON.
@@ -403,7 +454,12 @@ RESPONSE FORMAT:
 - expected_outcome: string — what should improve and in what timeframe if user follows advice
 
 OUTPUT FORMAT:
-{ "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...], "confidence": 0.8, "evidence": "...", "expected_outcome": "..." } ] }`;
+{
+  "trend_status": "improving | plateauing | regressing | mixed",
+  "primary_focus": "Single highest leverage focus for today",
+  "today_action": "Specific, implementable instruction for the next session",
+  "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...], "confidence": 0.8, "evidence": "...", "expected_outcome": "..." } ]
+}`;
 
     // Build volume-load trends section
     let volumeLoadSection = "";
@@ -440,7 +496,7 @@ ${programSummary}
 
 RECENT TRAINING LOGS:
 ${logSummary}
-${catalogSection}${fatigueSection}${recentHistorySection}${olderHistorySection}${adherenceSection}${antiRepetitionSection}
+${catalogSection}${fatigueSection}${recentHistorySection}${olderHistorySection}${adherenceSection}${coachingHistorySection}
 Analyze this data and return JSON insights.`;
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {

@@ -50,6 +50,65 @@ const MUSCLE_GROUPS = {
   OBLIQUES: ['oblique', 'russian twist', 'woodchop', 'wood chop', 'side bend', 'pallof'],
 };
 
+// --- Coach signal helpers ---
+
+const SECONDARY_SET_WEIGHT = 0.5;
+
+const PAIN_KEYWORDS = /\b(pain|hurt|injury|injured|sore|soreness|tight|tightness|strain|strained|pull|pulled|tweak|tweaked|snap|popped|swollen|inflamed|numb|tingling|doctor|physio|PT|rehab|surgery|tear|torn)\b/i;
+const FATIGUE_KEYWORDS = /\b(tired|exhausted|fatigued|drained|wiped|burned\s*out|burnout|worn\s*out|sluggish|flat|heavy\s*legs|no\s*energy|low\s*energy|overtrained|run\s*down)\b/i;
+
+function extractNoteSignals(text) {
+  if (!text || typeof text !== "string") return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const pain = PAIN_KEYWORDS.test(trimmed);
+  const fatigue = FATIGUE_KEYWORDS.test(trimmed);
+  if (!pain && !fatigue) return null;
+  return {
+    pain,
+    fatigue,
+    painConfidence: pain ? (trimmed.length > 30 ? "high" : "med") : null,
+    fatigueConfidence: fatigue ? (trimmed.length > 30 ? "high" : "med") : null,
+  };
+}
+
+function buildCoachSignals(moodEntries, rpeEntries, intensityEntries, painMentions, fatigueMentions) {
+  let mood = { avg: null, trend: "unknown", count: 0 };
+  if (moodEntries.length > 0) {
+    const avg = moodEntries.reduce((s, e) => s + e.value, 0) / moodEntries.length;
+    let trend = "unknown";
+    if (moodEntries.length >= 4) {
+      const sorted = [...moodEntries].sort((a, b) => a.date.localeCompare(b.date));
+      const mid = Math.floor(sorted.length / 2);
+      const firstHalf = sorted.slice(0, mid).reduce((s, e) => s + e.value, 0) / mid;
+      const secondHalf = sorted.slice(mid).reduce((s, e) => s + e.value, 0) / (sorted.length - mid);
+      const diff = secondHalf - firstHalf;
+      trend = diff > 0.5 ? "up" : diff < -0.5 ? "down" : "flat";
+    } else if (moodEntries.length >= 2) {
+      trend = "flat";
+    }
+    mood = { avg: Math.round(avg * 10) / 10, trend, count: moodEntries.length };
+  }
+
+  const effort = {};
+  if (rpeEntries.length > 0) {
+    effort.avgRpe = Math.round(rpeEntries.reduce((s, e) => s + e.value, 0) / rpeEntries.length * 10) / 10;
+    effort.rpeCount = rpeEntries.length;
+  }
+  if (intensityEntries.length > 0) {
+    effort.avgIntensity = Math.round(intensityEntries.reduce((s, e) => s + e.value, 0) / intensityEntries.length * 10) / 10;
+    effort.intensityCount = intensityEntries.length;
+    const peak = intensityEntries.reduce((best, e) => e.value > (best?.value || 0) ? e : best, null);
+    if (peak) effort.peakIntensity = { date: peak.date, activity: peak.activity, value: peak.value };
+  }
+
+  return {
+    mood,
+    effort,
+    notesSignals: { painMentions, fatigueMentions },
+  };
+}
+
 export function classifyExerciseMuscles(exerciseName) {
   const lower = exerciseName.toLowerCase();
   const matches = [];
@@ -178,6 +237,13 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
   const sportFrequency = {};
   let totalStrengthReps = 0;
   let totalStrengthSets = 0;
+  const muscleGroupSetsEffective = {};
+  // Coach signal collectors
+  const moodEntries = [];
+  const rpeEntries = [];
+  const intensityEntries = [];
+  const painMentions = [];
+  const fatigueMentions = [];
 
   // Build exercise ID → info map
   const exerciseIdToInfo = new Map();
@@ -212,6 +278,26 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
         s.completed !== undefined ? s.completed : Number(s.reps) > 0
       );
       if (completedSets.length === 0) continue;
+
+      // Collect coach signal data from this log entry
+      if (log.mood != null) {
+        moodEntries.push({ date: dateKey, value: Number(log.mood) });
+      }
+      const noteSignals = extractNoteSignals(log.notes);
+      if (noteSignals) {
+        if (noteSignals.pain) painMentions.push({ date: dateKey, text: log.notes.trim().slice(0, 100), confidence: noteSignals.painConfidence });
+        if (noteSignals.fatigue) fatigueMentions.push({ date: dateKey, text: log.notes.trim().slice(0, 100), confidence: noteSignals.fatigueConfidence });
+      }
+      for (const s of completedSets) {
+        if (s.targetRpe) {
+          const rpe = Number(s.targetRpe);
+          if (rpe > 0) rpeEntries.push({ date: dateKey, value: rpe, activity: name });
+        }
+        if (s.targetIntensity) {
+          const intensity = Number(s.targetIntensity);
+          if (intensity > 0) intensityEntries.push({ date: dateKey, value: intensity, activity: name });
+        }
+      }
 
       const totalValue = completedSets.reduce(
         (sum, set) => sum + (Number(set.reps) || 0),
@@ -249,6 +335,13 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
         for (const group of primaryGroups) {
           muscleGroupSets[group] = (muscleGroupSets[group] || 0) + workingSets;
         }
+        // Effective sets: primary gets full credit, secondary gets partial
+        for (const group of primaryGroups) {
+          muscleGroupSetsEffective[group] = (muscleGroupSetsEffective[group] || 0) + workingSets;
+        }
+        for (const group of secondaryGroups) {
+          muscleGroupSetsEffective[group] = (muscleGroupSetsEffective[group] || 0) + workingSets * SECONDARY_SET_WEIGHT;
+        }
       } else if (activity === "sport") {
         // Sport: convert to minutes, track frequency
         const minutes = normalizeToMinutes(totalValue, unit) || totalValue;
@@ -265,7 +358,9 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
     }
   }
 
-  return { muscleGroupVolume, muscleGroupSets, durationByActivity, sportFrequency, totalStrengthReps, totalStrengthSets };
+  const coachSignals = buildCoachSignals(moodEntries, rpeEntries, intensityEntries, painMentions, fatigueMentions);
+
+  return { muscleGroupVolume, muscleGroupSets, muscleGroupSetsEffective, durationByActivity, sportFrequency, totalStrengthReps, totalStrengthSets, coachSignals };
 }
 
 /**
@@ -347,6 +442,46 @@ export function detectImbalancesNormalized(analysis, opts) {
           ? `No direct ${groupName} sets logged this period. Consider adding some targeted work.`
           : `Only ${groupSets} direct ${groupName} set${groupSets !== 1 ? 's' : ''} out of ${totalSets} total — that's ${Math.round(percentage)}%. Consider adding more.`,
         suggestions: getSuggestionsForMuscleGroup(group, catalog, userExerciseNames)
+      });
+    }
+  }
+
+  // --- Sport/fatigue-aware insights ---
+  const signals = analysis?.coachSignals;
+  if (signals) {
+    const durationByActivity = analysis?.durationByActivity ?? {};
+
+    // Sport load (total minutes for sport-classified activities)
+    const sportMinutes = Object.entries(sportFrequency).reduce(
+      (sum, [name]) => sum + (durationByActivity[name] || 0), 0
+    );
+
+    // Pain mentions → recovery insight
+    const recentPain = (signals.notesSignals?.painMentions || [])
+      .filter((p) => p.confidence === "high" || p.confidence === "med");
+    if (recentPain.length > 0 && insights.length < 3) {
+      insights.push({
+        type: "RECOVERY",
+        severity: recentPain.some((p) => p.confidence === "high") ? "HIGH" : "MEDIUM",
+        title: "⚠️ Pain signals detected",
+        message: `Recent notes mention pain or discomfort (${recentPain.map((p) => p.date).join(", ")}). Consider modifying exercises that aggravate the area and prioritizing recovery.`,
+        suggestions: [],
+      });
+    }
+
+    // Mood trending down + high load → recovery insight
+    if (
+      signals.mood.trend === "down" &&
+      signals.mood.count >= 4 &&
+      (sportMinutes > 180 || totalSets > 20 || (signals.effort.avgRpe && signals.effort.avgRpe >= 7.5)) &&
+      insights.length < 3
+    ) {
+      insights.push({
+        type: "RECOVERY",
+        severity: "MEDIUM",
+        title: "😴 Recovery may be needed",
+        message: "Your mood has been trending down while training load remains high. Consider a lighter week or extra rest day to recover.",
+        suggestions: [],
       });
     }
   }

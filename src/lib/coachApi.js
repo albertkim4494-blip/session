@@ -66,7 +66,7 @@ function filterLogsToRange(logsByDate, start, end) {
 }
 
 // ---------------------------------------------------------------------------
-// Rolling insight history (v2) for anti-repetition
+// Rolling insight history (v3) — full coaching memory with continuity
 // ---------------------------------------------------------------------------
 
 /**
@@ -81,16 +81,22 @@ function simpleHash(str) {
 }
 
 /**
- * Load insight history from localStorage. Auto-migrates v1 → v2.
+ * Load insight history from localStorage. Auto-migrates v1 → v2 → v3.
+ * v3 stores full insight data (message, severity, suggestions, evidence, contextSnapshot).
  */
 function loadInsightHistory() {
   try {
     const raw = localStorage.getItem(LAST_INSIGHTS_KEY);
-    if (!raw) return { version: 2, history: [], fetchCounter: 0 };
+    if (!raw) return { version: 3, history: [], fetchCounter: 0 };
     const parsed = JSON.parse(raw);
 
-    // Already v2
-    if (parsed.version === 2 && Array.isArray(parsed.history)) return parsed;
+    // Already v3
+    if (parsed.version === 3 && Array.isArray(parsed.history)) return parsed;
+
+    // Migrate v2 → v3: existing entries keep their fields, new fields will be null
+    if (parsed.version === 2 && Array.isArray(parsed.history)) {
+      return { version: 3, history: parsed.history.slice(0, 15), fetchCounter: parsed.fetchCounter || 0 };
+    }
 
     // Migrate v1: { titles: [...], types: [...] }
     if (Array.isArray(parsed.titles) && parsed.titles.length > 0) {
@@ -104,23 +110,41 @@ function loadInsightHistory() {
         shownCount: 1,
         fetchIndex: 0,
       }));
-      return { version: 2, history: history.slice(0, 20), fetchCounter: 1 };
+      return { version: 3, history: history.slice(0, 15), fetchCounter: 1 };
     }
 
-    return { version: 2, history: [], fetchCounter: 0 };
+    return { version: 3, history: [], fetchCounter: 0 };
   } catch {
-    return { version: 2, history: [], fetchCounter: 0 };
+    return { version: 3, history: [], fetchCounter: 0 };
   }
 }
 
 /**
- * Save insights to rolling history. Upserts by titleHash, trims to 20 entries.
+ * Save insights to rolling history with full data + context snapshot.
+ * Upserts by titleHash, trims to 15 entries.
  */
-function saveInsightHistory(insights, historyState) {
+function saveInsightHistory(insights, historyState, contextData) {
   try {
     const fetchIndex = (historyState.fetchCounter || 0) + 1;
     const now = new Date().toISOString().slice(0, 10);
     const history = [...historyState.history];
+
+    // Build context snapshot from currently-available data
+    const contextSnapshot = {};
+    if (contextData?.muscleSetsSummary) {
+      contextSnapshot.muscleSets = contextData.muscleSetsSummary;
+    }
+    if (Array.isArray(contextData?.progressionTrends)) {
+      const topWeights = {};
+      for (const t of contextData.progressionTrends) {
+        const match = t.match(/^(.+?):\s.*?→\s*([\d.]+)/);
+        if (match) topWeights[match[1].trim()] = parseFloat(match[2]);
+      }
+      if (Object.keys(topWeights).length > 0) contextSnapshot.topWeights = topWeights;
+    }
+    if (contextData?.adherence) {
+      contextSnapshot.adherencePerWeek = contextData.adherence.sessionsPerWeek ?? null;
+    }
 
     for (const insight of insights) {
       const hash = simpleHash(insight.title);
@@ -129,11 +153,23 @@ function saveInsightHistory(insights, historyState) {
         existing.lastShown = now;
         existing.shownCount += 1;
         existing.fetchIndex = fetchIndex;
+        existing.message = insight.message || existing.message;
+        existing.severity = insight.severity || existing.severity;
+        existing.suggestions = insight.suggestions?.length > 0 ? insight.suggestions : existing.suggestions;
+        existing.evidence = insight.evidence || existing.evidence;
+        existing.expected_outcome = insight.expected_outcome || existing.expected_outcome;
+        existing.contextSnapshot = contextSnapshot;
       } else {
         history.push({
           titleHash: hash,
           title: insight.title,
           type: insight.type || "INFO",
+          severity: insight.severity || "LOW",
+          message: insight.message || "",
+          suggestions: Array.isArray(insight.suggestions) ? insight.suggestions : [],
+          evidence: insight.evidence || "",
+          expected_outcome: insight.expected_outcome || "",
+          contextSnapshot,
           firstShown: now,
           lastShown: now,
           shownCount: 1,
@@ -142,34 +178,119 @@ function saveInsightHistory(insights, historyState) {
       }
     }
 
-    // Sort by most recent first, trim to 20
+    // Sort by most recent first, trim to 15
     history.sort((a, b) => b.fetchIndex - a.fetchIndex);
-    const trimmed = history.slice(0, 20);
+    const trimmed = history.slice(0, 15);
 
     localStorage.setItem(
       LAST_INSIGHTS_KEY,
-      JSON.stringify({ version: 2, history: trimmed, fetchCounter: fetchIndex })
+      JSON.stringify({ version: 3, history: trimmed, fetchCounter: fetchIndex })
     );
 
-    return { version: 2, history: trimmed, fetchCounter: fetchIndex };
+    return { version: 3, history: trimmed, fetchCounter: fetchIndex };
   } catch {
-    // Ignore storage errors
     return historyState;
   }
 }
 
 /**
- * Build the payload sent to the edge function for anti-repetition.
+ * Build follow-up context by comparing past coaching insights to current data.
+ * Checks whether the user acted on suggestions and whether metrics changed.
  */
-function buildPreviousInsightsPayload(historyState) {
+function buildFollowUpContext(historyState, currentData) {
+  const { history } = historyState;
+  if (!history || history.length === 0) return null;
+
+  const { muscleSetsSummary, progressionTrends, activeExerciseNames } = currentData;
+
+  // Parse current top weights from progression trend strings
+  const currentTopWeights = {};
+  if (Array.isArray(progressionTrends)) {
+    for (const t of progressionTrends) {
+      const match = t.match(/^(.+?):\s.*?→\s*([\d.]+)/);
+      if (match) currentTopWeights[match[1].trim()] = parseFloat(match[2]);
+    }
+  }
+
+  const activeNames = new Set((activeExerciseNames || []).map((n) => n.toLowerCase()));
+
+  const followUps = [];
+  for (const entry of history) {
+    if (!entry.suggestions?.length && !entry.contextSnapshot) continue;
+
+    const parts = [];
+
+    // Check suggestion follow-through
+    if (entry.suggestions?.length > 0) {
+      for (const sug of entry.suggestions) {
+        const sugName = sug.exercise?.toLowerCase();
+        if (!sugName) continue;
+        if (activeNames.has(sugName)) {
+          parts.push(`User added ${sug.exercise}. ✓ Acted on advice.`);
+        } else {
+          parts.push(`User has not added ${sug.exercise} yet.`);
+        }
+      }
+    }
+
+    // Check metric changes from past snapshot
+    if (entry.contextSnapshot) {
+      const snap = entry.contextSnapshot;
+      if (snap.muscleSets && muscleSetsSummary) {
+        for (const [muscle, pastSets] of Object.entries(snap.muscleSets)) {
+          const currentSets = muscleSetsSummary[muscle];
+          if (currentSets != null && pastSets != null && currentSets !== pastSets) {
+            const label = muscle.replace(/_/g, " ").toLowerCase();
+            parts.push(`${label} volume: ${pastSets} → ${currentSets} sets. ${currentSets > pastSets ? "↑ Improved." : "↓ Decreased."}`);
+          }
+        }
+      }
+      if (snap.topWeights) {
+        for (const [exercise, pastWeight] of Object.entries(snap.topWeights)) {
+          const currentWeight = currentTopWeights[exercise];
+          if (currentWeight != null && currentWeight !== pastWeight) {
+            parts.push(`${exercise}: ${pastWeight} → ${currentWeight}. ${currentWeight > pastWeight ? "↑ Progressing." : "↓ Regressed."}`);
+          } else if (currentWeight === pastWeight) {
+            parts.push(`${exercise}: still at ${currentWeight}. → No change.`);
+          }
+        }
+      }
+    }
+
+    if (parts.length > 0) {
+      followUps.push({
+        date: entry.lastShown,
+        title: entry.title,
+        type: entry.type,
+        shownCount: entry.shownCount,
+        followUp: parts,
+      });
+    }
+  }
+
+  return followUps.length > 0 ? followUps : null;
+}
+
+/**
+ * Build coaching history payload for the edge function.
+ * Includes full insight data + follow-up context for coaching continuity.
+ */
+function buildCoachingHistoryPayload(historyState, followUpContext) {
   const { history } = historyState;
   if (!history || history.length === 0) return null;
 
   return {
-    titles: history.map((h) => h.title),
-    types: history.map((h) => h.type),
-    shownCounts: history.map((h) => h.shownCount),
-    dateRanges: history.map((h) => `${h.firstShown} to ${h.lastShown}`),
+    entries: history.map((h) => ({
+      title: h.title,
+      type: h.type,
+      severity: h.severity || "LOW",
+      message: h.message || "",
+      suggestions: h.suggestions || [],
+      shownCount: h.shownCount,
+      firstShown: h.firstShown,
+      lastShown: h.lastShown,
+    })),
+    followUps: followUpContext || [],
   };
 }
 
@@ -1021,7 +1142,12 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   const fatigueTrend = buildFatigueTrend(state?.logsByDate);
   const adherence = computeAdherenceStats(state?.logsByDate);
   const insightHistory = loadInsightHistory();
-  const previousInsights = buildPreviousInsightsPayload(insightHistory);
+
+  // Build active exercise names for follow-up context
+  const activeExerciseNames = [];
+  for (const w of allWorkouts) {
+    for (const ex of w.exercises || []) activeExerciseNames.push(ex.name);
+  }
 
   // Compute muscle set counts for the AI (primary-only, no secondary inflation)
   let muscleSetsSummary = null;
@@ -1036,6 +1162,14 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     muscleVolumeDetail = buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap);
   }
   tieredHistory = buildTieredHistory(state?.logsByDate, allWorkouts, dateRange, catalogMap, weightLabel);
+
+  // Build coaching history with follow-up context
+  const followUpContext = buildFollowUpContext(insightHistory, {
+    muscleSetsSummary,
+    progressionTrends,
+    activeExerciseNames,
+  });
+  const coachingHistory = buildCoachingHistoryPayload(insightHistory, followUpContext);
 
   // Compute complexity score for model routing
   const loggedDays = Object.keys(recentLogs).length;
@@ -1055,7 +1189,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     muscleGroupCount,
     hasSports: !!profile?.sports,
     hasHistory: !!(tieredHistory.recentHistory || tieredHistory.olderHistory),
-    previousInsightCount: previousInsights?.titles?.length || 0,
+    previousInsightCount: coachingHistory?.entries?.length || 0,
   });
   const modelHint = complexityScore >= 4 ? "gpt-4o" : "gpt-4o-mini";
 
@@ -1079,7 +1213,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       dateRange: {
         start: dateRange.start,
         end: dateRange.end,
-        label: dateRange.label,
+        label: dateRange.label || "today",
       },
       catalogEntries,
       equipment: equipment || ["full_gym"],
@@ -1090,7 +1224,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       estimated1RMTrends,
       fatigueTrend,
       adherence,
-      previousInsights,
+      coachingHistory,
       muscleSetsSummary,
       muscleVolumeDetail,
       recentHistory: tieredHistory.recentHistory,
@@ -1136,7 +1270,11 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   }));
 
   // Save unfiltered insights to rolling history, then filter for novelty
-  const updatedHistory = saveInsightHistory(insights, insightHistory);
+  const updatedHistory = saveInsightHistory(insights, insightHistory, {
+    muscleSetsSummary,
+    progressionTrends,
+    adherence,
+  });
   const filtered = filterRepetitiveInsights(insights, updatedHistory);
 
   // Update cache with filtered insights
