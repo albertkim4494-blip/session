@@ -1596,6 +1596,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Flip log card to show exercise detail (back face) or return to log (front face)
   const flipLogToDetail = useCallback((dir) => {
     if (!logDetailEntry) return;
+    // Blur any focused input (e.g. notes textarea) so native selection
+    // handles (Android blue bubble) don't persist on the detail face.
+    try { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); } catch (_) {}
     clearTimeout(logFlipTimeoutRef.current);
     const angle = dir === "right" ? -180 : 180;
     logFlipAngleRef.current = angle;
