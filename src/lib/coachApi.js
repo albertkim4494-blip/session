@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { getUnitAbbr, buildNormalizedAnalysis, classifyExerciseMuscles } from "./coachNormalize";
+import { getUnitAbbr, buildNormalizedAnalysis, classifyExerciseMuscles, inferSportTraits } from "./coachNormalize";
 import { buildCatalogMap } from "./exerciseCatalogUtils";
 import { recordAiEvent } from "./aiMetrics";
 
@@ -36,6 +36,96 @@ function buildFingerprint(dateRange, recentLogs, exerciseCount, profile) {
 function isCompleted(set) {
   if (set.completed !== undefined) return set.completed;
   return Number(set.reps) > 0; // fallback for unmigrated data
+}
+
+/**
+ * Parse profile.sports free text into structured entries with inferred traits.
+ * e.g., "Water Polo 3x/week, running" → [{ name, freqPerWeek, traits }, ...]
+ */
+function parseSportText(sportsText) {
+  if (!sportsText || typeof sportsText !== "string") return [];
+  const parts = sportsText.split(/[,;]\s*|\s+and\s+/i).map((s) => s.trim()).filter(Boolean);
+  const result = [];
+  for (const part of parts) {
+    const freqMatch = part.match(/(\d+)\s*x?\s*(?:\/|\s*(?:per|a)\s*)\s*(?:week|wk)/i);
+    const daily = /\bdaily\b/i.test(part);
+    let freqPerWeek = null;
+    if (freqMatch) freqPerWeek = parseInt(freqMatch[1], 10);
+    else if (daily) freqPerWeek = 7;
+    const name = part
+      .replace(/\d+\s*x?\s*(?:\/|\s*(?:per|a)\s*)\s*(?:week|wk)/i, "")
+      .replace(/\bdaily\b/i, "")
+      .trim();
+    if (!name) continue;
+    result.push({ name, freqPerWeek, traits: inferSportTraits(name) });
+  }
+  return result;
+}
+
+/**
+ * Merge logged sport traits (from analysis) with profile-declared sports.
+ * Logged data takes precedence. Profile-only sports are added if not already
+ * covered by logged data (fuzzy name matching).
+ */
+function mergeSportTraits(loggedSportTraits, profileSportsText) {
+  const profileSports = parseSportText(profileSportsText);
+  if (!loggedSportTraits && profileSports.length === 0) return null;
+
+  // If no logged trait data, build from profile declarations
+  if (!loggedSportTraits) {
+    const withTraits = profileSports.filter((s) => s.traits);
+    if (withTraits.length === 0) return null;
+    const perSport = {};
+    const TRAIT_KEYS = Object.keys(withTraits[0].traits);
+    const aggregated = {};
+    for (const k of TRAIT_KEYS) aggregated[k] = 0;
+    let totalWeight = 0;
+    for (const { name, freqPerWeek, traits } of withTraits) {
+      const w = freqPerWeek || 2;
+      const estMinutes = w * 60;
+      perSport[name] = { ...traits, sessions: w, minutes: estMinutes, source: "profile" };
+      totalWeight += w;
+    }
+    for (const entry of Object.values(perSport)) {
+      const w = (entry.sessions || 1) / (totalWeight || 1);
+      for (const k of TRAIT_KEYS) aggregated[k] += (entry[k] || 0) * w;
+    }
+    for (const k of TRAIT_KEYS) aggregated[k] = Math.round(aggregated[k] * 100) / 100;
+    return { perSport, aggregated, totalSportMinutes: 0, totalSportSessions: 0 };
+  }
+
+  // If we have logged data, supplement with profile-only sports not in logs
+  if (profileSports.length === 0) return loggedSportTraits;
+
+  const loggedNamesLower = new Set(Object.keys(loggedSportTraits.perSport).map((n) => n.toLowerCase()));
+  let added = false;
+  const perSport = { ...loggedSportTraits.perSport };
+
+  for (const { name, freqPerWeek, traits } of profileSports) {
+    if (!traits) continue;
+    const nameLower = name.toLowerCase();
+    // Skip if already covered by a logged sport (fuzzy substring match)
+    const isLogged = [...loggedNamesLower].some((ln) => ln.includes(nameLower) || nameLower.includes(ln));
+    if (isLogged) continue;
+    const w = freqPerWeek || 2;
+    perSport[name] = { ...traits, sessions: w, minutes: w * 60, source: "profile" };
+    added = true;
+  }
+
+  if (!added) return loggedSportTraits;
+
+  // Re-aggregate with the new entries
+  const TRAIT_KEYS = ["upperPush", "upperPull", "legLoad", "coreRotation", "gripLoad", "impactStress", "explosiveness", "cardioLoad"];
+  const totalMinutes = Object.values(perSport).reduce((s, e) => s + (e.minutes || 0), 0) || 1;
+  const aggregated = {};
+  for (const k of TRAIT_KEYS) aggregated[k] = 0;
+  for (const entry of Object.values(perSport)) {
+    const w = (entry.minutes || 1) / totalMinutes;
+    for (const k of TRAIT_KEYS) aggregated[k] += (entry[k] || 0) * w;
+  }
+  for (const k of TRAIT_KEYS) aggregated[k] = Math.round(aggregated[k] * 100) / 100;
+
+  return { ...loggedSportTraits, perSport, aggregated };
 }
 
 /**
@@ -1152,6 +1242,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   // Compute muscle set counts for the AI (primary-only, no secondary inflation)
   let muscleSetsSummary = null;
   let muscleVolumeDetail = null;
+  let sportTraitsPayload = null;
   let tieredHistory = { recentHistory: null, olderHistory: null };
   const catalogMap = catalog?.length > 0 ? buildCatalogMap(catalog) : null;
   if (catalogMap) {
@@ -1160,6 +1251,11 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       muscleSetsSummary = analysis.muscleGroupSets;
     }
     muscleVolumeDetail = buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap);
+    // Merge logged sport traits with profile-declared sports (logged takes precedence)
+    sportTraitsPayload = mergeSportTraits(analysis.sportTraits, profile?.sports);
+  } else {
+    // No catalog — still infer sport traits from profile text
+    sportTraitsPayload = mergeSportTraits(null, profile?.sports);
   }
   tieredHistory = buildTieredHistory(state?.logsByDate, allWorkouts, dateRange, catalogMap, weightLabel);
 
@@ -1187,7 +1283,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     exerciseCount: allExerciseIds.size,
     trendCount,
     muscleGroupCount,
-    hasSports: !!profile?.sports,
+    hasSports: !!(profile?.sports || sportTraitsPayload?.totalSportSessions > 0),
     hasHistory: !!(tieredHistory.recentHistory || tieredHistory.olderHistory),
     previousInsightCount: coachingHistory?.entries?.length || 0,
   });
@@ -1225,6 +1321,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       fatigueTrend,
       adherence,
       coachingHistory,
+      sportTraits: sportTraitsPayload?.aggregated || null,
       muscleSetsSummary,
       muscleVolumeDetail,
       recentHistory: tieredHistory.recentHistory,

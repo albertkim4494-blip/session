@@ -22,6 +22,56 @@ export const CARDIO_KEYWORDS = [
   "walk", "hike", "sprint", "cardio", "rowing", "jump rope", "ski",
 ];
 
+// --- Sport trait inference ---
+// Keyword patterns → movement demand traits. Each entry maps a regex to partial
+// trait scores (0.0–1.0). Multiple patterns can match the same activity name,
+// and the highest value per trait wins. This replaces hardcoded sport-to-muscle
+// mappings with composable movement-pattern recognition.
+const TRAIT_KEYS = ["upperPush", "upperPull", "legLoad", "coreRotation", "gripLoad", "impactStress", "explosiveness", "cardioLoad"];
+
+const SPORT_TRAIT_RULES = [
+  // Movement patterns → traits (use \b only at start; stems match prefixes like "swimming", "running")
+  { re: /\b(throw|overhead|pitch|javelin)/i,           traits: { upperPush: 0.8, coreRotation: 0.7 } },
+  { re: /\bswim/i,                                     traits: { upperPush: 0.6, upperPull: 0.8, cardioLoad: 0.9, legLoad: 0.5 } },
+  { re: /\b(row|crew)\b/i,                            traits: { upperPull: 0.8, legLoad: 0.7, coreRotation: 0.3, cardioLoad: 0.8 } },
+  { re: /\b(climb|boulder)/i,                         traits: { upperPull: 0.9, gripLoad: 0.9, coreRotation: 0.5, legLoad: 0.5 } },
+  { re: /\b(paddl|kayak|canoe)/i,                     traits: { upperPush: 0.5, upperPull: 0.7, coreRotation: 0.6, cardioLoad: 0.7 } },
+  { re: /\bsurf/i,                                    traits: { upperPull: 0.6, coreRotation: 0.6, legLoad: 0.5, explosiveness: 0.5 } },
+  { re: /\b(gymnast|calisthen)/i,                     traits: { upperPush: 0.7, upperPull: 0.8, coreRotation: 0.7, gripLoad: 0.6 } },
+
+  // Running / locomotion patterns
+  { re: /\b(run|jog|sprint|marathon|cross.?country)/i, traits: { legLoad: 0.9, cardioLoad: 0.9, impactStress: 0.7 } },
+  { re: /\bsprint/i,                                  traits: { explosiveness: 0.8 } },
+  { re: /\b(hik|trail|walk)/i,                        traits: { legLoad: 0.7, cardioLoad: 0.6, impactStress: 0.3 } },
+  { re: /\b(cycl|bik)/i,                              traits: { legLoad: 0.9, cardioLoad: 0.9, impactStress: 0.2 } },
+  { re: /\b(skat|ski)/i,                              traits: { legLoad: 0.8, cardioLoad: 0.7, impactStress: 0.5, explosiveness: 0.5 } },
+  { re: /\b(elliptical|stair)/i,                      traits: { legLoad: 0.7, cardioLoad: 0.8 } },
+  { re: /\bjump\s*rope/i,                             traits: { legLoad: 0.6, cardioLoad: 0.8, impactStress: 0.6, explosiveness: 0.6 } },
+
+  // Ball / field sports
+  { re: /\b(soccer|football)\b/i,                     traits: { legLoad: 0.9, cardioLoad: 0.9, explosiveness: 0.7, impactStress: 0.6, coreRotation: 0.5 } },
+  { re: /\bbasketball\b/i,                            traits: { legLoad: 0.8, explosiveness: 0.9, cardioLoad: 0.8, impactStress: 0.7, upperPush: 0.4 } },
+  { re: /\bvolleyball\b/i,                            traits: { upperPush: 0.6, legLoad: 0.7, explosiveness: 0.8, impactStress: 0.5, coreRotation: 0.5 } },
+  { re: /\bpolo\b/i,                                  traits: { upperPush: 0.8, legLoad: 0.7, cardioLoad: 0.9, explosiveness: 0.7, coreRotation: 0.6, upperPull: 0.5 } },
+  { re: /\b(hockey|lacrosse)\b/i,                     traits: { legLoad: 0.7, coreRotation: 0.7, gripLoad: 0.6, explosiveness: 0.7, cardioLoad: 0.8, impactStress: 0.7 } },
+  { re: /\brugby\b/i,                                 traits: { upperPush: 0.7, upperPull: 0.6, legLoad: 0.8, impactStress: 0.9, explosiveness: 0.8, cardioLoad: 0.8 } },
+  { re: /\b(handball|ultimate)\b/i,                    traits: { upperPush: 0.5, legLoad: 0.8, cardioLoad: 0.8, explosiveness: 0.7, coreRotation: 0.5 } },
+  { re: /\b(baseball|softball|cricket)\b/i,            traits: { upperPush: 0.4, coreRotation: 0.9, gripLoad: 0.6, explosiveness: 0.8, legLoad: 0.5 } },
+
+  // Racket sports
+  { re: /\b(tennis|badminton|squash|racquet|paddle)\b/i, traits: { coreRotation: 0.8, gripLoad: 0.7, legLoad: 0.6, explosiveness: 0.7, cardioLoad: 0.7, upperPush: 0.5, impactStress: 0.5 } },
+  { re: /\bgolf\b/i,                                  traits: { coreRotation: 0.8, gripLoad: 0.5, legLoad: 0.3, upperPush: 0.3 } },
+
+  // Combat / martial
+  { re: /\bbox/i,                                     traits: { upperPush: 0.8, coreRotation: 0.9, cardioLoad: 0.9, explosiveness: 0.9, impactStress: 0.8, legLoad: 0.6 } },
+  { re: /\b(wrestl|judo|bjj|grappl)/i,                traits: { upperPull: 0.9, gripLoad: 0.9, coreRotation: 0.7, legLoad: 0.8, explosiveness: 0.7, cardioLoad: 0.8, impactStress: 0.7 } },
+  { re: /\b(mma|martial)/i,                           traits: { upperPush: 0.7, upperPull: 0.7, legLoad: 0.7, coreRotation: 0.8, gripLoad: 0.7, explosiveness: 0.8, cardioLoad: 0.9, impactStress: 0.8 } },
+  { re: /\bfenc/i,                                    traits: { legLoad: 0.7, explosiveness: 0.7, coreRotation: 0.6, gripLoad: 0.6 } },
+
+  // Flexibility / low-intensity
+  { re: /\b(yoga|pilates)\b/i,                        traits: { coreRotation: 0.5, legLoad: 0.3 } },
+];
+
 export const UNIT_ABBR_MAP = {
   reps: "reps",
   miles: "mi",
@@ -224,6 +274,81 @@ export function getUnitAbbr(unitKey, customAbbr) {
 }
 
 /**
+ * Infer sport demand traits from an activity name using keyword pattern matching.
+ * Multiple rules can match; the highest value per trait wins.
+ * @param {string} name - Activity name (e.g., "Water Polo", "Running")
+ * @returns {Object|null} - { upperPush, upperPull, legLoad, ... } with 0.0–1.0 values, or null if no pattern matches
+ */
+export function inferSportTraits(name) {
+  if (!name || typeof name !== "string") return null;
+  const lower = name.toLowerCase();
+  let matched = false;
+  const traits = {};
+  for (const k of TRAIT_KEYS) traits[k] = 0;
+  for (const rule of SPORT_TRAIT_RULES) {
+    if (rule.re.test(lower)) {
+      matched = true;
+      for (const [k, v] of Object.entries(rule.traits)) {
+        traits[k] = Math.max(traits[k], v);
+      }
+    }
+  }
+  return matched ? traits : null;
+}
+
+/**
+ * Build aggregated sport traits from per-activity data.
+ * Weights each sport's traits by its share of total sport minutes.
+ * @param {Object} sportFrequency - { activityName: sessionCount }
+ * @param {Object} durationByActivity - { activityName: totalMinutes }
+ * @returns {Object|null} - { perSport: { name: { ...traits, sessions, minutes } }, aggregated: { ...traits }, totalSportMinutes, totalSportSessions }
+ */
+function buildSportTraits(sportFrequency, durationByActivity) {
+  const entries = Object.entries(sportFrequency || {});
+  if (entries.length === 0) return null;
+
+  const perSport = {};
+  let totalMinutes = 0;
+  let totalSessions = 0;
+
+  for (const [name, sessions] of entries) {
+    const traits = inferSportTraits(name);
+    if (!traits) continue;
+    const minutes = durationByActivity[name] || 0;
+    perSport[name] = { ...traits, sessions, minutes };
+    totalMinutes += minutes;
+    totalSessions += sessions;
+  }
+
+  if (Object.keys(perSport).length === 0) return null;
+
+  // Also check cardio/duration activities for trait matches
+  for (const [name, minutes] of Object.entries(durationByActivity || {})) {
+    if (perSport[name]) continue; // already counted as sport
+    const traits = inferSportTraits(name);
+    if (!traits) continue;
+    perSport[name] = { ...traits, sessions: 0, minutes };
+    totalMinutes += minutes;
+  }
+
+  // Weighted average by minutes (activities with more time have more impact)
+  const weightTotal = totalMinutes || 1;
+  const aggregated = {};
+  for (const k of TRAIT_KEYS) aggregated[k] = 0;
+  for (const entry of Object.values(perSport)) {
+    const w = (entry.minutes || 1) / weightTotal;
+    for (const k of TRAIT_KEYS) {
+      aggregated[k] += (entry[k] || 0) * w;
+    }
+  }
+  for (const k of TRAIT_KEYS) {
+    aggregated[k] = Math.round(aggregated[k] * 100) / 100;
+  }
+
+  return { perSport, aggregated, totalSportMinutes: totalMinutes, totalSportSessions: totalSessions };
+}
+
+/**
  * Build a normalized analysis from workout definitions and logs.
  * @param {Array} workouts - state.program.workouts
  * @param {Object} logsByDate - state.logsByDate
@@ -359,8 +484,9 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
   }
 
   const coachSignals = buildCoachSignals(moodEntries, rpeEntries, intensityEntries, painMentions, fatigueMentions);
+  const sportTraits = buildSportTraits(sportFrequency, durationByActivity);
 
-  return { muscleGroupVolume, muscleGroupSets, muscleGroupSetsEffective, durationByActivity, sportFrequency, totalStrengthReps, totalStrengthSets, coachSignals };
+  return { muscleGroupVolume, muscleGroupSets, muscleGroupSetsEffective, durationByActivity, sportFrequency, totalStrengthReps, totalStrengthSets, coachSignals, sportTraits };
 }
 
 /**
@@ -394,7 +520,12 @@ export function detectImbalancesNormalized(analysis, opts) {
     (sets.POSTERIOR_DELT || 0) +
     (sets.BICEPS || 0);
 
-  if (pushSets > pullSets * 1.5 && pullSets > 0) {
+  // Relax threshold if sport already provides significant pulling/pushing demand
+  const sportPullCover = analysis?.sportTraits?.aggregated?.upperPull >= 0.5;
+  const sportPushCover = analysis?.sportTraits?.aggregated?.upperPush >= 0.5;
+  const pushPullThreshold = sportPullCover ? 2.0 : 1.5;
+
+  if (pushSets > pullSets * pushPullThreshold && pullSets > 0 && !sportPullCover) {
     const ratio = (pushSets / pullSets).toFixed(1);
     insights.push({
       type: 'IMBALANCE',
@@ -422,8 +553,16 @@ export function detectImbalancesNormalized(analysis, opts) {
     });
   }
 
-  // Check neglected groups (skip groups that match sport names)
-  const sportNamesLower = Object.keys(sportFrequency).map((n) => n.toLowerCase());
+  // Check neglected groups — skip groups already covered by sport demand traits
+  const st = analysis?.sportTraits?.aggregated;
+  // Map muscle groups to the sport trait that covers them
+  const MUSCLE_TO_TRAIT = {
+    BACK: "upperPull", POSTERIOR_DELT: "upperPull", BICEPS: "upperPull",
+    CHEST: "upperPush", ANTERIOR_DELT: "upperPush", TRICEPS: "upperPush",
+    HAMSTRINGS: "legLoad", QUADS: "legLoad", GLUTES: "legLoad", CALVES: "legLoad",
+    ABS: "coreRotation", OBLIQUES: "coreRotation",
+    FOREARMS: "gripLoad",
+  };
   const importantGroups = ['BACK', 'HAMSTRINGS', 'POSTERIOR_DELT'];
 
   for (const group of importantGroups) {
@@ -431,9 +570,11 @@ export function detectImbalancesNormalized(analysis, opts) {
     const percentage = totalSets > 0 ? (groupSets / totalSets) * 100 : 0;
 
     if (percentage < 5 && totalSets > 12 && insights.length < 2) {
+      // Skip if sport already provides significant load for this muscle group
+      const traitKey = MUSCLE_TO_TRAIT[group];
+      if (traitKey && st && (st[traitKey] || 0) >= 0.5) continue;
+
       const groupName = group.replace(/_/g, ' ').toLowerCase();
-      // Skip if this group name appears in a sport name
-      if (sportNamesLower.some((sn) => sn.includes(groupName))) continue;
       insights.push({
         type: 'NEGLECTED',
         severity: 'LOW',
@@ -448,13 +589,8 @@ export function detectImbalancesNormalized(analysis, opts) {
 
   // --- Sport/fatigue-aware insights ---
   const signals = analysis?.coachSignals;
+  const sportMinutes = analysis?.sportTraits?.totalSportMinutes || 0;
   if (signals) {
-    const durationByActivity = analysis?.durationByActivity ?? {};
-
-    // Sport load (total minutes for sport-classified activities)
-    const sportMinutes = Object.entries(sportFrequency).reduce(
-      (sum, [name]) => sum + (durationByActivity[name] || 0), 0
-    );
 
     // Pain mentions → recovery insight (only last 14 days — older pain notes are stale)
     const painCutoff = (() => {
@@ -476,18 +612,51 @@ export function detectImbalancesNormalized(analysis, opts) {
     }
 
     // Mood trending down + high load → recovery insight
+    const highImpact = st && (st.impactStress || 0) >= 0.6;
     if (
       signals.mood.trend === "down" &&
       signals.mood.count >= 4 &&
-      (sportMinutes > 180 || totalSets > 20 || (signals.effort.avgRpe && signals.effort.avgRpe >= 7.5)) &&
+      (sportMinutes > 180 || totalSets > 20 || (signals.effort.avgRpe && signals.effort.avgRpe >= 7.5) || highImpact) &&
       insights.length < 3
     ) {
+      const sportContext = sportMinutes > 180
+        ? ` (${Math.round(sportMinutes)} min of sport activity plus ${totalSets} gym sets)`
+        : "";
       insights.push({
         type: "RECOVERY",
         severity: "MEDIUM",
         title: "😴 Recovery may be needed",
-        message: "Your mood has been trending down while training load remains high. Consider a lighter week or extra rest day to recover.",
+        message: `Your mood has been trending down while training load remains high${sportContext}. Consider a lighter week or extra rest day to recover.`,
         suggestions: [],
+      });
+    }
+  }
+
+  // Sport trait-driven complementary work suggestion
+  if (st && insights.length < 3 && totalSets > 6) {
+    // High upper push from sport but low gym pull → suggest pulling work
+    if (st.upperPush >= 0.5 && pullSets < pushSets * 0.8 && pullSets < totalSets * 0.3) {
+      insights.push({
+        type: "TIP",
+        severity: "MEDIUM",
+        title: "💡 Complement your sport with pulling work",
+        message: "Your sport heavily taxes pushing muscles (shoulders, chest). Adding more pulling exercises helps balance load and prevent shoulder injuries.",
+        suggestions: [
+          ...getSuggestionsForMuscleGroup("BACK", catalog, userExerciseNames).slice(0, 2),
+          ...getSuggestionsForMuscleGroup("POSTERIOR_DELT", catalog, userExerciseNames).slice(0, 1),
+        ],
+      });
+    }
+    // High upper pull from sport but low gym push → suggest pressing
+    else if (st.upperPull >= 0.5 && pushSets < pullSets * 0.8 && pushSets < totalSets * 0.3) {
+      insights.push({
+        type: "TIP",
+        severity: "LOW",
+        title: "💡 Complement your sport with pressing work",
+        message: "Your sport provides significant pulling demand. Adding pressing exercises helps balance your upper body and reduce injury risk.",
+        suggestions: [
+          ...getSuggestionsForMuscleGroup("CHEST", catalog, userExerciseNames).slice(0, 2),
+        ],
       });
     }
   }

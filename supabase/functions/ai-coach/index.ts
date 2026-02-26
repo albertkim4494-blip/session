@@ -37,6 +37,7 @@ Deno.serve(async (req) => {
       fatigueTrend,
       adherence,
       coachingHistory,
+      sportTraits,      // aggregated sport demand traits { upperPush, upperPull, legLoad, ... }
       muscleSetsSummary,
       muscleVolumeSummary, // legacy, ignored if muscleSetsSummary present
       muscleVolumeDetail, // detailed breakdown: "chest: 7 sets — Bench Press ×4 (02-12), Cable Fly ×3 (02-14)"
@@ -232,17 +233,43 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Sport biomechanics section for system prompt
+    // Sport biomechanics section — built from inferred traits, not hardcoded mappings
     let sportBioSection = "";
-    if (profile?.sports) {
+    if (sportTraits && typeof sportTraits === "object") {
+      const traitLabels: Record<string, string> = {
+        upperPush: "Upper push — chest, front delts, triceps",
+        upperPull: "Upper pull — back, rear delts, biceps",
+        legLoad: "Leg load — quads, hamstrings, glutes",
+        coreRotation: "Core / rotation — abs, obliques",
+        gripLoad: "Grip / forearm",
+        impactStress: "Impact / joint stress",
+        explosiveness: "Explosiveness / fast-twitch",
+        cardioLoad: "Cardio / endurance",
+      };
+      const level = (v: number) => v >= 0.7 ? "HIGH" : v >= 0.4 ? "MOD" : "LOW";
+      const traitLines = Object.entries(sportTraits)
+        .filter(([, v]) => typeof v === "number" && (v as number) > 0.1)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .map(([k, v]) => `  ${traitLabels[k] || k}: ${level(v as number)} (${(v as number).toFixed(1)})`);
+      if (traitLines.length > 0) {
+        sportBioSection = `
+SPORT DEMAND PROFILE (inferred from logged activities${profile?.sports ? " + profile" : ""}):
+${profile?.sports ? `Declared sports: ${profile.sports}\n` : ""}Trait profile (0.0 = no demand, 1.0 = maximum):
+${traitLines.join("\n")}
+
+Use these traits to:
+- Prioritize COMPLEMENTARY muscle work — muscles NOT heavily used by their sport need gym attention.
+- Avoid overloading muscles already taxed at HIGH level — the sport provides stimulus.
+- Factor total training load (sport + gym) into recovery recommendations.
+- HIGH impactStress → prioritize joint-friendly exercises, mobility, and recovery.
+- HIGH cardioLoad from sport → reduce dedicated gym cardio, account for aerobic fatigue.
+- HIGH explosiveness → consider periodizing heavy lifting around competition/practice days.
+`;
+      }
+    } else if (profile?.sports) {
       sportBioSection = `
-SPORT BIOMECHANICS AWARENESS:
-The user participates in: ${profile.sports}. Analyze the muscular and cardiovascular demands of their sport(s).
-Parse any frequency from the text (e.g. "3x/week", "daily").
-Calculate TOTAL load over the date range: sport sessions + gym sessions.
-If user trains sport 3x/week AND lifts 3x/week = 6 total sessions — factor total load into recovery.
-Common sport demands — Water polo: heavy shoulders, chest, legs, cardio. Basketball: legs, shoulders, cardio. Soccer: legs, cardio, core. Swimming: shoulders, back, chest, cardio. Tennis: shoulders, forearm, core, legs. Running: legs, cardio. Cycling: quads, hamstrings, cardio. Rowing: back, legs, shoulders, cardio.
-Factor sport demands into ALL recommendations. Prioritize complementary work, antagonist muscles, and injury prevention. Avoid overloading muscles already heavily taxed by the sport.
+SPORT CONTEXT:
+The user's profile mentions: ${profile.sports}. Factor sport demands into recommendations. Prioritize complementary work and injury prevention.
 `;
     }
 

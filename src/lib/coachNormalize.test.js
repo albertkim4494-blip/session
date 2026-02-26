@@ -9,6 +9,7 @@ import {
   getUnitAbbr,
   buildNormalizedAnalysis,
   detectImbalancesNormalized,
+  inferSportTraits,
 } from "./coachNormalize.js";
 
 let passed = 0;
@@ -64,6 +65,45 @@ assertEqual(getUnitAbbr("hrs"), "hrs", "hrs → hrs");
 assertEqual(getUnitAbbr("reps", "ea"), "ea", "custom abbr overrides");
 assertEqual(getUnitAbbr(undefined), "reps", "undefined → reps (default)");
 
+// --- inferSportTraits ---
+console.log("\ninferSportTraits:");
+const wpTraits = inferSportTraits("Water Polo");
+assert(wpTraits !== null, "water polo returns traits");
+assert(wpTraits.upperPush >= 0.5, "water polo has high upperPush");
+assert(wpTraits.cardioLoad >= 0.7, "water polo has high cardioLoad");
+assert(wpTraits.legLoad >= 0.5, "water polo has legLoad from locomotion");
+
+const runTraits = inferSportTraits("Running");
+assert(runTraits !== null, "running returns traits");
+assert(runTraits.legLoad >= 0.7, "running has high legLoad");
+assert(runTraits.cardioLoad >= 0.7, "running has high cardioLoad");
+assert(runTraits.upperPush <= 0.1, "running has no upperPush");
+
+const swimTraits = inferSportTraits("Swimming");
+assert(swimTraits !== null, "swimming returns traits");
+assert(swimTraits.upperPull >= 0.7, "swimming has high upperPull");
+assert(swimTraits.upperPush >= 0.5, "swimming has upperPush");
+
+const bbTraits = inferSportTraits("Basketball");
+assert(bbTraits !== null, "basketball returns traits");
+assert(bbTraits.explosiveness >= 0.7, "basketball has high explosiveness");
+assert(bbTraits.legLoad >= 0.7, "basketball has high legLoad");
+
+const climbTraits = inferSportTraits("Rock Climbing");
+assert(climbTraits !== null, "climbing returns traits");
+assert(climbTraits.gripLoad >= 0.8, "climbing has high gripLoad");
+assert(climbTraits.upperPull >= 0.8, "climbing has high upperPull");
+
+assert(inferSportTraits("Bench Press") === null, "non-sport returns null");
+assert(inferSportTraits("") === null, "empty string returns null");
+assert(inferSportTraits(null) === null, "null returns null");
+
+// Multiple pattern matching — "sprint" matches both run and sprint rules
+const sprintTraits = inferSportTraits("Sprint Training");
+assert(sprintTraits !== null, "sprint returns traits");
+assert(sprintTraits.explosiveness >= 0.7, "sprint has high explosiveness");
+assert(sprintTraits.legLoad >= 0.7, "sprint has high legLoad");
+
 // --- buildNormalizedAnalysis ---
 console.log("\nbuildNormalizedAnalysis:");
 
@@ -117,6 +157,15 @@ assert(analysis.muscleGroupSets.CHEST === 2, "bench press → 2 sets for CHEST (
 assert(analysis.muscleGroupSets.BACK === 2, "pull ups → 2 sets for BACK (primary)");
 assertEqual(analysis.totalStrengthSets, 4, "totalStrengthSets = 2 (bench) + 2 (pull ups) = 4");
 
+// sportTraits from logged sport activities
+assert(analysis.sportTraits !== null, "sport logs produce sportTraits");
+assert(analysis.sportTraits.aggregated.cardioLoad >= 0.5, "sport traits include cardioLoad from water polo");
+assert(analysis.sportTraits.aggregated.upperPush >= 0.5, "sport traits include upperPush from water polo");
+assert(analysis.sportTraits.perSport["Water Polo"] != null, "perSport has Water Polo entry");
+// Running (classified as cardio, not sport) should also get traits via durationByActivity
+assert(analysis.sportTraits.perSport["Running"] != null, "perSport includes Running from cardio activities");
+assert(analysis.sportTraits.perSport["Running"].legLoad >= 0.7, "Running trait has high legLoad");
+
 // --- detectImbalancesNormalized ---
 console.log("\ndetectImbalancesNormalized:");
 
@@ -132,11 +181,26 @@ const sportHeavy = {
   muscleGroupSets: { CHEST: 12, BACK: 12, QUADS: 8, HAMSTRINGS: 8 },
   durationByActivity: { "Water Polo": 500 },
   sportFrequency: { "Water Polo": 5 },
+  sportTraits: { perSport: { "Water Polo": { upperPush: 0.8, legLoad: 0.7, cardioLoad: 0.9 } }, aggregated: { upperPush: 0.8, upperPull: 0.5, legLoad: 0.7, cardioLoad: 0.9, coreRotation: 0.6, gripLoad: 0, impactStress: 0.5, explosiveness: 0.7 }, totalSportMinutes: 500, totalSportSessions: 5 },
   totalStrengthSets: 40,
 };
 const sportInsights = detectImbalancesNormalized(sportHeavy);
 assert(!sportInsights.some((i) => i.type === "NEGLECTED" && i.message.includes("water polo")),
   "sport frequency doesn't trigger neglect warning");
+
+// Sport trait-aware skip: swimming (high upperPull) should skip back neglect
+const swimHeavy = {
+  muscleGroupSets: { CHEST: 12, BACK: 0, QUADS: 8, HAMSTRINGS: 8, ANTERIOR_DELT: 4, POSTERIOR_DELT: 0 },
+  durationByActivity: { "Swimming": 300 },
+  sportFrequency: { "Swimming": 4 },
+  sportTraits: { perSport: { "Swimming": { upperPull: 0.8 } }, aggregated: { upperPush: 0.6, upperPull: 0.8, legLoad: 0.5, coreRotation: 0.4, gripLoad: 0.2, impactStress: 0.1, explosiveness: 0.3, cardioLoad: 0.9 }, totalSportMinutes: 300, totalSportSessions: 4 },
+  totalStrengthSets: 32,
+};
+const swimInsights = detectImbalancesNormalized(swimHeavy);
+assert(!swimInsights.some((i) => i.type === "NEGLECTED" && i.title.toLowerCase().includes("back")),
+  "sport with high upperPull trait skips back neglect warning");
+assert(!swimInsights.some((i) => i.type === "NEGLECTED" && i.title.toLowerCase().includes("posterior delt")),
+  "sport with high upperPull trait skips posterior delt neglect warning");
 
 // Balanced strength → positive
 const balanced = {
