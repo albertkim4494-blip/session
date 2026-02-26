@@ -166,6 +166,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [trainSearch, setTrainSearch] = useState("");
   const [trainSearchOpen, setTrainSearchOpen] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
+  const fabOpenRef = useRef(false);
+  fabOpenRef.current = fabOpen;
   const [highlightCardId, setHighlightCardId] = useState(null);
   const [fabVisible, setFabVisible] = useState(true);
 
@@ -1159,6 +1161,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const handleBackRef = useRef(null);
 
   handleBackRef.current = () => {
+    // Close FAB panel if open (before modal/exit checks)
+    if (fabOpenRef.current) {
+      setFabOpen(false);
+      return;
+    }
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
@@ -1188,9 +1195,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let cwWorking = false;
     let exiting = false;
     let exitTimer = null;
+    let exitAt = 0;
 
     const prepareExit = () => {
       exiting = true;
+      exitAt = Date.now();
       cwWorking = false;
       if (watcher) { try { watcher.destroy(); } catch (_) {} watcher = null; }
       // Drain history buffer so next back goes straight to OS
@@ -1241,11 +1250,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     const ensureEntries = (e) => {
       if (exiting) {
-        // Only cancel exit on deliberate taps (click), not pointerdown.
-        // Back gestures fire pointerdown on the screen edge before the back
-        // action is processed — cancelling exit there would swallow the press.
-        if (e.type !== "click") return;
-        cancelExit();
+        // Cancel exit on deliberate app taps (click), not pointerdown.
+        // Grace period: back button taps also fire click events (~50ms after
+        // prepareExit), so ignore clicks within 600ms to avoid immediately
+        // cancelling the exit the user just triggered.
+        if (e.type === "click" && Date.now() - exitAt > 600) {
+          cancelExit();
+        }
         return;
       }
       if (!initialized) {
