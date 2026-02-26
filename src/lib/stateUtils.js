@@ -181,6 +181,8 @@ export function normalizeState(st) {
   if (!next.preferences.exerciseRestTimes || typeof next.preferences.exerciseRestTimes !== "object") {
     next.preferences.exerciseRestTimes = {};
   }
+  // Strip legacy exerciseCategories if present (overrides/customGroups/categoryOrder removed)
+  delete next.preferences.exerciseCategories;
 
   // Clean up legacy standalone localStorage keys (migration complete)
   try {

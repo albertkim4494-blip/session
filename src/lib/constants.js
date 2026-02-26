@@ -33,3 +33,12 @@ export function getUnit(key, exercise) {
 export function getWeightLabel(ms) {
   return ms === "metric" ? "kg" : "lb";
 }
+
+export const TIME_UNITS = new Set(["sec", "min", "hrs"]);
+export const DISTANCE_UNITS = new Set(["miles", "yards", "laps", "steps", "km", "meters"]);
+
+export function classifyUnit(unitKey) {
+  if (TIME_UNITS.has(unitKey)) return "time";
+  if (DISTANCE_UNITS.has(unitKey)) return "distance";
+  return "reps";
+}

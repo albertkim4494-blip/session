@@ -903,6 +903,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             sessions: s.sessions,
             totalSets: s.totalSets,
             totalReps: s.totalReps,
+            totalVolume: s.totalVolume,
+            maxReps: s.maxReps,
             maxWeight: s.maxWeight,
             unitAbbr: exUnit.abbr,
             unitKey: exUnit.key,
@@ -1368,6 +1370,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   function computeExerciseSummary(exerciseId, startKey, endKey, unit) {
     let totalReps = 0;
+    let totalVolume = 0;
+    let maxReps = 0;
     let maxNum = null;
     let hasBW = false;
     let sessions = 0;
@@ -1388,14 +1392,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
       for (const set of completedInDay) {
         const reps = Number(set.reps ?? 0);
-        if (Number.isFinite(reps)) totalReps += reps;
+        if (Number.isFinite(reps)) {
+          totalReps += reps;
+          if (reps > maxReps) maxReps = reps;
+        }
 
         const w = String(set.weight ?? "").trim();
         if (w.toUpperCase() === "BW") {
           hasBW = true;
         } else {
           const n = toNumberOrNull(w);
-          if (n != null) maxNum = maxNum == null ? n : Math.max(maxNum, n);
+          if (n != null) {
+            maxNum = maxNum == null ? n : Math.max(maxNum, n);
+            if (Number.isFinite(reps)) totalVolume += reps * n;
+          }
         }
       }
     }
@@ -1403,8 +1413,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const displayTotal = unit?.allowDecimal
       ? parseFloat(totalReps.toFixed(2))
       : Math.floor(totalReps);
+    const displayMaxReps = unit?.allowDecimal
+      ? parseFloat(maxReps.toFixed(2))
+      : Math.floor(maxReps);
 
-    return { totalReps: displayTotal, maxWeight: formatMaxWeight(maxNum, hasBW), sessions, totalSets };
+    return { totalReps: displayTotal, totalVolume: Math.round(totalVolume), maxReps: displayMaxReps, maxWeight: formatMaxWeight(maxNum, hasBW), sessions, totalSets };
   }
 
   // ---------------------------------------------------------------------------
@@ -3259,48 +3272,53 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
                 const topRowCols = statBadges.length === 1 ? "1fr 1fr 1fr" : "1fr 1fr";
                 return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, position: "relative" }}>
-                    {/* Gear icon — absolutely positioned */}
-                    <div ref={statsConfigRef} style={{ position: "absolute", right: 0, top: 0, zIndex: 5 }}>
-                      <button
-                        onClick={() => setShowStatsConfig((v) => !v)}
-                        style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: colors.text, opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
-                        aria-label="Configure stats"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001.08 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z" />
-                        </svg>
-                      </button>
-                      {showStatsConfig && (
-                        <div style={{
-                          position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 50,
-                          background: colors.appBg, border: `1px solid ${colors.border}`,
-                          borderRadius: 10, padding: "10px 14px", minWidth: 160,
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                          display: "flex", flexDirection: "column", gap: 6,
-                        }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 2 }}>Show Highlights</div>
-                          {[
-                            { key: "totalReps", label: "Top Exercise" },
-                            { key: "volume", label: `Volume (${weightUnit})` },
-                            { key: "topLift", label: `Top Lift (${weightUnit})` },
-                          ].map((opt) => (
-                            <label key={opt.key} style={{
-                              display: "flex", alignItems: "center", gap: 8,
-                              fontSize: 13, color: colors.text, cursor: "pointer",
-                              whiteSpace: "nowrap",
-                            }}>
-                              <input
-                                type="checkbox"
-                                checked={selectedStats.includes(opt.key)}
-                                onChange={() => toggleStat(opt.key)}
-                                style={{ accentColor: colors.primaryBg }}
-                              />
-                              {opt.label}
-                            </label>
-                          ))}
-                        </div>
-                      )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {/* Highlights header — label + gear icon */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.4 }}>
+                        Highlights
+                      </span>
+                      <div ref={statsConfigRef} style={{ position: "relative" }}>
+                        <button
+                          onClick={() => setShowStatsConfig((v) => !v)}
+                          style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4, color: colors.text, opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
+                          aria-label="Configure stats"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001.08 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1.08z" />
+                          </svg>
+                        </button>
+                        {showStatsConfig && (
+                          <div style={{
+                            position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 50,
+                            background: colors.appBg, border: `1px solid ${colors.border}`,
+                            borderRadius: 10, padding: "10px 14px", minWidth: 160,
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                            display: "flex", flexDirection: "column", gap: 6,
+                          }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, marginBottom: 2 }}>Show Highlights</div>
+                            {[
+                              { key: "totalReps", label: "Top Exercise" },
+                              { key: "volume", label: `Volume (${weightUnit})` },
+                              { key: "topLift", label: `Top Lift (${weightUnit})` },
+                            ].map((opt) => (
+                              <label key={opt.key} style={{
+                                display: "flex", alignItems: "center", gap: 8,
+                                fontSize: 13, color: colors.text, cursor: "pointer",
+                                whiteSpace: "nowrap",
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedStats.includes(opt.key)}
+                                  onChange={() => toggleStat(opt.key)}
+                                  style={{ accentColor: colors.primaryBg }}
+                                />
+                                {opt.label}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {/* Stats grid — row 1: Sessions + Days Active (+ 1 stat if only 1 selected) */}
                     <div>
@@ -3356,7 +3374,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   exercises={flatExerciseList}
                   colors={colors}
                   styles={styles}
-                  weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
                 />
               )}
             </div>
