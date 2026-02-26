@@ -3214,7 +3214,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* SUMMARY TAB */}
           {tab === "progress" ? (
             <div key="progress" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
-              <div style={{ position: "sticky", top: -14, zIndex: 10, background: colors.appBg, marginTop: -14, paddingTop: 14, paddingBottom: 6, marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16 }}>
+              <div style={{ position: "sticky", top: -14, zIndex: 10, background: colors.appBg, marginTop: -14, paddingTop: 14, paddingBottom: 10, marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16 }}>
                 <TimeRangeControl
                   value={summaryMode}
                   onChange={setSummaryMode}
@@ -3223,7 +3223,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   dateLabel={`${formatDateLabel(summaryRange.start)} \u2013 ${formatDateLabel(summaryRange.end)}`}
                   colors={colors}
                 />
-              </div>
               {(() => {
                 const formatNum = (n) => n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : n.toLocaleString();
                 const weightUnit = getWeightLabel(state.preferences?.measurementSystem);
@@ -3350,6 +3349,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </div>
                 );
               })()}
+              </div>
 
               {summaryStats.logged === 0 ? (
                 <div style={{
