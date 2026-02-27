@@ -199,8 +199,11 @@ function PainAreaPills({ painMap, onChange, colors }) {
 // CheckinSummary — compact post-submission summary
 // ---------------------------------------------------------------------------
 export function CheckinSummary({ checkin, onEdit, onClear, colors }) {
-  const moodFace = MOOD_FACES.find((f) => f.value === checkin.mood);
-  const painItems = (checkin.pain || []).filter((p) => p.severity);
+  const c = checkin || {};
+  const moodFace = MOOD_FACES.find((f) => f.value === c.mood);
+  const hasMood = c.mood !== null && c.mood !== undefined;
+  const hasSleep = !!c.sleep;
+  const painItems = (c.pain || []).filter((p) => p.severity);
 
   const tagStyle = {
     display: "inline-flex", alignItems: "center", gap: 4,
@@ -210,25 +213,44 @@ export function CheckinSummary({ checkin, onEdit, onClear, colors }) {
     cursor: "pointer",
   };
 
+  const placeholderStyle = { ...tagStyle, opacity: 0.35 };
+
   return (
     <div style={{
       display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", alignItems: "center",
     }}>
-      {moodFace && (
+      {hasMood ? (
         <span style={tagStyle} onClick={() => onEdit("mood")}>
           <svg viewBox="0 0 32 32" width="14" height="14">
             <circle cx="16" cy="16" r="14" fill="#FFD93D" stroke="#E6B800" strokeWidth="1.5" />
             <path d={moodFace.mouth} fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          {MOOD_LABELS[String(checkin.mood)]}
+          {MOOD_LABELS[String(c.mood)]}
+        </span>
+      ) : (
+        <span style={placeholderStyle} onClick={() => onEdit("mood")}>
+          +
+          <svg viewBox="0 0 32 32" width="14" height="14">
+            <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <circle cx="11" cy="12.5" r="1.5" fill="currentColor" />
+            <circle cx="21" cy="12.5" r="1.5" fill="currentColor" />
+            <path d="M13,19 L19,19" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
         </span>
       )}
-      {checkin.sleep && (
+      {hasSleep ? (
         <span style={tagStyle} onClick={() => onEdit("sleep")}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" opacity="0.5">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
-          {SLEEP_LABELS[checkin.sleep]}
+          {SLEEP_LABELS[c.sleep]}
+        </span>
+      ) : (
+        <span style={placeholderStyle} onClick={() => onEdit("sleep")}>
+          +
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.7">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
         </span>
       )}
       {painItems.length > 0 ? painItems.map((p) => (
@@ -239,7 +261,7 @@ export function CheckinSummary({ checkin, onEdit, onClear, colors }) {
           {p.area}
         </span>
       )) : (
-        <span style={{ ...tagStyle, opacity: 0.4 }} onClick={() => onEdit("pain")}>+ Pain</span>
+        <span style={placeholderStyle} onClick={() => onEdit("pain")}>+ Pain</span>
       )}
       {onClear && (
         <button
