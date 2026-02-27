@@ -3169,15 +3169,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
                     {getTimeGreeting()}
                   </div>
-                  <CoachHeroInsight
-                    insights={coachInsights}
-                    onAddExercise={handleAddSuggestion}
+                  <CoachCheckin
                     colors={colors}
-                    loading={coachLoading}
-                    error={coachError}
-                    userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                    onRefresh={handleCoachRefresh}
+                    todayCheckin={checkinEditMode ? null : todayCheckin}
+                    onSubmit={handleCheckinSubmit}
+                    onEdit={() => setCheckinEditMode(true)}
                   />
+                  {todayCheckin && !checkinEditMode && (
+                    <CoachHeroInsight
+                      insights={coachInsights}
+                      onAddExercise={handleAddSuggestion}
+                      colors={colors}
+                      loading={coachLoading}
+                      error={coachError}
+                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                      onRefresh={handleCoachRefresh}
+                    />
+                  )}
                   <div style={{ fontSize: 14, opacity: 0.35 }}>
                     Tap + to start a session
                   </div>
