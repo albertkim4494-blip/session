@@ -64,6 +64,8 @@ import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
+import { CoachCheckin } from "./components/CoachCheckin";
+import { getTodayCheckin, saveCheckin, buildCheckinContext, loadCheckins, loadCoachNotes, mergeCoachNotes, saveCoachNotes } from "./lib/coachCheckin";
 
 // Extracted components (timer)
 import { ExerciseTimer } from "./components/ExerciseTimer";
@@ -236,6 +238,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const coachLastSignatureRef = useRef(null);
   const coachLastFetchRef = useRef(0);
   const MAX_DAILY_REFRESHES = 10;
+  const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(dateKey));
+  const [checkinEditMode, setCheckinEditMode] = useState(false);
 
   // Swipe navigation between tabs
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
@@ -982,8 +986,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const filteredCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
     const coachOpts = { catalog: filteredCatalog };
 
-    fetchCoachInsights({ profile, state, dateRange: coachDateRange, catalog: filteredCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
-      .then(({ insights, fromCache }) => {
+    // Include check-in context if available
+    const autoCheckin = getTodayCheckin(dateKey);
+    let autoCheckinCtx = null;
+    let autoCoachNotes = null;
+    if (autoCheckin) {
+      autoCheckinCtx = buildCheckinContext(autoCheckin, loadCheckins(), state.logsByDate);
+      autoCoachNotes = loadCoachNotes();
+    }
+
+    fetchCoachInsights({ profile, state, dateRange: coachDateRange, catalog: filteredCatalog, equipment, measurementSystem: state.preferences?.measurementSystem, checkinContext: autoCheckinCtx, coachNotesFromStorage: autoCoachNotes })
+      .then(({ insights, fromCache, coachNotes: returnedNotes }) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
         setCoachError(null);
@@ -997,6 +1010,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         } catch {}
         // Mark today as auto-fetched (even if coachApi returned from its own cache)
         try { sessionStorage.setItem(autoDateKey, today); } catch {}
+        // Persist AI coach notes
+        if (returnedNotes?.length > 0) {
+          const existing = loadCoachNotes();
+          const merged = mergeCoachNotes(existing, returnedNotes);
+          saveCoachNotes(merged);
+        }
       })
       .catch((err) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
@@ -2368,8 +2387,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
     const coachEnd = dateKey;
     const coachStart = addDays(coachEnd, -90);
-    fetchCoachInsights({ profile, state, dateRange: { start: coachStart, end: coachEnd }, options: { forceRefresh: true }, catalog: refreshCatalog, equipment, measurementSystem: state.preferences?.measurementSystem })
-      .then(({ insights }) => {
+    const checkinForRefresh = getTodayCheckin(dateKey);
+    let checkinCtx = null;
+    let coachNotesData = null;
+    if (checkinForRefresh) {
+      checkinCtx = buildCheckinContext(checkinForRefresh, loadCheckins(), state.logsByDate);
+      coachNotesData = loadCoachNotes();
+    }
+    fetchCoachInsights({ profile, state, dateRange: { start: coachStart, end: coachEnd }, options: { forceRefresh: true }, catalog: refreshCatalog, equipment, measurementSystem: state.preferences?.measurementSystem, checkinContext: checkinCtx, coachNotesFromStorage: coachNotesData })
+      .then(({ insights, coachNotes: returnedNotes }) => {
         if (coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
         coachLastSignatureRef.current = coachSignature;
@@ -2377,6 +2403,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
         const cacheKey = `wt_coach_v2:${session.user.id}:${dateKey}`;
         try { localStorage.setItem(cacheKey, JSON.stringify({ insights, signature: coachSignature, createdAt: Date.now() })); } catch {}
+        if (returnedNotes?.length > 0) {
+          const existing = loadCoachNotes();
+          const merged = mergeCoachNotes(existing, returnedNotes);
+          saveCoachNotes(merged);
+        }
       })
       .catch((err) => {
         if (coachReqIdRef.current !== reqId) return;
@@ -2393,6 +2424,65 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (coachReqIdRef.current === reqId) setCoachLoading(false);
       });
   }, [progressWorkouts, fullCatalog, equipment, dateKey, profile, state, coachSignature, coachInsights, session?.user?.id, catalogMap]);
+
+  const handleCheckinSubmit = useCallback((checkinData) => {
+    saveCheckin(dateKey, checkinData);
+    setTodayCheckin(checkinData);
+    setCheckinEditMode(false);
+
+    // Trigger coach fetch with check-in context
+    if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) return;
+    incrementDailyRefresh();
+    const reqId = ++coachReqIdRef.current;
+    setCoachLoading(true);
+    setCoachError(null);
+
+    const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
+    const coachEnd = dateKey;
+    const coachStart = addDays(coachEnd, -90);
+
+    const allCheckins = loadCheckins();
+    const checkinCtx = buildCheckinContext(checkinData, allCheckins, state.logsByDate);
+    const coachNotesData = loadCoachNotes();
+
+    fetchCoachInsights({
+      profile, state,
+      dateRange: { start: coachStart, end: coachEnd },
+      options: { forceRefresh: true },
+      catalog: refreshCatalog, equipment,
+      measurementSystem: state.preferences?.measurementSystem,
+      checkinContext: checkinCtx,
+      coachNotesFromStorage: coachNotesData,
+    })
+      .then(({ insights, coachNotes: returnedNotes }) => {
+        if (coachReqIdRef.current !== reqId) return;
+        setCoachInsights(insights);
+        coachLastSignatureRef.current = coachSignature;
+        coachLastFetchRef.current = Date.now();
+        coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
+        const cacheKey = `wt_coach_v2:${session.user.id}:${dateKey}`;
+        try { localStorage.setItem(cacheKey, JSON.stringify({ insights, signature: coachSignature, createdAt: Date.now() })); } catch {}
+        // Persist AI coach notes
+        if (returnedNotes?.length > 0) {
+          const existing = loadCoachNotes();
+          const merged = mergeCoachNotes(existing, returnedNotes);
+          saveCoachNotes(merged);
+        }
+      })
+      .catch((err) => {
+        if (coachReqIdRef.current !== reqId) return;
+        console.error("AI Coach check-in error:", err);
+        if (coachInsights.length === 0) {
+          const coachDR = { start: addDays(dateKey, -90), end: dateKey };
+          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDR, catalogMap);
+          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog }));
+        }
+        setCoachError(`AI coach unavailable \u2014 showing basic analysis`);
+      })
+      .finally(() => {
+        if (coachReqIdRef.current === reqId) setCoachLoading(false);
+      });
+  }, [dateKey, fullCatalog, equipment, profile, state, coachSignature, session?.user?.id, catalogMap, coachInsights]);
 
   const confirmAddSuggestion = useCallback((workoutIdOrIds, exerciseName) => {
     // Look up catalogId by name
@@ -3084,15 +3174,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       Tap + to start a session
                     </div>
                   </div>
-                  <CoachHeroInsight
-                    insights={coachInsights}
-                    onAddExercise={handleAddSuggestion}
+                  <CoachCheckin
                     colors={colors}
-                    loading={coachLoading}
-                    error={coachError}
-                    userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                    onRefresh={handleCoachRefresh}
+                    todayCheckin={checkinEditMode ? null : todayCheckin}
+                    onSubmit={handleCheckinSubmit}
+                    onEdit={() => setCheckinEditMode(true)}
                   />
+                  {todayCheckin && !checkinEditMode && (
+                    <CoachHeroInsight
+                      insights={coachInsights}
+                      onAddExercise={handleAddSuggestion}
+                      colors={colors}
+                      loading={coachLoading}
+                      error={coachError}
+                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                      onRefresh={handleCoachRefresh}
+                    />
+                  )}
                 </div>
               ) : !isToday && !hasSessions ? (
                 /* NON-TODAY EMPTY: no logs or sessions */
@@ -3111,16 +3209,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     {isToday ? "Today\u2019s sessions" : "Sessions logged"}
                   </div>
                   {isToday && (
-                    <CoachInsightsCard
-                      insights={coachInsights}
-                      onAddExercise={handleAddSuggestion}
-                      styles={styles}
-                      colors={colors}
-                      loading={coachLoading}
-                      error={coachError}
-                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                      onRefresh={handleCoachRefresh}
-                    />
+                    <>
+                      <CoachCheckin
+                        colors={colors}
+                        todayCheckin={checkinEditMode ? null : todayCheckin}
+                        onSubmit={handleCheckinSubmit}
+                        onEdit={() => setCheckinEditMode(true)}
+                      />
+                      {todayCheckin && !checkinEditMode && (
+                        <CoachInsightsCard
+                          insights={coachInsights}
+                          onAddExercise={handleAddSuggestion}
+                          styles={styles}
+                          colors={colors}
+                          loading={coachLoading}
+                          error={coachError}
+                          userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                          onRefresh={handleCoachRefresh}
+                        />
+                      )}
+                    </>
                   )}
                   {/* Explicitly added sessions (with remove button) — newest first */}
                   {[...todayProgramWorkouts].reverse().map((w) => (

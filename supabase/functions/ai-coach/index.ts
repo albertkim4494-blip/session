@@ -44,6 +44,10 @@ Deno.serve(async (req) => {
       recentHistory, // tier 1: summarized 4-week history before current range
       olderHistory,  // tier 2: high-level all-time history before recent
       modelHint,     // client-computed model routing: "gpt-4o" or "gpt-4o-mini"
+      checkin,           // today's check-in: { mood, moodLabel, sleep, pain }
+      checkinHistory,    // last 14 days of check-ins
+      moodPattern,       // pre vs post workout mood pattern string
+      coachNotes,        // AI's persisted notes about this user
     } = await req.json();
 
     // Validate and resolve model + max_tokens
@@ -480,12 +484,28 @@ RESPONSE FORMAT:
 - evidence: string — which specific data points triggered this insight (cite dates, numbers, exercise names)
 - expected_outcome: string — what should improve and in what timeframe if user follows advice
 
+PRE-WORKOUT CHECK-IN:
+- The user may have told you how they feel right now, their sleep quality, and any pain. This data appears in TODAY'S CHECK-IN above.
+- Use this to adjust your recommendations: rough mood + poor sleep → suggest lighter session or modified exercises.
+- Pain areas should influence exercise suggestions: shoulder pain → avoid overhead pressing, suggest alternatives. Lower back pain → avoid heavy deadlifts, suggest hip hinge alternatives.
+- Compare their pre-workout mood to their post-workout mood patterns (PRE VS POST WORKOUT MOOD PATTERN above). If they typically feel better after training, acknowledge that: "You've felt rough before but great after 5 of your last 7 sessions — you'll probably feel better once you get moving."
+- If they report severe pain anywhere, flag it seriously and suggest modifications or rest for that area.
+- If no check-in data is present, proceed with training data analysis as normal.
+
+COACH NOTES:
+- You can remember things about this person across sessions.
+- If the user's check-in reveals a pattern (recurring pain, consistent sleep issues, mood trends), add it to your notes.
+- Return a "coachNotes" array in your response with any new observations worth remembering.
+- Each note: { "topic": "short_key", "detail": "what you observed", "date": "YYYY-MM-DD" }
+- Only add notes for genuine insights, not every check-in. Empty array if nothing new.
+
 OUTPUT FORMAT:
 {
   "trend_status": "improving | plateauing | regressing | mixed",
   "primary_focus": "Single highest leverage focus for today",
   "today_action": "Specific, implementable instruction for the next session",
-  "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...], "confidence": 0.8, "evidence": "...", "expected_outcome": "..." } ]
+  "insights": [ { "type": "...", "severity": "...", "title": "...", "message": "...", "suggestions": [...], "confidence": 0.8, "evidence": "...", "expected_outcome": "..." } ],
+  "coachNotes": [ { "topic": "short_key", "detail": "what you observed", "date": "YYYY-MM-DD" } ]
 }`;
 
     // Build volume-load trends section
@@ -516,8 +536,39 @@ OUTPUT FORMAT:
       olderHistorySection = `\nOLDER HISTORY (all-time before recent — LOW weight, use for long-term progression and chronic patterns only):\n${olderHistory.split("\n").map((l: string) => `  ${l}`).join("\n")}\n`;
     }
 
+    // Build check-in sections for user message
+    let checkinSection = "";
+    if (checkin && typeof checkin === "object") {
+      const painStr = Array.isArray(checkin.pain) && checkin.pain.length > 0
+        ? checkin.pain.map((p: { area: string; severity: string }) => `${p.area} (${p.severity})`).join(", ")
+        : "None";
+      checkinSection = `\nTODAY'S CHECK-IN:\n- Feeling: ${checkin.moodLabel || "unknown"} (${checkin.mood}/2)\n- Sleep: ${checkin.sleep || "unknown"}\n- Pain: ${painStr}\n`;
+    }
+
+    let checkinHistorySection = "";
+    if (Array.isArray(checkinHistory) && checkinHistory.length > 0) {
+      const histLines = checkinHistory.map((c: { date: string; moodLabel: string; sleep: string; pain: Array<{ area: string; severity: string }> }) => {
+        const painStr = Array.isArray(c.pain) && c.pain.length > 0
+          ? c.pain.map((p: { area: string; severity: string }) => `${p.area} (${p.severity})`).join(", ")
+          : "No pain";
+        return `  ${c.date}: Feeling ${c.moodLabel || "?"}, Slept ${c.sleep || "?"}, Pain: ${painStr}`;
+      });
+      checkinHistorySection = `\nCHECK-IN HISTORY (last 14 days):\n${histLines.join("\n")}\n`;
+    }
+
+    let moodPatternSection = "";
+    if (moodPattern && typeof moodPattern === "string") {
+      moodPatternSection = `\nPRE VS POST WORKOUT MOOD PATTERN:\n${moodPattern}\n`;
+    }
+
+    let coachNotesSection = "";
+    if (coachNotes && Array.isArray(coachNotes.notes) && coachNotes.notes.length > 0) {
+      const noteLines = coachNotes.notes.map((n: { topic: string; detail: string }) => `- ${n.topic}: ${n.detail}`);
+      coachNotesSection = `\nYOUR NOTES ABOUT THIS PERSON (things you've learned):\n${noteLines.join("\n")}\n`;
+    }
+
     const userMessage = `Date range: ${dateRange?.label || "unknown"} (${dateRange?.start || "?"} to ${dateRange?.end || "?"})
-${muscleVolumeSection}${progressionSection}${volumeLoadSection}${e1rmSection}
+${checkinSection}${checkinHistorySection}${moodPatternSection}${coachNotesSection}${muscleVolumeSection}${progressionSection}${volumeLoadSection}${e1rmSection}
 WORKOUT PROGRAM:
 ${programSummary}
 
@@ -580,6 +631,7 @@ Analyze this data and return JSON insights.`;
 
     // Validate structure
     const insights = Array.isArray(parsed.insights) ? parsed.insights.slice(0, 3) : [];
+    const returnedCoachNotes = Array.isArray(parsed.coachNotes) ? parsed.coachNotes : [];
 
     console.log(JSON.stringify({
       event: "ai_success",
@@ -587,13 +639,14 @@ Analyze this data and return JSON insights.`;
       model,
       maxTokens,
       insightCount: insights.length,
+      coachNotesCount: returnedCoachNotes.length,
       promptTokens: usage?.prompt_tokens,
       completionTokens: usage?.completion_tokens,
       totalTokens: usage?.total_tokens,
     }));
 
     return new Response(
-      JSON.stringify({ insights }),
+      JSON.stringify({ insights, coachNotes: returnedCoachNotes }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

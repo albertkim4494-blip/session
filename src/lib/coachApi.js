@@ -1122,7 +1122,7 @@ export function computeComplexityScore({
  * @param {Object} [params.options] - { forceRefresh: boolean }
  * @returns {Promise<{ insights: Array, fromCache: boolean }>}
  */
-export async function fetchCoachInsights({ profile, state, dateRange, options, catalog, equipment, measurementSystem }) {
+export async function fetchCoachInsights({ profile, state, dateRange, options, catalog, equipment, measurementSystem, checkinContext, coachNotesFromStorage }) {
   const workouts = state?.program?.workouts || [];
   const recentLogs = filterLogsToRange(state?.logsByDate, dateRange.start, dateRange.end);
   const exerciseCount = workouts.reduce((sum, w) => sum + (w.exercises?.length || 0), 0);
@@ -1327,6 +1327,10 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       recentHistory: tieredHistory.recentHistory,
       olderHistory: tieredHistory.olderHistory,
       modelHint,
+      checkin: checkinContext?.today || null,
+      checkinHistory: checkinContext?.history || null,
+      moodPattern: checkinContext?.moodPattern || null,
+      coachNotes: coachNotesFromStorage || null,
     },
   });
 
@@ -1384,5 +1388,5 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     // Ignore storage errors
   }
 
-  return { insights: filtered, fromCache: false };
+  return { insights: filtered, fromCache: false, coachNotes: data?.coachNotes || [] };
 }
