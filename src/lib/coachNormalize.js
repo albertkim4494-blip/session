@@ -363,6 +363,7 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
   let totalStrengthReps = 0;
   let totalStrengthSets = 0;
   const muscleGroupSetsEffective = {};
+  const exerciseReps = {};  // name → total reps (strength only)
   // Coach signal collectors
   const moodEntries = [];
   const rpeEntries = [];
@@ -453,6 +454,7 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
           muscleGroupVolume[group] = (muscleGroupVolume[group] || 0) + Math.round(totalValue * 0.5);
         }
         totalStrengthReps += totalValue;
+        exerciseReps[name] = (exerciseReps[name] || 0) + totalValue;
 
         // Track working sets per PRIMARY muscle only (no secondary inflation)
         const workingSets = completedSets.filter(s => (Number(s.reps) || 0) > 0).length;
@@ -486,7 +488,7 @@ export function buildNormalizedAnalysis(workouts, logsByDate, dateRange, catalog
   const coachSignals = buildCoachSignals(moodEntries, rpeEntries, intensityEntries, painMentions, fatigueMentions);
   const sportTraits = buildSportTraits(sportFrequency, durationByActivity);
 
-  return { muscleGroupVolume, muscleGroupSets, muscleGroupSetsEffective, durationByActivity, sportFrequency, totalStrengthReps, totalStrengthSets, coachSignals, sportTraits };
+  return { muscleGroupVolume, muscleGroupSets, muscleGroupSetsEffective, durationByActivity, sportFrequency, totalStrengthReps, totalStrengthSets, exerciseReps, coachSignals, sportTraits };
 }
 
 /**
@@ -669,13 +671,24 @@ export function detectImbalancesNormalized(analysis, opts) {
     const hasSeverePain = painAreas.some((p) => p.severity === "severe");
     const hasAnyPain = painAreas.length > 0;
 
-    // Build volume context for acknowledgment
-    const totalReps = analysis?.totalStrengthReps ?? 0;
-    const volumeAck = totalReps > 500
-      ? ` You've logged ${totalReps.toLocaleString()} reps in this period — that's serious work.`
-      : totalReps > 100
-        ? ` ${totalReps} reps logged and building.`
-        : "";
+    // Build volume context with per-exercise breakdown
+    const exReps = analysis?.exerciseReps ?? {};
+    const topExercises = Object.entries(exReps)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 4);
+    let volumeAck = "";
+    if (topExercises.length > 0) {
+      const totalReps = topExercises.reduce((s, [, v]) => s + v, 0);
+      if (totalReps > 200) {
+        const breakdown = topExercises
+          .filter(([, v]) => v >= 50)
+          .map(([name, v]) => `${v.toLocaleString()} ${name.toLowerCase()}s`)
+          .join(", ");
+        volumeAck = breakdown
+          ? ` You've put in the work — ${breakdown} this period.`
+          : ` ${totalReps.toLocaleString()} reps logged and building.`;
+      }
+    }
 
     // Severe pain → top priority recovery warning
     if (hasSeverePain) {
