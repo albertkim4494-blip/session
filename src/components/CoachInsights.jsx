@@ -175,6 +175,8 @@ export function CoachInsightsCard({
   error,
   onRefresh,
   userExerciseNames,
+  checkinSlot,   // ReactNode — rendered in header row (right side)
+  refreshSlot,   // ReactNode — rendered below header (e.g. refresh button)
 }) {
   const [showMore, setShowMore] = useState(false);
   const [animKey, setAnimKey] = useState(0);
@@ -231,19 +233,10 @@ export function CoachInsightsCard({
           <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0b429" stroke="none"><path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" /><path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" /></svg>
           Coach Insight
         </div>
-        {onRefresh && !loading && (
-          <button
-            onClick={onRefresh}
-            style={{
-              background: "transparent", border: "none", color: colors.text,
-              opacity: 0.45, fontSize: 12, cursor: "pointer", padding: "2px 6px",
-              textDecoration: "underline",
-            }}
-          >
-            Refresh
-          </button>
-        )}
+        {checkinSlot || null}
       </div>
+      {/* Edit section inside card */}
+      {refreshSlot || null}
 
       {/* Error */}
       {error && (
@@ -345,8 +338,21 @@ export function CoachInsightsCard({
       )}
 
       {/* Footer */}
-      <div style={{ fontSize: 11, opacity: 0.35, marginTop: 12 }}>
-        {loading ? "Updating..." : "Powered by AI"}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+        {loading ? (
+          <span style={{ fontSize: 11, opacity: 0.35 }}>Updating...</span>
+        ) : onRefresh ? (
+          <button
+            onClick={onRefresh}
+            style={{
+              background: "transparent", border: "none", color: colors.text,
+              opacity: 0.35, fontSize: 11, cursor: "pointer", padding: "2px 6px",
+              textDecoration: "underline",
+            }}
+          >
+            Refresh
+          </button>
+        ) : null}
       </div>
     </div>
   );

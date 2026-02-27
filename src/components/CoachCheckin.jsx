@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { PAIN_AREAS } from "../lib/coachCheckin";
 
 // ---------------------------------------------------------------------------
@@ -273,12 +273,12 @@ export function CheckinEditSection({ section, checkin, onSave, onCancel, colors 
   useEffect(() => { ensureAnim(); }, []);
 
   const handleMoodSelect = (v) => {
-    if (v === null) return;
+    if (v === null || v === checkin.mood) { onCancel(); return; }
     onSave({ ...checkin, mood: v });
   };
 
   const handleSleepSelect = (v) => {
-    if (v === null) return;
+    if (v === null || v === checkin.sleep) { onCancel(); return; }
     onSave({ ...checkin, sleep: v });
   };
 
@@ -375,7 +375,7 @@ export function CheckinEditSection({ section, checkin, onSave, onCancel, colors 
 // ---------------------------------------------------------------------------
 // CheckinPills — compact pills showing current answers (rendered externally)
 // ---------------------------------------------------------------------------
-export function CheckinPills({ mood, sleep, step, onCancel, colors }) {
+export function CheckinPills({ mood, sleep, step, jumpToStep, colors }) {
   if (step < 1) return null;
 
   const tagStyle = {
@@ -383,6 +383,7 @@ export function CheckinPills({ mood, sleep, step, onCancel, colors }) {
     padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
     border: `1px solid ${colors.border}`,
     background: colors.cardBg, color: colors.text, opacity: 0.7,
+    cursor: jumpToStep ? "pointer" : "default",
   };
 
   const moodFace = mood !== null ? MOOD_FACES.find((f) => f.value === mood) : null;
@@ -393,7 +394,7 @@ export function CheckinPills({ mood, sleep, step, onCancel, colors }) {
       animation: "checkinFadeIn 0.3s ease-out",
     }}>
       {mood !== null && (
-        <span style={tagStyle}>
+        <span style={tagStyle} onClick={() => jumpToStep?.(0)}>
           {moodFace && (
             <svg viewBox="0 0 32 32" width="14" height="14">
               <circle cx="16" cy="16" r="14" fill="#FFD93D" stroke="#E6B800" strokeWidth="1.5" />
@@ -404,22 +405,13 @@ export function CheckinPills({ mood, sleep, step, onCancel, colors }) {
         </span>
       )}
       {sleep !== null && step > 1 && (
-        <span style={tagStyle}>Slept {sleep}</span>
-      )}
-      {onCancel && (
-        <button
-          onClick={onCancel}
-          style={{
-            background: "transparent", border: "none",
-            color: colors.text, opacity: 0.3, fontSize: 11,
-            cursor: "pointer", padding: "2px 4px",
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
+        <span style={tagStyle} onClick={() => jumpToStep?.(1)}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" opacity="0.5">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
-        </button>
+          {SLEEP_LABELS[sleep]}
+        </span>
+      )}
       )}
     </div>
   );
@@ -438,6 +430,7 @@ export function CoachCheckin({
   const [sleep, setSleep] = useState(null);
   const [painMap, setPainMap] = useState({});
   const [editStep, setEditStep] = useState(0); // tracks which step user is on during edit
+  const jumpToStepRef = useRef(null);
 
   useEffect(() => { ensureAnim(); }, []);
 
@@ -459,6 +452,27 @@ export function CoachCheckin({
     }
   }, [isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Step calculation (needed before early return for the effect below)
+  const step = isEdit ? editStep : (mood === null ? 0 : sleep === null ? 1 : 2);
+
+  // Keep jumpToStep ref current
+  const jumpToStep = (target) => {
+    if (isEdit) {
+      setEditStep(target);
+    } else {
+      if (target <= 0) { setMood(null); setSleep(null); setPainMap({}); }
+      else if (target <= 1) { setSleep(null); setPainMap({}); }
+    }
+  };
+  jumpToStepRef.current = jumpToStep;
+
+  // Report values changes up for external pill rendering
+  useEffect(() => {
+    if (expanded && onValuesChange) {
+      onValuesChange({ mood, sleep, step, jumpToStep: (...a) => jumpToStepRef.current?.(...a) });
+    }
+  }, [mood, sleep, step, expanded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Collapsed — subtle prompt
   if (!expanded) {
     return (
@@ -470,11 +484,16 @@ export function CoachCheckin({
           fontSize: 13, opacity: 0.35,
           padding: "4px 0",
           transition: "opacity 0.15s",
+          display: "inline-flex", alignItems: "center", gap: 5,
         }}
         onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.6"; }}
         onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.35"; }}
       >
-        Check in with your coach
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+          <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+          <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+        </svg>
+        How are you feeling?
       </button>
     );
   }
@@ -512,30 +531,60 @@ export function CoachCheckin({
     if (isEdit && onCancel) onCancel();
   };
 
-  // In edit mode, step is driven by editStep counter; in fresh mode, by null checks
-  const step = isEdit ? editStep : (mood === null ? 0 : sleep === null ? 1 : 2);
-
   const handleMoodChange = (v) => {
     setMood(v);
     if (v !== null && step === 0 && isEdit) setEditStep(1);
-    const nextStep = v !== null ? Math.max(step, 1) : step;
-    if (onValuesChange) onValuesChange({ mood: v, sleep, step: nextStep });
   };
 
   const handleSleepChange = (v) => {
     setSleep(v);
     if (v !== null && step === 1 && isEdit) setEditStep(2);
-    const nextStep = v !== null ? Math.max(step, 2) : step;
-    if (onValuesChange) onValuesChange({ mood, sleep: v, step: nextStep });
   };
 
   const fadeIn = { opacity: 0, animation: "checkinStagger 0.4s ease-out forwards" };
 
+  const moodFace = mood !== null ? MOOD_FACES.find((f) => f.value === mood) : null;
+  const tagStyle = {
+    display: "inline-flex", alignItems: "center", gap: 4,
+    padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+    border: `1px solid ${colors.border}`,
+    background: colors.cardBg, color: colors.text, opacity: 0.7,
+    cursor: "pointer",
+  };
+
   return (
     <div style={{
-      display: "flex", flexDirection: "column", gap: 14,
+      display: "flex", flexDirection: "column", gap: 14, alignItems: "center",
       animation: "checkinFadeIn 0.3s ease-out",
     }}>
+      {/* Answered tags — tappable to jump back */}
+      {step > 0 && (
+        <div style={{
+          display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", alignItems: "center",
+          animation: "checkinFadeIn 0.3s ease-out",
+        }}>
+          {mood !== null && (
+            <span style={tagStyle} onClick={() => jumpToStep(0)}>
+              {moodFace && (
+                <svg viewBox="0 0 32 32" width="14" height="14">
+                  <circle cx="16" cy="16" r="14" fill="#FFD93D" stroke="#E6B800" strokeWidth="1.5" />
+                  <path d={moodFace.mouth} fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              )}
+              {MOOD_LABELS[String(mood)]}
+            </span>
+          )}
+          {sleep !== null && step > 1 && (
+            <span style={tagStyle} onClick={() => jumpToStep(1)}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" opacity="0.5">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+              {SLEEP_LABELS[sleep]}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Current question */}
       {step === 0 && (
         <div key="mood" style={fadeIn}>
@@ -585,6 +634,35 @@ export function CoachCheckin({
           </div>
         </>
       )}
+
+      {/* Step dots */}
+      <div style={{ display: "flex", gap: 5, justifyContent: "center" }}>
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            style={{
+              width: 6, height: 6, borderRadius: "50%",
+              background: colors.text,
+              opacity: i === step ? 0.5 : 0.15,
+              transition: "opacity 0.2s",
+            }}
+          />
+        ))}
+      </div>
+      {/* Dismiss */}
+      <button
+        onClick={handleCollapse}
+        style={{
+          background: "transparent", border: "none",
+          color: colors.text, cursor: "pointer",
+          fontSize: 12, opacity: 0.25,
+          transition: "opacity 0.15s",
+        }}
+        onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.4"; }}
+        onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.25"; }}
+      >
+        Dismiss
+      </button>
     </div>
   );
 }

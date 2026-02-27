@@ -64,7 +64,7 @@ import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
-import { CoachCheckin, CheckinSummary, CheckinEditSection } from "./components/CoachCheckin";
+import { CoachCheckin, CheckinSummary, CheckinEditSection, CheckinPills } from "./components/CoachCheckin";
 import { getTodayCheckin, saveCheckin, buildCheckinContext, loadCheckins, loadCoachNotes, mergeCoachNotes, saveCoachNotes } from "./lib/coachCheckin";
 
 // Extracted components (timer)
@@ -242,6 +242,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [checkinEditSection, setCheckinEditSection] = useState(null); // null | "mood" | "sleep" | "pain"
   const checkinEditSectionRef = useRef(null);
   checkinEditSectionRef.current = checkinEditSection;
+  const [checkinProgress, setCheckinProgress] = useState(null); // { mood, sleep, step }
+  const checkinJumpRef = useRef(null);
 
   // Swipe navigation between tabs
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
@@ -3224,7 +3226,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     <CoachCheckin
                       colors={colors}
                       onSubmit={handleCheckinSubmit}
-                      onCancel={() => {}}
+                      onCancel={() => { setCheckinProgress(null); checkinJumpRef.current = null; }}
+                      onValuesChange={(v) => { checkinJumpRef.current = v.jumpToStep; setCheckinProgress({ mood: v.mood, sleep: v.sleep, step: v.step }); }}
                       editValues={null}
                     />
                   )}
@@ -3258,6 +3261,38 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       error={coachError}
                       userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
                       onRefresh={handleCoachRefresh}
+                      checkinSlot={
+                        todayCheckin ? (
+                          <CheckinSummary
+                            checkin={todayCheckin}
+                            onEdit={(section) => setCheckinEditSection(section)}
+                            onClear={() => {
+                              saveCheckin(dateKey, null);
+                              setTodayCheckin(null);
+                              setCheckinEditSection(null);
+                            }}
+                            colors={colors}
+                          />
+                        ) : (
+                          <CoachCheckin
+                            colors={colors}
+                            onSubmit={handleCheckinSubmit}
+                            onCancel={() => {}}
+                            editValues={null}
+                          />
+                        )
+                      }
+                      refreshSlot={
+                        checkinEditSection && todayCheckin ? (
+                          <CheckinEditSection
+                            section={checkinEditSection}
+                            checkin={todayCheckin}
+                            onSave={(updated) => { handleCheckinUpdate(updated); }}
+                            onCancel={() => setCheckinEditSection(null)}
+                            colors={colors}
+                          />
+                        ) : null
+                      }
                     />
                   )}
                   {/* Explicitly added sessions (with remove button) — newest first */}
