@@ -228,15 +228,15 @@ export function CoachInsightsCard({
       }}
     >
       {/* Header row */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: hero ? 14 : 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: refreshSlot ? 10 : (hero ? 14 : 8) }}>
         <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.5, letterSpacing: 0.5, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 5 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0b429" stroke="none"><path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" /><path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" /></svg>
           Coach Insight
         </div>
         {checkinSlot || null}
       </div>
-      {/* Edit section inside card */}
-      {refreshSlot || null}
+      {/* Edit / check-in section inside card */}
+      {refreshSlot && <div style={{ marginBottom: hero ? 14 : 8 }}>{refreshSlot}</div>}
 
       {/* Error */}
       {error && (

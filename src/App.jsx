@@ -240,6 +240,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const MAX_DAILY_REFRESHES = 10;
   const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(dateKey));
   const [checkinEditSection, setCheckinEditSection] = useState(null); // null | "mood" | "sleep" | "pain"
+  const [cardCheckinOpen, setCardCheckinOpen] = useState(false);
   const checkinEditSectionRef = useRef(null);
   checkinEditSectionRef.current = checkinEditSection;
   const [checkinProgress, setCheckinProgress] = useState(null); // { mood, sleep, step }
@@ -3273,14 +3274,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             }}
                             colors={colors}
                           />
-                        ) : (
-                          <CoachCheckin
-                            colors={colors}
-                            onSubmit={handleCheckinSubmit}
-                            onCancel={() => {}}
-                            editValues={null}
-                          />
-                        )
+                        ) : !cardCheckinOpen ? (
+                          <button
+                            onClick={() => setCardCheckinOpen(true)}
+                            style={{
+                              background: "transparent", border: "none",
+                              color: colors.text, cursor: "pointer",
+                              fontSize: 13, opacity: 0.35,
+                              padding: "4px 0",
+                              transition: "opacity 0.15s",
+                              display: "inline-flex", alignItems: "center", gap: 5,
+                            }}
+                            onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.6"; }}
+                            onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.35"; }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                              <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                              <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+                            </svg>
+                            How are you feeling?
+                          </button>
+                        ) : null
                       }
                       refreshSlot={
                         checkinEditSection && todayCheckin ? (
@@ -3290,6 +3304,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             onSave={(updated) => { handleCheckinUpdate(updated); }}
                             onCancel={() => setCheckinEditSection(null)}
                             colors={colors}
+                          />
+                        ) : !todayCheckin && cardCheckinOpen ? (
+                          <CoachCheckin
+                            colors={colors}
+                            onSubmit={(data) => {
+                              setCardCheckinOpen(false);
+                              handleCheckinSubmit(data);
+                            }}
+                            onCancel={() => setCardCheckinOpen(false)}
+                            editValues={null}
+                            startExpanded
                           />
                         ) : null
                       }

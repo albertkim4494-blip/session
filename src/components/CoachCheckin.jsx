@@ -423,9 +423,10 @@ export function CoachCheckin({
   onCancel,
   onValuesChange,  // ({ mood, sleep, step }) => void — reports current values for external pills
   editValues,   // null = fresh check-in, { mood, sleep, pain } = editing existing
+  startExpanded,  // skip collapsed state, go straight to questions
 }) {
   const isEdit = editValues !== null && editValues !== undefined;
-  const [expanded, setExpanded] = useState(isEdit);
+  const [expanded, setExpanded] = useState(isEdit || !!startExpanded);
   const [mood, setMood] = useState(null);
   const [sleep, setSleep] = useState(null);
   const [painMap, setPainMap] = useState({});
@@ -444,7 +445,7 @@ export function CoachCheckin({
       const map = {};
       for (const p of (editValues.pain || [])) { if (p.severity) map[p.area] = p.severity; }
       setPainMap(map);
-    } else {
+    } else if (!startExpanded) {
       setExpanded(false);
       setMood(null);
       setSleep(null);
@@ -528,7 +529,7 @@ export function CoachCheckin({
     setSleep(null);
     setPainMap({});
     setExpanded(false);
-    if (isEdit && onCancel) onCancel();
+    if (onCancel) onCancel();
   };
 
   const handleMoodChange = (v) => {
