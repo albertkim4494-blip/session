@@ -669,49 +669,91 @@ export function detectImbalancesNormalized(analysis, opts) {
     const hasSeverePain = painAreas.some((p) => p.severity === "severe");
     const hasAnyPain = painAreas.length > 0;
 
+    // Build volume context for acknowledgment
+    const totalReps = analysis?.totalStrengthReps ?? 0;
+    const volumeAck = totalReps > 500
+      ? ` You've logged ${totalReps.toLocaleString()} reps in this period — that's serious work.`
+      : totalReps > 100
+        ? ` ${totalReps} reps logged and building.`
+        : "";
+
     // Severe pain → top priority recovery warning
-    if (hasSeverePain && insights.length < 3) {
+    if (hasSeverePain) {
       const severeAreas = painAreas.filter((p) => p.severity === "severe").map((p) => p.area).join(", ");
       insights.unshift({
         type: "RECOVERY",
         severity: "HIGH",
-        title: "\u26A0\uFE0F Severe pain reported",
-        message: `You're reporting severe pain in ${severeAreas}. Consider skipping exercises that load ${severeAreas.toLowerCase()} today, or take a full rest day. If pain persists, consult a professional.`,
+        title: "\u26A0\uFE0F Severe pain — protect yourself",
+        message: `You're reporting severe pain in ${severeAreas}. Skip exercises that load ${severeAreas.toLowerCase()} today — no exercise is worth aggravating an injury. If this has been going on, get it checked out.${volumeAck} Your consistency is there, so a smart rest day won't cost you anything.`,
         suggestions: [],
       });
     }
 
-    // Feeling rough/brutal but still showed up → encouragement
-    if (checkin.mood <= -1 && totalSets > 0 && insights.length < 3) {
-      const sleepContext = checkin.sleep === "poor" ? " on poor sleep" : "";
-      insights.push({
+    // Feeling rough/brutal but still showed up → lead with real encouragement
+    if (checkin.mood <= -1 && insights.length < 3) {
+      const sleepBit = checkin.sleep === "poor" ? " on bad sleep" : "";
+      const painBit = hasAnyPain
+        ? " Go lighter on anything that hurts and focus on movements that feel good."
+        : " Even a lighter session today keeps the momentum going.";
+      insights.unshift({
         type: "POSITIVE",
         severity: "INFO",
-        title: `\uD83D\uDD25 Showing up when it's ${moodLabel}`,
-        message: `You're feeling ${moodLabel}${sleepContext} but you're still here — that's what separates consistency from motivation. ${hasAnyPain ? "Go lighter on anything that hurts and focus on what feels good." : "Even a lighter session today builds the habit. Do what you can."}`,
+        title: `\uD83D\uDD25 You showed up — that counts`,
+        message: `Feeling ${moodLabel}${sleepBit} and you're still here.${volumeAck} That kind of consistency is what actually builds results — not one perfect session.${painBit}`,
         suggestions: [],
       });
     }
 
-    // Pain areas → suggest modifications
+    // Feeling okay/good → acknowledge and set the tone
+    if (checkin.mood >= 0 && checkin.mood <= 1 && !hasSeverePain && insights.length < 3) {
+      const sleepNote = checkin.sleep === "poor"
+        ? " Sleep wasn't great though — consider dropping intensity a notch. A solid session at 80% beats grinding at 100% on bad sleep."
+        : checkin.sleep === "great"
+          ? " Good sleep too — your body's ready to work."
+          : "";
+      const painNote = hasAnyPain
+        ? ` Watch the ${painAreas.map((p) => p.area.toLowerCase()).join(" and ")} — avoid loading ${painAreas.length === 1 ? "that" : "those"} directly and swap for pain-free alternatives.`
+        : "";
+      insights.unshift({
+        type: "TIP",
+        severity: "INFO",
+        title: checkin.mood === 1 ? "\uD83D\uDC4A Good to go" : "\u2705 Solid foundation today",
+        message: `Feeling ${moodLabel}, slept ${checkin.sleep || "okay"} — ${hasAnyPain ? "workable with some adjustments" : "good foundation for a productive session"}.${volumeAck}${sleepNote}${painNote}`,
+        suggestions: [],
+      });
+    }
+
+    // Feeling great → let them push
+    if (checkin.mood >= 2 && !hasSeverePain && insights.length < 3) {
+      insights.unshift({
+        type: "POSITIVE",
+        severity: "INFO",
+        title: "\uD83D\uDE80 Green light",
+        message: `Feeling great${checkin.sleep === "great" ? ", well rested" : ""} — today's a good day to push.${volumeAck}${hasAnyPain ? ` Just be mindful of the ${painAreas.map((p) => p.area.toLowerCase()).join(" and ")}.` : ""}`,
+        suggestions: [],
+      });
+    }
+
+    // Pain areas → specific modifications (only if not already covered by severe pain)
     if (hasAnyPain && !hasSeverePain && insights.length < 3) {
-      const painList = painAreas.map((p) => `${p.area} (${p.severity})`).join(", ");
+      const PAIN_MODS = {
+        "Shoulders": "skip overhead pressing and upright rows — try floor press, landmine press, or low cable fly",
+        "Lower Back": "skip heavy deadlifts and good mornings — try hip thrusts, leg press, or goblet squats",
+        "Knees": "skip deep squats and leg extensions — try hip thrusts, Romanian deadlifts, or hamstring curls",
+        "Wrists": "skip barbell pressing — try dumbbell neutral grip variations or machines",
+        "Neck": "avoid heavy overhead work and shrugs — try lighter isolation and stretching",
+        "Elbows": "reduce heavy curls and tricep extensions — try lighter weight with controlled tempo",
+        "Hips": "avoid deep lunges and wide-stance squats — try hip-friendly machine work or upper body focus",
+        "Ankles": "skip box jumps and heavy calf raises — try seated calf work or upper body focus",
+      };
+      const modLines = painAreas.map((p) => PAIN_MODS[p.area] || `be careful with ${p.area.toLowerCase()}`);
       insights.push({
         type: "TIP",
         severity: "MEDIUM",
-        title: "\uD83D\uDCA1 Modify around pain",
-        message: `You mentioned ${painList}. Avoid exercises that aggravate ${painAreas.length === 1 ? "that area" : "those areas"} — swap for pain-free alternatives or reduce the load. Pain is information, not something to push through.`,
-        suggestions: [],
-      });
-    }
-
-    // Poor sleep → suggest lower intensity
-    if (checkin.sleep === "poor" && checkin.mood >= 0 && insights.length < 3) {
-      insights.push({
-        type: "TIP",
-        severity: "LOW",
-        title: "\uD83D\uDCA4 Poor sleep — adjust intensity",
-        message: "Sleep affects recovery and performance more than most variables. Consider dropping weight by 10-15% or cutting a set from each exercise today. A good session at 80% beats grinding at 100% on bad sleep.",
+        title: "\uD83D\uDCA1 Smart modifications",
+        message: modLines.length === 1
+          ? `${painAreas[0].area} is bothering you (${painAreas[0].severity}) — ${modLines[0]}.`
+          : `Working around some pain today: ${painAreas.map((p, i) => `${p.area} (${p.severity}) — ${modLines[i]}`).join(". ")}.`,
         suggestions: [],
       });
     }
