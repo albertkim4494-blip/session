@@ -317,50 +317,74 @@ export function CoachCheckin({
   };
 
   const hasAnyInput = mood !== null || sleep !== null || Object.keys(painMap).length > 0;
+  const showSleep = mood !== null;
+  const showPain = mood !== null && sleep !== null;
+  const showButton = mood !== null && sleep !== null;
 
-  const stagger = (i) => ({
-    opacity: 0,
-    animation: `checkinStagger 0.4s ease-out ${i * 150}ms forwards`,
-  });
+  const handleClear = () => {
+    setMood(null);
+    setSleep(null);
+    setPainMap({});
+  };
+
+  const fadeIn = { opacity: 0, animation: "checkinStagger 0.4s ease-out forwards" };
 
   return (
     <div style={{
       display: "flex", flexDirection: "column", gap: 16,
       padding: "16px 0",
     }}>
-      <div style={stagger(0)}>
+      <div style={fadeIn}>
         <CheckinMoodPicker value={mood} onChange={setMood} colors={colors} />
       </div>
-      <div style={stagger(1)}>
-        <SleepPicker value={sleep} onChange={setSleep} colors={colors} />
-      </div>
-      <div style={stagger(2)}>
-        <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
-      </div>
+      {showSleep && (
+        <div key="sleep" style={fadeIn}>
+          <SleepPicker value={sleep} onChange={setSleep} colors={colors} />
+        </div>
+      )}
+      {showPain && (
+        <div key="pain" style={fadeIn}>
+          <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
+        </div>
+      )}
 
-      <div style={{ ...stagger(3), display: "flex", justifyContent: "center", paddingTop: 4 }}>
-        <button
-          className="btn-press"
-          onClick={handleSubmit}
-          style={{
-            padding: "10px 24px", borderRadius: 10,
-            fontSize: 14, fontWeight: 700,
-            border: `1px solid ${colors.border}`,
-            background: colors.cardBg,
-            color: colors.text,
-            cursor: "pointer",
-            boxShadow: colors.shadow,
-            opacity: hasAnyInput ? 1 : 0.6,
-            display: "inline-flex", alignItems: "center", gap: 6,
-          }}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
-            <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
-            <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
-          </svg>
-          Get Today's Analysis
-        </button>
-      </div>
+      {showButton && (
+        <div key="actions" style={{ ...fadeIn, display: "flex", justifyContent: "center", alignItems: "center", gap: 12, paddingTop: 4 }}>
+          <button
+            className="btn-press"
+            onClick={handleSubmit}
+            style={{
+              padding: "10px 24px", borderRadius: 10,
+              fontSize: 14, fontWeight: 700,
+              border: `1px solid ${colors.border}`,
+              background: colors.cardBg,
+              color: colors.text,
+              cursor: "pointer",
+              boxShadow: colors.shadow,
+              display: "inline-flex", alignItems: "center", gap: 6,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+              <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+              <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+            </svg>
+            Get Today's Analysis
+          </button>
+          {hasAnyInput && (
+            <button
+              onClick={handleClear}
+              style={{
+                background: "transparent", border: "none",
+                color: colors.text, opacity: 0.35, fontSize: 12,
+                cursor: "pointer", padding: "4px 6px",
+                textDecoration: "underline",
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
