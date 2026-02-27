@@ -64,7 +64,7 @@ import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
-import { CoachCheckin } from "./components/CoachCheckin";
+import { CoachCheckin, CheckinSummary, CheckinEditSection } from "./components/CoachCheckin";
 import { getTodayCheckin, saveCheckin, buildCheckinContext, loadCheckins, loadCoachNotes, mergeCoachNotes, saveCoachNotes } from "./lib/coachCheckin";
 
 // Extracted components (timer)
@@ -239,7 +239,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const coachLastFetchRef = useRef(0);
   const MAX_DAILY_REFRESHES = 10;
   const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(dateKey));
-  const [checkinEditMode, setCheckinEditMode] = useState(false);
+  const [checkinEditSection, setCheckinEditSection] = useState(null); // null | "mood" | "sleep" | "pain"
+  const checkinEditSectionRef = useRef(null);
+  checkinEditSectionRef.current = checkinEditSection;
 
   // Swipe navigation between tabs
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
@@ -1182,6 +1184,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const handleBackRef = useRef(null);
 
   handleBackRef.current = () => {
+    // Close checkin edit section if open
+    if (checkinEditSectionRef.current) {
+      setCheckinEditSection(null);
+      return;
+    }
     // Close FAB panel if open (before modal/exit checks)
     if (fabOpenRef.current) {
       setFabOpen(false);
@@ -2425,10 +2432,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       });
   }, [progressWorkouts, fullCatalog, equipment, dateKey, profile, state, coachSignature, coachInsights, session?.user?.id, catalogMap]);
 
+  // Save check-in without triggering coach refresh (for inline pill edits)
+  const handleCheckinUpdate = useCallback((checkinData) => {
+    saveCheckin(dateKey, checkinData);
+    setTodayCheckin(checkinData);
+    setCheckinEditSection(null);
+  }, [dateKey]);
+
   const handleCheckinSubmit = useCallback((checkinData) => {
     saveCheckin(dateKey, checkinData);
     setTodayCheckin(checkinData);
-    setCheckinEditMode(false);
+    setCheckinEditSection(null);
 
     // Trigger coach fetch with check-in context
     if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) return;
@@ -3164,18 +3178,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 /* HERO STATE: centered greeting, today only, no sessions */
                 <div style={{
                   display: "flex", flexDirection: "column", alignItems: "center",
-                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 48, paddingTop: "8vh",
+                  textAlign: "center", minHeight: "50vh", gap: 48, paddingTop: "14vh",
                 }}>
                   <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
                     {getTimeGreeting()}
                   </div>
-                  <CoachCheckin
-                    colors={colors}
-                    todayCheckin={checkinEditMode ? null : todayCheckin}
-                    onSubmit={handleCheckinSubmit}
-                    onEdit={() => setCheckinEditMode(true)}
-                  />
-                  {todayCheckin && !checkinEditMode && (
+                  {/* Inline edit: single section picker above insight */}
+                  {checkinEditSection && todayCheckin && (
+                    <CheckinEditSection
+                      section={checkinEditSection}
+                      checkin={todayCheckin}
+                      onSave={(updated) => {
+                        handleCheckinUpdate(updated);
+                      }}
+                      onCancel={() => setCheckinEditSection(null)}
+                      colors={colors}
+                    />
+                  )}
+                  {/* Coach insight stays visible once checked in */}
+                  {todayCheckin && (
                     <CoachHeroInsight
                       insights={coachInsights}
                       onAddExercise={handleAddSuggestion}
@@ -3184,6 +3205,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       error={coachError}
                       userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
                       onRefresh={handleCoachRefresh}
+                    />
+                  )}
+                  {/* Below insight: summary pills or initial check-in link */}
+                  {todayCheckin && (
+                    <CheckinSummary
+                      checkin={todayCheckin}
+                      onEdit={(section) => setCheckinEditSection(section)}
+                      onClear={() => {
+                        saveCheckin(dateKey, null);
+                        setTodayCheckin(null);
+                        setCheckinEditSection(null);
+                      }}
+                      colors={colors}
+                    />
+                  )}
+                  {!todayCheckin && (
+                    <CoachCheckin
+                      colors={colors}
+                      onSubmit={handleCheckinSubmit}
+                      onCancel={() => {}}
+                      editValues={null}
                     />
                   )}
                   <div style={{ fontSize: 14, opacity: 0.35 }}>

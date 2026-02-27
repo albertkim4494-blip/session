@@ -30,7 +30,11 @@ export function loadCheckins() {
  */
 export function saveCheckin(dateKey, data) {
   const all = loadCheckins();
-  all[dateKey] = { ...data, submittedAt: data.submittedAt || new Date().toISOString() };
+  if (data === null) {
+    delete all[dateKey];
+  } else {
+    all[dateKey] = { ...data, submittedAt: data.submittedAt || new Date().toISOString() };
+  }
 
   // Prune to most recent MAX_CHECKINS days
   const keys = Object.keys(all).sort();

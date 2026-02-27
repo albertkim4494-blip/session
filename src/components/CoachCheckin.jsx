@@ -198,104 +198,288 @@ function PainAreaPills({ painMap, onChange, colors }) {
 // ---------------------------------------------------------------------------
 // CheckinSummary — compact post-submission summary
 // ---------------------------------------------------------------------------
-function CheckinSummary({ checkin, onEdit, colors }) {
-  const moodLabel = MOOD_LABELS[String(checkin.mood)] ?? "?";
+export function CheckinSummary({ checkin, onEdit, onClear, colors }) {
   const moodFace = MOOD_FACES.find((f) => f.value === checkin.mood);
-  const sleepLabel = checkin.sleep ? `Slept ${checkin.sleep}` : null;
   const painItems = (checkin.pain || []).filter((p) => p.severity);
 
+  const tagStyle = {
+    display: "inline-flex", alignItems: "center", gap: 4,
+    padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+    border: `1px solid ${colors.border}`,
+    background: colors.cardBg, color: colors.text, opacity: 0.7,
+    cursor: "pointer",
+  };
+
   return (
-    <button
-      onClick={onEdit}
-      style={{
-        display: "flex", flexDirection: "column", gap: 2,
-        width: "100%", padding: "8px 12px", borderRadius: 10,
-        border: `1px solid ${colors.border}`,
-        background: colors.cardBg,
-        color: colors.text,
-        cursor: "pointer", textAlign: "left",
-        transition: "opacity 0.15s",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-        {moodFace && (
-          <svg viewBox="0 0 32 32" width="20" height="20">
+    <div style={{
+      display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", alignItems: "center",
+    }}>
+      {moodFace && (
+        <span style={tagStyle} onClick={() => onEdit("mood")}>
+          <svg viewBox="0 0 32 32" width="14" height="14">
             <circle cx="16" cy="16" r="14" fill="#FFD93D" stroke="#E6B800" strokeWidth="1.5" />
-            {moodFace.eyes === "happy" ? (
-              <>
-                <path d="M10,13 Q11,11 12,13" fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M20,13 Q21,11 22,13" fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
-              </>
-            ) : moodFace.eyes === "squint" ? (
-              <>
-                <line x1="9.5" y1="13" x2="12.5" y2="13" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
-                <line x1="19.5" y1="13" x2="22.5" y2="13" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
-              </>
-            ) : (
-              <>
-                <circle cx="11" cy="12.5" r="1.5" fill="#5D4E00" />
-                <circle cx="21" cy="12.5" r="1.5" fill="#5D4E00" />
-              </>
-            )}
             <path d={moodFace.mouth} fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-        )}
-        <span style={{ fontWeight: 600 }}>{moodLabel}</span>
-        {sleepLabel && (
-          <>
-            <span style={{ opacity: 0.3 }}>{"\u00B7"}</span>
-            <span style={{ opacity: 0.7 }}>{sleepLabel}</span>
-          </>
-        )}
-        <span style={{ marginLeft: "auto", opacity: 0.3, fontSize: 11 }}>tap to edit</span>
-      </div>
-      {painItems.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
-          {painItems.map((p) => (
-            <span key={p.area} style={{ fontSize: 12, opacity: 0.8 }}>
-              {SEVERITY_EMOJI[p.severity]} {p.area} ({p.severity})
-            </span>
-          ))}
+          {MOOD_LABELS[String(checkin.mood)]}
+        </span>
+      )}
+      {checkin.sleep && (
+        <span style={tagStyle} onClick={() => onEdit("sleep")}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" opacity="0.5">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+          {SLEEP_LABELS[checkin.sleep]}
+        </span>
+      )}
+      {painItems.length > 0 ? painItems.map((p) => (
+        <span key={p.area} onClick={() => onEdit("pain")} style={tagStyle}>
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <circle cx="5" cy="5" r="5" fill={SEVERITY_COLORS[p.severity]} />
+          </svg>
+          {p.area}
+        </span>
+      )) : (
+        <span style={{ ...tagStyle, opacity: 0.4 }} onClick={() => onEdit("pain")}>+ Pain</span>
+      )}
+      {onClear && (
+        <button
+          onClick={onClear}
+          style={{
+            background: "transparent", border: "none",
+            color: colors.text, opacity: 0.3, fontSize: 11,
+            cursor: "pointer", padding: "2px 4px",
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CheckinEditSection — edit a single section inline, auto-saves on change
+// ---------------------------------------------------------------------------
+export function CheckinEditSection({ section, checkin, onSave, onCancel, colors }) {
+  const [painMap, setPainMap] = useState(() => {
+    const map = {};
+    for (const p of (checkin.pain || [])) { if (p.severity) map[p.area] = p.severity; }
+    return map;
+  });
+
+  useEffect(() => { ensureAnim(); }, []);
+
+  const handleMoodSelect = (v) => {
+    if (v === null) return;
+    onSave({ ...checkin, mood: v });
+  };
+
+  const handleSleepSelect = (v) => {
+    if (v === null) return;
+    onSave({ ...checkin, sleep: v });
+  };
+
+  const handlePainChange = (area, severity) => {
+    setPainMap((prev) => {
+      const next = { ...prev };
+      if (severity === null) { delete next[area]; } else { next[area] = severity; }
+      return next;
+    });
+  };
+
+  const handlePainDone = () => {
+    const pain = Object.entries(painMap)
+      .filter(([, sev]) => sev)
+      .map(([area, severity]) => ({ area, severity }));
+    onSave({ ...checkin, pain });
+  };
+
+  const fadeIn = { opacity: 0, animation: "checkinStagger 0.4s ease-out forwards" };
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", gap: 14,
+      animation: "checkinFadeIn 0.3s ease-out",
+    }}>
+      {section === "mood" && (
+        <div style={fadeIn}>
+          <CheckinMoodPicker value={checkin.mood} onChange={handleMoodSelect} colors={colors} />
         </div>
       )}
-    </button>
+      {section === "sleep" && (
+        <div style={fadeIn}>
+          <SleepPicker value={checkin.sleep} onChange={handleSleepSelect} colors={colors} />
+        </div>
+      )}
+      {section === "pain" && (
+        <>
+          <div style={fadeIn}>
+            <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 16, paddingTop: 4 }}>
+            {Object.keys(painMap).length > 0 ? (
+              <button
+                onClick={handlePainDone}
+                style={{
+                  background: "transparent", border: "none",
+                  color: colors.text, cursor: "pointer",
+                  fontSize: 13, opacity: 0.4,
+                  transition: "opacity 0.15s",
+                }}
+                onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
+                onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.4"; }}
+              >
+                Done
+              </button>
+            ) : (
+              <button
+                onClick={handlePainDone}
+                style={{
+                  background: "transparent", border: "none",
+                  color: colors.text, cursor: "pointer",
+                  fontSize: 13, opacity: 0.4,
+                  transition: "opacity 0.15s",
+                }}
+                onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
+                onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.4"; }}
+              >
+                No pain, I'm good
+              </button>
+            )}
+            <button
+              onClick={onCancel}
+              style={{
+                background: "transparent", border: "none",
+                color: colors.text, cursor: "pointer",
+                fontSize: 13, opacity: 0.3,
+                transition: "opacity 0.15s",
+              }}
+              onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.5"; }}
+              onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.3"; }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
 // CoachCheckin — Main export
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// CheckinPills — compact pills showing current answers (rendered externally)
+// ---------------------------------------------------------------------------
+export function CheckinPills({ mood, sleep, step, onCancel, colors }) {
+  if (step < 1) return null;
+
+  const tagStyle = {
+    display: "inline-flex", alignItems: "center", gap: 4,
+    padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+    border: `1px solid ${colors.border}`,
+    background: colors.cardBg, color: colors.text, opacity: 0.7,
+  };
+
+  const moodFace = mood !== null ? MOOD_FACES.find((f) => f.value === mood) : null;
+
+  return (
+    <div style={{
+      display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", alignItems: "center",
+      animation: "checkinFadeIn 0.3s ease-out",
+    }}>
+      {mood !== null && (
+        <span style={tagStyle}>
+          {moodFace && (
+            <svg viewBox="0 0 32 32" width="14" height="14">
+              <circle cx="16" cy="16" r="14" fill="#FFD93D" stroke="#E6B800" strokeWidth="1.5" />
+              <path d={moodFace.mouth} fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          )}
+          {MOOD_LABELS[String(mood)]}
+        </span>
+      )}
+      {sleep !== null && step > 1 && (
+        <span style={tagStyle}>Slept {sleep}</span>
+      )}
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          style={{
+            background: "transparent", border: "none",
+            color: colors.text, opacity: 0.3, fontSize: 11,
+            cursor: "pointer", padding: "2px 4px",
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function CoachCheckin({
   colors,
-  todayCheckin,
   onSubmit,
-  onEdit,
+  onCancel,
+  onValuesChange,  // ({ mood, sleep, step }) => void — reports current values for external pills
+  editValues,   // null = fresh check-in, { mood, sleep, pain } = editing existing
 }) {
+  const isEdit = editValues !== null && editValues !== undefined;
+  const [expanded, setExpanded] = useState(isEdit);
   const [mood, setMood] = useState(null);
   const [sleep, setSleep] = useState(null);
-  const [painMap, setPainMap] = useState({}); // area → severity
+  const [painMap, setPainMap] = useState({});
+  const [editStep, setEditStep] = useState(0); // tracks which step user is on during edit
 
   useEffect(() => { ensureAnim(); }, []);
 
-  // Reset form when switching to edit mode (todayCheckin becomes null)
+  // When switching into edit mode, pre-populate with existing values
   useEffect(() => {
-    if (todayCheckin === null) {
+    if (isEdit) {
+      setExpanded(true);
+      setEditStep(0);
+      setMood(editValues.mood ?? null);
+      setSleep(editValues.sleep ?? null);
+      const map = {};
+      for (const p of (editValues.pain || [])) { if (p.severity) map[p.area] = p.severity; }
+      setPainMap(map);
+    } else {
+      setExpanded(false);
       setMood(null);
       setSleep(null);
       setPainMap({});
     }
-  }, [todayCheckin]);
+  }, [isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Summary mode — already checked in
-  if (todayCheckin) {
+  // Collapsed — subtle prompt
+  if (!expanded) {
     return (
-      <div style={{ animation: "checkinFadeIn 0.3s ease-out" }}>
-        <CheckinSummary checkin={todayCheckin} onEdit={onEdit} colors={colors} />
-      </div>
+      <button
+        onClick={() => setExpanded(true)}
+        style={{
+          background: "transparent", border: "none",
+          color: colors.text, cursor: "pointer",
+          fontSize: 13, opacity: 0.35,
+          padding: "4px 0",
+          transition: "opacity 0.15s",
+        }}
+        onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.6"; }}
+        onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.35"; }}
+      >
+        Check in with your coach
+      </button>
     );
   }
 
-  // Form mode
+  // Form mode (expanded)
   const handlePainChange = (area, severity) => {
     setPainMap((prev) => {
       const next = { ...prev };
@@ -320,79 +504,47 @@ export function CoachCheckin({
     });
   };
 
-  const hasAnyInput = mood !== null || sleep !== null || Object.keys(painMap).length > 0;
-
-  // Progressive reveal: current step is the first unanswered question
-  const step = mood === null ? 0 : sleep === null ? 1 : 2;
-
-  const handleClear = () => {
+  const handleCollapse = () => {
     setMood(null);
     setSleep(null);
     setPainMap({});
+    setExpanded(false);
+    if (isEdit && onCancel) onCancel();
+  };
+
+  // In edit mode, step is driven by editStep counter; in fresh mode, by null checks
+  const step = isEdit ? editStep : (mood === null ? 0 : sleep === null ? 1 : 2);
+
+  const handleMoodChange = (v) => {
+    setMood(v);
+    if (v !== null && step === 0 && isEdit) setEditStep(1);
+    const nextStep = v !== null ? Math.max(step, 1) : step;
+    if (onValuesChange) onValuesChange({ mood: v, sleep, step: nextStep });
+  };
+
+  const handleSleepChange = (v) => {
+    setSleep(v);
+    if (v !== null && step === 1 && isEdit) setEditStep(2);
+    const nextStep = v !== null ? Math.max(step, 2) : step;
+    if (onValuesChange) onValuesChange({ mood, sleep: v, step: nextStep });
   };
 
   const fadeIn = { opacity: 0, animation: "checkinStagger 0.4s ease-out forwards" };
 
-  // Compact pill for an answered question
-  const tagStyle = {
-    display: "inline-flex", alignItems: "center", gap: 4,
-    padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-    border: `1px solid ${colors.border}`,
-    background: colors.cardBg, color: colors.text, opacity: 0.7,
-  };
-
-  const moodFace = mood !== null ? MOOD_FACES.find((f) => f.value === mood) : null;
-
   return (
     <div style={{
       display: "flex", flexDirection: "column", gap: 14,
-      padding: "16px 0",
+      animation: "checkinFadeIn 0.3s ease-out",
     }}>
-      {/* Answered tags row */}
-      {hasAnyInput && (
-        <div style={{
-          display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", alignItems: "center",
-          animation: "checkinFadeIn 0.3s ease-out",
-        }}>
-          {mood !== null && step > 0 && (
-            <span style={tagStyle}>
-              {moodFace && (
-                <svg viewBox="0 0 32 32" width="14" height="14">
-                  <circle cx="16" cy="16" r="14" fill="#FFD93D" stroke="#E6B800" strokeWidth="1.5" />
-                  <path d={moodFace.mouth} fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              )}
-              {MOOD_LABELS[String(mood)]}
-            </span>
-          )}
-          {sleep !== null && step > 1 && (
-            <span style={tagStyle}>Slept {sleep}</span>
-          )}
-          <button
-            onClick={handleClear}
-            style={{
-              background: "transparent", border: "none",
-              color: colors.text, opacity: 0.3, fontSize: 11,
-              cursor: "pointer", padding: "2px 4px",
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      )}
-
       {/* Current question */}
       {step === 0 && (
         <div key="mood" style={fadeIn}>
-          <CheckinMoodPicker value={mood} onChange={setMood} colors={colors} />
+          <CheckinMoodPicker value={mood} onChange={handleMoodChange} colors={colors} />
         </div>
       )}
       {step === 1 && (
         <div key="sleep" style={fadeIn}>
-          <SleepPicker value={sleep} onChange={setSleep} colors={colors} />
+          <SleepPicker value={sleep} onChange={handleSleepChange} colors={colors} />
         </div>
       )}
       {step === 2 && (
@@ -400,27 +552,36 @@ export function CoachCheckin({
           <div key="pain" style={fadeIn}>
             <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
           </div>
-          <div key="actions" style={{ ...fadeIn, display: "flex", justifyContent: "center", paddingTop: 4 }}>
-            <button
-              className="btn-press"
-              onClick={handleSubmit}
-              style={{
-                padding: "10px 24px", borderRadius: 10,
-                fontSize: 14, fontWeight: 700,
-                border: `1px solid ${colors.border}`,
-                background: colors.cardBg,
-                color: colors.text,
-                cursor: "pointer",
-                boxShadow: colors.shadow,
-                display: "inline-flex", alignItems: "center", gap: 6,
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
-                <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
-                <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
-              </svg>
-              Get Today's Analysis
-            </button>
+          <div key="actions" style={{ ...fadeIn, display: "flex", justifyContent: "center", gap: 16, paddingTop: 4 }}>
+            {Object.keys(painMap).length > 0 ? (
+              <button
+                onClick={handleSubmit}
+                style={{
+                  background: "transparent", border: "none",
+                  color: colors.text, cursor: "pointer",
+                  fontSize: 13, opacity: 0.4,
+                  transition: "opacity 0.15s",
+                }}
+                onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
+                onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.4"; }}
+              >
+                Done
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                style={{
+                  background: "transparent", border: "none",
+                  color: colors.text, cursor: "pointer",
+                  fontSize: 13, opacity: 0.4,
+                  transition: "opacity 0.15s",
+                }}
+                onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
+                onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.4"; }}
+              >
+                No pain, I'm good
+              </button>
+            )}
           </div>
         </>
       )}
