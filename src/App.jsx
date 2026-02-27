@@ -3161,18 +3161,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               ...(isToday && !hasSessions ? { flex: 1, justifyContent: "center" } : {}),
             }}>
               {isToday && !hasSessions ? (
-                /* HERO STATE: centered greeting, today only, no sessions */
+                /* HERO STATE: greeting flows into check-in */
                 <div style={{
                   display: "flex", flexDirection: "column", alignItems: "center",
-                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 32, paddingTop: "8vh",
+                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 8, paddingTop: "8vh",
                 }}>
-                  <div>
-                    <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
-                      {getTimeGreeting()}
-                    </div>
-                    <div style={{ fontSize: 14, opacity: 0.5, marginTop: 8 }}>
-                      Tap + to start a session
-                    </div>
+                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
+                    {getTimeGreeting()}
                   </div>
                   <CoachCheckin
                     colors={colors}
@@ -3191,6 +3186,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onRefresh={handleCoachRefresh}
                     />
                   )}
+                  <div style={{ fontSize: 13, opacity: 0.35, marginTop: 8 }}>
+                    Tap + to start a session
+                  </div>
                 </div>
               ) : !isToday && !hasSessions ? (
                 /* NON-TODAY EMPTY: no logs or sessions */
