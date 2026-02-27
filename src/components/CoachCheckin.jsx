@@ -26,6 +26,10 @@ const ANIM_CSS = `
 @keyframes checkinFadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes checkinStagger {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }`;
 let animInjected = false;
 function ensureAnim() {
@@ -314,17 +318,27 @@ export function CoachCheckin({
 
   const hasAnyInput = mood !== null || sleep !== null || Object.keys(painMap).length > 0;
 
+  const stagger = (i) => ({
+    opacity: 0,
+    animation: `checkinStagger 0.4s ease-out ${i * 150}ms forwards`,
+  });
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", gap: 16,
       padding: "16px 0",
-      animation: "checkinFadeIn 0.4s ease-out",
     }}>
-      <CheckinMoodPicker value={mood} onChange={setMood} colors={colors} />
-      <SleepPicker value={sleep} onChange={setSleep} colors={colors} />
-      <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
+      <div style={stagger(0)}>
+        <CheckinMoodPicker value={mood} onChange={setMood} colors={colors} />
+      </div>
+      <div style={stagger(1)}>
+        <SleepPicker value={sleep} onChange={setSleep} colors={colors} />
+      </div>
+      <div style={stagger(2)}>
+        <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
+      </div>
 
-      <div style={{ display: "flex", justifyContent: "center", paddingTop: 4 }}>
+      <div style={{ ...stagger(3), display: "flex", justifyContent: "center", paddingTop: 4 }}>
         <button
           className="btn-press"
           onClick={handleSubmit}
