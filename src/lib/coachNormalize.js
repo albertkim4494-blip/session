@@ -671,23 +671,15 @@ export function detectImbalancesNormalized(analysis, opts) {
     const hasSeverePain = painAreas.some((p) => p.severity === "severe");
     const hasAnyPain = painAreas.length > 0;
 
-    // Build volume context with per-exercise breakdown
-    const exReps = analysis?.exerciseReps ?? {};
-    const topExercises = Object.entries(exReps)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 4);
+    // Build natural volume acknowledgment
+    const totalReps = analysis?.totalStrengthReps ?? 0;
+    const totalSessions = Object.keys(analysis?.sportFrequency ?? {}).length +
+      (totalSets > 0 ? Math.ceil(totalSets / 8) : 0); // rough session estimate
     let volumeAck = "";
-    if (topExercises.length > 0) {
-      const totalReps = topExercises.reduce((s, [, v]) => s + v, 0);
-      if (totalReps > 200) {
-        const breakdown = topExercises
-          .filter(([, v]) => v >= 50)
-          .map(([name, v]) => `${v.toLocaleString()} ${name.toLowerCase()}s`)
-          .join(", ");
-        volumeAck = breakdown
-          ? ` You've put in the work — ${breakdown} this period.`
-          : ` ${totalReps.toLocaleString()} reps logged and building.`;
-      }
+    if (totalReps > 1000) {
+      volumeAck = " Your consistency has been solid — the work is there.";
+    } else if (totalReps > 300) {
+      volumeAck = " You've been putting in work.";
     }
 
     // Severe pain → top priority recovery warning
