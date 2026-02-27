@@ -3161,34 +3161,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               ...(isToday && !hasSessions ? { flex: 1, justifyContent: "center" } : {}),
             }}>
               {isToday && !hasSessions ? (
-                /* HERO STATE: greeting flows into check-in */
+                /* HERO STATE: centered greeting, today only, no sessions */
                 <div style={{
                   display: "flex", flexDirection: "column", alignItems: "center",
-                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 8, paddingTop: "8vh",
+                  justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 32, paddingTop: "8vh",
                 }}>
-                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
-                    {getTimeGreeting()}
+                  <div>
+                    <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
+                      {getTimeGreeting()}
+                    </div>
+                    <div style={{ fontSize: 14, opacity: 0.5, marginTop: 8 }}>
+                      Tap + to start a session
+                    </div>
                   </div>
-                  <CoachCheckin
+                  <CoachHeroInsight
+                    insights={coachInsights}
+                    onAddExercise={handleAddSuggestion}
                     colors={colors}
-                    todayCheckin={checkinEditMode ? null : todayCheckin}
-                    onSubmit={handleCheckinSubmit}
-                    onEdit={() => setCheckinEditMode(true)}
+                    loading={coachLoading}
+                    error={coachError}
+                    userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                    onRefresh={handleCoachRefresh}
                   />
-                  {todayCheckin && !checkinEditMode && (
-                    <CoachHeroInsight
-                      insights={coachInsights}
-                      onAddExercise={handleAddSuggestion}
-                      colors={colors}
-                      loading={coachLoading}
-                      error={coachError}
-                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                      onRefresh={handleCoachRefresh}
-                    />
-                  )}
-                  <div style={{ fontSize: 13, opacity: 0.35, marginTop: 8 }}>
-                    Tap + to start a session
-                  </div>
                 </div>
               ) : !isToday && !hasSessions ? (
                 /* NON-TODAY EMPTY: no logs or sessions */
@@ -3207,26 +3201,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     {isToday ? "Today\u2019s sessions" : "Sessions logged"}
                   </div>
                   {isToday && (
-                    <>
-                      <CoachCheckin
-                        colors={colors}
-                        todayCheckin={checkinEditMode ? null : todayCheckin}
-                        onSubmit={handleCheckinSubmit}
-                        onEdit={() => setCheckinEditMode(true)}
-                      />
-                      {todayCheckin && !checkinEditMode && (
-                        <CoachInsightsCard
-                          insights={coachInsights}
-                          onAddExercise={handleAddSuggestion}
-                          styles={styles}
-                          colors={colors}
-                          loading={coachLoading}
-                          error={coachError}
-                          userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                          onRefresh={handleCoachRefresh}
-                        />
-                      )}
-                    </>
+                    <CoachInsightsCard
+                      insights={coachInsights}
+                      onAddExercise={handleAddSuggestion}
+                      styles={styles}
+                      colors={colors}
+                      loading={coachLoading}
+                      error={coachError}
+                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                      onRefresh={handleCoachRefresh}
+                    />
                   )}
                   {/* Explicitly added sessions (with remove button) — newest first */}
                   {[...todayProgramWorkouts].reverse().map((w) => (
