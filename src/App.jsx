@@ -3166,13 +3166,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   display: "flex", flexDirection: "column", alignItems: "center",
                   justifyContent: "center", textAlign: "center", minHeight: "50vh", gap: 48, paddingTop: "8vh",
                 }}>
-                  <div>
-                    <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
-                      {getTimeGreeting()}
-                    </div>
-                    <div style={{ fontSize: 14, opacity: 0.5, marginTop: 8 }}>
-                      Tap + to start a session
-                    </div>
+                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
+                    {getTimeGreeting()}
                   </div>
                   <CoachHeroInsight
                     insights={coachInsights}
@@ -3183,6 +3178,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
                     onRefresh={handleCoachRefresh}
                   />
+                  <div style={{ fontSize: 14, opacity: 0.35 }}>
+                    Tap + to start a session
+                  </div>
                 </div>
               ) : !isToday && !hasSessions ? (
                 /* NON-TODAY EMPTY: no logs or sessions */
