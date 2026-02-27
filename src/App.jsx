@@ -3180,7 +3180,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 /* HERO STATE: centered greeting, today only, no sessions */
                 <div style={{
                   display: "flex", flexDirection: "column", alignItems: "center",
-                  textAlign: "center", minHeight: "50vh", gap: 48, paddingTop: "14vh",
+                  textAlign: "center", minHeight: "60vh", gap: 28, justifyContent: "center",
+                  padding: "24px 0",
                 }}>
                   <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
                     {getTimeGreeting()}
