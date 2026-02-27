@@ -30,6 +30,10 @@ const ANIM_CSS = `
 @keyframes checkinStagger {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes checkinCollapse {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.95); }
 }`;
 let animInjected = false;
 function ensureAnim() {
@@ -317,9 +321,9 @@ export function CoachCheckin({
   };
 
   const hasAnyInput = mood !== null || sleep !== null || Object.keys(painMap).length > 0;
-  const showSleep = mood !== null;
-  const showPain = mood !== null && sleep !== null;
-  const showButton = mood !== null && sleep !== null;
+
+  // Progressive reveal: current step is the first unanswered question
+  const step = mood === null ? 0 : sleep === null ? 1 : 2;
 
   const handleClear = () => {
     setMood(null);
@@ -329,61 +333,96 @@ export function CoachCheckin({
 
   const fadeIn = { opacity: 0, animation: "checkinStagger 0.4s ease-out forwards" };
 
+  // Compact pill for an answered question
+  const tagStyle = {
+    display: "inline-flex", alignItems: "center", gap: 4,
+    padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+    border: `1px solid ${colors.border}`,
+    background: colors.cardBg, color: colors.text, opacity: 0.7,
+  };
+
+  const moodFace = mood !== null ? MOOD_FACES.find((f) => f.value === mood) : null;
+
   return (
     <div style={{
-      display: "flex", flexDirection: "column", gap: 16,
+      display: "flex", flexDirection: "column", gap: 14,
       padding: "16px 0",
     }}>
-      <div style={fadeIn}>
-        <CheckinMoodPicker value={mood} onChange={setMood} colors={colors} />
-      </div>
-      {showSleep && (
+      {/* Answered tags row */}
+      {hasAnyInput && (
+        <div style={{
+          display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", alignItems: "center",
+          animation: "checkinFadeIn 0.3s ease-out",
+        }}>
+          {mood !== null && step > 0 && (
+            <span style={tagStyle}>
+              {moodFace && (
+                <svg viewBox="0 0 32 32" width="14" height="14">
+                  <circle cx="16" cy="16" r="14" fill="#FFD93D" stroke="#E6B800" strokeWidth="1.5" />
+                  <path d={moodFace.mouth} fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              )}
+              {MOOD_LABELS[String(mood)]}
+            </span>
+          )}
+          {sleep !== null && step > 1 && (
+            <span style={tagStyle}>Slept {sleep}</span>
+          )}
+          <button
+            onClick={handleClear}
+            style={{
+              background: "transparent", border: "none",
+              color: colors.text, opacity: 0.3, fontSize: 11,
+              cursor: "pointer", padding: "2px 4px",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Current question */}
+      {step === 0 && (
+        <div key="mood" style={fadeIn}>
+          <CheckinMoodPicker value={mood} onChange={setMood} colors={colors} />
+        </div>
+      )}
+      {step === 1 && (
         <div key="sleep" style={fadeIn}>
           <SleepPicker value={sleep} onChange={setSleep} colors={colors} />
         </div>
       )}
-      {showPain && (
-        <div key="pain" style={fadeIn}>
-          <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
-        </div>
-      )}
-
-      {showButton && (
-        <div key="actions" style={{ ...fadeIn, display: "flex", justifyContent: "center", alignItems: "center", gap: 12, paddingTop: 4 }}>
-          <button
-            className="btn-press"
-            onClick={handleSubmit}
-            style={{
-              padding: "10px 24px", borderRadius: 10,
-              fontSize: 14, fontWeight: 700,
-              border: `1px solid ${colors.border}`,
-              background: colors.cardBg,
-              color: colors.text,
-              cursor: "pointer",
-              boxShadow: colors.shadow,
-              display: "inline-flex", alignItems: "center", gap: 6,
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
-              <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
-              <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
-            </svg>
-            Get Today's Analysis
-          </button>
-          {hasAnyInput && (
+      {step === 2 && (
+        <>
+          <div key="pain" style={fadeIn}>
+            <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
+          </div>
+          <div key="actions" style={{ ...fadeIn, display: "flex", justifyContent: "center", paddingTop: 4 }}>
             <button
-              onClick={handleClear}
+              className="btn-press"
+              onClick={handleSubmit}
               style={{
-                background: "transparent", border: "none",
-                color: colors.text, opacity: 0.35, fontSize: 12,
-                cursor: "pointer", padding: "4px 6px",
-                textDecoration: "underline",
+                padding: "10px 24px", borderRadius: 10,
+                fontSize: 14, fontWeight: 700,
+                border: `1px solid ${colors.border}`,
+                background: colors.cardBg,
+                color: colors.text,
+                cursor: "pointer",
+                boxShadow: colors.shadow,
+                display: "inline-flex", alignItems: "center", gap: 6,
               }}
             >
-              Clear
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+              </svg>
+              Get Today's Analysis
             </button>
-          )}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
