@@ -1388,5 +1388,9 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     // Ignore storage errors
   }
 
-  return { insights: filtered, fromCache: false, coachNotes: data?.coachNotes || [] };
+  // Validate coachNotes — each must have topic + detail strings
+  const coachNotes = (Array.isArray(data?.coachNotes) ? data.coachNotes : [])
+    .filter((n) => n && typeof n.topic === "string" && typeof n.detail === "string");
+
+  return { insights: filtered, fromCache: false, coachNotes };
 }

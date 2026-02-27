@@ -102,7 +102,7 @@ export function mergeCoachNotes(existing, newNotes) {
   }
 
   // Overwrite with new notes (newer wins)
-  for (const note of (newNotes || [])) {
+  for (const note of (Array.isArray(newNotes) ? newNotes : [])) {
     if (note.topic && note.detail) {
       byTopic.set(note.topic, note);
     }

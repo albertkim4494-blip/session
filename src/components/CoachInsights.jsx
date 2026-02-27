@@ -207,11 +207,12 @@ export function CoachInsightsCard({
   }
   const rest = normalized.filter((n) => n !== hero && n.headline !== hero?.headline);
 
-  // Trigger animation when hero headline changes
+  // Trigger animation and auto-expand when hero headline changes
   useEffect(() => {
     ensureAnimation();
     if (hero && hero.headline !== prevHeadlineRef.current) {
       setAnimKey((k) => k + 1);
+      setCollapsed(false);
       prevHeadlineRef.current = hero.headline;
     }
   }, [hero?.headline]);

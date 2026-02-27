@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { PAIN_AREAS } from "../lib/coachCheckin";
 
 // ---------------------------------------------------------------------------
@@ -394,66 +394,18 @@ export function CheckinEditSection({ section, checkin, onSave, onCancel, colors 
 // ---------------------------------------------------------------------------
 // CoachCheckin — Main export
 // ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// CheckinPills — compact pills showing current answers (rendered externally)
-// ---------------------------------------------------------------------------
-export function CheckinPills({ mood, sleep, step, jumpToStep, colors }) {
-  if (step < 1) return null;
-
-  const tagStyle = {
-    display: "inline-flex", alignItems: "center", gap: 4,
-    padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-    border: `1px solid ${colors.border}`,
-    background: colors.cardBg, color: colors.text, opacity: 0.7,
-    cursor: jumpToStep ? "pointer" : "default",
-  };
-
-  const moodFace = mood !== null ? MOOD_FACES.find((f) => f.value === mood) : null;
-
-  return (
-    <div style={{
-      display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", alignItems: "center",
-      animation: "checkinFadeIn 0.3s ease-out",
-    }}>
-      {mood !== null && (
-        <span style={tagStyle} onClick={() => jumpToStep?.(0)}>
-          {moodFace && (
-            <svg viewBox="0 0 32 32" width="14" height="14">
-              <circle cx="16" cy="16" r="14" fill="#FFD93D" stroke="#E6B800" strokeWidth="1.5" />
-              <path d={moodFace.mouth} fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          )}
-          {MOOD_LABELS[String(mood)]}
-        </span>
-      )}
-      {sleep !== null && step > 1 && (
-        <span style={tagStyle} onClick={() => jumpToStep?.(1)}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" opacity="0.5">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          </svg>
-          {SLEEP_LABELS[sleep]}
-        </span>
-      )}
-      )}
-    </div>
-  );
-}
-
 export function CoachCheckin({
   colors,
   onSubmit,
   onCancel,
-  onValuesChange,  // ({ mood, sleep, step }) => void — reports current values for external pills
   editValues,   // null = fresh check-in, { mood, sleep, pain } = editing existing
-  startExpanded,  // skip collapsed state, go straight to questions
 }) {
   const isEdit = editValues !== null && editValues !== undefined;
-  const [expanded, setExpanded] = useState(isEdit || !!startExpanded);
+  const [expanded, setExpanded] = useState(isEdit);
   const [mood, setMood] = useState(null);
   const [sleep, setSleep] = useState(null);
   const [painMap, setPainMap] = useState({});
   const [editStep, setEditStep] = useState(0); // tracks which step user is on during edit
-  const jumpToStepRef = useRef(null);
 
   useEffect(() => { ensureAnim(); }, []);
 
@@ -467,7 +419,7 @@ export function CoachCheckin({
       const map = {};
       for (const p of (editValues.pain || [])) { if (p.severity) map[p.area] = p.severity; }
       setPainMap(map);
-    } else if (!startExpanded) {
+    } else {
       setExpanded(false);
       setMood(null);
       setSleep(null);
@@ -475,7 +427,7 @@ export function CoachCheckin({
     }
   }, [isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Step calculation (needed before early return for the effect below)
+  // Step calculation
   const step = isEdit ? editStep : (mood === null ? 0 : sleep === null ? 1 : 2);
 
   // Keep jumpToStep ref current
@@ -487,14 +439,6 @@ export function CoachCheckin({
       else if (target <= 1) { setSleep(null); setPainMap({}); }
     }
   };
-  jumpToStepRef.current = jumpToStep;
-
-  // Report values changes up for external pill rendering
-  useEffect(() => {
-    if (expanded && onValuesChange) {
-      onValuesChange({ mood, sleep, step, jumpToStep: (...a) => jumpToStepRef.current?.(...a) });
-    }
-  }, [mood, sleep, step, expanded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Collapsed — subtle prompt
   if (!expanded) {
