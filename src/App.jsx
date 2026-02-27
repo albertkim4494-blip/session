@@ -1022,7 +1022,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         console.error("AI Coach error:", err);
         if (coachInsights.length === 0) {
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDateRange, catalogMap);
-          setCoachInsights(detectImbalancesNormalized(analysis, coachOpts));
+          setCoachInsights(detectImbalancesNormalized(analysis, { ...coachOpts, checkin: autoCheckin }));
         }
         const detail = err?.message || String(err);
         setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
@@ -2415,7 +2415,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (coachInsights.length === 0) {
           const coachDR = { start: addDays(dateKey, -90), end: dateKey };
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDR, catalogMap);
-          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, userExerciseNames: refreshExNames }));
+          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, userExerciseNames: refreshExNames, checkin: checkinForRefresh }));
         }
         const detail = err?.message || String(err);
         setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
@@ -2475,7 +2475,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (coachInsights.length === 0) {
           const coachDR = { start: addDays(dateKey, -90), end: dateKey };
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDR, catalogMap);
-          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog }));
+          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, checkin: checkinData }));
         }
         setCoachError(`AI coach unavailable \u2014 showing basic analysis`);
       })

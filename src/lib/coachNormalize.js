@@ -661,12 +661,68 @@ export function detectImbalancesNormalized(analysis, opts) {
     }
   }
 
+  // --- Check-in-aware insights (offline fallback) ---
+  const checkin = opts?.checkin;
+  if (checkin) {
+    const moodLabel = { "-2": "brutal", "-1": "tough", "0": "okay", "1": "good", "2": "great" }[String(checkin.mood)] || "unknown";
+    const painAreas = (checkin.pain || []).filter((p) => p.severity);
+    const hasSeverePain = painAreas.some((p) => p.severity === "severe");
+    const hasAnyPain = painAreas.length > 0;
+
+    // Severe pain → top priority recovery warning
+    if (hasSeverePain && insights.length < 3) {
+      const severeAreas = painAreas.filter((p) => p.severity === "severe").map((p) => p.area).join(", ");
+      insights.unshift({
+        type: "RECOVERY",
+        severity: "HIGH",
+        title: "\u26A0\uFE0F Severe pain reported",
+        message: `You're reporting severe pain in ${severeAreas}. Consider skipping exercises that load ${severeAreas.toLowerCase()} today, or take a full rest day. If pain persists, consult a professional.`,
+        suggestions: [],
+      });
+    }
+
+    // Feeling rough/brutal but still showed up → encouragement
+    if (checkin.mood <= -1 && totalSets > 0 && insights.length < 3) {
+      const sleepContext = checkin.sleep === "poor" ? " on poor sleep" : "";
+      insights.push({
+        type: "POSITIVE",
+        severity: "INFO",
+        title: `\uD83D\uDD25 Showing up when it's ${moodLabel}`,
+        message: `You're feeling ${moodLabel}${sleepContext} but you're still here — that's what separates consistency from motivation. ${hasAnyPain ? "Go lighter on anything that hurts and focus on what feels good." : "Even a lighter session today builds the habit. Do what you can."}`,
+        suggestions: [],
+      });
+    }
+
+    // Pain areas → suggest modifications
+    if (hasAnyPain && !hasSeverePain && insights.length < 3) {
+      const painList = painAreas.map((p) => `${p.area} (${p.severity})`).join(", ");
+      insights.push({
+        type: "TIP",
+        severity: "MEDIUM",
+        title: "\uD83D\uDCA1 Modify around pain",
+        message: `You mentioned ${painList}. Avoid exercises that aggravate ${painAreas.length === 1 ? "that area" : "those areas"} — swap for pain-free alternatives or reduce the load. Pain is information, not something to push through.`,
+        suggestions: [],
+      });
+    }
+
+    // Poor sleep → suggest lower intensity
+    if (checkin.sleep === "poor" && checkin.mood >= 0 && insights.length < 3) {
+      insights.push({
+        type: "TIP",
+        severity: "LOW",
+        title: "\uD83D\uDCA4 Poor sleep — adjust intensity",
+        message: "Sleep affects recovery and performance more than most variables. Consider dropping weight by 10-15% or cutting a set from each exercise today. A good session at 80% beats grinding at 100% on bad sleep.",
+        suggestions: [],
+      });
+    }
+  }
+
   // Positive feedback
   if (insights.length === 0 && totalSets > 12) {
     insights.push({
       type: 'POSITIVE',
       severity: 'INFO',
-      title: '✅ Training looks balanced!',
+      title: '\u2705 Training looks balanced!',
       message: `${totalSets} sets well-distributed across muscle groups. Keep it up!`,
       suggestions: []
     });

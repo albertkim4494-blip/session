@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     // Validate and resolve model + max_tokens
     const ALLOWED_MODELS = new Set(["gpt-4o", "gpt-4o-mini"]);
     const model = ALLOWED_MODELS.has(modelHint) ? modelHint : "gpt-4o-mini";
-    const maxTokens = model === "gpt-4o" ? 1200 : 1000;
+    const maxTokens = model === "gpt-4o" ? 1500 : 1200;
 
     const wUnit = weightUnit || "lb";
 
