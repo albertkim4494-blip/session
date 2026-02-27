@@ -569,6 +569,10 @@ export function detectImbalancesNormalized(analysis, opts) {
 
   for (const group of importantGroups) {
     const groupSets = sets[group] || 0;
+
+    // Skip if this muscle group has adequate absolute volume (6+ sets is fine regardless of percentage)
+    if (groupSets >= 6) continue;
+
     const percentage = totalSets > 0 ? (groupSets / totalSets) * 100 : 0;
 
     if (percentage < 5 && totalSets > 12 && insights.length < 2) {
@@ -580,10 +584,10 @@ export function detectImbalancesNormalized(analysis, opts) {
       insights.push({
         type: 'NEGLECTED',
         severity: 'LOW',
-        title: `📊 ${groupName} needs attention`,
+        title: `\uD83D\uDCCA ${groupName} needs attention`,
         message: groupSets === 0
           ? `No direct ${groupName} sets logged this period. Consider adding some targeted work.`
-          : `Only ${groupSets} direct ${groupName} set${groupSets !== 1 ? 's' : ''} out of ${totalSets} total — that's ${Math.round(percentage)}%. Consider adding more.`,
+          : `${groupSets} direct ${groupName} set${groupSets !== 1 ? 's' : ''} — could benefit from a bit more volume.`,
         suggestions: getSuggestionsForMuscleGroup(group, catalog, userExerciseNames)
       });
     }

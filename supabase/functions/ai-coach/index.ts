@@ -630,20 +630,34 @@ Analyze this data and return JSON insights.`;
       bodyLen: openaiBody.length,
     }));
 
-    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: openaiBody,
-    });
+    // Call OpenAI with retry on 429 (rate limit)
+    let openaiRes: Response | null = null;
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: openaiBody,
+      });
 
-    if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      console.error("OpenAI API error:", openaiRes.status, errText);
+      if (openaiRes.status !== 429) break;
+
+      // 429 rate limit — wait and retry
+      const retryAfter = openaiRes.headers.get("retry-after");
+      const waitMs = retryAfter ? Math.min(Number(retryAfter) * 1000, 10000) : (attempt + 1) * 2000;
+      console.log(JSON.stringify({ event: "ai_rate_limit", feature: "coach", attempt, waitMs }));
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+
+    if (!openaiRes || !openaiRes.ok) {
+      const status = openaiRes?.status ?? 0;
+      const errText = openaiRes ? await openaiRes.text() : "No response";
+      console.error("OpenAI API error:", status, errText);
       return new Response(
-        JSON.stringify({ error: "AI service error", detail: openaiRes.status }),
+        JSON.stringify({ error: "AI service error", detail: status }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
