@@ -177,6 +177,8 @@ export function CoachInsightsCard({
   userExerciseNames,
   checkinSlot,   // ReactNode — rendered in header row (right side)
   refreshSlot,   // ReactNode — rendered below header (e.g. refresh button)
+  hasNotification, // boolean — red dot badge when true
+  onSeen,          // callback — called when card is expanded (user sees content)
 }) {
   const [showMore, setShowMore] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -217,6 +219,13 @@ export function CoachInsightsCard({
     }
   }, [hero?.headline]);
 
+  // Mark notification as seen when card is expanded and has insights
+  useEffect(() => {
+    if (!collapsed && hasNotification && hasInsights) {
+      onSeen?.();
+    }
+  }, [collapsed, hasNotification, hasInsights]);
+
   const accentColor = hero ? (SEVERITY_COLORS[hero.severity] || "#6b7280") : "#6b7280";
 
   return (
@@ -229,6 +238,13 @@ export function CoachInsightsCard({
         <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.4, letterSpacing: 0.5, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 5 }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none"><path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" /><path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" /></svg>
           Coach
+          {hasNotification && collapsed && (
+            <div style={{
+              width: 7, height: 7, borderRadius: "50%",
+              background: "#ef4444", flexShrink: 0,
+              marginLeft: 1,
+            }} />
+          )}
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3, transform: collapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}>
           <path d="M6 9l6 6 6-6" />

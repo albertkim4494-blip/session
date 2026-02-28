@@ -237,6 +237,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const coachCacheRef = useRef(new Map());
   const coachLastSignatureRef = useRef(null);
   const coachLastFetchRef = useRef(0);
+  const [coachUnseen, setCoachUnseen] = useState(false);
   const MAX_DAILY_REFRESHES = 10;
   const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(dateKey));
   const [checkinEditSection, setCheckinEditSection] = useState(null); // null | "mood" | "sleep" | "pain"
@@ -1037,6 +1038,63 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     return () => { cancelled = true; };
   }, [dataReady, profile]);
+
+  // Auto-refresh coach when workout data changes (signature change = sets logged)
+  useEffect(() => {
+    // Skip if not ready or no prior fetch yet
+    if (!dataReady || !profile || !coachLastSignatureRef.current) return;
+    // Skip if signature hasn't actually changed
+    if (coachSignature === coachLastSignatureRef.current) return;
+    // Debounce — wait 5s after last log save before re-fetching
+    const timer = setTimeout(() => {
+      if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) return;
+      incrementDailyRefresh();
+      const reqId = ++coachReqIdRef.current;
+      setCoachLoading(true);
+      const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
+      const coachEnd = dateKey;
+      const coachStart = addDays(coachEnd, -90);
+      const checkin = getTodayCheckin(dateKey);
+      let checkinCtx = null;
+      let coachNotesData = null;
+      if (checkin) {
+        checkinCtx = buildCheckinContext(checkin, loadCheckins(), state.logsByDate);
+        coachNotesData = loadCoachNotes();
+      }
+      fetchCoachInsights({
+        profile, state,
+        dateRange: { start: coachStart, end: coachEnd },
+        options: { forceRefresh: true },
+        catalog: refreshCatalog, equipment,
+        measurementSystem: state.preferences?.measurementSystem,
+        checkinContext: checkinCtx,
+        coachNotesFromStorage: coachNotesData,
+      })
+        .then(({ insights, coachNotes: returnedNotes }) => {
+          if (coachReqIdRef.current !== reqId) return;
+          setCoachInsights(insights);
+          setCoachUnseen(true);
+          coachLastSignatureRef.current = coachSignature;
+          coachLastFetchRef.current = Date.now();
+          coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
+          const cacheKey = `wt_coach_v2:${session.user.id}:${dateKey}`;
+          try { localStorage.setItem(cacheKey, JSON.stringify({ insights, signature: coachSignature, createdAt: Date.now() })); } catch {}
+          if (returnedNotes?.length > 0) {
+            const existing = loadCoachNotes();
+            const merged = mergeCoachNotes(existing, returnedNotes);
+            saveCoachNotes(merged);
+          }
+        })
+        .catch((err) => {
+          if (coachReqIdRef.current !== reqId) return;
+          console.error("AI Coach auto-refresh error:", err);
+        })
+        .finally(() => {
+          if (coachReqIdRef.current === reqId) setCoachLoading(false);
+        });
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [coachSignature, dataReady, profile]);
 
   // ---------------------------------------------------------------------------
   // EFFECTS
@@ -3258,6 +3316,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       error={coachError}
                       userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
                       onRefresh={handleCoachRefresh}
+                      hasNotification={coachUnseen}
+                      onSeen={() => setCoachUnseen(false)}
                       checkinSlot={
                         <CheckinSummary
                           checkin={todayCheckin || { mood: null, sleep: null, pain: [] }}
