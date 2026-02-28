@@ -981,6 +981,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (lastAutoDate === today) return; // Already fetched today — use cached insights
 
     // 4. Fetch from AI
+    // Set signature ref now to prevent auto-refresh effect from double-firing
+    coachLastSignatureRef.current = coachSignature;
     let cancelled = false;
     const reqId = ++coachReqIdRef.current;
 
@@ -1045,9 +1047,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (!dataReady || !profile || !coachLastSignatureRef.current) return;
     // Skip if signature hasn't actually changed
     if (coachSignature === coachLastSignatureRef.current) return;
-    // Debounce — wait 5s after last log save before re-fetching
+    // Debounce — wait 8s after last log save before re-fetching
+    const reqIdBefore = coachReqIdRef.current;
     const timer = setTimeout(() => {
       if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) return;
+      // Skip if another fetch was started since this timer was scheduled
+      if (coachReqIdRef.current !== reqIdBefore) return;
       incrementDailyRefresh();
       const reqId = ++coachReqIdRef.current;
       setCoachLoading(true);
