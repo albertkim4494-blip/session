@@ -220,39 +220,32 @@ export function CoachInsightsCard({
   const accentColor = hero ? (SEVERITY_COLORS[hero.severity] || "#6b7280") : "#6b7280";
 
   return (
-    <div
-      style={{
-        background: colors.cardBg,
-        border: `1px solid ${colors.border}`,
-        borderRadius: 16,
-        padding: "20px 18px",
-        boxShadow: colors.shadow,
-      }}
-    >
+    <div style={{ padding: "4px 0" }}>
       {/* Header row — clickable to collapse */}
       <div
         onClick={() => setCollapsed((v) => !v)}
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: checkinSlot && !collapsed ? 8 : (collapsed ? 0 : (refreshSlot ? 10 : (hero ? 14 : 8))), cursor: "pointer" }}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: collapsed ? 0 : 10, cursor: "pointer" }}
       >
-        <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.5, letterSpacing: 0.5, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 5 }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="#f0b429" stroke="none"><path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" /><path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" /></svg>
-          Coach Insight
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.4, letterSpacing: 0.5, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 5 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none"><path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" /><path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" /></svg>
+          Coach
         </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, transform: collapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3, transform: collapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}>
           <path d="M6 9l6 6 6-6" />
         </svg>
       </div>
-      {/* Check-in pills row */}
-      {checkinSlot && !collapsed && (
-        <div onClick={(e) => e.stopPropagation()} style={{ marginBottom: refreshSlot ? 10 : (hero ? 14 : 8) }}>
-          {checkinSlot}
-        </div>
-      )}
 
       {!collapsed && (
         <>
-          {/* Edit / check-in section inside card */}
-          {refreshSlot && <div style={{ marginBottom: hero ? 14 : 8 }}>{refreshSlot}</div>}
+          {/* Check-in pills row */}
+          {checkinSlot && (
+            <div onClick={(e) => e.stopPropagation()} style={{ marginBottom: 10 }}>
+              {checkinSlot}
+            </div>
+          )}
+
+          {/* Edit / check-in section */}
+          {refreshSlot && <div style={{ marginBottom: 10 }}>{refreshSlot}</div>}
 
           {/* Error */}
           {error && (
@@ -266,14 +259,14 @@ export function CoachInsightsCard({
 
           {/* Loading */}
           {loading && !hasInsights && (
-            <div style={{ padding: "12px 0", textAlign: "center", opacity: 0.5, fontSize: 14 }}>
+            <div style={{ padding: "8px 0", opacity: 0.4, fontSize: 13 }}>
               Analyzing your workouts...
             </div>
           )}
 
           {/* Empty state — no insights yet */}
           {!loading && !hasInsights && !error && (
-            <div style={{ fontSize: 14, opacity: 0.6, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 13, opacity: 0.5, lineHeight: 1.5 }}>
               {onRefresh ? (
                 <>
                   Tap{" "}
@@ -281,7 +274,7 @@ export function CoachInsightsCard({
                     onClick={onRefresh}
                     style={{
                       background: "transparent", border: "none", color: colors.text,
-                      fontWeight: 700, fontSize: 14, cursor: "pointer", padding: 0,
+                      fontWeight: 700, fontSize: 13, cursor: "pointer", padding: 0,
                       textDecoration: "underline", opacity: 0.9,
                     }}
                   >
@@ -304,20 +297,20 @@ export function CoachInsightsCard({
                 transition: "opacity 0.3s",
                 animation: "coachFadeIn 0.4s ease-out",
                 borderLeft: `3px solid ${accentColor}`,
-                paddingLeft: 14,
+                paddingLeft: 12,
               }}
             >
-              <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.35, marginBottom: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.35, marginBottom: 3 }}>
                 {hero.headline}
               </div>
-              <div style={{ fontSize: 14, opacity: 0.8, lineHeight: 1.45 }}>
+              <div style={{ fontSize: 13, opacity: 0.7, lineHeight: 1.45 }}>
                 {hero.detail}
               </div>
               {hero.cta && (
                 <button
                   onClick={() => onAddExercise(hero.cta.exercise)}
                   style={{
-                    marginTop: 10, padding: "7px 14px", fontSize: 13, fontWeight: 700,
+                    marginTop: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700,
                     borderRadius: 8, border: `1px solid ${accentColor}44`,
                     background: `${accentColor}18`, color: colors.text,
                     cursor: "pointer",
@@ -335,8 +328,8 @@ export function CoachInsightsCard({
               <button
                 onClick={() => setShowMore((v) => !v)}
                 style={{
-                  marginTop: 14, background: "transparent", border: "none",
-                  color: colors.text, opacity: 0.5, fontSize: 13, cursor: "pointer",
+                  marginTop: 12, background: "transparent", border: "none",
+                  color: colors.text, opacity: 0.4, fontSize: 12, cursor: "pointer",
                   padding: 0, fontWeight: 600,
                 }}
               >
@@ -354,15 +347,15 @@ export function CoachInsightsCard({
           )}
 
           {/* Footer */}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
             {loading ? (
-              <span style={{ fontSize: 11, opacity: 0.35 }}>Updating...</span>
+              <span style={{ fontSize: 11, opacity: 0.3 }}>Updating...</span>
             ) : onRefresh ? (
               <button
                 onClick={onRefresh}
                 style={{
                   background: "transparent", border: "none", color: colors.text,
-                  opacity: 0.35, fontSize: 11, cursor: "pointer", padding: "2px 6px",
+                  opacity: 0.3, fontSize: 11, cursor: "pointer", padding: "2px 6px",
                   textDecoration: "underline",
                 }}
               >
