@@ -4,6 +4,7 @@ import { usernameChangeCooldownMs } from "../../lib/userIdentity";
 import { SOUND_LIST, playTimerSound } from "../../lib/timerSounds";
 import { EQUIPMENT_LABELS } from "../../lib/exerciseCatalog";
 import { updateSearchable } from "../../lib/socialApi";
+import { TimeInput } from "../TimeInput";
 
 const sectionHeaderStyle = {
   fontSize: 13,
@@ -287,57 +288,14 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
 
           <div>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Default Rest</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8 }}>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={60}
-                value={Math.floor((preferences?.defaultRestSec ?? 90) / 60)}
-                onChange={(e) => {
-                  const m = Math.max(0, Math.min(60, Number(e.target.value) || 0));
-                  const s = (preferences?.defaultRestSec ?? 90) % 60;
-                  onUpdatePreference?.("defaultRestSec", m * 60 + s);
-                }}
-                style={{
-                  width: 40,
-                  padding: "6px 4px",
-                  borderRadius: 10,
-                  border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
-                  background: colors?.inputBg || "#161b22",
-                  color: colors?.text || "#e8eef7",
-                  fontSize: 13,
-                  fontFamily: "inherit",
-                  fontWeight: 600,
-                  textAlign: "center",
-                }}
+            <div style={{ marginTop: 8 }}>
+              <TimeInput
+                value={preferences?.defaultRestSec ?? 90}
+                onChange={(sec) => onUpdatePreference?.("defaultRestSec", sec)}
+                colors={colors}
+                labelPosition="inline"
+                labels={{ m: "m", s: "s" }}
               />
-              <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.5 }}>m</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={59}
-                value={(preferences?.defaultRestSec ?? 90) % 60}
-                onChange={(e) => {
-                  const s = Math.max(0, Math.min(59, Number(e.target.value) || 0));
-                  const m = Math.floor((preferences?.defaultRestSec ?? 90) / 60);
-                  onUpdatePreference?.("defaultRestSec", m * 60 + s);
-                }}
-                style={{
-                  width: 40,
-                  padding: "6px 4px",
-                  borderRadius: 10,
-                  border: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`,
-                  background: colors?.inputBg || "#161b22",
-                  color: colors?.text || "#e8eef7",
-                  fontSize: 13,
-                  fontFamily: "inherit",
-                  fontWeight: 600,
-                  textAlign: "center",
-                }}
-              />
-              <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.5 }}>s</span>
             </div>
           </div>
         </div>

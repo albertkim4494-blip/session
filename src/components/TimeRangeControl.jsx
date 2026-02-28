@@ -11,16 +11,16 @@ export function TimeRangeControl({ value, onChange, offset, onOffsetChange, date
   const isAll = value === "all";
 
   const tabBase = {
-    flex: 1,
     border: "none",
-    padding: "8px 0",
-    fontSize: 13,
+    padding: "5px 14px",
+    fontSize: 12,
     fontWeight: 700,
     cursor: "pointer",
-    transition: "background 0.15s, color 0.15s",
+    transition: "background 0.15s, color 0.15s, opacity 0.15s",
     lineHeight: 1,
     fontFamily: "inherit",
     textAlign: "center",
+    borderRadius: 8,
   };
 
   const chevronStyle = (disabled) => ({
@@ -38,14 +38,8 @@ export function TimeRangeControl({ value, onChange, offset, onOffsetChange, date
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {/* Row 1: full-width period pills */}
-      <div style={{
-        display: "flex",
-        borderRadius: 10,
-        overflow: "hidden",
-        border: `1px solid ${colors.border}`,
-        background: colors.cardAltBg,
-      }}>
+      {/* Row 1: period pills */}
+      <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
         {TABS.map((t) => {
           const active = t.value === value;
           return (
@@ -56,7 +50,8 @@ export function TimeRangeControl({ value, onChange, offset, onOffsetChange, date
                 ...tabBase,
                 background: active ? colors.primaryBg : "transparent",
                 color: active ? (colors.primaryText || "#fff") : colors.text,
-                opacity: active ? 1 : 0.5,
+                opacity: active ? 1 : 0.4,
+                border: active ? "none" : `1px solid ${colors.border}`,
               }}
             >
               {t.label}
