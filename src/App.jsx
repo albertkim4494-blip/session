@@ -237,6 +237,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const coachCacheRef = useRef(new Map());
   const coachLastSignatureRef = useRef(null);
   const coachLastFetchRef = useRef(0);
+  const coachFetchingRef = useRef(false);  // lock to prevent concurrent fetches
   const [coachUnseen, setCoachUnseen] = useState(false);
   const MAX_DAILY_REFRESHES = 10;
   const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(dateKey));
@@ -986,6 +987,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let cancelled = false;
     const reqId = ++coachReqIdRef.current;
 
+    coachFetchingRef.current = true;
     setCoachLoading(true);
 
     const filteredCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
@@ -1033,6 +1035,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
       })
       .finally(() => {
+        coachFetchingRef.current = false;
         if (!cancelled && coachReqIdRef.current === reqId) {
           setCoachLoading(false);
         }
@@ -2385,12 +2388,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }
 
   const handleCoachRefresh = useCallback(() => {
+    if (coachFetchingRef.current) return;
     if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) {
       showToast("Daily refresh limit reached \u2014 insights update automatically each day");
       return;
     }
     incrementDailyRefresh();
     const reqId = ++coachReqIdRef.current;
+    coachFetchingRef.current = true;
     setCoachLoading(true);
     setCoachError(null);
     const refreshExNames = progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
@@ -2432,6 +2437,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
       })
       .finally(() => {
+        coachFetchingRef.current = false;
         if (coachReqIdRef.current === reqId) setCoachLoading(false);
       });
   }, [progressWorkouts, fullCatalog, equipment, dateKey, profile, state, coachSignature, coachInsights, session?.user?.id, catalogMap]);
@@ -2448,10 +2454,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setTodayCheckin(checkinData);
     setCheckinEditSection(null);
 
-    // Trigger coach fetch with check-in context
+    // Trigger coach fetch with check-in context (skip if already fetching)
+    if (coachFetchingRef.current) return;
     if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) return;
     incrementDailyRefresh();
     const reqId = ++coachReqIdRef.current;
+    coachFetchingRef.current = true;
     setCoachLoading(true);
     setCoachError(null);
 
@@ -2499,6 +2507,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         setCoachError(`AI coach unavailable \u2014 showing basic analysis`);
       })
       .finally(() => {
+        coachFetchingRef.current = false;
         if (coachReqIdRef.current === reqId) setCoachLoading(false);
       });
   }, [dateKey, fullCatalog, equipment, profile, state, coachSignature, session?.user?.id, catalogMap, coachInsights]);
