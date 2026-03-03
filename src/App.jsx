@@ -1042,17 +1042,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [dataReady, profile]);
 
   // Auto-refresh coach when workout data changes (signature change = sets logged)
+  // Debounces 10s after last change, with a 2-minute cooldown between refreshes
   useEffect(() => {
     // Skip if not ready or no prior fetch yet
     if (!dataReady || !profile || !coachLastSignatureRef.current) return;
     // Skip if signature hasn't actually changed
     if (coachSignature === coachLastSignatureRef.current) return;
-    // Debounce — wait 8s after last log save before re-fetching
+    // Debounce — wait 10s after last log save before re-fetching
     const reqIdBefore = coachReqIdRef.current;
     const timer = setTimeout(() => {
       if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) return;
       // Skip if another fetch was started since this timer was scheduled
       if (coachReqIdRef.current !== reqIdBefore) return;
+      // Cooldown — skip if last fetch was less than 2 minutes ago
+      if (Date.now() - coachLastFetchRef.current < 120_000) return;
       incrementDailyRefresh();
       const reqId = ++coachReqIdRef.current;
       setCoachLoading(true);
@@ -1097,7 +1100,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         .finally(() => {
           if (coachReqIdRef.current === reqId) setCoachLoading(false);
         });
-    }, 5000);
+    }, 10_000);
     return () => clearTimeout(timer);
   }, [coachSignature, dataReady, profile]);
 
