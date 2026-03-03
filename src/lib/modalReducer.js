@@ -147,6 +147,11 @@ export const initialModalState = {
     friends: [], selectedFriendId: null, message: "", sending: false,
   },
   workoutPreview: { isOpen: false, sharedWorkout: null, importing: false },
+  createGroup: { isOpen: false, name: "", description: "", creating: false },
+  groupDetail: { isOpen: false, groupId: null, group: null, members: [], workouts: [], loading: false, subTab: "feed" },
+  inviteToGroup: { isOpen: false, groupId: null, groupName: "", friends: [], existingMemberIds: [], sending: false },
+  shareToGroup: { isOpen: false, groupId: null, groupName: "", exercises: [], workoutName: "", message: "", sending: false },
+  groupWorkoutPreview: { isOpen: false, groupWorkout: null },
 };
 
 export function modalReducer(state, action) {
@@ -696,6 +701,113 @@ export function modalReducer(state, action) {
       return {
         ...state,
         workoutPreview: initialModalState.workoutPreview,
+      };
+
+    // ===== CREATE GROUP MODAL =====
+    case "OPEN_CREATE_GROUP":
+      return {
+        ...state,
+        createGroup: { ...initialModalState.createGroup, isOpen: true },
+      };
+
+    case "UPDATE_CREATE_GROUP":
+      return {
+        ...state,
+        createGroup: { ...state.createGroup, ...action.payload },
+      };
+
+    case "CLOSE_CREATE_GROUP":
+      return {
+        ...state,
+        createGroup: initialModalState.createGroup,
+      };
+
+    // ===== GROUP DETAIL =====
+    case "OPEN_GROUP_DETAIL":
+      return {
+        ...state,
+        groupDetail: {
+          ...initialModalState.groupDetail,
+          isOpen: true,
+          groupId: action.payload.groupId,
+        },
+      };
+
+    case "UPDATE_GROUP_DETAIL":
+      return {
+        ...state,
+        groupDetail: { ...state.groupDetail, ...action.payload },
+      };
+
+    case "CLOSE_GROUP_DETAIL":
+      return {
+        ...state,
+        groupDetail: initialModalState.groupDetail,
+      };
+
+    // ===== INVITE TO GROUP MODAL =====
+    case "OPEN_INVITE_TO_GROUP":
+      return {
+        ...state,
+        inviteToGroup: {
+          ...initialModalState.inviteToGroup,
+          isOpen: true,
+          groupId: action.payload.groupId,
+          groupName: action.payload.groupName || "",
+          existingMemberIds: action.payload.existingMemberIds || [],
+        },
+      };
+
+    case "UPDATE_INVITE_TO_GROUP":
+      return {
+        ...state,
+        inviteToGroup: { ...state.inviteToGroup, ...action.payload },
+      };
+
+    case "CLOSE_INVITE_TO_GROUP":
+      return {
+        ...state,
+        inviteToGroup: initialModalState.inviteToGroup,
+      };
+
+    // ===== SHARE TO GROUP MODAL =====
+    case "OPEN_SHARE_TO_GROUP":
+      return {
+        ...state,
+        shareToGroup: {
+          ...initialModalState.shareToGroup,
+          isOpen: true,
+          groupId: action.payload.groupId,
+          groupName: action.payload.groupName || "",
+        },
+      };
+
+    case "UPDATE_SHARE_TO_GROUP":
+      return {
+        ...state,
+        shareToGroup: { ...state.shareToGroup, ...action.payload },
+      };
+
+    case "CLOSE_SHARE_TO_GROUP":
+      return {
+        ...state,
+        shareToGroup: initialModalState.shareToGroup,
+      };
+
+    // ===== GROUP WORKOUT PREVIEW MODAL =====
+    case "OPEN_GROUP_WORKOUT_PREVIEW":
+      return {
+        ...state,
+        groupWorkoutPreview: {
+          isOpen: true,
+          groupWorkout: action.payload.groupWorkout,
+        },
+      };
+
+    case "CLOSE_GROUP_WORKOUT_PREVIEW":
+      return {
+        ...state,
+        groupWorkoutPreview: initialModalState.groupWorkoutPreview,
       };
 
     // ===== CLOSE ALL (for back-button navigation) =====

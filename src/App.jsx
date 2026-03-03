@@ -49,12 +49,21 @@ import { BodyDiagram } from "./components/BodyDiagram";
 import { FriendSearchModal } from "./components/FriendSearchModal";
 import { ShareWorkoutModal } from "./components/ShareWorkoutModal";
 import { WorkoutPreviewModal } from "./components/WorkoutPreviewModal";
+import { CreateGroupModal } from "./components/CreateGroupModal";
+import { InviteToGroupModal } from "./components/InviteToGroupModal";
+import { ShareToGroupModal } from "./components/ShareToGroupModal";
+import { GroupWorkoutPreviewModal } from "./components/GroupWorkoutPreviewModal";
+import { GroupDetailView } from "./components/GroupDetailView";
 import { CircuitTimer } from "./components/CircuitTimer";
 import {
   getFriends, getPendingRequests, getInbox, getUnreadCount,
   acceptFriendRequest, declineFriendRequest, removeFriend,
   acceptSharedWorkout, dismissSharedWorkout,
 } from "./lib/socialApi";
+import {
+  getMyGroups, getGroupInvites, getGroupInviteCount,
+  acceptGroupInvite, declineGroupInvite,
+} from "./lib/groupApi";
 
 // Exercise catalog
 import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
@@ -197,6 +206,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [socialPending, setSocialPending] = useState([]);
   const [socialInbox, setSocialInbox] = useState([]);
   const [socialLoading, setSocialLoading] = useState(false);
+  const [socialGroups, setSocialGroups] = useState([]);
+  const [socialGroupInvites, setSocialGroupInvites] = useState([]);
+  const [activeGroupId, setActiveGroupId] = useState(null);
 
   // Log card flip state (log ↔ exercise detail)
   const [logFlipped, setLogFlipped] = useState(false);
@@ -525,16 +537,22 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Fetch social data when social tab is opened
   const refreshSocial = useCallback(async () => {
     setSocialLoading(true);
-    const [friendsRes, pendingRes, inboxRes, badgeRes] = await Promise.all([
+    const [friendsRes, pendingRes, inboxRes, badgeRes, groupsRes, groupInvitesRes, groupInviteCountRes] = await Promise.all([
       getFriends(),
       getPendingRequests(),
       getInbox(),
       getUnreadCount(),
+      getMyGroups(),
+      getGroupInvites(),
+      getGroupInviteCount(),
     ]);
     setSocialFriends(friendsRes.data || []);
     setSocialPending(pendingRes.data || []);
     setSocialInbox(inboxRes.data || []);
-    setSocialBadge(badgeRes.data || 0);
+    setSocialGroups(groupsRes.data || []);
+    setSocialGroupInvites(groupInvitesRes.data || []);
+    const totalBadge = (badgeRes.data || 0) + (groupInviteCountRes.data || 0);
+    setSocialBadge(totalBadge);
     setSocialLoading(false);
   }, []);
 
@@ -706,11 +724,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const progressWorkouts = useMemo(() => {
     const dailyExercises = [];
     const coachExercises = [];
+    const groupExercises = [];
     for (const [date, ws] of Object.entries(state.dailyWorkouts || {})) {
       if (inRangeInclusive(date, summaryRange.start, summaryRange.end)) {
         for (const w of ws) {
           if (w.source === "coach") {
             coachExercises.push(...(w.exercises || []));
+          } else if (w.source === "group") {
+            groupExercises.push(...(w.exercises || []));
           } else {
             dailyExercises.push(...(w.exercises || []));
           }
@@ -747,6 +768,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
     if (coachExercises.length > 0) {
       result.push({ id: "__coach__", name: "Coach Suggestions", category: "Coach", exercises: coachExercises });
+    }
+    if (groupExercises.length > 0) {
+      result.push({ id: "__group__", name: "Group Workouts", category: "Group", exercises: groupExercises });
     }
     return result;
   }, [workouts, state.dailyWorkouts, state.sessionOverrides, state.sessionAdditions, summaryRange]);
@@ -1176,7 +1200,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     modals.editExercise?.isOpen || modals.catalogBrowse.isOpen || modals.generateWizard.isOpen ||
     modals.generateToday.isOpen || modals.customExercise?.isOpen || modals.billing?.isOpen ||
     modals.social?.isOpen || modals.friendSearch?.isOpen ||
-    modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen;
+    modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen ||
+    modals.createGroup?.isOpen || modals.inviteToGroup?.isOpen ||
+    modals.shareToGroup?.isOpen || modals.groupWorkoutPreview?.isOpen;
 
   const backOverrideRef = useRef(null);
   const anyModalOpenRef = useRef(false);
@@ -3833,15 +3859,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               {(() => {
                 const socialTab = modals.social.tab || "friends";
                 const pendingInboxCount = socialInbox.filter((i) => i.status === "pending").length;
+                const groupInviteCount = socialGroupInvites.length;
                 return (
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <PillTabs
                       tabs={[
                         { value: "friends", label: `Friends${socialFriends.length ? ` (${socialFriends.length})` : ""}` },
+                        { value: "groups", label: `Groups${socialGroups.length ? ` (${socialGroups.length})` : ""}${groupInviteCount ? " ●" : ""}` },
                         { value: "inbox", label: `Inbox${pendingInboxCount ? ` (${pendingInboxCount})` : ""}` },
                       ]}
                       value={socialTab}
-                      onChange={(v) => dispatchModal({ type: "UPDATE_SOCIAL", payload: { tab: v } })}
+                      onChange={(v) => { setActiveGroupId(null); dispatchModal({ type: "UPDATE_SOCIAL", payload: { tab: v } }); }}
                       styles={styles}
                     />
 
@@ -3987,6 +4015,150 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               </div>
                             ))}
                           </div>
+                        )}
+                      </div>
+                    ) : socialTab === "groups" ? (
+                      /* Groups sub-tab */
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {activeGroupId ? (
+                          <GroupDetailView
+                            groupId={activeGroupId}
+                            userId={session.user.id}
+                            dispatch={dispatchModal}
+                            styles={styles}
+                            colors={colors}
+                            onBack={() => setActiveGroupId(null)}
+                            onStartGroupWorkout={(gw) => {
+                              const snapshot = gw.workout_snapshot;
+                              updateState((st) => {
+                                if (!st.dailyWorkouts) st.dailyWorkouts = {};
+                                if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
+                                st.dailyWorkouts[dateKey].push({
+                                  id: uid("w"),
+                                  name: snapshot.name || "Group Workout",
+                                  category: snapshot.category || "Workout",
+                                  source: "group",
+                                  groupWorkoutId: gw.id,
+                                  sharedBy: gw.shared_by_profile?.username || "unknown",
+                                  exercises: (snapshot.exercises || []).map((ex) => ({
+                                    ...ex, id: uid("ex"),
+                                  })),
+                                });
+                                return st;
+                              });
+                              showToast("Workout added to today!");
+                              setTab("train");
+                            }}
+                            showToast={showToast}
+                            refreshSocial={refreshSocial}
+                          />
+                        ) : (
+                          <>
+                            <button
+                              className="btn-press"
+                              onClick={() => dispatchModal({ type: "OPEN_CREATE_GROUP" })}
+                              style={{ ...styles.primaryBtn, width: "100%", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "12px 14px" }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                              Create Group
+                            </button>
+
+                            {socialLoading && socialGroups.length === 0 && socialGroupInvites.length === 0 && (
+                              <div style={{ textAlign: "center", padding: 20, opacity: 0.5, fontSize: 13 }}>Loading...</div>
+                            )}
+
+                            {/* Group invites */}
+                            {socialGroupInvites.length > 0 && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.7 }}>
+                                  Invites ({socialGroupInvites.length})
+                                </div>
+                                {socialGroupInvites.map((inv) => (
+                                  <div
+                                    key={inv.id}
+                                    style={{
+                                      display: "flex", alignItems: "center", gap: 10,
+                                      padding: "12px 14px", borderRadius: 12,
+                                      background: colors.accentBg,
+                                      border: `1px solid ${colors.accentBorder}`,
+                                    }}
+                                  >
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontSize: 14, fontWeight: 700 }}>{inv.group?.name || "Group"}</div>
+                                      <div style={{ fontSize: 12, opacity: 0.6 }}>
+                                        from @{inv.inviter?.username || "unknown"}
+                                      </div>
+                                    </div>
+                                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                      <button
+                                        className="btn-press"
+                                        onClick={async () => {
+                                          await acceptGroupInvite(inv.id);
+                                          refreshSocial();
+                                          showToast(`Joined ${inv.group?.name || "group"}!`);
+                                        }}
+                                        style={{ ...styles.primaryBtn, padding: "6px 12px", fontSize: 12 }}
+                                      >
+                                        Join
+                                      </button>
+                                      <button
+                                        className="btn-press"
+                                        onClick={async () => {
+                                          await declineGroupInvite(inv.id);
+                                          refreshSocial();
+                                        }}
+                                        style={{ ...styles.secondaryBtn, padding: "6px 10px", fontSize: 12 }}
+                                      >
+                                        Decline
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Groups list */}
+                            {socialGroups.length === 0 && !socialLoading && socialGroupInvites.length === 0 ? (
+                              <div style={{ textAlign: "center", padding: 20, opacity: 0.5, fontSize: 13 }}>
+                                No groups yet. Create one or get invited!
+                              </div>
+                            ) : (
+                              socialGroups.map((g) => (
+                                <div
+                                  key={g.id}
+                                  className="btn-press"
+                                  onClick={() => setActiveGroupId(g.id)}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: 10,
+                                    padding: "12px 14px", borderRadius: 12,
+                                    background: colors.cardBg,
+                                    border: `1px solid ${colors.border}`,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <div style={{
+                                    width: 36, height: 36, borderRadius: 10,
+                                    background: colors.accent + "22", color: colors.accent,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 16, fontWeight: 700, flexShrink: 0,
+                                  }}>
+                                    {(g.name || "G")[0].toUpperCase()}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</div>
+                                    {g.description && <div style={{ fontSize: 12, opacity: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.description}</div>}
+                                  </div>
+                                  <span style={{
+                                    fontSize: 10, fontWeight: 600, padding: "2px 8px",
+                                    borderRadius: 999, background: colors.subtleBg, opacity: 0.6,
+                                  }}>
+                                    {g.role}
+                                  </span>
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}><polyline points="9 18 15 12 9 6" /></svg>
+                                </div>
+                              ))
+                            )}
+                          </>
                         )}
                       </div>
                     ) : (
@@ -4211,6 +4383,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           const logExercise = findExerciseById(state, logCtx?.exerciseId);
           const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
           const logScheme = logCtx?.scheme;
+          const prescribedSets = logExercise?.prescribedSets || [];
           const showWeight = logUnit.key === "reps" && !logExercise?.bodyweight;
           const exerciseTargets = logExercise?.targets || [];
           const tCount = exerciseTargets.length;
@@ -4450,6 +4623,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               const isSetSaved = !!s.completed;
               const isNextSet = i === firstUncompleted;
               const showRestAfter = restTimer.active && restTimer.exerciseId === logCtx?.exerciseId && restTimer.completedSetIndex === i;
+              const prescribed = prescribedSets[i];
               return (
                 <React.Fragment key={i}>
                 <div style={{
@@ -4460,6 +4634,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   ...(isSetSaved ? { animation: "rowPulse 0.5s ease-out" } : {}),
                   padding: "8px 10px",
                 }}>
+                  {prescribed && (prescribed.reps || prescribed.weight || prescribed.targetTime) && (
+                    <div style={{ fontSize: 11, opacity: 0.45, marginBottom: 4, paddingLeft: 34 }}>
+                      Target: {prescribed.reps ? `${prescribed.reps}` : ""}{prescribed.reps && prescribed.weight ? ` × ${prescribed.weight}` : prescribed.weight || ""}{prescribed.targetTime || ""}{prescribed.rpe ? ` RPE ${prescribed.rpe}` : ""}{prescribed.rest ? ` · ${prescribed.rest}s rest` : ""}
+                    </div>
+                  )}
                   <div style={{
                     display: "grid",
                     gridTemplateColumns: baseGridCols,
@@ -5858,6 +6037,71 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }}
       />
 
+      {/* Create Group Modal */}
+      <CreateGroupModal
+        open={modals.createGroup.isOpen}
+        state={modals.createGroup}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        onCreated={() => {
+          refreshSocial();
+          showToast("Group created!");
+        }}
+      />
+
+      {/* Invite to Group Modal */}
+      <InviteToGroupModal
+        open={modals.inviteToGroup.isOpen}
+        state={modals.inviteToGroup}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+      />
+
+      {/* Share to Group Modal */}
+      <ShareToGroupModal
+        open={modals.shareToGroup.isOpen}
+        state={modals.shareToGroup}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        onShared={() => {
+          showToast("Workout shared to group!");
+          refreshSocial();
+        }}
+      />
+
+      {/* Group Workout Preview Modal */}
+      <GroupWorkoutPreviewModal
+        open={modals.groupWorkoutPreview.isOpen}
+        state={modals.groupWorkoutPreview}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        onStartWorkout={(gw) => {
+          const snapshot = gw.workout_snapshot;
+          updateState((st) => {
+            if (!st.dailyWorkouts) st.dailyWorkouts = {};
+            if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
+            st.dailyWorkouts[dateKey].push({
+              id: uid("w"),
+              name: snapshot.name || "Group Workout",
+              category: snapshot.category || "Workout",
+              source: "group",
+              groupWorkoutId: gw.id,
+              sharedBy: gw.shared_by_profile?.username || "unknown",
+              exercises: (snapshot.exercises || []).map((ex) => ({
+                ...ex, id: uid("ex"),
+              })),
+            });
+            return st;
+          });
+          showToast("Workout added to today!");
+          setTab("train");
+        }}
+      />
+
       {/* Workout Preview Modal */}
       <WorkoutPreviewModal
         open={modals.workoutPreview.isOpen}
@@ -6245,6 +6489,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
+          {workout.source === "group" && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>Group</span>}
           {overrides && <span style={{ fontSize: 11, opacity: 0.5, fontStyle: "italic" }}>(modified)</span>}
         </div>
         {onRemoveFromToday && (
