@@ -1287,7 +1287,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     hasHistory: !!(tieredHistory.recentHistory || tieredHistory.olderHistory),
     previousInsightCount: coachingHistory?.entries?.length || 0,
   });
-  const modelHint = complexityScore >= 4 ? "gpt-4o" : "gpt-4o-mini";
+  const modelHint = "gpt-4o-mini";
 
   // Ensure we have a fresh session token before calling the edge function
   await supabase.auth.getSession();
