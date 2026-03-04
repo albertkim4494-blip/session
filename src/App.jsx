@@ -1512,8 +1512,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }
       }
 
-      // Pad partial logs with remaining template sets
-      if (existing && template?.sets?.length && sets.length < template.sets.length) {
+      // Pad partial logs with remaining template sets — only when no existing
+      // log for today. If the user already saved, respect their set count.
+      if (!existing && template?.sets?.length && sets.length < template.sets.length) {
         for (let i = sets.length; i < template.sets.length; i++) {
           const ts = template.sets[i];
           sets.push({
@@ -1527,9 +1528,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }
       }
 
-      // Pad from scheme if still fewer sets than scheme specifies
+      // Pad from scheme if still fewer sets than scheme specifies — same guard
       const parsedScheme = schemeStr ? parseScheme(schemeStr) : null;
-      if (existing && parsedScheme && sets.length < parsedScheme.sets) {
+      if (!existing && parsedScheme && sets.length < parsedScheme.sets) {
         for (let i = sets.length; i < parsedScheme.sets; i++) {
           sets.push({ reps: parsedScheme.reps, weight: "", targetRpe: "", targetPace: "", targetCustom: "", targetIntensity: "" });
         }
