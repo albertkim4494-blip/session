@@ -921,30 +921,39 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     };
   }, [state.logsByDate, progressWorkouts]);
 
-  // Flat exercise list for progress tab (replaces per-workout SummaryBlock)
+  // Flat exercise list for progress tab — grouped by name so swapped/re-added
+  // exercises with different IDs but the same name merge their stats.
   const flatExerciseList = useMemo(() => {
-    const seen = new Map();
+    const byName = new Map(); // name (lowercase) → { ids: Set, exercise }
     for (const w of progressWorkouts) {
       for (const ex of w.exercises || []) {
-        if (!seen.has(ex.id)) {
-          const exUnit = getUnit(ex.unit, ex);
-          const s = computeExerciseSummary(ex.id, summaryRange.start, summaryRange.end, exUnit);
-          seen.set(ex.id, {
-            id: ex.id,
-            name: ex.name,
-            sessions: s.sessions,
-            totalSets: s.totalSets,
-            totalReps: s.totalReps,
-            totalVolume: s.totalVolume,
-            maxReps: s.maxReps,
-            maxWeight: s.maxWeight,
-            unitAbbr: exUnit.abbr,
-            unitKey: exUnit.key,
-          });
+        const key = ex.name.toLowerCase();
+        if (!byName.has(key)) {
+          byName.set(key, { ids: new Set([ex.id]), exercise: ex });
+        } else {
+          byName.get(key).ids.add(ex.id);
         }
       }
     }
-    return [...seen.values()];
+    const result = [];
+    for (const [, { ids, exercise }] of byName) {
+      const exUnit = getUnit(exercise.unit, exercise);
+      const allIds = [...ids];
+      const s = computeExerciseSummary(allIds, summaryRange.start, summaryRange.end, exUnit);
+      result.push({
+        id: exercise.id,
+        name: exercise.name,
+        sessions: s.sessions,
+        totalSets: s.totalSets,
+        totalReps: s.totalReps,
+        totalVolume: s.totalVolume,
+        maxReps: s.maxReps,
+        maxWeight: s.maxWeight,
+        unitAbbr: exUnit.abbr,
+        unitKey: exUnit.key,
+      });
+    }
+    return result;
   }, [progressWorkouts, summaryRange, state.logsByDate]);
 
   const loggedDaysInMonth = useMemo(() => {
@@ -1426,7 +1435,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return null;
   }
 
-  function computeExerciseSummary(exerciseId, startKey, endKey, unit) {
+  function computeExerciseSummary(exerciseIdOrIds, startKey, endKey, unit) {
+    const ids = Array.isArray(exerciseIdOrIds) ? exerciseIdOrIds : [exerciseIdOrIds];
     let totalReps = 0;
     let totalVolume = 0;
     let maxReps = 0;
@@ -1439,30 +1449,33 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (!isValidDateKey(dk)) continue;
       if (!inRangeInclusive(dk, startKey, endKey)) continue;
 
-      const exLog = state.logsByDate[dk]?.[exerciseId];
-      if (!exLog || !Array.isArray(exLog.sets)) continue;
+      let dayHit = false;
+      for (const exerciseId of ids) {
+        const exLog = state.logsByDate[dk]?.[exerciseId];
+        if (!exLog || !Array.isArray(exLog.sets)) continue;
 
-      const completedInDay = exLog.sets.filter((s) => isSetCompleted(s));
-      if (completedInDay.length === 0) continue;
+        const completedInDay = exLog.sets.filter((s) => isSetCompleted(s));
+        if (completedInDay.length === 0) continue;
 
-      sessions++;
-      totalSets += completedInDay.length;
+        if (!dayHit) { sessions++; dayHit = true; }
+        totalSets += completedInDay.length;
 
-      for (const set of completedInDay) {
-        const reps = Number(set.reps ?? 0);
-        if (Number.isFinite(reps)) {
-          totalReps += reps;
-          if (reps > maxReps) maxReps = reps;
-        }
+        for (const set of completedInDay) {
+          const reps = Number(set.reps ?? 0);
+          if (Number.isFinite(reps)) {
+            totalReps += reps;
+            if (reps > maxReps) maxReps = reps;
+          }
 
-        const w = String(set.weight ?? "").trim();
-        if (w.toUpperCase() === "BW") {
-          hasBW = true;
-        } else {
-          const n = toNumberOrNull(w);
-          if (n != null) {
-            maxNum = maxNum == null ? n : Math.max(maxNum, n);
-            if (Number.isFinite(reps)) totalVolume += reps * n;
+          const w = String(set.weight ?? "").trim();
+          if (w.toUpperCase() === "BW") {
+            hasBW = true;
+          } else {
+            const n = toNumberOrNull(w);
+            if (n != null) {
+              maxNum = maxNum == null ? n : Math.max(maxNum, n);
+              if (Number.isFinite(reps)) totalVolume += reps * n;
+            }
           }
         }
       }
