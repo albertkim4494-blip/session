@@ -1901,7 +1901,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         const exPrior = findMostRecentLogBefore(ex.id, dateKey);
         const exScheme = ex.scheme || workout?.scheme || null;
         const exSchemeParsed = exScheme ? parseScheme(exScheme) : null;
-        const exTotal = exPrior?.sets?.length || exSchemeParsed?.sets || 0;
+        const exTotal = exLog.sets.length;
         return exTotal > 0 ? completedCount >= exTotal : completedCount > 0;
       });
 
@@ -1914,7 +1914,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const prior = findMostRecentLogBefore(exerciseId, dateKey);
       const schemeStr = exercises.find((e) => e.id === exerciseId)?.scheme || workout?.scheme || null;
       const schemeParsed = schemeStr ? parseScheme(schemeStr) : null;
-      const totalSets = Math.max(modalSets.length, prior?.sets?.length || 0, schemeParsed?.sets || 0, modalSetCount || 0);
+      const totalSets = modalSets.length;
 
       const toastObj = selectSetCompletionToast({
         exerciseId,
@@ -6344,7 +6344,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   const templateSets = findPrior ? (findPrior(exercise.id)?.sets || []) : [];
   const schemeStr = exercise.scheme || workoutScheme || null;
   const schemeSets = schemeStr ? (parseScheme(schemeStr)?.sets || 0) : 0;
-  const totalSets = Math.max(templateSets.length, hasAnySets ? exLog.sets.length : 0, schemeSets);
+  const totalSets = hasAnySets ? exLog.sets.length : Math.max(templateSets.length, schemeSets);
   const completedCount = completedSets.length;
   const allDone = totalSets > 0 && completedCount >= totalSets;
 
