@@ -53,6 +53,8 @@ import { CreateGroupModal } from "./components/CreateGroupModal";
 import { InviteToGroupModal } from "./components/InviteToGroupModal";
 import { ShareToGroupModal } from "./components/ShareToGroupModal";
 import { GroupWorkoutPreviewModal } from "./components/GroupWorkoutPreviewModal";
+import { CreatePollModal } from "./components/CreatePollModal";
+import { PollDetailModal } from "./components/PollDetailModal";
 import { GroupDetailView } from "./components/GroupDetailView";
 import { CircuitTimer } from "./components/CircuitTimer";
 import {
@@ -62,7 +64,7 @@ import {
 } from "./lib/socialApi";
 import {
   getMyGroups, getGroupInvites, getGroupInviteCount,
-  acceptGroupInvite, declineGroupInvite,
+  acceptGroupInvite, declineGroupInvite, getPendingPollCount,
 } from "./lib/groupApi";
 
 // Exercise catalog
@@ -537,7 +539,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Fetch social data when social tab is opened
   const refreshSocial = useCallback(async () => {
     setSocialLoading(true);
-    const [friendsRes, pendingRes, inboxRes, badgeRes, groupsRes, groupInvitesRes, groupInviteCountRes] = await Promise.all([
+    const [friendsRes, pendingRes, inboxRes, badgeRes, groupsRes, groupInvitesRes, groupInviteCountRes, pendingPollsRes] = await Promise.all([
       getFriends(),
       getPendingRequests(),
       getInbox(),
@@ -545,13 +547,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       getMyGroups(),
       getGroupInvites(),
       getGroupInviteCount(),
+      getPendingPollCount(),
     ]);
     setSocialFriends(friendsRes.data || []);
     setSocialPending(pendingRes.data || []);
     setSocialInbox(inboxRes.data || []);
     setSocialGroups(groupsRes.data || []);
     setSocialGroupInvites(groupInvitesRes.data || []);
-    const totalBadge = (badgeRes.data || 0) + (groupInviteCountRes.data || 0);
+    const totalBadge = (badgeRes.data || 0) + (groupInviteCountRes.data || 0) + (pendingPollsRes.data || 0);
     setSocialBadge(totalBadge);
     setSocialLoading(false);
   }, []);
@@ -6114,6 +6117,32 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           showToast("Workout added to today!");
           setTab("train");
         }}
+      />
+
+      {/* Create Poll Modal */}
+      <CreatePollModal
+        open={modals.createPoll.isOpen}
+        state={modals.createPoll}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        onCreated={() => {
+          showToast("Poll created!");
+          refreshSocial();
+        }}
+      />
+
+      {/* Poll Detail Modal */}
+      <PollDetailModal
+        open={modals.pollDetail.isOpen}
+        state={modals.pollDetail}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        userId={session?.user?.id}
+        showToast={showToast}
+        onUpdated={() => refreshSocial()}
+        onDeleted={() => refreshSocial()}
       />
 
       {/* Workout Preview Modal */}

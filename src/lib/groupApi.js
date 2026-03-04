@@ -75,7 +75,7 @@ export async function getMyGroups() {
 // ============================================================================
 
 export async function getGroupDetail(groupId) {
-  const [groupRes, membersRes, workoutsRes] = await Promise.all([
+  const [groupRes, membersRes, workoutsRes, pollsRes] = await Promise.all([
     supabase
       .from("groups")
       .select("id, name, description, created_by, created_at")
@@ -85,7 +85,7 @@ export async function getGroupDetail(groupId) {
       .from("group_members")
       .select(`
         id, user_id, role, status, joined_at, created_at,
-        profile:profiles(id, username, display_name, avatar_url)
+        profile:profiles!group_members_user_id_fkey(id, username, display_name, avatar_url)
       `)
       .eq("group_id", groupId)
       .order("created_at", { ascending: true }),
@@ -98,14 +98,27 @@ export async function getGroupDetail(groupId) {
       .eq("group_id", groupId)
       .order("created_at", { ascending: false })
       .limit(50),
+    supabase
+      .from("group_polls")
+      .select(`
+        id, group_id, created_by, title, description, event_date, event_time,
+        deadline, allow_self_checkin, closed, created_at,
+        created_by_profile:profiles!group_polls_created_by_fkey(id, username, display_name, avatar_url),
+        poll_responses(id, poll_id, user_id, response, attended, responded_at, attendance_marked_at)
+      `)
+      .eq("group_id", groupId)
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
 
+  // Only treat group/members/workouts errors as blocking; polls are non-blocking
   const error = groupRes.error || membersRes.error || workoutsRes.error;
   return {
     data: {
       group: groupRes.data,
       members: membersRes.data || [],
       workouts: workoutsRes.data || [],
+      polls: pollsRes.data || [],
     },
     error,
   };
@@ -240,10 +253,173 @@ export async function shareWorkoutToGroup(groupId, workout, message) {
   return { data, error };
 }
 
+export async function getPollDetail(pollId) {
+  const { data, error } = await supabase
+    .from("group_polls")
+    .select(`
+      id, group_id, created_by, title, description, event_date, event_time,
+      deadline, allow_self_checkin, closed, created_at,
+      created_by_profile:profiles!group_polls_created_by_fkey(id, username, display_name, avatar_url),
+      poll_responses(id, poll_id, user_id, response, attended, responded_at, attendance_marked_at)
+    `)
+    .eq("id", pollId)
+    .single();
+  return { data, error };
+}
+
 export async function deleteGroupWorkout(workoutId) {
   const { error } = await supabase
     .from("group_workouts")
     .delete()
     .eq("id", workoutId);
   return { data: null, error };
+}
+
+// ============================================================================
+// Polls
+// ============================================================================
+
+export async function createPoll(groupId, { title, description, eventDate, eventTime, deadline, allowSelfCheckin }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("group_polls")
+    .insert({
+      group_id: groupId,
+      created_by: user.id,
+      title,
+      description: description || null,
+      event_date: eventDate || null,
+      event_time: eventTime || null,
+      deadline: deadline || null,
+      allow_self_checkin: allowSelfCheckin || false,
+    })
+    .select()
+    .single();
+
+  return { data, error };
+}
+
+export async function closePoll(pollId) {
+  const { data, error } = await supabase
+    .from("group_polls")
+    .update({ closed: true })
+    .eq("id", pollId)
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function reopenPoll(pollId) {
+  const { data, error } = await supabase
+    .from("group_polls")
+    .update({ closed: false })
+    .eq("id", pollId)
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function deletePoll(pollId) {
+  const { error } = await supabase
+    .from("group_polls")
+    .delete()
+    .eq("id", pollId);
+  return { data: null, error };
+}
+
+export async function respondToPoll(pollId, response) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("poll_responses")
+    .upsert(
+      { poll_id: pollId, user_id: user.id, response, responded_at: new Date().toISOString() },
+      { onConflict: "poll_id,user_id" }
+    )
+    .select()
+    .single();
+
+  return { data, error };
+}
+
+export async function removeResponse(pollId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: "Not authenticated" } };
+
+  const { error } = await supabase
+    .from("poll_responses")
+    .delete()
+    .eq("poll_id", pollId)
+    .eq("user_id", user.id);
+
+  return { data: null, error };
+}
+
+export async function markAttendance(pollId, userId, attended) {
+  // Upsert: if no response row exists, auto-create with response: 'yes'
+  const { data, error } = await supabase
+    .from("poll_responses")
+    .upsert(
+      {
+        poll_id: pollId,
+        user_id: userId,
+        response: "yes",
+        attended,
+        attendance_marked_at: new Date().toISOString(),
+      },
+      { onConflict: "poll_id,user_id", ignoreDuplicates: false }
+    )
+    .select()
+    .single();
+
+  return { data, error };
+}
+
+export async function bulkMarkAttendance(pollId, attendanceMap) {
+  const results = [];
+  for (const [userId, attended] of Object.entries(attendanceMap)) {
+    const res = await markAttendance(pollId, userId, attended);
+    results.push(res);
+  }
+  const firstError = results.find((r) => r.error);
+  return { data: results.map((r) => r.data), error: firstError?.error || null };
+}
+
+export async function getPendingPollCount() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: 0, error: null };
+
+  // Get all open polls in user's groups that user hasn't responded to
+  const { data: polls, error: pollsErr } = await supabase
+    .from("group_polls")
+    .select("id, closed, deadline")
+    .eq("closed", false);
+
+  if (pollsErr) return { data: 0, error: pollsErr };
+
+  // Filter to actually open polls (deadline not passed)
+  const now = Date.now();
+  const openPolls = (polls || []).filter((p) => {
+    if (p.closed) return false;
+    if (p.deadline && new Date(p.deadline).getTime() <= now) return false;
+    return true;
+  });
+
+  if (openPolls.length === 0) return { data: 0, error: null };
+
+  // Get user's existing responses
+  const { data: responses, error: respErr } = await supabase
+    .from("poll_responses")
+    .select("poll_id")
+    .eq("user_id", user.id);
+
+  if (respErr) return { data: 0, error: respErr };
+
+  const respondedPollIds = new Set((responses || []).map((r) => r.poll_id));
+  const pending = openPolls.filter((p) => !respondedPollIds.has(p.id)).length;
+
+  return { data: pending, error: null };
 }

@@ -152,6 +152,8 @@ export const initialModalState = {
   inviteToGroup: { isOpen: false, groupId: null, groupName: "", friends: [], existingMemberIds: [], sending: false },
   shareToGroup: { isOpen: false, groupId: null, groupName: "", exercises: [], workoutName: "", message: "", sending: false },
   groupWorkoutPreview: { isOpen: false, groupWorkout: null },
+  createPoll: { isOpen: false, groupId: null, groupName: "", title: "", description: "", eventDate: "", eventTime: "", deadline: "", allowSelfCheckin: false, creating: false },
+  pollDetail: { isOpen: false, poll: null, members: [], loading: false, attendanceMode: false },
 };
 
 export function modalReducer(state, action) {
@@ -808,6 +810,54 @@ export function modalReducer(state, action) {
       return {
         ...state,
         groupWorkoutPreview: initialModalState.groupWorkoutPreview,
+      };
+
+    // ===== CREATE POLL MODAL =====
+    case "OPEN_CREATE_POLL":
+      return {
+        ...state,
+        createPoll: {
+          ...initialModalState.createPoll,
+          isOpen: true,
+          groupId: action.payload.groupId,
+          groupName: action.payload.groupName || "",
+        },
+      };
+
+    case "UPDATE_CREATE_POLL":
+      return {
+        ...state,
+        createPoll: { ...state.createPoll, ...action.payload },
+      };
+
+    case "CLOSE_CREATE_POLL":
+      return {
+        ...state,
+        createPoll: initialModalState.createPoll,
+      };
+
+    // ===== POLL DETAIL MODAL =====
+    case "OPEN_POLL_DETAIL":
+      return {
+        ...state,
+        pollDetail: {
+          ...initialModalState.pollDetail,
+          isOpen: true,
+          poll: action.payload.poll,
+          members: action.payload.members || [],
+        },
+      };
+
+    case "UPDATE_POLL_DETAIL":
+      return {
+        ...state,
+        pollDetail: { ...state.pollDetail, ...action.payload },
+      };
+
+    case "CLOSE_POLL_DETAIL":
+      return {
+        ...state,
+        pollDetail: initialModalState.pollDetail,
       };
 
     // ===== CLOSE ALL (for back-button navigation) =====
