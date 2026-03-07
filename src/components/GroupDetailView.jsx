@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { PillTabs } from "./PillTabs";
 import { getGroupDetail, leaveGroup, removeMember, promoteMember, deleteGroup, deleteGroupWorkout } from "../lib/groupApi";
 import { isPollOpen, getPollCounts, formatDeadline, formatEventDateTime } from "../lib/pollUtils";
+import { REACTION_EMOJIS, getReactionCounts, formatAmount, getDuesPaymentSummary, formatTimeAgo } from "../lib/announcementUtils";
 
 export function GroupDetailView({
   groupId, userId, dispatch, styles, colors,
@@ -11,6 +12,8 @@ export function GroupDetailView({
   const [members, setMembers] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [polls, setPolls] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [dues, setDues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState("feed");
 
@@ -22,6 +25,8 @@ export function GroupDetailView({
       setMembers(data.members || []);
       setWorkouts(data.workouts || []);
       setPolls(data.polls || []);
+      setAnnouncements(data.announcements || []);
+      setDues(data.dues || []);
     }
     setLoading(false);
   }, [groupId]);
@@ -35,18 +40,28 @@ export function GroupDetailView({
   const acceptedMembers = members.filter((m) => m.status === "accepted");
   const memberIds = members.map((m) => m.user_id);
 
-  // Merge workouts + polls into unified feed sorted by created_at desc
+  // Merge workouts + polls + announcements + dues into unified feed
+  // Pinned announcements sort to top, then by created_at desc
   const feedItems = useMemo(() => {
     const items = [];
     for (const w of workouts) {
-      items.push({ type: "workout", data: w, created_at: w.created_at });
+      items.push({ type: "workout", data: w, created_at: w.created_at, pinned: false });
     }
     for (const p of polls) {
-      items.push({ type: "poll", data: p, created_at: p.created_at });
+      items.push({ type: "poll", data: p, created_at: p.created_at, pinned: false });
     }
-    items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    for (const a of announcements) {
+      items.push({ type: "announcement", data: a, created_at: a.created_at, pinned: !!a.pinned });
+    }
+    for (const d of dues) {
+      items.push({ type: "dues", data: d, created_at: d.created_at, pinned: false });
+    }
+    items.sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
     return items;
-  }, [workouts, polls]);
+  }, [workouts, polls, announcements, dues]);
 
   if (loading && !group) {
     return (
@@ -117,51 +132,94 @@ export function GroupDetailView({
       {/* Feed tab */}
       {subTab === "feed" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {isAdmin && (
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                className="btn-press"
-                onClick={() => dispatch({
-                  type: "OPEN_SHARE_TO_GROUP",
-                  payload: { groupId: group.id, groupName: group.name },
-                })}
-                style={{
-                  ...styles.primaryBtn, flex: 1, textAlign: "center",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  padding: "12px 14px",
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
-                Share Workout
-              </button>
-              <button
-                className="btn-press"
-                onClick={() => dispatch({
-                  type: "OPEN_CREATE_POLL",
-                  payload: { groupId: group.id, groupName: group.name },
-                })}
-                style={{
-                  ...styles.secondaryBtn, flex: 1, textAlign: "center",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  padding: "12px 14px",
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                Create Poll
-              </button>
-            </div>
-          )}
+          {/* Action buttons row */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              className="btn-press"
+              onClick={() => dispatch({
+                type: "OPEN_CREATE_ANNOUNCEMENT",
+                payload: { groupId: group.id },
+              })}
+              style={{
+                ...styles.secondaryBtn, flex: 1, textAlign: "center",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "12px 14px", minWidth: 0,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+              Post
+            </button>
+            {isAdmin && (
+              <>
+                <button
+                  className="btn-press"
+                  onClick={() => dispatch({
+                    type: "OPEN_SHARE_TO_GROUP",
+                    payload: { groupId: group.id, groupName: group.name },
+                  })}
+                  style={{
+                    ...styles.primaryBtn, flex: 1, textAlign: "center",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    padding: "12px 14px", minWidth: 0,
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                  Workout
+                </button>
+                <button
+                  className="btn-press"
+                  onClick={() => dispatch({
+                    type: "OPEN_CREATE_POLL",
+                    payload: { groupId: group.id, groupName: group.name },
+                  })}
+                  style={{
+                    ...styles.secondaryBtn, flex: 1, textAlign: "center",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    padding: "12px 14px", minWidth: 0,
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                  Poll
+                </button>
+                <button
+                  className="btn-press"
+                  onClick={() => dispatch({
+                    type: "OPEN_CREATE_DUES",
+                    payload: { groupId: group.id },
+                  })}
+                  style={{
+                    ...styles.secondaryBtn, flex: 1, textAlign: "center",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    padding: "12px 14px", minWidth: 0,
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
+                  Dues
+                </button>
+              </>
+            )}
+          </div>
 
           {feedItems.length === 0 ? (
             <div style={{ textAlign: "center", padding: 20, opacity: 0.5, fontSize: 13 }}>
-              {isAdmin ? "Share a workout or create a poll to get started!" : "Nothing shared yet"}
+              {isAdmin ? "Share a workout or post an update to get started!" : "Nothing shared yet"}
             </div>
           ) : (
-            feedItems.map((item) =>
-              item.type === "workout"
-                ? renderWorkoutCard(item.data, { dispatch, colors, styles, isAdmin, fetchDetail })
-                : renderPollCard(item.data, { dispatch, colors, styles, userId, acceptedMembers, members })
-            )
+            feedItems.map((item) => {
+              if (item.type === "workout") {
+                return renderWorkoutCard(item.data, { dispatch, colors, styles, isAdmin, fetchDetail });
+              }
+              if (item.type === "poll") {
+                return renderPollCard(item.data, { dispatch, colors, styles, userId, acceptedMembers, members });
+              }
+              if (item.type === "announcement") {
+                return renderAnnouncementCard(item.data, { dispatch, colors, styles, userId, members });
+              }
+              if (item.type === "dues") {
+                return renderDuesCard(item.data, { dispatch, colors, styles, acceptedMembers, members });
+              }
+              return null;
+            })
           )}
         </div>
       )}
@@ -495,15 +553,133 @@ function renderPollCard(poll, { dispatch, colors, userId, acceptedMembers, membe
   );
 }
 
-function formatTimeAgo(dateStr) {
-  if (!dateStr) return "";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
+function renderAnnouncementCard(announcement, { dispatch, colors, styles, userId, members }) {
+  const author = announcement.author_profile;
+  const reactions = announcement.announcement_reactions || [];
+  const counts = getReactionCounts(reactions);
+  const bodyPreview = announcement.body.length > 150
+    ? announcement.body.slice(0, 150) + "..."
+    : announcement.body;
+
+  const reactionEntries = Object.entries(counts).filter(([, count]) => count > 0);
+
+  return (
+    <div
+      key={announcement.id}
+      className="btn-press"
+      onClick={() => dispatch({
+        type: "OPEN_ANNOUNCEMENT_DETAIL",
+        payload: { announcement, members },
+      })}
+      style={{
+        padding: "12px 14px", borderRadius: 12,
+        background: colors.cardBg,
+        border: `1px solid ${colors.border}`,
+        cursor: "pointer",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        {announcement.pinned && (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill={colors.accent} stroke={colors.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <path d="M12 2L15 8.5L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L9 8.5L12 2Z" />
+          </svg>
+        )}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+        </svg>
+        <span style={{ fontSize: 14, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          @{author?.username || "unknown"}
+        </span>
+        <span style={{ fontSize: 11, opacity: 0.4, flexShrink: 0 }}>
+          {formatTimeAgo(announcement.created_at)}
+        </span>
+      </div>
+
+      <div style={{ fontSize: 13, opacity: 0.8, lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        {bodyPreview}
+      </div>
+
+      {reactionEntries.length > 0 && (
+        <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+          {reactionEntries.map(([key, count]) => (
+            <span key={key} style={{
+              fontSize: 12, padding: "2px 6px", borderRadius: 999,
+              background: colors.subtleBg, border: `1px solid ${colors.border}`,
+            }}>
+              {REACTION_EMOJIS[key]} {count}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
+
+function renderDuesCard(dues, { dispatch, colors, styles, acceptedMembers, members }) {
+  const createdBy = dues.created_by_profile;
+  const payments = dues.dues_payments || [];
+  const summary = getDuesPaymentSummary(payments, acceptedMembers.length, dues.amount_cents);
+
+  return (
+    <div
+      key={dues.id}
+      className="btn-press"
+      onClick={() => dispatch({
+        type: "OPEN_DUES_DETAIL",
+        payload: { dues, members },
+      })}
+      style={{
+        padding: "12px 14px", borderRadius: 12,
+        background: colors.cardBg,
+        border: `1px solid ${colors.border}`,
+        cursor: "pointer",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+        </svg>
+        <span style={{ fontSize: 15, fontWeight: 700, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {dues.title}
+        </span>
+        {dues.closed && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "2px 8px",
+            borderRadius: 999, background: "rgba(231,76,60,0.12)", color: "#e74c3c",
+          }}>
+            Closed
+          </span>
+        )}
+      </div>
+
+      <div style={{ fontSize: 12, opacity: 0.6 }}>
+        {formatAmount(dues.amount_cents)} · by @{createdBy?.username || "unknown"} · {formatTimeAgo(dues.created_at)}
+      </div>
+
+      {dues.due_date && (
+        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
+          Due {new Date(dues.due_date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+        </div>
+      )}
+
+      {/* Progress bar */}
+      <div style={{ marginTop: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 3, opacity: 0.7 }}>
+          {summary.paid}/{summary.total} paid
+        </div>
+        <div style={{
+          height: 5, borderRadius: 3,
+          background: colors.border, overflow: "hidden",
+        }}>
+          <div style={{
+            height: "100%", borderRadius: 3,
+            background: colors.accent,
+            width: summary.total > 0 ? `${(summary.paid / summary.total) * 100}%` : "0%",
+            transition: "width 0.3s",
+          }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+

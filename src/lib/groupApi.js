@@ -75,7 +75,7 @@ export async function getMyGroups() {
 // ============================================================================
 
 export async function getGroupDetail(groupId) {
-  const [groupRes, membersRes, workoutsRes, pollsRes] = await Promise.all([
+  const [groupRes, membersRes, workoutsRes, pollsRes, announcementsRes, duesRes] = await Promise.all([
     supabase
       .from("groups")
       .select("id, name, description, created_by, created_at")
@@ -109,9 +109,28 @@ export async function getGroupDetail(groupId) {
       .eq("group_id", groupId)
       .order("created_at", { ascending: false })
       .limit(50),
+    supabase
+      .from("group_announcements")
+      .select(`
+        id, group_id, author_id, body, pinned, created_at,
+        author_profile:profiles!group_announcements_author_id_fkey(id, username, display_name, avatar_url),
+        announcement_reactions(id, announcement_id, user_id, emoji, created_at)
+      `)
+      .eq("group_id", groupId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("group_dues")
+      .select(`
+        id, group_id, created_by, title, amount_cents, description, due_date, closed, created_at,
+        created_by_profile:profiles!group_dues_created_by_fkey(id, username, display_name, avatar_url),
+        dues_payments(id, dues_id, user_id, marked_by, paid_at)
+      `)
+      .eq("group_id", groupId)
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
 
-  // Only treat group/members/workouts errors as blocking; polls are non-blocking
   const error = groupRes.error || membersRes.error || workoutsRes.error;
   return {
     data: {
@@ -119,6 +138,8 @@ export async function getGroupDetail(groupId) {
       members: membersRes.data || [],
       workouts: workoutsRes.data || [],
       polls: pollsRes.data || [],
+      announcements: announcementsRes.data || [],
+      dues: duesRes.data || [],
     },
     error,
   };
@@ -386,6 +407,133 @@ export async function bulkMarkAttendance(pollId, attendanceMap) {
   }
   const firstError = results.find((r) => r.error);
   return { data: results.map((r) => r.data), error: firstError?.error || null };
+}
+
+// ============================================================================
+// Announcements
+// ============================================================================
+
+export async function createAnnouncement(groupId, body) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("group_announcements")
+    .insert({ group_id: groupId, author_id: user.id, body })
+    .select()
+    .single();
+
+  return { data, error };
+}
+
+export async function deleteAnnouncement(announcementId) {
+  const { error } = await supabase
+    .from("group_announcements")
+    .delete()
+    .eq("id", announcementId);
+  return { data: null, error };
+}
+
+export async function pinAnnouncement(announcementId, pinned) {
+  const { data, error } = await supabase
+    .from("group_announcements")
+    .update({ pinned })
+    .eq("id", announcementId)
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function toggleReaction(announcementId, emoji) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: "Not authenticated" } };
+
+  // Check if already reacted
+  const { data: existing } = await supabase
+    .from("announcement_reactions")
+    .select("id")
+    .eq("announcement_id", announcementId)
+    .eq("user_id", user.id)
+    .eq("emoji", emoji)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("announcement_reactions")
+      .delete()
+      .eq("id", existing.id);
+    return { data: null, error, removed: true };
+  } else {
+    const { data, error } = await supabase
+      .from("announcement_reactions")
+      .insert({ announcement_id: announcementId, user_id: user.id, emoji })
+      .select()
+      .single();
+    return { data, error, removed: false };
+  }
+}
+
+// ============================================================================
+// Dues
+// ============================================================================
+
+export async function createDues(groupId, { title, amountCents, description, dueDate }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("group_dues")
+    .insert({
+      group_id: groupId,
+      created_by: user.id,
+      title,
+      amount_cents: amountCents,
+      description: description || null,
+      due_date: dueDate || null,
+    })
+    .select()
+    .single();
+
+  return { data, error };
+}
+
+export async function closeDues(duesId) {
+  const { data, error } = await supabase
+    .from("group_dues")
+    .update({ closed: true })
+    .eq("id", duesId)
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function deleteDues(duesId) {
+  const { error } = await supabase
+    .from("group_dues")
+    .delete()
+    .eq("id", duesId);
+  return { data: null, error };
+}
+
+export async function markPaid(duesId, userId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("dues_payments")
+    .insert({ dues_id: duesId, user_id: userId, marked_by: user.id })
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function unmarkPaid(duesId, userId) {
+  const { error } = await supabase
+    .from("dues_payments")
+    .delete()
+    .eq("dues_id", duesId)
+    .eq("user_id", userId);
+  return { data: null, error };
 }
 
 export async function getPendingPollCount() {

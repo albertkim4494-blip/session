@@ -154,6 +154,10 @@ export const initialModalState = {
   groupWorkoutPreview: { isOpen: false, groupWorkout: null },
   createPoll: { isOpen: false, groupId: null, groupName: "", title: "", description: "", eventDate: "", eventTime: "", deadline: "", allowSelfCheckin: false, creating: false },
   pollDetail: { isOpen: false, poll: null, members: [], loading: false, attendanceMode: false },
+  createAnnouncement: { isOpen: false, groupId: null, body: "", posting: false },
+  announcementDetail: { isOpen: false, announcement: null, members: [] },
+  createDues: { isOpen: false, groupId: null, title: "", amount: "", description: "", dueDate: "", creating: false },
+  duesDetail: { isOpen: false, dues: null, members: [] },
 };
 
 export function modalReducer(state, action) {
@@ -858,6 +862,100 @@ export function modalReducer(state, action) {
       return {
         ...state,
         pollDetail: initialModalState.pollDetail,
+      };
+
+    // ===== CREATE ANNOUNCEMENT MODAL =====
+    case "OPEN_CREATE_ANNOUNCEMENT":
+      return {
+        ...state,
+        createAnnouncement: {
+          ...initialModalState.createAnnouncement,
+          isOpen: true,
+          groupId: action.payload.groupId,
+        },
+      };
+
+    case "UPDATE_CREATE_ANNOUNCEMENT":
+      return {
+        ...state,
+        createAnnouncement: { ...state.createAnnouncement, ...action.payload },
+      };
+
+    case "CLOSE_CREATE_ANNOUNCEMENT":
+      return {
+        ...state,
+        createAnnouncement: initialModalState.createAnnouncement,
+      };
+
+    // ===== ANNOUNCEMENT DETAIL MODAL =====
+    case "OPEN_ANNOUNCEMENT_DETAIL":
+      return {
+        ...state,
+        announcementDetail: {
+          ...initialModalState.announcementDetail,
+          isOpen: true,
+          announcement: action.payload.announcement,
+          members: action.payload.members || [],
+        },
+      };
+
+    case "UPDATE_ANNOUNCEMENT_DETAIL":
+      return {
+        ...state,
+        announcementDetail: { ...state.announcementDetail, ...action.payload },
+      };
+
+    case "CLOSE_ANNOUNCEMENT_DETAIL":
+      return {
+        ...state,
+        announcementDetail: initialModalState.announcementDetail,
+      };
+
+    // ===== CREATE DUES MODAL =====
+    case "OPEN_CREATE_DUES":
+      return {
+        ...state,
+        createDues: {
+          ...initialModalState.createDues,
+          isOpen: true,
+          groupId: action.payload.groupId,
+        },
+      };
+
+    case "UPDATE_CREATE_DUES":
+      return {
+        ...state,
+        createDues: { ...state.createDues, ...action.payload },
+      };
+
+    case "CLOSE_CREATE_DUES":
+      return {
+        ...state,
+        createDues: initialModalState.createDues,
+      };
+
+    // ===== DUES DETAIL MODAL =====
+    case "OPEN_DUES_DETAIL":
+      return {
+        ...state,
+        duesDetail: {
+          ...initialModalState.duesDetail,
+          isOpen: true,
+          dues: action.payload.dues,
+          members: action.payload.members || [],
+        },
+      };
+
+    case "UPDATE_DUES_DETAIL":
+      return {
+        ...state,
+        duesDetail: { ...state.duesDetail, ...action.payload },
+      };
+
+    case "CLOSE_DUES_DETAIL":
+      return {
+        ...state,
+        duesDetail: initialModalState.duesDetail,
       };
 
     // ===== CLOSE ALL (for back-button navigation) =====

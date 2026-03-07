@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node src/lib/coachNormalize.test.js && node src/lib/userIdentity.test.js && node src/lib/exerciseCatalogUtils.test.js && node src/lib/workoutGenerator.test.js && node src/lib/muscleGroups.test.js && node src/lib/coachCheckin.test.js && node src/lib/pollUtils.test.js"
+    "test": "node src/lib/coachNormalize.test.js && node src/lib/userIdentity.test.js && node src/lib/exerciseCatalogUtils.test.js && node src/lib/workoutGenerator.test.js && node src/lib/muscleGroups.test.js && node src/lib/coachCheckin.test.js && node src/lib/pollUtils.test.js && node src/lib/announcementUtils.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.93.3",

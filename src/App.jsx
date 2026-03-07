@@ -55,6 +55,10 @@ import { ShareToGroupModal } from "./components/ShareToGroupModal";
 import { GroupWorkoutPreviewModal } from "./components/GroupWorkoutPreviewModal";
 import { CreatePollModal } from "./components/CreatePollModal";
 import { PollDetailModal } from "./components/PollDetailModal";
+import { CreateAnnouncementModal } from "./components/CreateAnnouncementModal";
+import { AnnouncementDetailModal } from "./components/AnnouncementDetailModal";
+import { CreateDuesModal } from "./components/CreateDuesModal";
+import { DuesDetailModal } from "./components/DuesDetailModal";
 import { GroupDetailView } from "./components/GroupDetailView";
 import { CircuitTimer } from "./components/CircuitTimer";
 import {
@@ -6136,6 +6140,58 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       <PollDetailModal
         open={modals.pollDetail.isOpen}
         state={modals.pollDetail}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        userId={session?.user?.id}
+        showToast={showToast}
+        onUpdated={() => refreshSocial()}
+        onDeleted={() => refreshSocial()}
+      />
+
+      {/* Create Announcement Modal */}
+      <CreateAnnouncementModal
+        open={modals.createAnnouncement.isOpen}
+        state={modals.createAnnouncement}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        onCreated={() => {
+          showToast("Announcement posted!");
+          refreshSocial();
+        }}
+      />
+
+      {/* Announcement Detail Modal */}
+      <AnnouncementDetailModal
+        open={modals.announcementDetail.isOpen}
+        state={modals.announcementDetail}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        userId={session?.user?.id}
+        showToast={showToast}
+        onUpdated={() => refreshSocial()}
+        onDeleted={() => refreshSocial()}
+      />
+
+      {/* Create Dues Modal */}
+      <CreateDuesModal
+        open={modals.createDues.isOpen}
+        state={modals.createDues}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        onCreated={() => {
+          showToast("Dues created!");
+          refreshSocial();
+        }}
+      />
+
+      {/* Dues Detail Modal */}
+      <DuesDetailModal
+        open={modals.duesDetail.isOpen}
+        state={modals.duesDetail}
         dispatch={dispatchModal}
         styles={styles}
         colors={colors}
