@@ -59,6 +59,8 @@ import { CreateAnnouncementModal } from "./components/CreateAnnouncementModal";
 import { AnnouncementDetailModal } from "./components/AnnouncementDetailModal";
 import { CreateDuesModal } from "./components/CreateDuesModal";
 import { DuesDetailModal } from "./components/DuesDetailModal";
+import { ImportPreviewModal } from "./components/ImportPreviewModal";
+import { stateToCSV, detectCSVFormat, parseStrongCSV, parseHevyCSV, buildImportState, mergeImportedData } from "./lib/importExport";
 import { GroupDetailView } from "./components/GroupDetailView";
 import { CircuitTimer } from "./components/CircuitTimer";
 import {
@@ -2384,9 +2386,59 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, [state]);
 
-  async function importJsonFromFile(file) {
+  const exportCSV = useCallback(() => {
+    try {
+      const csv = stateToCSV(state);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `workout-history-${yyyyMmDd(new Date())}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      showToast("Failed to export CSV");
+    }
+  }, [state]);
+
+  async function importFile(file) {
     try {
       const text = await file.text();
+      const ext = (file.name || "").split(".").pop()?.toLowerCase();
+
+      if (ext === "csv") {
+        // CSV import — detect format, parse, open preview
+        const format = detectCSVFormat(text);
+        let parsed;
+        if (format === "strong") {
+          parsed = parseStrongCSV(text);
+        } else if (format === "hevy") {
+          parsed = parseHevyCSV(text);
+        } else {
+          // Try Strong format as fallback (our export is Strong-compatible)
+          parsed = parseStrongCSV(text);
+        }
+
+        if (parsed.errors.length > 0 && parsed.sessions.length === 0) {
+          showToast("Could not parse CSV: " + parsed.errors[0]);
+          return;
+        }
+
+        const importData = buildImportState(parsed.sessions, EXERCISE_CATALOG);
+
+        dispatchModal({
+          type: "OPEN_IMPORT_PREVIEW",
+          payload: {
+            format,
+            sessions: parsed.sessions,
+            stats: importData.stats,
+            importData,
+          },
+        });
+        return;
+      }
+
+      // JSON import — existing flow
       const incoming = safeParse(text, null);
 
       if (!incoming || typeof incoming !== "object") {
@@ -2425,6 +2477,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     } catch (error) {
       showToast("Failed to import file");
     }
+  }
+
+  function handleImportConfirm(mode) {
+    const importData = modals.importPreview.importData;
+    if (!importData) return;
+
+    if (mode === "replace") {
+      const next = {
+        ...makeDefaultState(),
+        program: { workouts: importData.workouts },
+        logsByDate: importData.logsByDate,
+        meta: { updatedAt: Date.now() },
+      };
+      setState(next);
+    } else {
+      const merged = mergeImportedData(state, importData);
+      setState(merged);
+    }
+
+    dispatchModal({ type: "CLOSE_IMPORT_PREVIEW" });
+    const count = importData.stats?.sessionCount ?? 0;
+    showToast(`Imported ${count} session${count !== 1 ? "s" : ""}`);
   }
 
   function handleAddSuggestion(exerciseName) {
@@ -3810,8 +3884,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>Export</div>
-                      <div style={{ fontSize: 12, opacity: 0.5 }}>Download your data as JSON</div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>Export JSON</div>
+                      <div style={{ fontSize: 12, opacity: 0.5 }}>Download all data as JSON</div>
+                    </div>
+                  </button>
+
+                  <button
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors.border}`, background: colors.cardAltBg, color: colors.text, cursor: "pointer", textAlign: "left", width: "100%" }}
+                    onClick={exportCSV}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>Export CSV</div>
+                      <div style={{ fontSize: 12, opacity: 0.5 }}>Download workout history as CSV</div>
                     </div>
                   </button>
 
@@ -3823,15 +3910,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     </svg>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>Import</div>
-                      <div style={{ fontSize: 12, opacity: 0.5 }}>Load data from a JSON file</div>
+                      <div style={{ fontSize: 12, opacity: 0.5 }}>Load from JSON or CSV file</div>
                     </div>
                     <input
                       type="file"
-                      accept="application/json"
+                      accept=".json,.csv"
                       style={{ display: "none" }}
                       onChange={(e) => {
                         const f = e.target.files?.[0];
-                        if (f) importJsonFromFile(f);
+                        if (f) importFile(f);
                         e.target.value = "";
                       }}
                     />
@@ -6199,6 +6286,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         showToast={showToast}
         onUpdated={() => refreshSocial()}
         onDeleted={() => refreshSocial()}
+      />
+
+      {/* Import Preview Modal */}
+      <ImportPreviewModal
+        open={modals.importPreview.isOpen}
+        state={modals.importPreview}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        onConfirm={handleImportConfirm}
       />
 
       {/* Workout Preview Modal */}

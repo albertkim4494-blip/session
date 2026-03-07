@@ -158,6 +158,7 @@ export const initialModalState = {
   announcementDetail: { isOpen: false, announcement: null, members: [] },
   createDues: { isOpen: false, groupId: null, title: "", amount: "", description: "", dueDate: "", creating: false },
   duesDetail: { isOpen: false, dues: null, members: [] },
+  importPreview: { isOpen: false, format: null, sessions: [], stats: null, importData: null, mode: "merge" },
 };
 
 export function modalReducer(state, action) {
@@ -956,6 +957,32 @@ export function modalReducer(state, action) {
       return {
         ...state,
         duesDetail: initialModalState.duesDetail,
+      };
+
+    // ===== IMPORT PREVIEW MODAL =====
+    case "OPEN_IMPORT_PREVIEW":
+      return {
+        ...state,
+        importPreview: {
+          ...initialModalState.importPreview,
+          isOpen: true,
+          format: action.payload.format,
+          sessions: action.payload.sessions,
+          stats: action.payload.stats,
+          importData: action.payload.importData,
+        },
+      };
+
+    case "UPDATE_IMPORT_PREVIEW":
+      return {
+        ...state,
+        importPreview: { ...state.importPreview, ...action.payload },
+      };
+
+    case "CLOSE_IMPORT_PREVIEW":
+      return {
+        ...state,
+        importPreview: initialModalState.importPreview,
       };
 
     // ===== CLOSE ALL (for back-button navigation) =====
