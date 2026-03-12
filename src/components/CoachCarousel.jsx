@@ -162,14 +162,14 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
                   <div style={{
                     fontSize: 11, fontWeight: 600, opacity: 0.4,
                     textTransform: "uppercase", letterSpacing: 1,
-                    padding: "14px 18px 0",
+                    padding: "10px 16px 0",
                     display: "flex", alignItems: "center", gap: 5,
                   }}>
                     {card.icon}
                     {card.label}
                   </div>
                 )}
-                <div style={{ flex: 1, overflow: "auto", padding: "10px 18px 36px", display: "flex", flexDirection: "column" }}>
+                <div style={{ flex: 1, overflow: "auto", padding: "8px 16px 30px", display: "flex", flexDirection: "column" }}>
                   {card.content}
                 </div>
                 {/* Dot indicators — sticky at bottom */}
