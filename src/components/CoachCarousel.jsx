@@ -39,6 +39,8 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     const t = e.touches[0];
     touchRef.current = { startX: t.clientX, startY: t.clientY, startTime: Date.now(), locked: null };
     setIsDragging(true);
+    // Stop propagation so the parent tab-swipe handler doesn't also claim this touch
+    e.stopPropagation();
   }, []);
 
   const onTouchMove = useCallback((e) => {
@@ -54,13 +56,15 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     }
     if (ref.locked === "v") return;
 
-    // Horizontal drag — prevent vertical scroll
+    // Horizontal drag — prevent vertical scroll and tab swipe
     e.preventDefault();
+    e.stopPropagation();
     dragRef.current = dx;
     setDragDelta(dx);
   }, []);
 
-  const onTouchEnd = useCallback(() => {
+  const onTouchEnd = useCallback((e) => {
+    e.stopPropagation();
     const ref = touchRef.current;
     touchRef.current = null;
     setIsDragging(false);
