@@ -399,9 +399,10 @@ export function CoachCheckin({
   onSubmit,
   onCancel,
   editValues,   // null = fresh check-in, { mood, sleep, pain } = editing existing
+  autoExpand,   // if true, skip the collapsed "How are you feeling?" prompt
 }) {
   const isEdit = editValues !== null && editValues !== undefined;
-  const [expanded, setExpanded] = useState(isEdit);
+  const [expanded, setExpanded] = useState(isEdit || autoExpand);
   const [mood, setMood] = useState(null);
   const [sleep, setSleep] = useState(null);
   const [painMap, setPainMap] = useState({});

@@ -3417,6 +3417,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                 colors={colors}
                                 onSubmit={handleCheckinSubmit}
                                 editValues={null}
+                                autoExpand
                               />
                             )}
                           </div>
