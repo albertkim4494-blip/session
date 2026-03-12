@@ -504,7 +504,7 @@ export function detectImbalancesNormalized(analysis, opts) {
   const catalog = opts?.catalog;
   const userExerciseNames = opts?.userExerciseNames;
   const insights = [];
-  const sets = analysis?.muscleGroupSets ?? {};
+  const sets = analysis?.muscleGroupSetsEffective ?? {};
   const sportFrequency = analysis?.sportFrequency ?? {};
   const totalSets = analysis?.totalStrengthSets ?? 0;
 

@@ -214,11 +214,11 @@ Deno.serve(async (req) => {
       coachingHistorySection = `\nYOUR PREVIOUS COACHING NOTES (you said these — build on them, don't repeat verbatim):\n${entryLines.join("\n\n")}\n`;
     }
 
-    // Build muscle sets section (primary-only working set counts — the standard volume metric)
+    // Build muscle sets section (effective sets: primary + secondary at 0.5×)
     let muscleVolumeSection = "";
     // Prefer the detailed breakdown (includes exercise names & dates) over the summary
     if (muscleVolumeDetail && typeof muscleVolumeDetail === "string" && muscleVolumeDetail.trim()) {
-      muscleVolumeSection = `\nMUSCLE GROUP VOLUME (working sets, primary muscles only — with exercise breakdown):\n${muscleVolumeDetail}\n`;
+      muscleVolumeSection = `\nMUSCLE GROUP VOLUME (effective sets, secondary muscles counted at 0.5× — with exercise breakdown):\n${muscleVolumeDetail}\n`;
     } else {
       const setsData = muscleSetsSummary || muscleVolumeSummary;
       const setsLabel = muscleSetsSummary ? "sets" : "reps";
@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
             const pct = totalSets > 0 ? Math.round(((v as number) / totalSets) * 100) : 0;
             return `  ${(g as string).replace(/_/g, " ").toLowerCase()}: ${v} ${setsLabel} (${pct}%)`;
           });
-          muscleVolumeSection = `\nMUSCLE GROUP VOLUME (working ${setsLabel}, primary muscles only — ${totalSets} total):\n${lines.join("\n")}\n`;
+          muscleVolumeSection = `\nMUSCLE GROUP VOLUME (effective ${setsLabel}, secondary muscles counted at 0.5× — ${totalSets} total):\n${lines.join("\n")}\n`;
         }
       }
     }
@@ -355,9 +355,9 @@ RECOVERY & REST:
 - Use type "RECOVERY" for these insights.
 
 ANALYSIS RULES:
-- MUSCLE GROUP VOLUME is measured in WORKING SETS per primary muscle group. This is the standard training science metric. Use set counts, not rep counts, when discussing volume balance.
-- The MUSCLE GROUP VOLUME section below contains pre-computed set counts and percentages per muscle group. USE THESE EXACT NUMBERS — do not invent your own percentages. If it says "chest: 4 sets (80%)" and "back: 1 set (20%)", say 80/20, not 100/0. NEVER claim a muscle group has 0% or was "neglected" if it appears in the volume data with any sets > 0.
-- A muscle group with 0 sets means it was NOT directly trained — do not claim it was trained with indirect/secondary work.
+- MUSCLE GROUP VOLUME is measured in EFFECTIVE SETS per muscle group (secondary muscles counted at 0.5×). This is the standard training science metric. Use set counts, not rep counts, when discussing volume balance.
+- The MUSCLE GROUP VOLUME section below contains pre-computed effective set counts and percentages per muscle group. USE THESE EXACT NUMBERS — do not invent your own percentages. If it says "chest: 4 sets (80%)" and "back: 1 set (20%)", say 80/20, not 100/0. NEVER claim a muscle group has 0% or was "neglected" if it appears in the volume data with any sets > 0.
+- A muscle group with 0 sets means it was NOT trained (neither as primary nor secondary) — it received zero effective volume.
 - Duration/sport activities measured in minutes are NOT strength volume.
 - Repeated sport activities (e.g. Water Polo 3x/week) are normal — don't flag as low variety.
 - Only compare strength exercises for muscle-group balance.

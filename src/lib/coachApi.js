@@ -856,12 +856,14 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
       const workingSets = log.sets.filter((s) => (Number(s.reps) || 0) > 0).length;
       if (workingSets === 0) continue;
 
-      // Look up primary muscles from catalog, fall back to keyword classification
+      // Look up primary + secondary muscles from catalog, fall back to keyword classification
       let primaryGroups = null;
+      let secondaryGroups = [];
       if (info.catalogId && catalogMap) {
         const entry = catalogMap.get(info.catalogId);
         if (entry?.muscles?.primary?.length > 0) {
           primaryGroups = entry.muscles.primary;
+          secondaryGroups = entry.muscles.secondary || [];
         }
       }
       if (!primaryGroups) {
@@ -874,7 +876,11 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
 
       for (const group of primaryGroups) {
         if (!muscleExercises[group]) muscleExercises[group] = [];
-        muscleExercises[group].push({ name: info.name, sets: workingSets, date: dateKey });
+        muscleExercises[group].push({ name: info.name, sets: workingSets, date: dateKey, secondary: false });
+      }
+      for (const group of secondaryGroups) {
+        if (!muscleExercises[group]) muscleExercises[group] = [];
+        muscleExercises[group].push({ name: info.name, sets: workingSets * 0.5, date: dateKey, secondary: true });
       }
     }
   }
@@ -904,7 +910,7 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
     lines.push(`  ${group.replace(/_/g, " ").toLowerCase()}: ${totalSets} sets (${pct}%) — ${parts.join(", ")}`);
   }
 
-  return lines.length > 0 ? `Total: ${grandTotalSets} working sets\n${lines.join("\n")}` : null;
+  return lines.length > 0 ? `Total: ${grandTotalSets} effective sets (incl. secondary at 0.5×)\n${lines.join("\n")}` : null;
 }
 
 /**
@@ -1239,7 +1245,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     for (const ex of w.exercises || []) activeExerciseNames.push(ex.name);
   }
 
-  // Compute muscle set counts for the AI (primary-only, no secondary inflation)
+  // Compute muscle set counts for the AI (effective: primary + 0.5× secondary)
   let muscleSetsSummary = null;
   let muscleVolumeDetail = null;
   let sportTraitsPayload = null;
@@ -1247,8 +1253,8 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   const catalogMap = catalog?.length > 0 ? buildCatalogMap(catalog) : null;
   if (catalogMap) {
     const analysis = buildNormalizedAnalysis(allWorkouts, recentLogs, { start: dateRange.start, end: dateRange.end }, catalogMap);
-    if (analysis.muscleGroupSets && Object.keys(analysis.muscleGroupSets).length > 0) {
-      muscleSetsSummary = analysis.muscleGroupSets;
+    if (analysis.muscleGroupSetsEffective && Object.keys(analysis.muscleGroupSetsEffective).length > 0) {
+      muscleSetsSummary = analysis.muscleGroupSetsEffective;
     }
     muscleVolumeDetail = buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap);
     // Merge logged sport traits with profile-declared sports (logged takes precedence)

@@ -179,6 +179,7 @@ assertEqual(detectImbalancesNormalized(smallAnalysis).length, 0,
 // Sport duration shouldn't inflate thresholds
 const sportHeavy = {
   muscleGroupSets: { CHEST: 12, BACK: 12, QUADS: 8, HAMSTRINGS: 8 },
+  muscleGroupSetsEffective: { CHEST: 12, BACK: 12, QUADS: 8, HAMSTRINGS: 8 },
   durationByActivity: { "Water Polo": 500 },
   sportFrequency: { "Water Polo": 5 },
   sportTraits: { perSport: { "Water Polo": { upperPush: 0.8, legLoad: 0.7, cardioLoad: 0.9 } }, aggregated: { upperPush: 0.8, upperPull: 0.5, legLoad: 0.7, cardioLoad: 0.9, coreRotation: 0.6, gripLoad: 0, impactStress: 0.5, explosiveness: 0.7 }, totalSportMinutes: 500, totalSportSessions: 5 },
@@ -191,6 +192,7 @@ assert(!sportInsights.some((i) => i.type === "NEGLECTED" && i.message.includes("
 // Sport trait-aware skip: swimming (high upperPull) should skip back neglect
 const swimHeavy = {
   muscleGroupSets: { CHEST: 12, BACK: 0, QUADS: 8, HAMSTRINGS: 8, ANTERIOR_DELT: 4, POSTERIOR_DELT: 0 },
+  muscleGroupSetsEffective: { CHEST: 12, BACK: 0, QUADS: 8, HAMSTRINGS: 8, ANTERIOR_DELT: 4, POSTERIOR_DELT: 0 },
   durationByActivity: { "Swimming": 300 },
   sportFrequency: { "Swimming": 4 },
   sportTraits: { perSport: { "Swimming": { upperPull: 0.8 } }, aggregated: { upperPush: 0.6, upperPull: 0.8, legLoad: 0.5, coreRotation: 0.4, gripLoad: 0.2, impactStress: 0.1, explosiveness: 0.3, cardioLoad: 0.9 }, totalSportMinutes: 300, totalSportSessions: 4 },
@@ -205,6 +207,7 @@ assert(!swimInsights.some((i) => i.type === "NEGLECTED" && i.title.toLowerCase()
 // Balanced strength â†’ positive
 const balanced = {
   muscleGroupSets: { CHEST: 10, BACK: 10, ANTERIOR_DELT: 4, POSTERIOR_DELT: 4, QUADS: 6, HAMSTRINGS: 6 },
+  muscleGroupSetsEffective: { CHEST: 10, BACK: 10, ANTERIOR_DELT: 4, POSTERIOR_DELT: 4, QUADS: 6, HAMSTRINGS: 6 },
   durationByActivity: {},
   sportFrequency: {},
   totalStrengthSets: 40,
@@ -215,6 +218,7 @@ assert(balancedInsights.some((i) => i.type === "POSITIVE"), "balanced training â
 // Push/pull imbalance (sets-based)
 const imbalanced = {
   muscleGroupSets: { CHEST: 15, ANTERIOR_DELT: 8, TRICEPS: 6, BACK: 3, POSTERIOR_DELT: 0, BICEPS: 2 },
+  muscleGroupSetsEffective: { CHEST: 15, ANTERIOR_DELT: 8, TRICEPS: 6, BACK: 3, POSTERIOR_DELT: 0, BICEPS: 2 },
   durationByActivity: {},
   sportFrequency: {},
   totalStrengthSets: 34,
@@ -226,6 +230,7 @@ assert(imbInsights[0].message.includes("push sets"), "imbalance message referenc
 // Neglected group with 0 sets shows correct message (balanced push/pull so imbalance doesn't fire first)
 const neglected = {
   muscleGroupSets: { CHEST: 8, BACK: 0, ANTERIOR_DELT: 4, POSTERIOR_DELT: 4, BICEPS: 6, TRICEPS: 4, QUADS: 8, GLUTES: 4 },
+  muscleGroupSetsEffective: { CHEST: 8, BACK: 0, ANTERIOR_DELT: 4, POSTERIOR_DELT: 4, BICEPS: 6, TRICEPS: 4, QUADS: 8, GLUTES: 4 },
   durationByActivity: {},
   sportFrequency: {},
   totalStrengthSets: 38,

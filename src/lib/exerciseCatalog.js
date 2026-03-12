@@ -5206,10 +5206,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -5242,10 +5242,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "HAMSTRINGS",
         "GLUTES"
       ],
       "secondary": [
-        "HAMSTRINGS",
         "BACK"
       ],
       "targetRaw": [
@@ -5276,10 +5276,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
-        "GLUTES"
+        "HAMSTRINGS"
       ],
       "secondary": [
-        "HAMSTRINGS",
+        "GLUTES",
         "BACK"
       ],
       "targetRaw": [
@@ -5348,10 +5348,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
-        "GLUTES"
+        "QUADS"
       ],
       "secondary": [
-        "QUADS",
+        "GLUTES",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -5383,12 +5383,11 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "BACK",
+        "HAMSTRINGS",
         "GLUTES"
       ],
-      "secondary": [
-        "HAMSTRINGS",
-        "BACK"
-      ],
+      "secondary": [],
       "targetRaw": [
         "glutes"
       ],
@@ -5452,11 +5451,11 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
-        "GLUTES"
+        "GLUTES",
+        "HAMSTRINGS",
+        "QUADS"
       ],
       "secondary": [
-        "HAMSTRINGS",
-        "QUADS",
         "BACK"
       ],
       "targetRaw": [
@@ -5489,10 +5488,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -5562,10 +5561,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -5597,10 +5596,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -5805,10 +5804,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -5838,10 +5837,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -5907,12 +5906,12 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
-        "GLUTES"
+        "GLUTES",
+        "HAMSTRINGS",
+        "BACK"
       ],
       "secondary": [
-        "HAMSTRINGS",
-        "QUADS",
-        "BACK"
+        "QUADS"
       ],
       "targetRaw": [
         "glutes"
@@ -5971,10 +5970,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -6135,10 +6134,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES",
         "ABS"
@@ -6175,10 +6174,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -6211,10 +6210,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -6248,10 +6247,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -6284,10 +6283,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
-        "GLUTES"
+        "HAMSTRINGS"
       ],
       "secondary": [
-        "HAMSTRINGS",
+        "GLUTES",
         "BACK"
       ],
       "targetRaw": [
@@ -6318,10 +6317,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -6355,10 +6354,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
-        "GLUTES"
+        "QUADS"
       ],
       "secondary": [
-        "QUADS",
+        "GLUTES",
         "HAMSTRINGS",
         "CALVES",
         "ABS"
@@ -6393,11 +6392,11 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
-        "GLUTES"
+        "QUADS",
+        "GLUTES",
+        "HAMSTRINGS"
       ],
       "secondary": [
-        "HAMSTRINGS",
-        "QUADS",
         "BACK"
       ],
       "targetRaw": [
@@ -6429,10 +6428,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -6504,10 +6503,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES",
         "ABS"
@@ -6542,12 +6541,11 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "BACK",
+        "HAMSTRINGS",
         "GLUTES"
       ],
-      "secondary": [
-        "HAMSTRINGS",
-        "BACK"
-      ],
+      "secondary": [],
       "targetRaw": [
         "glutes"
       ],
@@ -6686,10 +6684,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -6749,10 +6747,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -6817,10 +6815,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -6891,10 +6889,10 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
+        "QUADS",
         "GLUTES"
       ],
       "secondary": [
-        "QUADS",
         "HAMSTRINGS",
         "CALVES"
       ],
@@ -7357,7 +7355,7 @@ export const EXERCISE_CATALOG = [
     "defaultUnit": "reps",
     "muscles": {
       "primary": [
-        "ANTERIOR_DELT"
+        "POSTERIOR_DELT"
       ],
       "secondary": [
         "BACK"
