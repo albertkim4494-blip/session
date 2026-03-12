@@ -82,6 +82,7 @@ import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from 
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 import { CoachCheckin, CheckinSummary, CheckinEditSection } from "./components/CoachCheckin";
+import { CoachCarousel } from "./components/CoachCarousel";
 import { getTodayCheckin, saveCheckin, buildCheckinContext, loadCheckins, loadCoachNotes, mergeCoachNotes, saveCoachNotes } from "./lib/coachCheckin";
 
 // Extracted components (timer)
@@ -262,6 +263,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const MAX_DAILY_REFRESHES = 10;
   const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(dateKey));
   const [checkinEditSection, setCheckinEditSection] = useState(null); // null | "mood" | "sleep" | "pain"
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const checkinEditSectionRef = useRef(null);
   checkinEditSectionRef.current = checkinEditSection;
 
@@ -646,6 +648,57 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const fullCatalog = useMemo(() => [...EXERCISE_CATALOG, ...(state.customExercises || [])], [state.customExercises]);
   const catalogMap = useMemo(() => buildCatalogMap(fullCatalog), [fullCatalog]);
+
+  // Weekly summary for the Coach Carousel "Your Week" card
+  const weeklySummary = useMemo(() => {
+    const today = new Date();
+    const day = today.getDay(); // 0=Sun
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset);
+    monday.setHours(0, 0, 0, 0);
+    const weekStart = yyyyMmDd(monday);
+    const weekEnd = yyyyMmDd(today);
+
+    const sessionsSet = new Set();
+    let totalSets = 0;
+    const musclesHit = new Set();
+
+    // Collect all workouts (program + daily) for exercise lookups
+    const allExercises = new Map();
+    for (const w of (state.program?.workouts || [])) {
+      for (const ex of (w.exercises || [])) allExercises.set(ex.id, ex);
+    }
+    for (const [, ws] of Object.entries(state.dailyWorkouts || {})) {
+      for (const w of (ws || [])) {
+        for (const ex of (w.exercises || [])) allExercises.set(ex.id, ex);
+      }
+    }
+
+    for (const [dateStr, dayLogs] of Object.entries(state.logsByDate || {})) {
+      if (dateStr < weekStart || dateStr > weekEnd) continue;
+      if (!dayLogs || typeof dayLogs !== "object") continue;
+      let dayHasCompleted = false;
+      for (const [exId, log] of Object.entries(dayLogs)) {
+        if (!log?.sets || !Array.isArray(log.sets)) continue;
+        const completed = log.sets.filter(s => s.completed === true || (s.completed === undefined && Number(s.reps) > 0));
+        if (completed.length === 0) continue;
+        dayHasCompleted = true;
+        totalSets += completed.length;
+        // Look up muscles from catalog
+        const ex = allExercises.get(exId);
+        if (ex?.catalogId) {
+          const entry = catalogMap.get(ex.catalogId);
+          if (entry?.muscles?.primary) {
+            for (const m of entry.muscles.primary) musclesHit.add(m);
+          }
+        }
+      }
+      if (dayHasCompleted) sessionsSet.add(dateStr);
+    }
+
+    return { sessions: sessionsSet.size, totalSets, musclesHit };
+  }, [state.logsByDate, state.program?.workouts, state.dailyWorkouts, catalogMap, dateKey]);
 
   // Catalog entry for the back face of the log card flip
   const logDetailEntry = useMemo(() => {
@@ -3315,60 +3368,128 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               ...(isToday && !hasSessions ? { flex: 1, justifyContent: "center" } : {}),
             }}>
               {isToday && !hasSessions ? (
-                /* HERO STATE: centered greeting, today only, no sessions */
+                /* HERO STATE: greeting + swipeable coach carousel */
                 <div style={{
-                  display: "flex", flexDirection: "column", alignItems: "center",
-                  textAlign: "center", minHeight: "60vh", gap: 28, justifyContent: "center",
+                  display: "flex", flexDirection: "column",
+                  minHeight: "60vh", gap: 20, justifyContent: "center",
                   padding: "24px 0",
                 }}>
-                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3 }}>
+                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3, textAlign: "center" }}>
                     {getTimeGreeting()}
                   </div>
-                  {/* Inline edit: single section picker above insight */}
-                  {checkinEditSection && todayCheckin && (
-                    <CheckinEditSection
-                      section={checkinEditSection}
-                      checkin={todayCheckin}
-                      onSave={(updated) => {
-                        handleCheckinUpdate(updated);
-                      }}
-                      onCancel={() => setCheckinEditSection(null)}
-                      colors={colors}
-                    />
-                  )}
-                  {/* Coach insight stays visible once checked in */}
-                  {todayCheckin && (
-                    <CoachHeroInsight
-                      insights={coachInsights}
-                      onAddExercise={handleAddSuggestion}
-                      colors={colors}
-                      loading={coachLoading}
-                      error={coachError}
-                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                      onRefresh={handleCoachRefresh}
-                    />
-                  )}
-                  {/* Below insight: summary pills or initial check-in link */}
-                  {todayCheckin && (
-                    <CheckinSummary
-                      checkin={todayCheckin}
-                      onEdit={(section) => setCheckinEditSection(section)}
-                      onClear={() => {
-                        saveCheckin(dateKey, null);
-                        setTodayCheckin(null);
-                        setCheckinEditSection(null);
-                      }}
-                      colors={colors}
-                    />
-                  )}
-                  {!todayCheckin && (
-                    <CoachCheckin
-                      colors={colors}
-                      onSubmit={handleCheckinSubmit}
-                      editValues={null}
-                    />
-                  )}
-                  <div style={{ fontSize: 14, opacity: 0.35 }}>
+                  <CoachCarousel
+                    colors={colors}
+                    activeIndex={carouselIndex}
+                    onChangeIndex={setCarouselIndex}
+                    cards={[
+                      {
+                        key: "checkin",
+                        content: (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", textAlign: "center" }}>
+                            {todayCheckin ? (
+                              <>
+                                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.4, textTransform: "uppercase", letterSpacing: 1 }}>
+                                  {"\u2713"} Checked in
+                                </div>
+                                {checkinEditSection ? (
+                                  <CheckinEditSection
+                                    section={checkinEditSection}
+                                    checkin={todayCheckin}
+                                    onSave={(updated) => handleCheckinUpdate(updated)}
+                                    onCancel={() => setCheckinEditSection(null)}
+                                    colors={colors}
+                                  />
+                                ) : (
+                                  <CheckinSummary
+                                    checkin={todayCheckin}
+                                    onEdit={(section) => setCheckinEditSection(section)}
+                                    onClear={() => {
+                                      saveCheckin(dateKey, null);
+                                      setTodayCheckin(null);
+                                      setCheckinEditSection(null);
+                                    }}
+                                    colors={colors}
+                                  />
+                                )}
+                              </>
+                            ) : (
+                              <CoachCheckin
+                                colors={colors}
+                                onSubmit={handleCheckinSubmit}
+                                editValues={null}
+                              />
+                            )}
+                          </div>
+                        ),
+                      },
+                      {
+                        key: "week",
+                        content: (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div style={{ fontSize: 15, fontWeight: 600, color: colors.text }}>Your Week</div>
+                            {weeklySummary.sessions > 0 ? (
+                              <>
+                                <div style={{ fontSize: 13, color: colors.textSecondary || colors.text, opacity: 0.6 }}>
+                                  {weeklySummary.sessions} session{weeklySummary.sessions !== 1 ? "s" : ""} {"\u00B7"} {weeklySummary.totalSets} sets
+                                </div>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
+                                  {["CHEST", "BACK", "SHOULDERS", "BICEPS", "TRICEPS", "QUADS", "HAMSTRINGS", "GLUTES", "ABS", "CALVES"].map((m) => {
+                                    const hit = weeklySummary.musclesHit.has(m) ||
+                                      (m === "SHOULDERS" && (weeklySummary.musclesHit.has("ANTERIOR_DELT") || weeklySummary.musclesHit.has("LATERAL_DELT") || weeklySummary.musclesHit.has("POSTERIOR_DELT")));
+                                    return (
+                                      <span key={m} style={{
+                                        fontSize: 12, fontWeight: 500, padding: "3px 8px", borderRadius: 6,
+                                        background: hit ? ((colors.accent || "#3b82f6") + "18") : "transparent",
+                                        color: hit ? (colors.accent || "#3b82f6") : (colors.textSecondary || colors.text),
+                                        opacity: hit ? 1 : 0.35,
+                                        border: `1px solid ${hit ? ((colors.accent || "#3b82f6") + "30") : colors.border}`,
+                                      }}>
+                                        {hit ? "\u2713 " : ""}{m.charAt(0) + m.slice(1).toLowerCase()}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </>
+                            ) : (
+                              <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary || colors.text, padding: "16px 0" }}>
+                                No sessions yet this week.{"\n"}Tap + to start your first workout.
+                              </div>
+                            )}
+                          </div>
+                        ),
+                      },
+                      {
+                        key: "coach",
+                        content: (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center" }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.4, textTransform: "uppercase", letterSpacing: 1 }}>
+                              Coach{"\u2019"}s Take
+                            </div>
+                            {coachLoading && coachInsights.length === 0 ? (
+                              <div style={{ fontSize: 14, opacity: 0.4, padding: "16px 0" }}>Analyzing your workouts...</div>
+                            ) : coachInsights.length > 0 ? (
+                              <CoachHeroInsight
+                                insights={coachInsights}
+                                onAddExercise={handleAddSuggestion}
+                                colors={colors}
+                                loading={coachLoading}
+                                error={coachError}
+                                userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                                onRefresh={handleCoachRefresh}
+                              />
+                            ) : (
+                              <div style={{ fontSize: 13, opacity: 0.45, padding: "16px 0", color: colors.textSecondary || colors.text }}>
+                                {todayCheckin
+                                  ? "Your coach insights will appear here."
+                                  : "Complete a check-in for personalized coaching."}
+                              </div>
+                            )}
+                          </div>
+                        ),
+                      },
+                    ]}
+                  />
+                  <div style={{ fontSize: 14, opacity: 0.35, textAlign: "center" }}>
                     Tap + to start a session
                   </div>
                 </div>
