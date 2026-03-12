@@ -3386,7 +3386,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         key: "checkin",
                         label: "Check In",
                         content: (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", textAlign: "center" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", textAlign: "center", flex: 1, justifyContent: "center" }}>
                             {todayCheckin ? (
                               checkinEditSection ? (
                                 <CheckinEditSection
@@ -3465,7 +3465,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           </svg>
                         ),
                         content: (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center", flex: 1, justifyContent: "center" }}>
                             {coachLoading && coachInsights.length === 0 ? (
                               <div style={{ fontSize: 14, opacity: 0.4, padding: "16px 0" }}>Analyzing your workouts...</div>
                             ) : coachInsights.length > 0 ? (
