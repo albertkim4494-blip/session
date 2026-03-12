@@ -34,6 +34,18 @@ const ANIM_CSS = `
 @keyframes checkinCollapse {
   from { opacity: 1; transform: scale(1); }
   to   { opacity: 0; transform: scale(0.95); }
+}
+@keyframes checkinQuestionIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes checkinQuestionOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-30px) scale(0.7); }
+}
+@keyframes checkinChipIn {
+  from { opacity: 0; transform: scale(0.5) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }`;
 let animInjected = false;
 function ensureAnim() {
@@ -408,6 +420,8 @@ export function CoachCheckin({
   const [sleep, setSleep] = useState(null);
   const [painMap, setPainMap] = useState({});
   const [editStep, setEditStep] = useState(0); // tracks which step user is on during edit
+  const [transitioning, setTransitioning] = useState(false);
+  const [visibleStep, setVisibleStep] = useState(0);
 
   useEffect(() => { ensureAnim(); }, []);
 
@@ -521,31 +535,139 @@ export function CoachCheckin({
     cursor: "pointer",
   };
 
-  // --- Show-all mode: all 3 questions visible at once ---
+  // --- Card mode: animated step-by-step with morph-to-chip transitions ---
   if (showAll) {
+    // Animate transition between steps
+    const advanceStep = (nextStep) => {
+      setTransitioning(true);
+      setTimeout(() => {
+        setVisibleStep(nextStep);
+        setTransitioning(false);
+      }, 300);
+    };
+
+    const handleCardMood = (v) => {
+      if (v === null) return;
+      setMood(v);
+      advanceStep(1);
+    };
+
+    const handleCardSleep = (v) => {
+      if (v === null) return;
+      setSleep(v);
+      advanceStep(2);
+    };
+
+    const handleChipTap = (targetStep) => {
+      if (isEdit) {
+        setEditStep(targetStep);
+      } else {
+        if (targetStep <= 0) { setMood(null); setSleep(null); setPainMap({}); }
+        else if (targetStep <= 1) { setSleep(null); setPainMap({}); }
+      }
+      setVisibleStep(targetStep);
+    };
+
+    const chipBase = {
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+      border: `1px solid ${colors.border}`,
+      background: colors.cardBg, color: colors.text,
+      cursor: "pointer", transition: "all 0.15s",
+      animation: "checkinChipIn 0.35s cubic-bezier(.2,.8,.3,1) forwards",
+    };
+
+    const moodChipFace = mood !== null ? MOOD_FACES.find((f) => f.value === mood) : null;
+    const painItems = Object.entries(painMap).filter(([, sev]) => sev);
+
     return (
       <div style={{
-        display: "flex", flexDirection: "column", gap: 16, alignItems: "center",
-        animation: "checkinFadeIn 0.3s ease-out",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        gap: 0, flex: 1, justifyContent: "center", position: "relative",
       }}>
-        <CheckinMoodPicker value={mood} onChange={setMood} colors={colors} />
-        <SleepPicker value={sleep} onChange={setSleep} colors={colors} />
-        <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
-        <button
-          onClick={handleSubmit}
-          style={{
-            background: "transparent", border: "none",
-            color: colors.text, cursor: "pointer",
-            fontSize: 13, opacity: mood !== null ? 0.5 : 0.2,
-            transition: "opacity 0.15s",
-            padding: "4px 0",
-          }}
-          disabled={mood === null}
-          onPointerEnter={(e) => { if (mood !== null) e.currentTarget.style.opacity = "0.7"; }}
-          onPointerLeave={(e) => { e.currentTarget.style.opacity = mood !== null ? "0.5" : "0.2"; }}
-        >
-          Done
-        </button>
+        {/* Chip bar — answered steps accumulate here */}
+        {(mood !== null || sleep !== null || painItems.length > 0) && visibleStep > 0 && (
+          <div style={{
+            display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center",
+            marginBottom: 16, minHeight: 28,
+          }}>
+            {mood !== null && visibleStep > 0 && (
+              <span style={chipBase} onClick={() => handleChipTap(0)}>
+                {moodChipFace && (
+                  <svg viewBox="0 0 32 32" width="14" height="14">
+                    <circle cx="16" cy="16" r="14" fill="#FFD93D" stroke="#E6B800" strokeWidth="1.5" />
+                    {moodChipFace.eyes === "happy" ? (
+                      <>
+                        <path d="M10,13 Q11,11 12,13" fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
+                        <path d="M20,13 Q21,11 22,13" fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
+                      </>
+                    ) : moodChipFace.eyes === "squint" ? (
+                      <>
+                        <line x1="9.5" y1="13" x2="12.5" y2="13" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
+                        <line x1="19.5" y1="13" x2="22.5" y2="13" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
+                      </>
+                    ) : (
+                      <>
+                        <circle cx="11" cy="12.5" r="1.5" fill="#5D4E00" />
+                        <circle cx="21" cy="12.5" r="1.5" fill="#5D4E00" />
+                      </>
+                    )}
+                    <path d={moodChipFace.mouth} fill="none" stroke="#5D4E00" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                )}
+                {MOOD_LABELS[String(mood)]}
+              </span>
+            )}
+            {sleep !== null && visibleStep > 1 && (
+              <span style={chipBase} onClick={() => handleChipTap(1)}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" opacity="0.5">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+                {SLEEP_LABELS[sleep]}
+              </span>
+            )}
+            {painItems.length > 0 && visibleStep > 2 && painItems.map(([area, sev]) => (
+              <span key={area} style={chipBase} onClick={() => handleChipTap(2)}>
+                <svg width="10" height="10" viewBox="0 0 10 10">
+                  <circle cx="5" cy="5" r="5" fill={SEVERITY_COLORS[sev]} />
+                </svg>
+                {area}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Active question — centered with transitions */}
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center",
+          gap: 12, width: "100%",
+          animation: transitioning ? "checkinQuestionOut 0.3s ease-in forwards" : "checkinQuestionIn 0.35s ease-out forwards",
+        }}>
+          {visibleStep === 0 && (
+            <CheckinMoodPicker value={mood} onChange={handleCardMood} colors={colors} />
+          )}
+          {visibleStep === 1 && (
+            <SleepPicker value={sleep} onChange={handleCardSleep} colors={colors} />
+          )}
+          {visibleStep === 2 && (
+            <>
+              <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
+              <button
+                onClick={handleSubmit}
+                style={{
+                  background: "transparent", border: "none",
+                  color: colors.text, cursor: "pointer",
+                  fontSize: 13, opacity: 0.45,
+                  transition: "opacity 0.15s", padding: "4px 0",
+                }}
+                onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
+                onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.45"; }}
+              >
+                {painItems.length > 0 ? "Done" : "No pain, I\u2019m good"}
+              </button>
+            </>
+          )}
+        </div>
       </div>
     );
   }
