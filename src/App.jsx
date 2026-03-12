@@ -3463,7 +3463,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         key: "coach",
                         content: (
                           <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center" }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.4, textTransform: "uppercase", letterSpacing: 1 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.4, textTransform: "uppercase", letterSpacing: 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                                <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                                <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+                              </svg>
                               Coach{"\u2019"}s Take
                             </div>
                             {coachLoading && coachInsights.length === 0 ? (
@@ -3477,6 +3481,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                 error={coachError}
                                 userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
                                 onRefresh={handleCoachRefresh}
+                                hideLabel
                               />
                             ) : (
                               <div style={{ fontSize: 13, opacity: 0.45, padding: "16px 0", color: colors.textSecondary || colors.text }}>
