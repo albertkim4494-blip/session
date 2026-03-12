@@ -442,8 +442,8 @@ export function CoachCheckin({
     }
   };
 
-  // Collapsed — subtle prompt
-  if (!expanded) {
+  // Collapsed — subtle prompt (skip if showAll)
+  if (!expanded && !showAll) {
     return (
       <button
         onClick={() => setExpanded(true)}

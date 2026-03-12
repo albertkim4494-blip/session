@@ -3371,8 +3371,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 /* HERO STATE: greeting + swipeable coach carousel */
                 <div style={{
                   display: "flex", flexDirection: "column",
-                  minHeight: "60vh", gap: 20, justifyContent: "center",
-                  padding: "24px 0",
+                  flex: 1, gap: 16,
+                  padding: "24px 0 0",
                 }}>
                   <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3, textAlign: "center" }}>
                     {getTimeGreeting()}
@@ -3384,34 +3384,30 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     cards={[
                       {
                         key: "checkin",
+                        label: "Check In",
                         content: (
                           <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", textAlign: "center" }}>
                             {todayCheckin ? (
-                              <>
-                                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.4, textTransform: "uppercase", letterSpacing: 1 }}>
-                                  {"\u2713"} Checked in
-                                </div>
-                                {checkinEditSection ? (
-                                  <CheckinEditSection
-                                    section={checkinEditSection}
-                                    checkin={todayCheckin}
-                                    onSave={(updated) => handleCheckinUpdate(updated)}
-                                    onCancel={() => setCheckinEditSection(null)}
-                                    colors={colors}
-                                  />
-                                ) : (
-                                  <CheckinSummary
-                                    checkin={todayCheckin}
-                                    onEdit={(section) => setCheckinEditSection(section)}
-                                    onClear={() => {
-                                      saveCheckin(dateKey, null);
-                                      setTodayCheckin(null);
-                                      setCheckinEditSection(null);
-                                    }}
-                                    colors={colors}
-                                  />
-                                )}
-                              </>
+                              checkinEditSection ? (
+                                <CheckinEditSection
+                                  section={checkinEditSection}
+                                  checkin={todayCheckin}
+                                  onSave={(updated) => handleCheckinUpdate(updated)}
+                                  onCancel={() => setCheckinEditSection(null)}
+                                  colors={colors}
+                                />
+                              ) : (
+                                <CheckinSummary
+                                  checkin={todayCheckin}
+                                  onEdit={(section) => setCheckinEditSection(section)}
+                                  onClear={() => {
+                                    saveCheckin(dateKey, null);
+                                    setTodayCheckin(null);
+                                    setCheckinEditSection(null);
+                                  }}
+                                  colors={colors}
+                                />
+                              )
                             ) : (
                               <CoachCheckin
                                 colors={colors}
@@ -3425,9 +3421,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       },
                       {
                         key: "week",
+                        label: "Your Week",
                         content: (
                           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                            <div style={{ fontSize: 15, fontWeight: 600, color: colors.text }}>Your Week</div>
                             {weeklySummary.sessions > 0 ? (
                               <>
                                 <div style={{ fontSize: 13, color: colors.textSecondary || colors.text, opacity: 0.6 }}>
@@ -3461,15 +3457,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       },
                       {
                         key: "coach",
+                        label: "Coach\u2019s Take",
+                        icon: (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                            <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                            <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+                          </svg>
+                        ),
                         content: (
                           <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center" }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.4, textTransform: "uppercase", letterSpacing: 1, display: "inline-flex", alignItems: "center", gap: 5 }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
-                                <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
-                                <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
-                              </svg>
-                              Coach{"\u2019"}s Take
-                            </div>
                             {coachLoading && coachInsights.length === 0 ? (
                               <div style={{ fontSize: 14, opacity: 0.4, padding: "16px 0" }}>Analyzing your workouts...</div>
                             ) : coachInsights.length > 0 ? (

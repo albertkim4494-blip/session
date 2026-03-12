@@ -23,7 +23,6 @@ function ensureCSS() {
 export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex }) {
   const [dragDelta, setDragDelta] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [fixedHeight, setFixedHeight] = useState(null);
   const dragRef = useRef(0); // mirrors dragDelta for use in callbacks
   const touchRef = useRef(null);
   const containerRef = useRef(null);
@@ -33,17 +32,6 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
 
   useEffect(() => { ensureCSS(); }, []);
 
-  // Measure the tallest card after mount and lock all cards to that height
-  useEffect(() => {
-    const strip = stripRef.current;
-    if (!strip) return;
-    const cardEls = strip.querySelectorAll("[data-carousel-card]");
-    let max = 0;
-    // Temporarily remove fixed height so cards size naturally
-    for (const el of cardEls) el.style.height = "auto";
-    for (const el of cardEls) max = Math.max(max, el.offsetHeight);
-    if (max > 0) setFixedHeight(max);
-  }, [cards.length]);
 
   const count = cards.length;
   const clampIndex = useCallback((i) => Math.max(0, Math.min(count - 1, i)), [count]);
@@ -112,11 +100,11 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
   const translateX = baseOffset + (isDragging ? dragDelta : 0);
 
   return (
-    <div style={{ animation: "carouselFadeIn 0.3s ease-out" }}>
+    <div style={{ animation: "carouselFadeIn 0.3s ease-out", flex: 1, display: "flex", flexDirection: "column" }}>
       {/* Cards container */}
       <div
         ref={containerRef}
-        style={{ overflow: "hidden", borderRadius: 16 }}
+        style={{ overflow: "hidden", borderRadius: 16, flex: 1, display: "flex", flexDirection: "column" }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -124,6 +112,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
         <div ref={stripRef} style={{
           display: "flex",
           width: `${count * 100}%`,
+          flex: 1,
           transform: `translateX(${translateX}px)`,
           transition: isDragging ? "none" : "transform 0.3s cubic-bezier(.25,.8,.25,1)",
         }}>
@@ -135,6 +124,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
                 flexShrink: 0,
                 padding: "0 2px",
                 boxSizing: "border-box",
+                display: "flex",
               }}
             >
               <div
@@ -144,15 +134,26 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
                   border: `1px solid ${colors.border}`,
                   borderRadius: 16,
                   boxShadow: colors.shadow,
-                  minHeight: "calc(50vh - 40px)",
-                  ...(fixedHeight ? { height: fixedHeight } : {}),
+                  flex: 1,
                   display: "flex",
                   flexDirection: "column",
                   overflow: "hidden",
                   position: "relative",
                 }}
               >
-                <div style={{ flex: 1, overflow: "auto", padding: 18, paddingBottom: 36 }}>
+                {/* Unified card header */}
+                {card.label && (
+                  <div style={{
+                    fontSize: 11, fontWeight: 600, opacity: 0.4,
+                    textTransform: "uppercase", letterSpacing: 1,
+                    padding: "14px 18px 0",
+                    display: "flex", alignItems: "center", gap: 5,
+                  }}>
+                    {card.icon}
+                    {card.label}
+                  </div>
+                )}
+                <div style={{ flex: 1, overflow: "auto", padding: "10px 18px 36px" }}>
                   {card.content}
                 </div>
                 {/* Dot indicators — sticky at bottom */}
