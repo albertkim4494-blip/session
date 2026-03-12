@@ -583,13 +583,13 @@ export function CoachCheckin({
     return (
       <div style={{
         display: "flex", flexDirection: "column", alignItems: "center",
-        gap: 0, flex: 1, justifyContent: "center", position: "relative",
+        flex: 1, position: "relative",
       }}>
-        {/* Chip bar — answered steps accumulate here */}
+        {/* Chip bar — pinned at top, doesn't push question down */}
         {(mood !== null || sleep !== null || painItems.length > 0) && visibleStep > 0 && (
           <div style={{
             display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center",
-            marginBottom: 16, minHeight: 28,
+            width: "100%", paddingBottom: 8,
           }}>
             {mood !== null && visibleStep > 0 && (
               <span style={chipBase} onClick={() => handleChipTap(0)}>
@@ -637,9 +637,10 @@ export function CoachCheckin({
           </div>
         )}
 
-        {/* Active question — centered with transitions */}
+        {/* Active question — centered vertically in remaining space */}
         <div style={{
           display: "flex", flexDirection: "column", alignItems: "center",
+          justifyContent: "center", flex: 1,
           gap: 12, width: "100%",
           animation: transitioning ? "checkinQuestionOut 0.3s ease-in forwards" : "checkinQuestionIn 0.35s ease-out forwards",
         }}>

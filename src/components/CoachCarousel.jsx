@@ -104,7 +104,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
       {/* Cards container */}
       <div
         ref={containerRef}
-        style={{ overflow: "hidden", borderRadius: 16, flex: 1, display: "flex", flexDirection: "column" }}
+        style={{ overflow: "hidden", borderRadius: 16, flex: 1, minHeight: 0 }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -112,7 +112,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
         <div ref={stripRef} style={{
           display: "flex",
           width: `${count * 100}%`,
-          flex: 1,
+          height: "100%",
           transform: `translateX(${translateX}px)`,
           transition: isDragging ? "none" : "transform 0.3s cubic-bezier(.25,.8,.25,1)",
         }}>
@@ -124,7 +124,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
                 flexShrink: 0,
                 padding: "0 2px",
                 boxSizing: "border-box",
-                display: "flex",
+                height: "100%",
               }}
             >
               <div
@@ -134,7 +134,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
                   border: `1px solid ${colors.border}`,
                   borderRadius: 16,
                   boxShadow: colors.shadow,
-                  flex: 1,
+                  height: "100%",
                   display: "flex",
                   flexDirection: "column",
                   overflow: "hidden",
