@@ -20,7 +20,7 @@ function ensureCSS() {
 // ---------------------------------------------------------------------------
 // CoachCarousel — Swipeable horizontal card carousel with dot indicators
 // ---------------------------------------------------------------------------
-export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex }) {
+export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex, greeting }) {
   const [dragDelta, setDragDelta] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [lockedHeight, setLockedHeight] = useState(null);
@@ -114,6 +114,11 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
 
   return (
     <div style={{ animation: "carouselFadeIn 0.3s ease-out", flex: 1, display: "flex", flexDirection: "column" }}>
+      {greeting && (
+        <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2, textAlign: "center", padding: "4px 0 6px" }}>
+          {greeting}
+        </div>
+      )}
       {/* Cards container */}
       <div
         ref={containerRef}
