@@ -143,21 +143,24 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
                   background: colors.cardBg,
                   border: `1px solid ${colors.border}`,
                   borderRadius: 16,
-                  padding: 18,
                   boxShadow: colors.shadow,
-                  minHeight: 280,
-                  ...(fixedHeight ? { height: fixedHeight, overflow: "auto" } : {}),
+                  minHeight: "calc(50vh - 40px)",
+                  ...(fixedHeight ? { height: fixedHeight } : {}),
                   display: "flex",
                   flexDirection: "column",
+                  overflow: "hidden",
+                  position: "relative",
                 }}
               >
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, overflow: "auto", padding: 18, paddingBottom: 36 }}>
                   {card.content}
                 </div>
-                {/* Dot indicators inside card */}
+                {/* Dot indicators — sticky at bottom */}
                 <div style={{
+                  position: "absolute", bottom: 0, left: 0, right: 0,
                   display: "flex", justifyContent: "center", alignItems: "center",
-                  gap: 8, paddingTop: 14,
+                  gap: 8, padding: "10px 0",
+                  background: `linear-gradient(transparent, ${colors.cardBg} 40%)`,
                 }}>
                   {cards.map((c, j) => (
                     <button
