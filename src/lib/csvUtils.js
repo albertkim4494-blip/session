@@ -4,11 +4,15 @@
 
 /**
  * Parse CSV text into headers + rows.
- * Handles quoted fields, escaped quotes (""), and newlines within quoted values.
+ * Handles quoted fields, escaped quotes (""), newlines within quoted values,
+ * UTF-8 BOM, and trailing blank lines.
  * @param {string} text - raw CSV text
  * @returns {{ headers: string[], rows: string[][] }}
  */
 export function parseCSV(text) {
+  // Strip UTF-8 BOM if present (common in Excel exports)
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+
   const rows = [];
   let row = [];
   let field = "";
@@ -45,14 +49,16 @@ export function parseCSV(text) {
         // Handle \r\n or bare \r
         row.push(field);
         field = "";
-        rows.push(row);
+        // Skip blank rows (trailing newlines)
+        if (row.length > 1 || row[0] !== "") rows.push(row);
         row = [];
         i++;
         if (i < text.length && text[i] === "\n") i++;
       } else if (ch === "\n") {
         row.push(field);
         field = "";
-        rows.push(row);
+        // Skip blank rows (trailing newlines)
+        if (row.length > 1 || row[0] !== "") rows.push(row);
         row = [];
         i++;
       } else {
@@ -65,13 +71,20 @@ export function parseCSV(text) {
   // Last field/row
   if (field.length > 0 || row.length > 0) {
     row.push(field);
-    rows.push(row);
+    if (row.length > 1 || row[0] !== "") rows.push(row);
   }
 
   if (rows.length === 0) return { headers: [], rows: [] };
 
   const headers = rows[0];
-  return { headers, rows: rows.slice(1) };
+  // Normalize row lengths to match header count
+  const headerLen = headers.length;
+  const dataRows = rows.slice(1).map((r) => {
+    if (r.length < headerLen) return [...r, ...Array(headerLen - r.length).fill("")];
+    if (r.length > headerLen) return r.slice(0, headerLen);
+    return r;
+  });
+  return { headers, rows: dataRows };
 }
 
 /**

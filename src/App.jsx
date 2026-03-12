@@ -2419,8 +2419,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           parsed = parseStrongCSV(text);
         }
 
-        if (parsed.errors.length > 0 && parsed.sessions.length === 0) {
-          showToast("Could not parse CSV: " + parsed.errors[0]);
+        if (parsed.sessions.length === 0) {
+          showToast(parsed.errors.length > 0
+            ? "Could not parse CSV: " + parsed.errors[0]
+            : "No workout sessions found in file");
           return;
         }
 
@@ -2481,18 +2483,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   function handleImportConfirm(mode) {
     const importData = modals.importPreview.importData;
-    if (!importData) return;
+    if (!importData) {
+      dispatchModal({ type: "CLOSE_IMPORT_PREVIEW" });
+      return;
+    }
 
     if (mode === "replace") {
-      const next = {
+      const next = normalizeState({
         ...makeDefaultState(),
         program: { workouts: importData.workouts },
         logsByDate: importData.logsByDate,
         meta: { updatedAt: Date.now() },
-      };
+      });
       setState(next);
     } else {
-      const merged = mergeImportedData(state, importData);
+      const merged = normalizeState(mergeImportedData(state, importData));
       setState(merged);
     }
 

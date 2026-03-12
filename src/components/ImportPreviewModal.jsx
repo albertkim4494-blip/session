@@ -11,12 +11,17 @@ export function ImportPreviewModal({ open, state: modalState, dispatch, styles, 
   const exerciseCount = stats?.exerciseCount ?? 0;
   const dateRange = stats?.dateRange;
 
-  // Count matched vs unmatched exercises
-  const matchedCount = (importData?.workouts || []).reduce(
-    (acc, w) => acc + (w.exercises || []).filter((e) => e.catalogId).length,
-    0
-  );
-  const unmatchedCount = exerciseCount - matchedCount;
+  // Count matched vs unmatched exercises (by unique name to avoid double-counting)
+  const matchedNames = new Set();
+  const allNames = new Set();
+  for (const w of (importData?.workouts || [])) {
+    for (const e of (w.exercises || [])) {
+      allNames.add(e.name);
+      if (e.catalogId) matchedNames.add(e.name);
+    }
+  }
+  const matchedCount = matchedNames.size;
+  const unmatchedCount = allNames.size - matchedCount;
 
   return (
     <Modal

@@ -17,7 +17,7 @@ function uid(prefix = "id") {
 
 /**
  * Convert app state to Strong-compatible CSV.
- * Columns: Date, Workout Name, Exercise Name, Set Order, Weight, Reps, RPE, Notes
+ * Columns: Date, Workout Name, Exercise Name, Set Order, Weight, Reps, Distance, Seconds, RPE, Notes
  *
  * @param {object} state - full app state
  * @returns {string} CSV text
@@ -132,7 +132,9 @@ export function stateToCSV(state) {
  * @returns {"strong"|"hevy"|"unknown"}
  */
 export function detectCSVFormat(csvText) {
-  const firstLine = csvText.split(/\r?\n/)[0] || "";
+  // Strip BOM before reading headers
+  const text = csvText.charCodeAt(0) === 0xFEFF ? csvText.slice(1) : csvText;
+  const firstLine = text.split(/\r?\n/)[0] || "";
   const lower = firstLine.toLowerCase();
 
   if (lower.includes("workout name") && lower.includes("exercise name")) return "strong";
@@ -426,10 +428,10 @@ export function buildImportState(sessions, catalog) {
     if (!logsByDate[date]) logsByDate[date] = {};
 
     for (const ex of exercises) {
-      const catalogMatch = matchExercise(ex.name);
+      // Skip exercises with empty names
+      if (!ex.name || !ex.name.trim()) continue;
 
-      // Generate stable exercise ID per workout+name combo
-      const exKey = `${workoutName}|${ex.name}`;
+      const catalogMatch = matchExercise(ex.name);
       let exerciseId;
 
       // Infer exercise unit from parsed data
@@ -484,7 +486,12 @@ export function buildImportState(sessions, catalog) {
       const firstNote = ex.sets.find((s) => s.notes)?.notes;
       if (firstNote) logEntry.notes = firstNote;
 
-      logsByDate[date][exerciseId] = logEntry;
+      // Merge sets if same exercise already logged on this date (e.g. two sessions)
+      if (logsByDate[date][exerciseId]) {
+        logsByDate[date][exerciseId].sets.push(...sets);
+      } else {
+        logsByDate[date][exerciseId] = logEntry;
+      }
     }
   }
 
@@ -537,6 +544,31 @@ export function mergeImportedData(currentState, importedData) {
     meta: { ...(currentState.meta ?? {}), updatedAt: Date.now() },
   };
 
+  // Build imported exerciseId → exercise name lookup
+  const importedIdToName = new Map();
+  for (const w of importedData.workouts) {
+    for (const ex of (w.exercises || [])) {
+      importedIdToName.set(ex.id, { name: ex.name, workoutName: w.name });
+    }
+  }
+
+  // Build existing exercise name → ID lookup (per workout name) for remapping
+  const existingNameToId = new Map(); // key: "workoutName|exerciseName" → exerciseId
+  for (const w of next.program.workouts) {
+    for (const ex of (w.exercises || [])) {
+      existingNameToId.set(`${w.name}|${ex.name}`, ex.id);
+    }
+  }
+
+  // Build remap table: imported exerciseId → existing exerciseId (when workout+name matches)
+  const idRemap = new Map();
+  for (const [importedId, info] of importedIdToName) {
+    const existingId = existingNameToId.get(`${info.workoutName}|${info.name}`);
+    if (existingId) {
+      idRemap.set(importedId, existingId);
+    }
+  }
+
   // Append workouts that don't exist by name
   const existingNames = new Set(next.program.workouts.map((w) => w.name));
   for (const w of importedData.workouts) {
@@ -546,15 +578,21 @@ export function mergeImportedData(currentState, importedData) {
     }
   }
 
-  // Merge logsByDate — imported data fills gaps
+  // Merge logsByDate — imported data fills gaps, remap exercise IDs
   for (const [date, dayLogs] of Object.entries(importedData.logsByDate)) {
     if (!next.logsByDate[date]) {
-      next.logsByDate[date] = dayLogs;
+      // Remap IDs for the whole day
+      const remapped = {};
+      for (const [exId, exLog] of Object.entries(dayLogs)) {
+        remapped[idRemap.get(exId) || exId] = exLog;
+      }
+      next.logsByDate[date] = remapped;
     } else {
       // Merge exercise entries — don't overwrite existing
       for (const [exId, exLog] of Object.entries(dayLogs)) {
-        if (!next.logsByDate[date][exId]) {
-          next.logsByDate[date][exId] = exLog;
+        const targetId = idRemap.get(exId) || exId;
+        if (!next.logsByDate[date][targetId]) {
+          next.logsByDate[date][targetId] = exLog;
         }
       }
     }
@@ -577,35 +615,49 @@ function parseFlexibleDate(str) {
 
   // Strip time portion if present (keep date part)
   // Handle ISO datetime like "2024-01-15T10:30:00Z" or "2024-01-15 10:30:00"
-  const dateOnly = str.split(/[T ]/)[0];
+  const dateOnly = str.trim().split(/[T ]/)[0];
+
+  let y, m, d;
 
   // Try YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
-    return dateOnly;
+  const isoMatch = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    [, y, m, d] = isoMatch.map(Number);
+    // shift off the full match placeholder
   }
 
   // Try MM/DD/YYYY or DD/MM/YYYY
-  const slashMatch = dateOnly.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
-  if (slashMatch) {
-    const [, a, b, year] = slashMatch;
-    // Heuristic: if a > 12, it's DD/MM/YYYY; otherwise assume MM/DD/YYYY
-    let month, day;
-    if (Number(a) > 12) {
-      day = a;
-      month = b;
-    } else {
-      month = a;
-      day = b;
+  if (!y) {
+    const slashMatch = dateOnly.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+    if (slashMatch) {
+      const [, a, b, year] = slashMatch;
+      y = Number(year);
+      // Heuristic: if a > 12, it's DD/MM/YYYY; otherwise assume MM/DD/YYYY
+      if (Number(a) > 12) {
+        d = Number(a);
+        m = Number(b);
+      } else {
+        m = Number(a);
+        d = Number(b);
+      }
     }
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
 
   // Try YYYY/MM/DD
-  const ymdSlash = dateOnly.match(/^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})$/);
-  if (ymdSlash) {
-    const [, year, month, day] = ymdSlash;
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  if (!y) {
+    const ymdSlash = dateOnly.match(/^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})$/);
+    if (ymdSlash) {
+      [, y, m, d] = ymdSlash.map(Number);
+    }
   }
 
-  return null;
+  if (!y) return null;
+
+  // Validate the date is real (catches 2024-13-45, Feb 30, etc.)
+  const testDate = new Date(y, m - 1, d);
+  if (testDate.getFullYear() !== y || testDate.getMonth() !== m - 1 || testDate.getDate() !== d) {
+    return null;
+  }
+
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }

@@ -66,6 +66,31 @@ section("parseCSV");
   assert(rows[0][0] === "1" && rows[1][2] === "6", "parseCSV: CRLF values correct");
 }
 
+{
+  // BOM handling
+  const { headers } = parseCSV("\uFEFFDate,Name\n2024-01-01,Test");
+  assert(headers[0] === "Date", "parseCSV: strips UTF-8 BOM from first header");
+}
+
+{
+  // Trailing newlines don't create phantom rows
+  const { rows } = parseCSV("a,b\n1,2\n");
+  assert(rows.length === 1, "parseCSV: trailing newline → no phantom row");
+}
+
+{
+  const { rows } = parseCSV("a,b\n1,2\n\n");
+  assert(rows.length === 1, "parseCSV: double trailing newline → no phantom row");
+}
+
+{
+  // Short rows get padded to header length
+  const { headers, rows } = parseCSV("a,b,c\n1,2\n4");
+  assert(rows[0].length === 3, "parseCSV: short row padded to header length");
+  assert(rows[0][2] === "", "parseCSV: padded field is empty string");
+  assert(rows[1].length === 3, "parseCSV: very short row also padded");
+}
+
 section("toCSV");
 
 {
@@ -640,6 +665,180 @@ section("Round-trip");
   assert(benchSets[0].reps === 8 && benchSets[0].weight === "135", "round-trip: bench set 1 data");
   assert(benchSets[0].rpe === 7, "round-trip: RPE preserved");
   assert(benchSets[0].notes === "Good session", "round-trip: notes preserved");
+}
+
+// ============================================================================
+// Edge cases
+// ============================================================================
+
+section("Edge cases");
+
+{
+  // Invalid dates should be rejected
+  const csv = `Date,Exercise Name
+2024-13-45,Squat
+2024-02-30,Deadlift
+2024-01-15,Bench Press`;
+
+  const { sessions, errors } = parseStrongCSV(csv);
+  assert(sessions.length === 1, "edge: invalid dates rejected, only valid row kept");
+  assert(sessions[0].date === "2024-01-15", "edge: valid date preserved");
+  assert(errors.length === 2, "edge: 2 error messages for invalid dates");
+}
+
+{
+  // Same exercise, same date, two sessions should merge sets (not overwrite)
+  const sessions = [
+    {
+      date: "2024-01-01",
+      workoutName: "Push",
+      exercises: [
+        { name: "Bench Press", sets: [
+          { reps: 8, weight: "135", rpe: null, notes: "", seconds: null, distance: null },
+        ]},
+      ],
+    },
+    {
+      date: "2024-01-01",
+      workoutName: "Push",
+      exercises: [
+        { name: "Bench Press", sets: [
+          { reps: 5, weight: "185", rpe: null, notes: "", seconds: null, distance: null },
+        ]},
+      ],
+    },
+  ];
+
+  const result = buildImportState(sessions, []);
+  const benchId = result.workouts[0].exercises[0].id;
+  const logSets = result.logsByDate["2024-01-01"][benchId].sets;
+  assert(logSets.length === 2, "edge: same-date same-exercise sets merged (2 total)");
+  assert(logSets[0].weight === "135" && logSets[1].weight === "185", "edge: both session sets present");
+}
+
+{
+  // Empty exercise name should be skipped
+  const sessions = [
+    {
+      date: "2024-01-01",
+      workoutName: "Test",
+      exercises: [
+        { name: "", sets: [{ reps: 10, weight: "100", rpe: null, notes: "", seconds: null, distance: null }] },
+        { name: "Squat", sets: [{ reps: 5, weight: "200", rpe: null, notes: "", seconds: null, distance: null }] },
+      ],
+    },
+  ];
+
+  const result = buildImportState(sessions, []);
+  assert(result.workouts[0].exercises.length === 1, "edge: empty exercise name skipped");
+  assert(result.workouts[0].exercises[0].name === "Squat", "edge: valid exercise preserved");
+}
+
+{
+  // Double-import with merge should not create duplicates when workout name matches
+  const currentState = {
+    program: {
+      workouts: [
+        { id: "w1", name: "Push", exercises: [{ id: "existing_ex1", name: "Bench Press", unit: "reps" }] },
+      ],
+    },
+    logsByDate: {
+      "2024-01-01": {
+        existing_ex1: { sets: [{ reps: 8, weight: "135", completed: true }] },
+      },
+    },
+    meta: {},
+  };
+
+  const importedData = {
+    workouts: [
+      { id: "w_new", name: "Push", exercises: [{ id: "imported_ex1", name: "Bench Press", unit: "reps" }] },
+    ],
+    logsByDate: {
+      "2024-01-02": {
+        imported_ex1: { sets: [{ reps: 10, weight: "140", completed: true }] },
+      },
+    },
+  };
+
+  const merged = mergeImportedData(currentState, importedData);
+
+  // Workout should NOT be duplicated
+  assert(merged.program.workouts.length === 1, "edge: duplicate workout not added");
+
+  // New date's log should use existing exercise ID (remapped)
+  assert(merged.logsByDate["2024-01-02"].existing_ex1, "edge: imported log remapped to existing exercise ID");
+  assert(!merged.logsByDate["2024-01-02"].imported_ex1, "edge: imported exercise ID not used (remapped)");
+}
+
+{
+  // BOM in CSV should not break Strong detection
+  const csv = "\uFEFFDate,Workout Name,Exercise Name,Set Order,Weight,Reps\n2024-01-01,Push,Bench Press,1,135,8";
+  assert(detectCSVFormat(csv) === "strong", "edge: BOM does not break format detection");
+  const { sessions, errors } = parseStrongCSV(csv);
+  assert(sessions.length === 1, "edge: BOM CSV parses successfully");
+  assert(errors.length === 0, "edge: no errors with BOM CSV");
+}
+
+{
+  // DD/MM/YYYY date format (day > 12 triggers DD/MM heuristic)
+  const csv = `Date,Exercise Name,Reps,Weight
+15/03/2024,Squat,5,225`;
+
+  const { sessions } = parseStrongCSV(csv);
+  assert(sessions.length === 1, "edge: DD/MM/YYYY date parsed");
+  assert(sessions[0].date === "2024-03-15", "edge: DD/MM/YYYY → ISO correct");
+}
+
+{
+  // dailyWorkouts export
+  const state = {
+    program: {
+      workouts: [
+        { id: "w1", name: "Push", exercises: [{ id: "ex1", name: "Bench Press", unit: "reps" }] },
+      ],
+    },
+    dailyWorkouts: {
+      "2024-03-20": [
+        {
+          id: "dw1",
+          name: "Quick Cardio",
+          source: "generate_today",
+          exercises: [{ id: "dex1", name: "Burpees", unit: "reps" }],
+        },
+      ],
+    },
+    logsByDate: {
+      "2024-03-15": {
+        ex1: { sets: [{ reps: 8, weight: "135", completed: true }] },
+      },
+      "2024-03-20": {
+        dex1: { sets: [{ reps: 15, weight: "", completed: true }] },
+      },
+    },
+  };
+
+  const csv = stateToCSV(state);
+  const { rows } = parseCSV(csv);
+
+  // Should contain both program and daily workout entries
+  assert(rows.length === 2, "edge: dailyWorkouts export → 2 data rows");
+  const burpeeRow = rows.find((r) => r[2] === "Burpees");
+  const benchRow = rows.find((r) => r[2] === "Bench Press");
+  assert(burpeeRow, "edge: dailyWorkout exercise included in export");
+  assert(burpeeRow[1] === "Quick Cardio", "edge: dailyWorkout name exported");
+  assert(benchRow, "edge: program workout also included");
+}
+
+{
+  // Ambiguous date: 01/02/2024 could be Jan 2 (US) or Feb 1 (EU)
+  // When first number <= 12, US MM/DD is assumed
+  const csv = `Date,Exercise Name,Reps,Weight
+01/02/2024,Squat,5,225`;
+
+  const { sessions } = parseStrongCSV(csv);
+  assert(sessions.length === 1, "edge: ambiguous date parsed");
+  assert(sessions[0].date === "2024-01-02", "edge: MM/DD assumed when first number <= 12");
 }
 
 // ============================================================================
