@@ -400,6 +400,7 @@ export function CoachCheckin({
   onCancel,
   editValues,   // null = fresh check-in, { mood, sleep, pain } = editing existing
   autoExpand,   // if true, skip the collapsed "How are you feeling?" prompt
+  showAll,      // if true, show all 3 questions at once instead of step-by-step
 }) {
   const isEdit = editValues !== null && editValues !== undefined;
   const [expanded, setExpanded] = useState(isEdit || autoExpand);
@@ -520,6 +521,36 @@ export function CoachCheckin({
     cursor: "pointer",
   };
 
+  // --- Show-all mode: all 3 questions visible at once ---
+  if (showAll) {
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", gap: 16, alignItems: "center",
+        animation: "checkinFadeIn 0.3s ease-out",
+      }}>
+        <CheckinMoodPicker value={mood} onChange={setMood} colors={colors} />
+        <SleepPicker value={sleep} onChange={setSleep} colors={colors} />
+        <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
+        <button
+          onClick={handleSubmit}
+          style={{
+            background: "transparent", border: "none",
+            color: colors.text, cursor: "pointer",
+            fontSize: 13, opacity: mood !== null ? 0.5 : 0.2,
+            transition: "opacity 0.15s",
+            padding: "4px 0",
+          }}
+          disabled={mood === null}
+          onPointerEnter={(e) => { if (mood !== null) e.currentTarget.style.opacity = "0.7"; }}
+          onPointerLeave={(e) => { e.currentTarget.style.opacity = mood !== null ? "0.5" : "0.2"; }}
+        >
+          Done
+        </button>
+      </div>
+    );
+  }
+
+  // --- Step-by-step mode (original) ---
   return (
     <div style={{
       display: "flex", flexDirection: "column", gap: 14, alignItems: "center",
