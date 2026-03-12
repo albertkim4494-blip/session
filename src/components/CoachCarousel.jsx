@@ -23,13 +23,27 @@ function ensureCSS() {
 export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex }) {
   const [dragDelta, setDragDelta] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [fixedHeight, setFixedHeight] = useState(null);
   const dragRef = useRef(0); // mirrors dragDelta for use in callbacks
   const touchRef = useRef(null);
   const containerRef = useRef(null);
+  const stripRef = useRef(null);
   const activeRef = useRef(activeIndex);
   activeRef.current = activeIndex;
 
   useEffect(() => { ensureCSS(); }, []);
+
+  // Measure the tallest card after mount and lock all cards to that height
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const cardEls = strip.querySelectorAll("[data-carousel-card]");
+    let max = 0;
+    // Temporarily remove fixed height so cards size naturally
+    for (const el of cardEls) el.style.height = "auto";
+    for (const el of cardEls) max = Math.max(max, el.offsetHeight);
+    if (max > 0) setFixedHeight(max);
+  }, [cards.length]);
 
   const count = cards.length;
   const clampIndex = useCallback((i) => Math.max(0, Math.min(count - 1, i)), [count]);
@@ -107,7 +121,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        <div style={{
+        <div ref={stripRef} style={{
           display: "flex",
           width: `${count * 100}%`,
           transform: `translateX(${translateX}px)`,
@@ -123,16 +137,20 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
                 boxSizing: "border-box",
               }}
             >
-              <div style={{
-                background: colors.cardBg,
-                border: `1px solid ${colors.border}`,
-                borderRadius: 16,
-                padding: 18,
-                boxShadow: colors.shadow,
-                minHeight: 200,
-                display: "flex",
-                flexDirection: "column",
-              }}>
+              <div
+                data-carousel-card
+                style={{
+                  background: colors.cardBg,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 16,
+                  padding: 18,
+                  boxShadow: colors.shadow,
+                  minHeight: 200,
+                  ...(fixedHeight ? { height: fixedHeight, overflow: "auto" } : {}),
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
                 {card.content}
               </div>
             </div>
