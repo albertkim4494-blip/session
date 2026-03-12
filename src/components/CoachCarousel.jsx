@@ -145,39 +145,41 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
                   borderRadius: 16,
                   padding: 18,
                   boxShadow: colors.shadow,
-                  minHeight: 200,
+                  minHeight: 280,
                   ...(fixedHeight ? { height: fixedHeight, overflow: "auto" } : {}),
                   display: "flex",
                   flexDirection: "column",
                 }}
               >
-                {card.content}
+                <div style={{ flex: 1 }}>
+                  {card.content}
+                </div>
+                {/* Dot indicators inside card */}
+                <div style={{
+                  display: "flex", justifyContent: "center", alignItems: "center",
+                  gap: 8, paddingTop: 14,
+                }}>
+                  {cards.map((c, j) => (
+                    <button
+                      key={c.key}
+                      onClick={() => onChangeIndex(j)}
+                      aria-label={`Go to card ${j + 1}`}
+                      style={{
+                        width: 8, height: 8, borderRadius: "50%", padding: 0,
+                        border: "none", cursor: "pointer",
+                        background: j === activeIndex ? (colors.accent || colors.primaryText) : colors.border,
+                        opacity: j === activeIndex ? 1 : 0.5,
+                        transition: "background 0.2s, opacity 0.2s",
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Dot indicators */}
-      <div style={{
-        display: "flex", justifyContent: "center", alignItems: "center",
-        gap: 8, marginTop: 12,
-      }}>
-        {cards.map((card, i) => (
-          <button
-            key={card.key}
-            onClick={() => onChangeIndex(i)}
-            aria-label={`Go to card ${i + 1}`}
-            style={{
-              width: 8, height: 8, borderRadius: "50%", padding: 0,
-              border: "none", cursor: "pointer",
-              background: i === activeIndex ? (colors.accent || colors.primaryText) : colors.border,
-              opacity: i === activeIndex ? 1 : 0.5,
-              transition: "background 0.2s, opacity 0.2s",
-            }}
-          />
-        ))}
-      </div>
     </div>
   );
 }
