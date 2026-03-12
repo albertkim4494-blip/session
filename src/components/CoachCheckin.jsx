@@ -421,7 +421,7 @@ export function CoachCheckin({
       for (const p of (editValues.pain || [])) { if (p.severity) map[p.area] = p.severity; }
       setPainMap(map);
     } else {
-      setExpanded(false);
+      setExpanded(!!autoExpand);
       setMood(null);
       setSleep(null);
       setPainMap({});
