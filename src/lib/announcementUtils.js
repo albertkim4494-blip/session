@@ -56,3 +56,14 @@ export function getDuesPaymentSummary(payments, totalMembers, amountCents) {
   const collectedCents = paid * (amountCents || 0);
   return { paid, unpaid, total: totalMembers, collectedCents };
 }
+
+export function getVenmoPaymentUrl(username, amountCents, note) {
+  if (!username) return null;
+  const cleanUsername = username.replace(/^@/, "");
+  const dollars = (amountCents / 100).toFixed(2);
+  const encodedNote = encodeURIComponent(note || "");
+  return {
+    nativeUrl: `venmo://paycharge?txn=pay&recipients=${cleanUsername}&amount=${dollars}&note=${encodedNote}`,
+    webUrl: `https://venmo.com/${cleanUsername}?txn=pay&amount=${dollars}&note=${encodedNote}`,
+  };
+}

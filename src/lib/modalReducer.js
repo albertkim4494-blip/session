@@ -152,12 +152,14 @@ export const initialModalState = {
   inviteToGroup: { isOpen: false, groupId: null, groupName: "", friends: [], existingMemberIds: [], sending: false },
   shareToGroup: { isOpen: false, groupId: null, groupName: "", exercises: [], workoutName: "", message: "", sending: false },
   groupWorkoutPreview: { isOpen: false, groupWorkout: null },
-  createPoll: { isOpen: false, groupId: null, groupName: "", title: "", description: "", eventDate: "", eventTime: "", deadline: "", allowSelfCheckin: false, creating: false },
+  createPoll: { isOpen: false, groupId: null, groupName: "", title: "", description: "", eventDate: "", eventTime: "", eventEndTime: "", deadline: "", allowSelfCheckin: false, creating: false },
   pollDetail: { isOpen: false, poll: null, members: [], loading: false, attendanceMode: false },
   createAnnouncement: { isOpen: false, groupId: null, body: "", posting: false },
   announcementDetail: { isOpen: false, announcement: null, members: [] },
   createDues: { isOpen: false, groupId: null, title: "", amount: "", description: "", dueDate: "", creating: false },
-  duesDetail: { isOpen: false, dues: null, members: [] },
+  duesDetail: { isOpen: false, dues: null, members: [], venmoUsername: null },
+  manageFields: { isOpen: false, groupId: null, fields: [], loading: false },
+  fillFields: { isOpen: false, groupId: null, fields: [], values: {}, requiredMode: false, saving: false, onComplete: null },
   importPreview: { isOpen: false, format: null, sessions: [], stats: null, importData: null, mode: "merge" },
 };
 
@@ -944,6 +946,7 @@ export function modalReducer(state, action) {
           isOpen: true,
           dues: action.payload.dues,
           members: action.payload.members || [],
+          venmoUsername: action.payload.venmoUsername || null,
         },
       };
 
@@ -957,6 +960,57 @@ export function modalReducer(state, action) {
       return {
         ...state,
         duesDetail: initialModalState.duesDetail,
+      };
+
+    // ===== MANAGE FIELDS MODAL =====
+    case "OPEN_MANAGE_FIELDS":
+      return {
+        ...state,
+        manageFields: {
+          ...initialModalState.manageFields,
+          isOpen: true,
+          groupId: action.payload.groupId,
+          fields: action.payload.fields || [],
+        },
+      };
+
+    case "UPDATE_MANAGE_FIELDS":
+      return {
+        ...state,
+        manageFields: { ...state.manageFields, ...action.payload },
+      };
+
+    case "CLOSE_MANAGE_FIELDS":
+      return {
+        ...state,
+        manageFields: initialModalState.manageFields,
+      };
+
+    // ===== FILL FIELDS MODAL =====
+    case "OPEN_FILL_FIELDS":
+      return {
+        ...state,
+        fillFields: {
+          ...initialModalState.fillFields,
+          isOpen: true,
+          groupId: action.payload.groupId,
+          fields: action.payload.fields || [],
+          values: action.payload.values || {},
+          requiredMode: action.payload.requiredMode || false,
+          onComplete: action.payload.onComplete || null,
+        },
+      };
+
+    case "UPDATE_FILL_FIELDS":
+      return {
+        ...state,
+        fillFields: { ...state.fillFields, ...action.payload },
+      };
+
+    case "CLOSE_FILL_FIELDS":
+      return {
+        ...state,
+        fillFields: initialModalState.fillFields,
       };
 
     // ===== IMPORT PREVIEW MODAL =====

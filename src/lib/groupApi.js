@@ -75,10 +75,10 @@ export async function getMyGroups() {
 // ============================================================================
 
 export async function getGroupDetail(groupId) {
-  const [groupRes, membersRes, workoutsRes, pollsRes, announcementsRes, duesRes] = await Promise.all([
+  const [groupRes, membersRes, workoutsRes, pollsRes, announcementsRes, duesRes, customFieldsRes] = await Promise.all([
     supabase
       .from("groups")
-      .select("id, name, description, created_by, created_at")
+      .select("id, name, description, created_by, venmo_username, created_at")
       .eq("id", groupId)
       .single(),
     supabase
@@ -101,7 +101,7 @@ export async function getGroupDetail(groupId) {
     supabase
       .from("group_polls")
       .select(`
-        id, group_id, created_by, title, description, event_date, event_time,
+        id, group_id, created_by, title, description, event_date, event_time, event_end_time,
         deadline, allow_self_checkin, closed, created_at,
         created_by_profile:profiles!group_polls_created_by_fkey(id, username, display_name, avatar_url),
         poll_responses(id, poll_id, user_id, response, attended, responded_at, attendance_marked_at)
@@ -129,6 +129,11 @@ export async function getGroupDetail(groupId) {
       .eq("group_id", groupId)
       .order("created_at", { ascending: false })
       .limit(50),
+    supabase
+      .from("group_custom_fields")
+      .select("id, group_id, field_name, field_type, required, options, sort_order, preset_key, created_at")
+      .eq("group_id", groupId)
+      .order("sort_order", { ascending: true }),
   ]);
 
   const error = groupRes.error || membersRes.error || workoutsRes.error;
@@ -140,6 +145,7 @@ export async function getGroupDetail(groupId) {
       polls: pollsRes.data || [],
       announcements: announcementsRes.data || [],
       dues: duesRes.data || [],
+      customFields: customFieldsRes.data || [],
     },
     error,
   };
@@ -278,7 +284,7 @@ export async function getPollDetail(pollId) {
   const { data, error } = await supabase
     .from("group_polls")
     .select(`
-      id, group_id, created_by, title, description, event_date, event_time,
+      id, group_id, created_by, title, description, event_date, event_time, event_end_time,
       deadline, allow_self_checkin, closed, created_at,
       created_by_profile:profiles!group_polls_created_by_fkey(id, username, display_name, avatar_url),
       poll_responses(id, poll_id, user_id, response, attended, responded_at, attendance_marked_at)
@@ -300,7 +306,7 @@ export async function deleteGroupWorkout(workoutId) {
 // Polls
 // ============================================================================
 
-export async function createPoll(groupId, { title, description, eventDate, eventTime, deadline, allowSelfCheckin }) {
+export async function createPoll(groupId, { title, description, eventDate, eventTime, eventEndTime, deadline, allowSelfCheckin }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: null, error: { message: "Not authenticated" } };
 
@@ -313,6 +319,7 @@ export async function createPoll(groupId, { title, description, eventDate, event
       description: description || null,
       event_date: eventDate || null,
       event_time: eventTime || null,
+      event_end_time: eventEndTime || null,
       deadline: deadline || null,
       allow_self_checkin: allowSelfCheckin || false,
     })
@@ -535,6 +542,153 @@ export async function unmarkPaid(duesId, userId) {
     .eq("user_id", userId);
   return { data: null, error };
 }
+
+// ============================================================================
+// Group Settings
+// ============================================================================
+
+export async function updateGroupSettings(groupId, { venmoUsername }) {
+  const updates = {};
+  if (venmoUsername !== undefined) updates.venmo_username = venmoUsername || null;
+
+  const { data, error } = await supabase
+    .from("groups")
+    .update(updates)
+    .eq("id", groupId)
+    .select()
+    .single();
+  return { data, error };
+}
+
+// ============================================================================
+// Custom Fields
+// ============================================================================
+
+export const PRESET_FIELDS = [
+  { key: "age", name: "Age", type: "number", required: false },
+  { key: "gender", name: "Gender", type: "select", required: false, options: ["Male", "Female", "Non-binary", "Prefer not to say"] },
+  { key: "emergency_contact", name: "Emergency Contact", type: "text", required: false },
+  { key: "membership_id", name: "Membership ID", type: "text", required: false },
+  { key: "phone", name: "Phone Number", type: "text", required: false },
+];
+
+export async function getGroupCustomFields(groupId) {
+  const { data, error } = await supabase
+    .from("group_custom_fields")
+    .select("id, group_id, field_name, field_type, required, options, sort_order, preset_key, created_at")
+    .eq("group_id", groupId)
+    .order("sort_order", { ascending: true });
+  return { data: data || [], error };
+}
+
+export async function createCustomField(groupId, { fieldName, fieldType, required, options, presetKey }) {
+  // Get next sort_order
+  const { data: existing } = await supabase
+    .from("group_custom_fields")
+    .select("sort_order")
+    .eq("group_id", groupId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+
+  const nextSort = (existing?.[0]?.sort_order ?? -1) + 1;
+
+  const { data, error } = await supabase
+    .from("group_custom_fields")
+    .insert({
+      group_id: groupId,
+      field_name: fieldName,
+      field_type: fieldType || "text",
+      required: required || false,
+      options: options || null,
+      sort_order: nextSort,
+      preset_key: presetKey || null,
+    })
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function updateCustomField(fieldId, updates) {
+  const payload = {};
+  if (updates.fieldName !== undefined) payload.field_name = updates.fieldName;
+  if (updates.fieldType !== undefined) payload.field_type = updates.fieldType;
+  if (updates.required !== undefined) payload.required = updates.required;
+  if (updates.options !== undefined) payload.options = updates.options;
+  if (updates.sortOrder !== undefined) payload.sort_order = updates.sortOrder;
+
+  const { data, error } = await supabase
+    .from("group_custom_fields")
+    .update(payload)
+    .eq("id", fieldId)
+    .select()
+    .single();
+  return { data, error };
+}
+
+export async function deleteCustomField(fieldId) {
+  const { error } = await supabase
+    .from("group_custom_fields")
+    .delete()
+    .eq("id", fieldId);
+  return { data: null, error };
+}
+
+export async function getGroupMemberFieldValues(groupId) {
+  // Fetch all field values for all members in this group
+  const { data, error } = await supabase
+    .from("group_member_field_values")
+    .select(`
+      id, field_id, user_id, value, updated_at,
+      field:group_custom_fields!group_member_field_values_field_id_fkey(id, group_id, field_name, field_type)
+    `)
+    .eq("field.group_id", groupId);
+  return { data: (data || []).filter((v) => v.field), error };
+}
+
+export async function getMyFieldValues(groupId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: [], error: { message: "Not authenticated" } };
+
+  const { data: fields } = await supabase
+    .from("group_custom_fields")
+    .select("id")
+    .eq("group_id", groupId);
+
+  if (!fields?.length) return { data: [], error: null };
+
+  const fieldIds = fields.map((f) => f.id);
+  const { data, error } = await supabase
+    .from("group_member_field_values")
+    .select("id, field_id, value, updated_at")
+    .eq("user_id", user.id)
+    .in("field_id", fieldIds);
+
+  return { data: data || [], error };
+}
+
+export async function setFieldValue(fieldId, value) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("group_member_field_values")
+    .upsert(
+      {
+        field_id: fieldId,
+        user_id: user.id,
+        value: value ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "field_id,user_id" }
+    )
+    .select()
+    .single();
+  return { data, error };
+}
+
+// ============================================================================
+// Pending Polls
+// ============================================================================
 
 export async function getPendingPollCount() {
   const { data: { user } } = await supabase.auth.getUser();
