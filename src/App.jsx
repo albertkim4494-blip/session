@@ -3371,10 +3371,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 /* HERO STATE: greeting + swipeable coach carousel */
                 <div style={{
                   display: "flex", flexDirection: "column",
-                  flex: 1, gap: 8,
-                  padding: "8px 0 0",
+                  flex: 1, gap: 16,
+                  padding: "24px 0 0",
                 }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2, textAlign: "center" }}>
+                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3, textAlign: "center" }}>
                     {getTimeGreeting()}
                   </div>
                   <CoachCarousel
@@ -3491,7 +3491,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       },
                     ]}
                   />
-                  <div style={{ fontSize: 12, opacity: 0.3, textAlign: "center" }}>
+                  <div style={{ fontSize: 14, opacity: 0.35, textAlign: "center" }}>
                     Tap + to start a session
                   </div>
                 </div>
