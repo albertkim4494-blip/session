@@ -3573,8 +3573,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               </div>
 
                               {noData ? (
-                                <div style={{ fontSize: 13, opacity: 0.45, color: secondary, textAlign: "center" }}>
-                                  No sessions yet this week.{"\n"}Tap + to start your first workout.
+                                <div style={{
+                                  display: "flex", flexDirection: "column", alignItems: "center",
+                                  gap: 10, flex: 1, justifyContent: "center",
+                                }}>
+                                  <div style={{ fontSize: 13, opacity: 0.45, color: secondary }}>
+                                    No sessions yet this week
+                                  </div>
+                                  <button
+                                    onClick={() => setFabOpen(true)}
+                                    style={{
+                                      background: "transparent", border: `1px solid ${colors.border}`,
+                                      borderRadius: 10, padding: "8px 18px",
+                                      color: accent, fontSize: 13, fontWeight: 600,
+                                      cursor: "pointer", fontFamily: "inherit",
+                                      display: "inline-flex", alignItems: "center", gap: 6,
+                                    }}
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                                    </svg>
+                                    Start a session
+                                  </button>
                                 </div>
                               ) : (
                                 <>
@@ -4713,22 +4733,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </div>
                 </div>
               </>
-            )}
-            {!fabOpen && isToday && !hasSessions && (
-              <div
-                onClick={() => setFabOpen(true)}
-                style={{
-                  position: "fixed", bottom: 30, right: 80, zIndex: 40,
-                  background: colors.cardBg, color: colors.text,
-                  padding: "8px 14px", borderRadius: 10,
-                  fontSize: 13, fontWeight: 600, opacity: 0.85,
-                  boxShadow: `0 2px 12px rgba(0,0,0,0.15), 0 0 0 1px ${colors.border}`,
-                  cursor: "pointer", whiteSpace: "nowrap",
-                  animation: "fabTipIn 0.3s ease-out",
-                }}
-              >
-                Start a session
-              </div>
             )}
             <button style={{
               ...styles.fab,
