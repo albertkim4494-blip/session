@@ -3365,7 +3365,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             <div key="train" style={{
               ...styles.section,
               animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)",
-              ...(isToday && !hasSessions ? { flex: 1, justifyContent: "center" } : {}),
+              ...(isToday && !hasSessions ? { flex: 1 } : {}),
             }}>
               {isToday && !hasSessions ? (
                 /* HERO STATE: greeting + swipeable coach carousel */
