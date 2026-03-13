@@ -86,8 +86,9 @@ import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from 
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
-import { CoachCheckin, CheckinSummary, CheckinEditSection } from "./components/CoachCheckin";
+import { CheckinSummary, CheckinEditSection } from "./components/CoachCheckin";
 import { CoachCarousel } from "./components/CoachCarousel";
+import { CoachCard } from "./components/CoachCard";
 import { getTodayCheckin, saveCheckin, buildCheckinContext, loadCheckins, loadCoachNotes, mergeCoachNotes, saveCoachNotes } from "./lib/coachCheckin";
 
 // Extracted components (timer)
@@ -3490,40 +3491,35 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     onChangeIndex={setCarouselIndex}
                     cards={[
                       {
-                        key: "checkin",
-                        label: "Check In",
+                        key: "coach",
+                        label: todayCheckin ? "Coach" : "Check In",
+                        icon: todayCheckin ? (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                            <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                            <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+                          </svg>
+                        ) : undefined,
                         content: (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", textAlign: "center", flex: 1, justifyContent: "center" }}>
-                            {todayCheckin ? (
-                              checkinEditSection ? (
-                                <CheckinEditSection
-                                  section={checkinEditSection}
-                                  checkin={todayCheckin}
-                                  onSave={(updated) => handleCheckinUpdate(updated)}
-                                  onCancel={() => setCheckinEditSection(null)}
-                                  colors={colors}
-                                />
-                              ) : (
-                                <CheckinSummary
-                                  checkin={todayCheckin}
-                                  onEdit={(section) => setCheckinEditSection(section)}
-                                  onClear={() => {
-                                    saveCheckin(dateKey, null);
-                                    setTodayCheckin(null);
-                                    setCheckinEditSection(null);
-                                  }}
-                                  colors={colors}
-                                />
-                              )
-                            ) : (
-                              <CoachCheckin
-                                colors={colors}
-                                onSubmit={handleCheckinSubmit}
-                                editValues={null}
-                                showAll
-                              />
-                            )}
-                          </div>
+                          <CoachCard
+                            todayCheckin={todayCheckin}
+                            onCheckinSubmit={handleCheckinSubmit}
+                            onCheckinUpdate={handleCheckinUpdate}
+                            checkinEditSection={checkinEditSection}
+                            setCheckinEditSection={setCheckinEditSection}
+                            coachInsights={coachInsights}
+                            coachLoading={coachLoading}
+                            coachStreaming={coachStreaming}
+                            coachError={coachError}
+                            onCoachRefresh={handleCoachRefresh}
+                            onAddSuggestion={handleAddSuggestion}
+                            userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                            colors={colors}
+                            onClearCheckin={() => {
+                              saveCheckin(dateKey, null);
+                              setTodayCheckin(null);
+                              setCheckinEditSection(null);
+                            }}
+                          />
                         ),
                       },
                       {
@@ -3644,80 +3640,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             </div>
                           );
                         })(),
-                      },
-                      {
-                        key: "coach",
-                        label: "Coach\u2019s Take",
-                        icon: (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
-                            <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
-                            <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
-                          </svg>
-                        ),
-                        content: (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center", flex: 1, justifyContent: "center" }}>
-                            {!todayCheckin && coachInsights.length === 0 ? (
-                              /* No check-in yet — nudge user */
-                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                                <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary || colors.text }}>
-                                  Check in to get personalized coaching
-                                </div>
-                                <button
-                                  onClick={() => setCarouselIndex(0)}
-                                  style={{
-                                    background: "transparent", border: "none", cursor: "pointer",
-                                    color: colors.accent || "#3b82f6", fontSize: 13, fontWeight: 600,
-                                    padding: "4px 0", textDecoration: "underline",
-                                  }}
-                                >
-                                  Go to check-in
-                                </button>
-                              </div>
-                            ) : coachInsights.length > 0 ? (
-                              /* Has insights (streaming or complete) */
-                              <div style={{ width: "100%" }}>
-                                <CoachHeroInsight
-                                  insights={coachInsights}
-                                  onAddExercise={handleAddSuggestion}
-                                  colors={colors}
-                                  loading={coachLoading}
-                                  error={coachError}
-                                  userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                                  onRefresh={handleCoachRefresh}
-                                  hideLabel
-                                  streaming={coachStreaming}
-                                />
-                                {coachStreaming && (
-                                  <div style={{ display: "flex", justifyContent: "center", gap: 4, padding: "12px 0 0" }}>
-                                    {[0, 1, 2].map((i) => (
-                                      <div key={i} style={{
-                                        width: 6, height: 6, borderRadius: "50%",
-                                        background: colors.textSecondary || colors.text,
-                                        animation: `coachDotPulse 1s ease-in-out ${i * 0.2}s infinite`,
-                                      }} />
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ) : coachStreaming ? (
-                              /* Streaming started but no insights yet */
-                              <div style={{ display: "flex", justifyContent: "center", gap: 4, padding: "16px 0" }}>
-                                {[0, 1, 2].map((i) => (
-                                  <div key={i} style={{
-                                    width: 6, height: 6, borderRadius: "50%",
-                                    background: colors.textSecondary || colors.text,
-                                    animation: `coachDotPulse 1s ease-in-out ${i * 0.2}s infinite`,
-                                  }} />
-                                ))}
-                              </div>
-                            ) : (
-                              /* Checked in but no insights yet (waiting or error) */
-                              <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary || colors.text }}>
-                                {coachError || "Your coach insights will appear here."}
-                              </div>
-                            )}
-                          </div>
-                        ),
                       },
                     ]}
                   />
