@@ -94,8 +94,19 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     if (newIndex !== idx) onChangeIndex(newIndex);
   }, [clampIndex, onChangeIndex]);
 
-  // Compute translateX
-  const containerWidth = containerRef.current?.offsetWidth || 0;
+  // Track container width in state so it updates after mount/visibility changes
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const measure = () => {
+      const w = containerRef.current?.offsetWidth || 0;
+      if (w > 0) setContainerWidth(w);
+    };
+    measure();
+    // Re-measure on next frame in case layout hasn't settled yet (e.g. returning from another tab)
+    const raf = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(raf);
+  }, [activeIndex]);
+
   const baseOffset = -activeIndex * containerWidth;
   const translateX = baseOffset + (isDragging ? dragDelta : 0);
 
