@@ -3491,9 +3491,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       },
                     ]}
                   />
-                  <div style={{ fontSize: 14, opacity: 0.35, textAlign: "center" }}>
-                    Tap + to start a session
-                  </div>
                 </div>
               ) : !isToday && !hasSessions ? (
                 /* NON-TODAY EMPTY: no logs or sessions */

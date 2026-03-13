@@ -23,7 +23,6 @@ function ensureCSS() {
 export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex }) {
   const [dragDelta, setDragDelta] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [lockedHeight, setLockedHeight] = useState(null);
   const dragRef = useRef(0); // mirrors dragDelta for use in callbacks
   const touchRef = useRef(null);
   const containerRef = useRef(null);
@@ -32,18 +31,6 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
   activeRef.current = activeIndex;
 
   useEffect(() => { ensureCSS(); }, []);
-
-  // Measure container height after first render and lock it
-  useEffect(() => {
-    if (lockedHeight !== null) return;
-    const el = containerRef.current;
-    if (!el) return;
-    // Use rAF to ensure layout is complete
-    requestAnimationFrame(() => {
-      const h = el.offsetHeight;
-      if (h > 0) setLockedHeight(h);
-    });
-  });
 
 
   const count = cards.length;
@@ -117,10 +104,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
       {/* Cards container */}
       <div
         ref={containerRef}
-        style={{
-          overflow: "hidden", borderRadius: 16, minHeight: 0,
-          ...(lockedHeight ? { height: lockedHeight } : { flex: 1 }),
-        }}
+        style={{ overflow: "hidden", borderRadius: 16, flex: 1, minHeight: 0 }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
