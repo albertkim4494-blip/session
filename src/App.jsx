@@ -120,6 +120,8 @@ function ensureAnimations() {
 @keyframes micPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 @keyframes fabPanelIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes fabGlow { 0%,100% { box-shadow: 0 4px 16px rgba(0,0,0,0.15); } 50% { box-shadow: 0 0 28px 8px var(--fab-glow, rgba(217,119,6,0.6)), 0 4px 16px rgba(0,0,0,0.15); } }
+@keyframes fabTipIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes fabTipOut { from { opacity: 1; } to { opacity: 0; } }
 .btn-press { transition: transform 0.15s ease, opacity 0.15s ease; }
 .btn-press:active { transform: scale(0.97); opacity: 0.85; }
 @media (hover: hover) {
@@ -4711,6 +4713,22 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   </div>
                 </div>
               </>
+            )}
+            {!fabOpen && isToday && !hasSessions && (
+              <div
+                onClick={() => setFabOpen(true)}
+                style={{
+                  position: "fixed", bottom: 30, right: 80, zIndex: 40,
+                  background: colors.cardBg, color: colors.text,
+                  padding: "8px 14px", borderRadius: 10,
+                  fontSize: 13, fontWeight: 600, opacity: 0.85,
+                  boxShadow: `0 2px 12px rgba(0,0,0,0.15), 0 0 0 1px ${colors.border}`,
+                  cursor: "pointer", whiteSpace: "nowrap",
+                  animation: "fabTipIn 0.3s ease-out",
+                }}
+              >
+                Start a session
+              </div>
             )}
             <button style={{
               ...styles.fab,
