@@ -9,8 +9,8 @@ import { avatarInitial } from "./lib/userIdentity";
 import { REP_UNITS, getUnit, getWeightLabel } from "./lib/constants";
 import {
   yyyyMmDd, addDays, formatDateLabel, monthKeyFromDate, daysInMonth,
-  weekdaySunday0, shiftMonth, formatMonthLabel,
-  startOfWeekSunday, startOfMonth, startOfYear,
+  weekdaySunday0, weekdayMonday0, shiftMonth, formatMonthLabel,
+  startOfWeekMonday, startOfWeekSunday, startOfMonth, startOfYear,
   endOfWeekSunday, endOfMonth, endOfYear,
   inRangeInclusive, isValidDateKey,
 } from "./lib/dateUtils";
@@ -80,6 +80,7 @@ import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
+import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 import { CoachCheckin, CheckinSummary, CheckinEditSection } from "./components/CoachCheckin";
 import { CoachCarousel } from "./components/CoachCarousel";
@@ -651,54 +652,58 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // Weekly summary for the Coach Carousel "Your Week" card
   const weeklySummary = useMemo(() => {
-    const today = new Date();
-    const day = today.getDay(); // 0=Sun
-    const mondayOffset = day === 0 ? -6 : 1 - day;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + mondayOffset);
-    monday.setHours(0, 0, 0, 0);
-    const weekStart = yyyyMmDd(monday);
-    const weekEnd = yyyyMmDd(today);
+    const weekStart = startOfWeekMonday(dateKey);
+    const weekEnd = addDays(weekStart, 6); // Sunday
 
     const sessionsSet = new Set();
     let totalSets = 0;
-    const musclesHit = new Set();
 
-    // Collect all workouts (program + daily) for exercise lookups
-    const allExercises = new Map();
-    for (const w of (state.program?.workouts || [])) {
-      for (const ex of (w.exercises || [])) allExercises.set(ex.id, ex);
-    }
-    for (const [, ws] of Object.entries(state.dailyWorkouts || {})) {
-      for (const w of (ws || [])) {
-        for (const ex of (w.exercises || [])) allExercises.set(ex.id, ex);
-      }
-    }
+    // Build day-of-week row data (Mon=0 .. Sun=6)
+    const dayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+    const days = dayLabels.map((label, i) => {
+      const d = addDays(weekStart, i);
+      const logs = (state.logsByDate || {})[d];
+      const hasSession = logs ? dayHasCompletedSets(logs) : false;
+      return { label, dateKey: d, hasSession, isToday: d === dateKey };
+    });
 
-    for (const [dateStr, dayLogs] of Object.entries(state.logsByDate || {})) {
-      if (dateStr < weekStart || dateStr > weekEnd) continue;
-      if (!dayLogs || typeof dayLogs !== "object") continue;
-      let dayHasCompleted = false;
-      for (const [exId, log] of Object.entries(dayLogs)) {
+    // Count sessions + sets
+    for (const day of days) {
+      if (!day.hasSession) continue;
+      sessionsSet.add(day.dateKey);
+      const dayLogs = state.logsByDate[day.dateKey];
+      for (const exId of Object.keys(dayLogs)) {
+        const log = dayLogs[exId];
         if (!log?.sets || !Array.isArray(log.sets)) continue;
-        const completed = log.sets.filter(s => s.completed === true || (s.completed === undefined && Number(s.reps) > 0));
-        if (completed.length === 0) continue;
-        dayHasCompleted = true;
-        totalSets += completed.length;
-        // Look up muscles from catalog
-        const ex = allExercises.get(exId);
-        if (ex?.catalogId) {
-          const entry = catalogMap.get(ex.catalogId);
-          if (entry?.muscles?.primary) {
-            for (const m of entry.muscles.primary) musclesHit.add(m);
-          }
-        }
+        totalSets += log.sets.filter(s => isSetCompleted(s)).length;
       }
-      if (dayHasCompleted) sessionsSet.add(dateStr);
     }
 
-    return { sessions: sessionsSet.size, totalSets, musclesHit };
-  }, [state.logsByDate, state.program?.workouts, state.dailyWorkouts, catalogMap, dateKey]);
+    // Progress bar: sessions vs goal
+    const daysPerWeek = state.program?.daysPerWeek || state.preferences?.daysPerWeek || 4;
+
+    // Week streak (reuse existing helper, needs weekMap with Sunday-start keys)
+    const weekMap = {};
+    for (const [ds, dl] of Object.entries(state.logsByDate || {})) {
+      if (!dl || !dayHasCompletedSets(dl)) continue;
+      const ws = startOfWeekSunday(ds);
+      weekMap[ws] = (weekMap[ws] || 0) + 1;
+    }
+    const weekStreak = calculateWeekStreak(weekMap);
+
+    // Up next suggestion
+    const upNext = getUpNextSuggestion(
+      state.logsByDate,
+      state.program?.workouts || [],
+      state.dailyWorkouts || {},
+      dateKey,
+    );
+
+    return {
+      sessions: sessionsSet.size, totalSets, days,
+      daysPerWeek, weekStreak, upNext,
+    };
+  }, [state.logsByDate, state.program?.workouts, state.program?.daysPerWeek, state.preferences?.daysPerWeek, state.dailyWorkouts, dateKey]);
 
   // Catalog entry for the back face of the log card flip
   const logDetailEntry = useMemo(() => {
@@ -3422,38 +3427,121 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       {
                         key: "week",
                         label: "Your Week",
-                        content: (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                            {weeklySummary.sessions > 0 ? (
-                              <>
-                                <div style={{ fontSize: 13, color: colors.textSecondary || colors.text, opacity: 0.6 }}>
-                                  {weeklySummary.sessions} session{weeklySummary.sessions !== 1 ? "s" : ""} {"\u00B7"} {weeklySummary.totalSets} sets
-                                </div>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
-                                  {["CHEST", "BACK", "SHOULDERS", "BICEPS", "TRICEPS", "QUADS", "HAMSTRINGS", "GLUTES", "ABS", "CALVES"].map((m) => {
-                                    const hit = weeklySummary.musclesHit.has(m) ||
-                                      (m === "SHOULDERS" && (weeklySummary.musclesHit.has("ANTERIOR_DELT") || weeklySummary.musclesHit.has("LATERAL_DELT") || weeklySummary.musclesHit.has("POSTERIOR_DELT")));
-                                    return (
-                                      <span key={m} style={{
-                                        fontSize: 12, fontWeight: 500, padding: "3px 8px", borderRadius: 6,
-                                        background: hit ? ((colors.accent || "#3b82f6") + "18") : "transparent",
-                                        color: hit ? (colors.accent || "#3b82f6") : (colors.textSecondary || colors.text),
-                                        opacity: hit ? 1 : 0.35,
-                                        border: `1px solid ${hit ? ((colors.accent || "#3b82f6") + "30") : colors.border}`,
-                                      }}>
-                                        {hit ? "\u2713 " : ""}{m.charAt(0) + m.slice(1).toLowerCase()}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              </>
-                            ) : (
-                              <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary || colors.text, padding: "16px 0" }}>
-                                No sessions yet this week.{"\n"}Tap + to start your first workout.
+                        content: (() => {
+                          const accent = colors.accent || "#3b82f6";
+                          const secondary = colors.textSecondary || colors.text;
+                          const { sessions, totalSets, days, daysPerWeek, weekStreak, upNext } = weeklySummary;
+                          const progress = Math.min(sessions / daysPerWeek, 1);
+                          const hasProgram = (state.program?.workouts || []).length > 0;
+                          const noData = sessions === 0 && !hasProgram;
+
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1, justifyContent: noData ? "center" : "flex-start" }}>
+                              {/* Day-of-week row */}
+                              <div style={{ display: "flex", justifyContent: "space-between", padding: "0 4px" }}>
+                                {days.map((d, i) => (
+                                  <div key={i} style={{
+                                    display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                                  }}>
+                                    <div style={{
+                                      fontSize: 11, fontWeight: 600, opacity: d.isToday ? 0.9 : 0.45,
+                                      color: d.isToday ? accent : colors.text,
+                                    }}>
+                                      {d.label}
+                                    </div>
+                                    <div style={{
+                                      width: 22, height: 22, borderRadius: "50%",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      border: d.isToday ? `2px solid ${accent}` : "none",
+                                      background: d.hasSession ? accent : "transparent",
+                                    }}>
+                                      {d.hasSession ? (
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                          <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                      ) : (
+                                        <div style={{
+                                          width: 8, height: 8, borderRadius: "50%",
+                                          border: `1.5px solid ${d.isToday ? accent : (secondary)}`,
+                                          opacity: d.isToday ? 0.6 : 0.3,
+                                        }} />
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            )}
-                          </div>
-                        ),
+
+                              {noData ? (
+                                <div style={{ fontSize: 13, opacity: 0.45, color: secondary, textAlign: "center" }}>
+                                  No sessions yet this week.{"\n"}Tap + to start your first workout.
+                                </div>
+                              ) : (
+                                <>
+                                  {/* Stats row */}
+                                  <div style={{ fontSize: 13, color: secondary, opacity: 0.6 }}>
+                                    {sessions} session{sessions !== 1 ? "s" : ""} {"\u00B7"} {totalSets} set{totalSets !== 1 ? "s" : ""}
+                                  </div>
+
+                                  {/* Progress bar */}
+                                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    <div style={{
+                                      flex: 1, height: 6, borderRadius: 3,
+                                      background: colors.border, overflow: "hidden",
+                                    }}>
+                                      <div style={{
+                                        width: `${progress * 100}%`,
+                                        height: "100%", borderRadius: 3,
+                                        background: accent,
+                                        transition: "width 0.3s ease",
+                                      }} />
+                                    </div>
+                                    <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.5, whiteSpace: "nowrap" }}>
+                                      {sessions}/{daysPerWeek} days
+                                    </div>
+                                  </div>
+
+                                  {/* Up next suggestion */}
+                                  {upNext && (
+                                    <div style={{ marginTop: 2 }}>
+                                      {upNext.allDone ? (
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: accent }}>
+                                          All workouts done this week {"\u2713"}
+                                        </div>
+                                      ) : upNext.isRestDay ? (
+                                        <div style={{ fontSize: 13, color: secondary, opacity: 0.5 }}>
+                                          Rest day — you usually take {upNext.dayName}s off
+                                        </div>
+                                      ) : upNext.workouts.length > 0 ? (
+                                        <div>
+                                          <div style={{ fontSize: 13, fontWeight: 600 }}>
+                                            Up next: {upNext.workouts.join(" + ")}
+                                          </div>
+                                          {upNext.confidence >= 0.6 && upNext.dayName && (
+                                            <div style={{ fontSize: 11, color: secondary, opacity: 0.45, marginTop: 2 }}>
+                                              You usually do this on {upNext.dayName}s
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  )}
+                                  {!upNext && !hasProgram && (
+                                    <div style={{ fontSize: 13, color: secondary, opacity: 0.45 }}>
+                                      Tap + to start your first workout
+                                    </div>
+                                  )}
+
+                                  {/* Week streak */}
+                                  {weekStreak >= 2 && (
+                                    <div style={{ fontSize: 12, opacity: 0.55, marginTop: "auto" }}>
+                                      {"\uD83D\uDD25"} {weekStreak} week streak
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })(),
                       },
                       {
                         key: "coach",
