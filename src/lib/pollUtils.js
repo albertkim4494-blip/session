@@ -49,7 +49,15 @@ export function formatDeadline(deadline) {
   return `Closes in ${days}d`;
 }
 
-export function formatEventDateTime(eventDate, eventTime) {
+function formatTime12(timeStr) {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+export function formatEventDateTime(eventDate, eventTime, eventEndTime) {
   if (!eventDate) return null;
   const d = new Date(eventDate + "T00:00:00");
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -60,10 +68,19 @@ export function formatEventDateTime(eventDate, eventTime) {
 
   let str = `${dayName}, ${monthName} ${dayNum}`;
   if (eventTime) {
-    const [h, m] = eventTime.split(":").map(Number);
-    const ampm = h >= 12 ? "PM" : "AM";
-    const h12 = h % 12 || 12;
-    str += ` at ${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+    str += ` at ${formatTime12(eventTime)}`;
+    if (eventEndTime) {
+      str += ` \u2013 ${formatTime12(eventEndTime)}`;
+    }
   }
   return str;
+}
+
+export function calcEventDurationMinutes(startTime, endTime) {
+  if (!startTime || !endTime) return null;
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) diff += 24 * 60; // handle overnight
+  return diff;
 }

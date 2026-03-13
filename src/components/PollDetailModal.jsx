@@ -3,7 +3,7 @@ import { Modal } from "./Modal";
 import { respondToPoll, removeResponse, closePoll, reopenPoll, deletePoll, markAttendance, getPollDetail } from "../lib/groupApi";
 import { isPollOpen, getPollCounts, getAttendanceSummary, formatDeadline, formatEventDateTime } from "../lib/pollUtils";
 
-export function PollDetailModal({ open, state: modalState, dispatch, styles, colors, userId, onUpdated, onDeleted, showToast }) {
+export function PollDetailModal({ open, state: modalState, dispatch, styles, colors, userId, onUpdated, onDeleted, onRsvpChanged, showToast }) {
   const [attendanceMode, setAttendanceMode] = useState(false);
   const [attendanceMap, setAttendanceMap] = useState({});
   const [savingAttendance, setSavingAttendance] = useState(false);
@@ -43,7 +43,7 @@ export function PollDetailModal({ open, state: modalState, dispatch, styles, col
 
   const counts = getPollCounts(responses, acceptedMembers.length);
   const attendanceSummary = getAttendanceSummary(responses);
-  const eventDateStr = formatEventDateTime(poll?.event_date, poll?.event_time);
+  const eventDateStr = formatEventDateTime(poll?.event_date, poll?.event_time, poll?.event_end_time);
   const deadlineStr = formatDeadline(poll?.deadline);
 
   // Check if event date has passed (show attendance section)
@@ -53,15 +53,19 @@ export function PollDetailModal({ open, state: modalState, dispatch, styles, col
     if (voting) return;
     setVoting(true);
 
+    let newResponse;
     if (myResponse?.response === response) {
       // Un-vote (tap same to remove)
       await removeResponse(poll.id);
+      newResponse = null;
     } else {
       await respondToPoll(poll.id, response);
+      newResponse = response;
     }
 
     setVoting(false);
     await refreshPoll();
+    onRsvpChanged?.(poll, newResponse);
   }
 
   async function handleClosePoll() {

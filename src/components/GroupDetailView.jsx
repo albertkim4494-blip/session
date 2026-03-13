@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { PillTabs } from "./PillTabs";
-import { getGroupDetail, leaveGroup, removeMember, promoteMember, deleteGroup, deleteGroupWorkout } from "../lib/groupApi";
+import { getGroupDetail, leaveGroup, removeMember, promoteMember, deleteGroup, deleteGroupWorkout, updateGroupSettings } from "../lib/groupApi";
 import { isPollOpen, getPollCounts, formatDeadline, formatEventDateTime } from "../lib/pollUtils";
 import { REACTION_EMOJIS, getReactionCounts, formatAmount, getDuesPaymentSummary, formatTimeAgo } from "../lib/announcementUtils";
 
@@ -14,8 +14,11 @@ export function GroupDetailView({
   const [polls, setPolls] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [dues, setDues] = useState([]);
+  const [customFields, setCustomFields] = useState([]);
   const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState("feed");
+  const [venmoInput, setVenmoInput] = useState("");
+  const [venmoSaving, setVenmoSaving] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -27,6 +30,8 @@ export function GroupDetailView({
       setPolls(data.polls || []);
       setAnnouncements(data.announcements || []);
       setDues(data.dues || []);
+      setCustomFields(data.customFields || []);
+      setVenmoInput(data.group?.venmo_username || "");
     }
     setLoading(false);
   }, [groupId]);
@@ -216,7 +221,7 @@ export function GroupDetailView({
                 return renderAnnouncementCard(item.data, { dispatch, colors, styles, userId, members });
               }
               if (item.type === "dues") {
-                return renderDuesCard(item.data, { dispatch, colors, styles, acceptedMembers, members });
+                return renderDuesCard(item.data, { dispatch, colors, styles, acceptedMembers, members, venmoUsername: group?.venmo_username });
               }
               return null;
             })
@@ -227,27 +232,46 @@ export function GroupDetailView({
       {/* Members tab */}
       {subTab === "members" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {isAdmin && (
-            <button
-              className="btn-press"
-              onClick={() => dispatch({
-                type: "OPEN_INVITE_TO_GROUP",
-                payload: {
-                  groupId: group.id,
-                  groupName: group.name,
-                  existingMemberIds: memberIds,
-                },
-              })}
-              style={{
-                ...styles.secondaryBtn, width: "100%", textAlign: "center",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "10px 14px",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></svg>
-              Invite Friends
-            </button>
-          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            {isAdmin && (
+              <button
+                className="btn-press"
+                onClick={() => dispatch({
+                  type: "OPEN_INVITE_TO_GROUP",
+                  payload: {
+                    groupId: group.id,
+                    groupName: group.name,
+                    existingMemberIds: memberIds,
+                  },
+                })}
+                style={{
+                  ...styles.secondaryBtn, flex: 1, textAlign: "center",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  padding: "10px 14px",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></svg>
+                Invite Friends
+              </button>
+            )}
+            {customFields.length > 0 && (
+              <button
+                className="btn-press"
+                onClick={() => dispatch({
+                  type: "OPEN_FILL_FIELDS",
+                  payload: { groupId: group.id, fields: customFields, requiredMode: false },
+                })}
+                style={{
+                  ...styles.secondaryBtn, flex: 1, textAlign: "center",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  padding: "10px 14px",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                My Info
+              </button>
+            )}
+          </div>
 
           {acceptedMembers.map((m) => {
             const p = m.profile;
@@ -348,6 +372,60 @@ export function GroupDetailView({
             <div style={{ fontSize: 14, fontWeight: 600 }}>{group.name}</div>
             {group.description && <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>{group.description}</div>}
           </div>
+
+          {/* Venmo username */}
+          <div style={{ padding: "12px 14px", borderRadius: 12, background: colors.subtleBg, border: `1px solid ${colors.border}` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.7, marginBottom: 6 }}>Venmo</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 14, opacity: 0.5 }}>@</span>
+              <input
+                className="input-focus"
+                value={venmoInput}
+                onChange={(e) => setVenmoInput(e.target.value.replace(/^@/, "").slice(0, 40))}
+                placeholder="venmo-username"
+                maxLength={40}
+                style={{ ...styles.textInput, fontFamily: "inherit", flex: 1, boxSizing: "border-box" }}
+              />
+              <button
+                className="btn-press"
+                disabled={venmoSaving || venmoInput === (group?.venmo_username || "")}
+                onClick={async () => {
+                  setVenmoSaving(true);
+                  await updateGroupSettings(group.id, { venmoUsername: venmoInput.trim() || null });
+                  setVenmoSaving(false);
+                  showToast?.("Venmo updated");
+                  fetchDetail();
+                }}
+                style={{
+                  ...styles.primaryBtn,
+                  padding: "8px 14px", fontSize: 13, flexShrink: 0,
+                  opacity: (venmoSaving || venmoInput === (group?.venmo_username || "")) ? 0.4 : 1,
+                }}
+              >
+                {venmoSaving ? "..." : "Save"}
+              </button>
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.4, marginTop: 4 }}>
+              Members will see a "Pay via Venmo" button on dues
+            </div>
+          </div>
+
+          {/* Manage Member Fields */}
+          <button
+            className="btn-press"
+            onClick={() => dispatch({
+              type: "OPEN_MANAGE_FIELDS",
+              payload: { groupId: group.id, fields: customFields },
+            })}
+            style={{
+              ...styles.secondaryBtn, width: "100%", textAlign: "center",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "12px 14px",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+            Manage Member Fields {customFields.length > 0 ? `(${customFields.length})` : ""}
+          </button>
 
           <button
             className="btn-press"
@@ -471,7 +549,7 @@ function renderPollCard(poll, { dispatch, colors, userId, acceptedMembers, membe
   const counts = getPollCounts(responses, acceptedMembers.length);
   const open = isPollOpen(poll);
   const myResponse = responses.find((r) => r.user_id === userId);
-  const eventDateStr = formatEventDateTime(poll.event_date, poll.event_time);
+  const eventDateStr = formatEventDateTime(poll.event_date, poll.event_time, poll.event_end_time);
   const deadlineStr = formatDeadline(poll.deadline);
   const createdBy = poll.created_by_profile;
 
@@ -615,7 +693,7 @@ function renderAnnouncementCard(announcement, { dispatch, colors, styles, userId
   );
 }
 
-function renderDuesCard(dues, { dispatch, colors, styles, acceptedMembers, members }) {
+function renderDuesCard(dues, { dispatch, colors, styles, acceptedMembers, members, venmoUsername }) {
   const createdBy = dues.created_by_profile;
   const payments = dues.dues_payments || [];
   const summary = getDuesPaymentSummary(payments, acceptedMembers.length, dues.amount_cents);
@@ -626,7 +704,7 @@ function renderDuesCard(dues, { dispatch, colors, styles, acceptedMembers, membe
       className="btn-press"
       onClick={() => dispatch({
         type: "OPEN_DUES_DETAIL",
-        payload: { dues, members },
+        payload: { dues, members, venmoUsername },
       })}
       style={{
         padding: "12px 14px", borderRadius: 12,

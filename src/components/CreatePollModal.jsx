@@ -22,6 +22,7 @@ export function CreatePollModal({ open, state: modalState, dispatch, styles, col
       description: (modalState.description || "").trim() || null,
       eventDate: modalState.eventDate || null,
       eventTime: modalState.eventTime || null,
+      eventEndTime: modalState.eventEndTime || null,
       deadline,
       allowSelfCheckin: modalState.allowSelfCheckin || false,
     });
@@ -94,25 +95,37 @@ export function CreatePollModal({ open, state: modalState, dispatch, styles, col
           </div>
         </div>
 
-        {/* Event Date + Time */}
+        {/* Event Date */}
+        <div>
+          <label style={{ ...styles.label, marginBottom: 6, display: "block" }}>Event Date</label>
+          <input
+            className="input-focus"
+            type="date"
+            value={modalState.eventDate || ""}
+            onChange={(e) => dispatch({ type: "UPDATE_CREATE_POLL", payload: { eventDate: e.target.value } })}
+            style={{ ...styles.textInput, fontFamily: "inherit", width: "100%", boxSizing: "border-box" }}
+          />
+        </div>
+
+        {/* Start Time + End Time */}
         <div style={{ display: "flex", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <label style={{ ...styles.label, marginBottom: 6, display: "block" }}>Event Date</label>
-            <input
-              className="input-focus"
-              type="date"
-              value={modalState.eventDate || ""}
-              onChange={(e) => dispatch({ type: "UPDATE_CREATE_POLL", payload: { eventDate: e.target.value } })}
-              style={{ ...styles.textInput, fontFamily: "inherit", width: "100%", boxSizing: "border-box" }}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ ...styles.label, marginBottom: 6, display: "block" }}>Event Time</label>
+            <label style={{ ...styles.label, marginBottom: 6, display: "block" }}>Start Time</label>
             <input
               className="input-focus"
               type="time"
               value={modalState.eventTime || ""}
               onChange={(e) => dispatch({ type: "UPDATE_CREATE_POLL", payload: { eventTime: e.target.value } })}
+              style={{ ...styles.textInput, fontFamily: "inherit", width: "100%", boxSizing: "border-box" }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ ...styles.label, marginBottom: 6, display: "block" }}>End Time</label>
+            <input
+              className="input-focus"
+              type="time"
+              value={modalState.eventEndTime || ""}
+              onChange={(e) => dispatch({ type: "UPDATE_CREATE_POLL", payload: { eventEndTime: e.target.value } })}
               style={{ ...styles.textInput, fontFamily: "inherit", width: "100%", boxSizing: "border-box" }}
             />
           </div>
