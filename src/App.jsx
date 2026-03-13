@@ -255,6 +255,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [coachInsights, setCoachInsights] = useState([]);
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachError, setCoachError] = useState(null);
+  const [coachStreaming, setCoachStreaming] = useState(false);
   const coachReqIdRef = useRef(0);
   const coachCacheRef = useRef(new Map());
   const coachLastSignatureRef = useRef(null);
@@ -1076,33 +1077,40 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       setCoachError(null);
     }
 
-    // 3. Once-per-session auto-fetch: fetch once per app launch (sessionStorage clears on restart)
+    // 3. Only auto-fetch if user already checked in today
+    const autoCheckin = getTodayCheckin(dateKey);
+    if (!autoCheckin) return; // No check-in yet — wait until user submits one
+
+    // 4. Once-per-session auto-fetch: fetch once per app launch (sessionStorage clears on restart)
     const today = new Date().toISOString().slice(0, 10);
     const lastAutoDate = sessionStorage.getItem(autoDateKey);
     if (lastAutoDate === today) return; // Already fetched today — use cached insights
 
-    // 4. Fetch from AI
-    // Set signature ref now to prevent auto-refresh effect from double-firing
+    // 5. Fetch from AI with streaming
     coachLastSignatureRef.current = coachSignature;
     let cancelled = false;
     const reqId = ++coachReqIdRef.current;
 
     coachFetchingRef.current = true;
-    setCoachLoading(true);
+    setCoachStreaming(true);
+    setCoachInsights([]);
 
     const filteredCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
     const coachOpts = { catalog: filteredCatalog };
 
-    // Include check-in context if available
-    const autoCheckin = getTodayCheckin(dateKey);
-    let autoCheckinCtx = null;
-    let autoCoachNotes = null;
-    if (autoCheckin) {
-      autoCheckinCtx = buildCheckinContext(autoCheckin, loadCheckins(), state.logsByDate);
-      autoCoachNotes = loadCoachNotes();
-    }
+    const autoCheckinCtx = buildCheckinContext(autoCheckin, loadCheckins(), state.logsByDate);
+    const autoCoachNotes = loadCoachNotes();
 
-    fetchCoachInsights({ profile, state, dateRange: coachDateRange, catalog: filteredCatalog, equipment, measurementSystem: state.preferences?.measurementSystem, checkinContext: autoCheckinCtx, coachNotesFromStorage: autoCoachNotes })
+    fetchCoachInsights({
+      profile, state, dateRange: coachDateRange, catalog: filteredCatalog, equipment,
+      measurementSystem: state.preferences?.measurementSystem,
+      checkinContext: autoCheckinCtx, coachNotesFromStorage: autoCoachNotes,
+      onInsight: (insight) => {
+        if (!cancelled && coachReqIdRef.current === reqId) {
+          setCoachInsights(prev => [...prev, insight]);
+        }
+      },
+    })
       .then(({ insights, fromCache, coachNotes: returnedNotes }) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
@@ -1115,9 +1123,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             insights, signature: coachSignature, createdAt: Date.now(),
           }));
         } catch {}
-        // Mark today as auto-fetched (even if coachApi returned from its own cache)
         try { sessionStorage.setItem(autoDateKey, today); } catch {}
-        // Persist AI coach notes
         if (returnedNotes?.length > 0) {
           const existing = loadCoachNotes();
           const merged = mergeCoachNotes(existing, returnedNotes);
@@ -1138,6 +1144,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         coachFetchingRef.current = false;
         if (!cancelled && coachReqIdRef.current === reqId) {
           setCoachLoading(false);
+          setCoachStreaming(false);
         }
       });
 
@@ -2580,7 +2587,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     incrementDailyRefresh();
     const reqId = ++coachReqIdRef.current;
     coachFetchingRef.current = true;
-    setCoachLoading(true);
+    setCoachInsights([]);
+    setCoachStreaming(true);
     setCoachError(null);
     const refreshExNames = progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
     const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
@@ -2593,7 +2601,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       checkinCtx = buildCheckinContext(checkinForRefresh, loadCheckins(), state.logsByDate);
       coachNotesData = loadCoachNotes();
     }
-    fetchCoachInsights({ profile, state, dateRange: { start: coachStart, end: coachEnd }, options: { forceRefresh: true }, catalog: refreshCatalog, equipment, measurementSystem: state.preferences?.measurementSystem, checkinContext: checkinCtx, coachNotesFromStorage: coachNotesData })
+    fetchCoachInsights({
+      profile, state, dateRange: { start: coachStart, end: coachEnd },
+      options: { forceRefresh: true }, catalog: refreshCatalog, equipment,
+      measurementSystem: state.preferences?.measurementSystem,
+      checkinContext: checkinCtx, coachNotesFromStorage: coachNotesData,
+      onInsight: (insight) => {
+        if (coachReqIdRef.current === reqId) {
+          setCoachInsights(prev => [...prev, insight]);
+        }
+      },
+    })
       .then(({ insights, coachNotes: returnedNotes }) => {
         if (coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
@@ -2622,7 +2640,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       })
       .finally(() => {
         coachFetchingRef.current = false;
-        if (coachReqIdRef.current === reqId) setCoachLoading(false);
+        if (coachReqIdRef.current === reqId) {
+          setCoachLoading(false);
+          setCoachStreaming(false);
+        }
       });
   }, [progressWorkouts, fullCatalog, equipment, dateKey, profile, state, coachSignature, coachInsights, session?.user?.id, catalogMap]);
 
@@ -2644,7 +2665,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     incrementDailyRefresh();
     const reqId = ++coachReqIdRef.current;
     coachFetchingRef.current = true;
-    setCoachLoading(true);
+    setCoachInsights([]);
+    setCoachStreaming(true);
     setCoachError(null);
 
     const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
@@ -2663,6 +2685,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       measurementSystem: state.preferences?.measurementSystem,
       checkinContext: checkinCtx,
       coachNotesFromStorage: coachNotesData,
+      onInsight: (insight) => {
+        if (coachReqIdRef.current === reqId) {
+          setCoachInsights(prev => [...prev, insight]);
+        }
+      },
     })
       .then(({ insights, coachNotes: returnedNotes }) => {
         if (coachReqIdRef.current !== reqId) return;
@@ -2673,7 +2700,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
         const cacheKey = `wt_coach_v2:${session.user.id}:${dateKey}`;
         try { localStorage.setItem(cacheKey, JSON.stringify({ insights, signature: coachSignature, createdAt: Date.now() })); } catch {}
-        // Persist AI coach notes
         if (returnedNotes?.length > 0) {
           const existing = loadCoachNotes();
           const merged = mergeCoachNotes(existing, returnedNotes);
@@ -2692,7 +2718,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       })
       .finally(() => {
         coachFetchingRef.current = false;
-        if (coachReqIdRef.current === reqId) setCoachLoading(false);
+        if (coachReqIdRef.current === reqId) {
+          setCoachLoading(false);
+          setCoachStreaming(false);
+        }
       });
   }, [dateKey, fullCatalog, equipment, profile, state, coachSignature, session?.user?.id, catalogMap, coachInsights]);
 
@@ -3554,24 +3583,64 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         ),
                         content: (
                           <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center", flex: 1, justifyContent: "center" }}>
-                            {coachLoading && coachInsights.length === 0 ? (
-                              <div style={{ fontSize: 14, opacity: 0.4, padding: "16px 0" }}>Analyzing your workouts...</div>
+                            {!todayCheckin && coachInsights.length === 0 ? (
+                              /* No check-in yet — nudge user */
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                                <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary || colors.text }}>
+                                  Check in to get personalized coaching
+                                </div>
+                                <button
+                                  onClick={() => setCarouselIndex(0)}
+                                  style={{
+                                    background: "transparent", border: "none", cursor: "pointer",
+                                    color: colors.accent || "#3b82f6", fontSize: 13, fontWeight: 600,
+                                    padding: "4px 0", textDecoration: "underline",
+                                  }}
+                                >
+                                  Go to check-in
+                                </button>
+                              </div>
                             ) : coachInsights.length > 0 ? (
-                              <CoachHeroInsight
-                                insights={coachInsights}
-                                onAddExercise={handleAddSuggestion}
-                                colors={colors}
-                                loading={coachLoading}
-                                error={coachError}
-                                userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                                onRefresh={handleCoachRefresh}
-                                hideLabel
-                              />
+                              /* Has insights (streaming or complete) */
+                              <div style={{ width: "100%" }}>
+                                <CoachHeroInsight
+                                  insights={coachInsights}
+                                  onAddExercise={handleAddSuggestion}
+                                  colors={colors}
+                                  loading={coachLoading}
+                                  error={coachError}
+                                  userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                                  onRefresh={handleCoachRefresh}
+                                  hideLabel
+                                  streaming={coachStreaming}
+                                />
+                                {coachStreaming && (
+                                  <div style={{ display: "flex", justifyContent: "center", gap: 4, padding: "12px 0 0" }}>
+                                    {[0, 1, 2].map((i) => (
+                                      <div key={i} style={{
+                                        width: 6, height: 6, borderRadius: "50%",
+                                        background: colors.textSecondary || colors.text,
+                                        animation: `coachDotPulse 1s ease-in-out ${i * 0.2}s infinite`,
+                                      }} />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : coachStreaming ? (
+                              /* Streaming started but no insights yet */
+                              <div style={{ display: "flex", justifyContent: "center", gap: 4, padding: "16px 0" }}>
+                                {[0, 1, 2].map((i) => (
+                                  <div key={i} style={{
+                                    width: 6, height: 6, borderRadius: "50%",
+                                    background: colors.textSecondary || colors.text,
+                                    animation: `coachDotPulse 1s ease-in-out ${i * 0.2}s infinite`,
+                                  }} />
+                                ))}
+                              </div>
                             ) : (
-                              <div style={{ fontSize: 13, opacity: 0.45, padding: "16px 0", color: colors.textSecondary || colors.text }}>
-                                {todayCheckin
-                                  ? "Your coach insights will appear here."
-                                  : "Complete a check-in for personalized coaching."}
+                              /* Checked in but no insights yet (waiting or error) */
+                              <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary || colors.text }}>
+                                {coachError || "Your coach insights will appear here."}
                               </div>
                             )}
                           </div>

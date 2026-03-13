@@ -19,6 +19,10 @@ const ANIM_CSS = `
 @keyframes coachFadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes coachDotPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
 }`;
 
 let animInjected = false;

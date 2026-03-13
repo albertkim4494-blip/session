@@ -1128,7 +1128,7 @@ export function computeComplexityScore({
  * @param {Object} [params.options] - { forceRefresh: boolean }
  * @returns {Promise<{ insights: Array, fromCache: boolean }>}
  */
-export async function fetchCoachInsights({ profile, state, dateRange, options, catalog, equipment, measurementSystem, checkinContext, coachNotesFromStorage }) {
+export async function fetchCoachInsights({ profile, state, dateRange, options, catalog, equipment, measurementSystem, checkinContext, coachNotesFromStorage, onInsight }) {
   const workouts = state?.program?.workouts || [];
   const recentLogs = filterLogsToRange(state?.logsByDate, dateRange.start, dateRange.end);
   const exerciseCount = workouts.reduce((sum, w) => sum + (w.exercises?.length || 0), 0);
@@ -1296,65 +1296,182 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   const modelHint = "gpt-4o-mini";
 
   // Ensure we have a fresh session token before calling the edge function
-  await supabase.auth.getSession();
+  const { data: { session: authSession } } = await supabase.auth.getSession();
 
-  // Call Edge Function
-  const { data, error } = await supabase.functions.invoke("ai-coach", {
-    body: {
-      profile: {
-        age: profile?.age,
-        gender: profile?.gender,
-        weight_lbs: profile?.weight_lbs,
-        height_inches: profile?.height_inches,
-        goal: profile?.goal,
-        about: profile?.about,
-        sports: profile?.sports,
-      },
-      workouts: allWorkouts,
-      recentLogs,
-      dateRange: {
-        start: dateRange.start,
-        end: dateRange.end,
-        label: dateRange.label || "today",
-      },
-      catalogEntries,
-      equipment: equipment || ["full_gym"],
-      weightUnit: weightLabel,
-      enrichedLogSummary,
-      progressionTrends,
-      volumeLoadTrends,
-      estimated1RMTrends,
-      fatigueTrend,
-      adherence,
-      coachingHistory,
-      sportTraits: sportTraitsPayload?.aggregated || null,
-      muscleSetsSummary,
-      muscleVolumeDetail,
-      recentHistory: tieredHistory.recentHistory,
-      olderHistory: tieredHistory.olderHistory,
-      modelHint,
-      checkin: checkinContext?.today || null,
-      checkinHistory: checkinContext?.history || null,
-      moodPattern: checkinContext?.moodPattern || null,
-      coachNotes: coachNotesFromStorage || null,
+  const requestBody = {
+    profile: {
+      age: profile?.age,
+      gender: profile?.gender,
+      weight_lbs: profile?.weight_lbs,
+      height_inches: profile?.height_inches,
+      goal: profile?.goal,
+      about: profile?.about,
+      sports: profile?.sports,
     },
+    workouts: allWorkouts,
+    recentLogs,
+    dateRange: {
+      start: dateRange.start,
+      end: dateRange.end,
+      label: dateRange.label || "today",
+    },
+    catalogEntries,
+    equipment: equipment || ["full_gym"],
+    weightUnit: weightLabel,
+    enrichedLogSummary,
+    progressionTrends,
+    volumeLoadTrends,
+    estimated1RMTrends,
+    fatigueTrend,
+    adherence,
+    coachingHistory,
+    sportTraits: sportTraitsPayload?.aggregated || null,
+    muscleSetsSummary,
+    muscleVolumeDetail,
+    recentHistory: tieredHistory.recentHistory,
+    olderHistory: tieredHistory.olderHistory,
+    modelHint,
+    checkin: checkinContext?.today || null,
+    checkinHistory: checkinContext?.history || null,
+    moodPattern: checkinContext?.moodPattern || null,
+    coachNotes: coachNotesFromStorage || null,
+  };
+
+  // Helper: normalize a single insight so UI never crashes on missing fields
+  function normalizeInsightFields(i) {
+    return {
+      ...i,
+      type: i.type || "INFO",
+      severity: i.severity || "LOW",
+      title: i.title || "Insight",
+      message: i.message || "",
+      suggestions: Array.isArray(i.suggestions) ? i.suggestions : [],
+      confidence: typeof i.confidence === "number" ? i.confidence : null,
+      evidence: typeof i.evidence === "string" ? i.evidence : "",
+      expected_outcome: typeof i.expected_outcome === "string" ? i.expected_outcome : "",
+    };
+  }
+
+  // Helper: post-process insights (save history, filter, cache)
+  function postProcess(insights, coachNotesData) {
+    const updatedHistory = saveInsightHistory(insights, insightHistory, {
+      muscleSetsSummary,
+      progressionTrends,
+      adherence,
+    });
+    const filtered = filterRepetitiveInsights(insights, updatedHistory);
+    try {
+      localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({ fingerprint, insights: filtered, timestamp: Date.now() })
+      );
+    } catch { /* ignore */ }
+    const validNotes = (Array.isArray(coachNotesData) ? coachNotesData : [])
+      .filter((n) => n && typeof n.topic === "string" && typeof n.detail === "string");
+    return { insights: filtered, fromCache: false, coachNotes: validNotes };
+  }
+
+  // ---------------------------------------------------------------------------
+  // STREAMING PATH: use raw fetch + SSE parsing with onInsight callback
+  // ---------------------------------------------------------------------------
+  const useStreaming = typeof onInsight === "function";
+
+  if (useStreaming) {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const edgeUrl = `${supabaseUrl}/functions/v1/ai-coach`;
+
+      const response = await fetch(edgeUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authSession?.access_token || ""}`,
+          "apikey": supabaseKey,
+        },
+        body: JSON.stringify({ ...requestBody, stream: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Edge function HTTP ${response.status}`);
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+
+      // If the response is JSON (not SSE), fall through to blocking path
+      if (contentType.includes("application/json")) {
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        recordAiEvent("ai_success", "coach", { model: modelHint, complexityScore });
+        const insights = (data.insights || []).map(normalizeInsightFields);
+        for (const ins of insights) onInsight(ins);
+        return postProcess(insights, data.coachNotes);
+      }
+
+      // SSE stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = "";
+      const allInsights = [];
+      let doneData = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        sseBuffer += decoder.decode(value, { stream: true });
+
+        const lines = sseBuffer.split("\n");
+        sseBuffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (!payload) continue;
+
+          try {
+            const event = JSON.parse(payload);
+            if (event.type === "insight") {
+              const normalized = normalizeInsightFields(event.data);
+              allInsights.push(normalized);
+              onInsight(normalized);
+            } else if (event.type === "done") {
+              doneData = event;
+            } else if (event.type === "error") {
+              throw new Error(event.message || "Stream error");
+            }
+          } catch (e) {
+            if (e.message === "Stream error" || e.message?.startsWith("Stream")) throw e;
+            // skip malformed SSE events
+          }
+        }
+      }
+
+      recordAiEvent("ai_success", "coach", { model: modelHint, complexityScore, streamed: true });
+      return postProcess(allInsights, doneData?.coachNotes || []);
+    } catch (streamErr) {
+      console.warn("Streaming failed, falling back to blocking:", streamErr.message);
+      // Fall through to blocking path below
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // BLOCKING PATH (original behavior, also used as streaming fallback)
+  // ---------------------------------------------------------------------------
+  const { data, error } = await supabase.functions.invoke("ai-coach", {
+    body: requestBody,
   });
 
   if (error) {
-    // Extract useful details from FunctionsHttpError
     let detail = error.message || "Edge function call failed";
     if (error.context && typeof error.context.status === "number") {
       detail += ` (HTTP ${error.context.status})`;
     }
-    // Try to read error body for debugging
     if (error.context && typeof error.context.json === "function") {
       try {
         const body = await error.context.json();
         if (body?.error) detail += `: ${body.error}`;
         if (body?.detail) detail += ` — ${body.detail}`;
-      } catch {
-        // body already consumed or not JSON
-      }
+      } catch { /* body already consumed */ }
     }
     console.error("Coach API error detail:", detail);
     recordAiEvent("ai_parse_fail", "coach", { detail });
@@ -1363,40 +1480,10 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
 
   recordAiEvent("ai_success", "coach", { model: modelHint, complexityScore });
 
-  // Normalize each insight so UI never crashes on missing fields
-  const insights = (data?.insights || []).map((i) => ({
-    ...i,
-    type: i.type || "INFO",
-    severity: i.severity || "LOW",
-    title: i.title || "Insight",
-    message: i.message || "",
-    suggestions: Array.isArray(i.suggestions) ? i.suggestions : [],
-    confidence: typeof i.confidence === "number" ? i.confidence : null,
-    evidence: typeof i.evidence === "string" ? i.evidence : "",
-    expected_outcome: typeof i.expected_outcome === "string" ? i.expected_outcome : "",
-  }));
-
-  // Save unfiltered insights to rolling history, then filter for novelty
-  const updatedHistory = saveInsightHistory(insights, insightHistory, {
-    muscleSetsSummary,
-    progressionTrends,
-    adherence,
-  });
-  const filtered = filterRepetitiveInsights(insights, updatedHistory);
-
-  // Update cache with filtered insights
-  try {
-    localStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({ fingerprint, insights: filtered, timestamp: Date.now() })
-    );
-  } catch {
-    // Ignore storage errors
+  const insights = (data?.insights || []).map(normalizeInsightFields);
+  // If onInsight was provided but streaming failed, deliver all at once
+  if (typeof onInsight === "function") {
+    for (const ins of insights) onInsight(ins);
   }
-
-  // Validate coachNotes — each must have topic + detail strings
-  const coachNotes = (Array.isArray(data?.coachNotes) ? data.coachNotes : [])
-    .filter((n) => n && typeof n.topic === "string" && typeof n.detail === "string");
-
-  return { insights: filtered, fromCache: false, coachNotes };
+  return postProcess(insights, data?.coachNotes);
 }

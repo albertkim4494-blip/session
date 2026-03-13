@@ -48,6 +48,7 @@ Deno.serve(async (req) => {
       checkinHistory,    // last 14 days of check-ins
       moodPattern,       // pre vs post workout mood pattern string
       coachNotes,        // AI's persisted notes about this user
+      stream: streamRequested, // if true, return SSE stream instead of JSON blob
     } = await req.json();
 
     // Validate and resolve model + max_tokens
@@ -652,16 +653,23 @@ Analyze this data and return JSON insights.`;
     }));
 
     // Call OpenAI with retry on 429 (rate limit)
+    const openaiHeaders = {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    };
+
+    // Build OpenAI request body — add stream flag if SSE requested
+    const openaiParsed = JSON.parse(openaiBody);
+    if (streamRequested) openaiParsed.stream = true;
+    const finalOpenaiBody = JSON.stringify(openaiParsed);
+
     let openaiRes: Response | null = null;
     const MAX_RETRIES = 3;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: openaiBody,
+        headers: openaiHeaders,
+        body: finalOpenaiBody,
       });
 
       if (openaiRes.status !== 429) break;
@@ -683,6 +691,181 @@ Analyze this data and return JSON insights.`;
       );
     }
 
+    // -----------------------------------------------------------------------
+    // STREAMING PATH: parse OpenAI SSE stream, extract complete insight objects,
+    // and forward them to the client as SSE events.
+    // -----------------------------------------------------------------------
+    if (streamRequested && openaiRes.body) {
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+      const reader = openaiRes.body.getReader();
+
+      const sseStream = new ReadableStream({
+        async start(controller) {
+          let fullText = "";
+
+          try {
+            let sseBuffer = "";
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              sseBuffer += decoder.decode(value, { stream: true });
+
+              // Process SSE lines from OpenAI
+              const lines = sseBuffer.split("\n");
+              sseBuffer = lines.pop() || ""; // keep incomplete line
+
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                const payload = line.slice(6).trim();
+                if (payload === "[DONE]") continue;
+
+                try {
+                  const chunk = JSON.parse(payload);
+                  const delta = chunk.choices?.[0]?.delta?.content;
+                  if (delta) fullText += delta;
+                } catch {
+                  // skip malformed chunks
+                }
+              }
+
+              // Try to extract complete insight objects from accumulated text
+              // Look for the "insights" array and extract complete objects
+              const insightsMatch = fullText.match(/"insights"\s*:\s*\[/);
+              if (insightsMatch) {
+                const arrayStart = fullText.indexOf("[", insightsMatch.index);
+                let depth = 0;
+                let objStart = -1;
+                let insightsSent = 0;
+                // Count how many insights we've already sent
+                const sentMarker = "\u0000"; // Track sent objects
+                let searchFrom = arrayStart + 1;
+
+                // Count already-sent insights by counting complete objects
+                let tempDepth = 0;
+                let tempObjStart = -1;
+                let completeObjects = 0;
+                for (let i = arrayStart + 1; i < fullText.length; i++) {
+                  const ch = fullText[i];
+                  if (ch === '"') {
+                    // Skip string contents
+                    i++;
+                    while (i < fullText.length && fullText[i] !== '"') {
+                      if (fullText[i] === '\\') i++;
+                      i++;
+                    }
+                    continue;
+                  }
+                  if (ch === '{') {
+                    if (tempDepth === 0) tempObjStart = i;
+                    tempDepth++;
+                  } else if (ch === '}') {
+                    tempDepth--;
+                    if (tempDepth === 0 && tempObjStart >= 0) {
+                      completeObjects++;
+                      tempObjStart = -1;
+                    }
+                  }
+                }
+
+                // Send any newly completed insight objects
+                if (completeObjects > insightsSent) {
+                  // Re-parse to extract individual objects
+                  let d = 0;
+                  let oStart = -1;
+                  let objectIndex = 0;
+                  for (let i = arrayStart + 1; i < fullText.length; i++) {
+                    const ch = fullText[i];
+                    if (ch === '"') {
+                      i++;
+                      while (i < fullText.length && fullText[i] !== '"') {
+                        if (fullText[i] === '\\') i++;
+                        i++;
+                      }
+                      continue;
+                    }
+                    if (ch === '{') {
+                      if (d === 0) oStart = i;
+                      d++;
+                    } else if (ch === '}') {
+                      d--;
+                      if (d === 0 && oStart >= 0) {
+                        if (objectIndex >= insightsSent) {
+                          const objStr = fullText.slice(oStart, i + 1);
+                          try {
+                            const insight = JSON.parse(objStr);
+                            controller.enqueue(
+                              encoder.encode(`data: ${JSON.stringify({ type: "insight", data: insight })}\n\n`)
+                            );
+                          } catch {
+                            // Incomplete or malformed — skip
+                          }
+                        }
+                        objectIndex++;
+                        oStart = -1;
+                      }
+                    }
+                  }
+                  insightsSent = completeObjects;
+                }
+              }
+            }
+
+            // Stream finished — parse the complete response
+            const cleaned = fullText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+            let parsed;
+            try {
+              parsed = JSON.parse(cleaned);
+            } catch {
+              console.log(JSON.stringify({ event: "ai_parse_fail", feature: "coach", contentPreview: fullText.slice(0, 200) }));
+              parsed = { insights: [] };
+            }
+
+            const returnedCoachNotes = Array.isArray(parsed.coachNotes) ? parsed.coachNotes : [];
+
+            // Send final done event with metadata
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({
+                type: "done",
+                coachNotes: returnedCoachNotes,
+                trendStatus: parsed.trend_status || null,
+              })}\n\n`)
+            );
+
+            console.log(JSON.stringify({
+              event: "ai_success",
+              feature: "coach",
+              model,
+              maxTokens,
+              streamed: true,
+              insightCount: Array.isArray(parsed.insights) ? parsed.insights.length : 0,
+              coachNotesCount: returnedCoachNotes.length,
+            }));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "error", message: msg })}\n\n`)
+            );
+            console.error("Stream error:", msg);
+          } finally {
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(sseStream, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // NON-STREAMING PATH (original behavior)
+    // -----------------------------------------------------------------------
     const openaiData = await openaiRes.json();
     const usage = openaiData.usage;
     const content = openaiData.choices?.[0]?.message?.content || "{}";
