@@ -157,7 +157,7 @@ export const initialModalState = {
   createAnnouncement: { isOpen: false, groupId: null, body: "", posting: false },
   announcementDetail: { isOpen: false, announcement: null, members: [] },
   createDues: { isOpen: false, groupId: null, title: "", amount: "", description: "", dueDate: "", creating: false },
-  duesDetail: { isOpen: false, dues: null, members: [] },
+  duesDetail: { isOpen: false, dues: null, members: [], venmoUsername: null },
   manageFields: { isOpen: false, groupId: null, fields: [], loading: false },
   fillFields: { isOpen: false, groupId: null, fields: [], values: {}, requiredMode: false, saving: false, onComplete: null },
   importPreview: { isOpen: false, format: null, sessions: [], stats: null, importData: null, mode: "merge" },
@@ -946,6 +946,7 @@ export function modalReducer(state, action) {
           isOpen: true,
           dues: action.payload.dues,
           members: action.payload.members || [],
+          venmoUsername: action.payload.venmoUsername || null,
         },
       };
 

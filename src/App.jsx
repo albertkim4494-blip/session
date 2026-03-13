@@ -59,9 +59,12 @@ import { CreateAnnouncementModal } from "./components/CreateAnnouncementModal";
 import { AnnouncementDetailModal } from "./components/AnnouncementDetailModal";
 import { CreateDuesModal } from "./components/CreateDuesModal";
 import { DuesDetailModal } from "./components/DuesDetailModal";
+import { ManageFieldsModal } from "./components/ManageFieldsModal";
+import { FillFieldsModal } from "./components/FillFieldsModal";
 import { ImportPreviewModal } from "./components/ImportPreviewModal";
 import { stateToCSV, detectCSVFormat, parseStrongCSV, parseHevyCSV, buildImportState, mergeImportedData } from "./lib/importExport";
 import { GroupDetailView } from "./components/GroupDetailView";
+import { calcEventDurationMinutes } from "./lib/pollUtils";
 import { CircuitTimer } from "./components/CircuitTimer";
 import {
   getFriends, getPendingRequests, getInbox, getUnreadCount,
@@ -71,6 +74,7 @@ import {
 import {
   getMyGroups, getGroupInvites, getGroupInviteCount,
   acceptGroupInvite, declineGroupInvite, getPendingPollCount,
+  markAttendance, getGroupCustomFields,
 } from "./lib/groupApi";
 
 // Exercise catalog
@@ -1718,6 +1722,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       toastTimerRef.current = setTimeout(() => setToast(null), 2500);
     }
 
+    // Attendance auto-sync: if exercise belongs to an event workout and has completed sets
+    const logCtx = modals.log.context;
+    const eventWorkout = (state.dailyWorkouts?.[dateKey] || []).find(
+      w => w.source === "event" && w.exercises?.some(ex => ex.id === logCtx.exerciseId)
+    );
+    if (eventWorkout?.pollId && eventWorkout.allowSelfCheckin && !eventWorkout.attendanceMarked) {
+      const hasCompleted = (modals.log.sets || []).some(s => s.completed);
+      if (hasCompleted) {
+        markAttendance(eventWorkout.pollId, session?.user?.id, true).then(() => {
+          showToast("Marked as attended");
+        }).catch(() => {});
+        updateState((st) => {
+          const dw = (st.dailyWorkouts?.[dateKey] || []).find(w => w.id === eventWorkout.id);
+          if (dw) dw.attendanceMarked = true;
+          return st;
+        });
+      }
+    }
+
     // Dismiss rest timer when closing modal
     setRestTimer((prev) => prev.active ? { ...prev, active: false } : prev);
     setShowTargetConfig(false);
@@ -1725,7 +1748,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setRpePopoverIdx(null);
 
     dispatchModal({ type: "CLOSE_LOG" });
-  }, [modals.log, dateKey, state.logsByDate, state.preferences, saveLogData]);
+  }, [modals.log, dateKey, state.logsByDate, state.dailyWorkouts, state.preferences, saveLogData, session]);
 
   // Check if navigation to next/prev exercise is possible
   const canNavLogExercise = useCallback((direction) => {
@@ -2815,6 +2838,56 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
     setCollapsedToday((prev) => new Set(prev).add(workout.id));
     dispatchModal({ type: "CLOSE_GENERATE_TODAY" });
+  }
+
+  // Handle RSVP changes from PollDetailModal — create/remove event session
+  function handleRsvpChanged(poll, response) {
+    if (!poll?.event_date) return;
+    const eventDateKey = poll.event_date;
+
+    if (response === "yes") {
+      // Create event session in dailyWorkouts if not already there
+      updateState((st) => {
+        if (!st.dailyWorkouts) st.dailyWorkouts = {};
+        if (!st.dailyWorkouts[eventDateKey]) st.dailyWorkouts[eventDateKey] = [];
+        // Skip if already exists for this poll
+        if (st.dailyWorkouts[eventDateKey].some(w => w.source === "event" && w.pollId === poll.id)) return st;
+        const durationMin = calcEventDurationMinutes(poll.event_time, poll.event_end_time);
+        const exercise = {
+          id: uid("ex"),
+          name: poll.title,
+          unit: "min",
+          sets: durationMin ? [{ reps: durationMin, weight: "" }] : [],
+        };
+        st.dailyWorkouts[eventDateKey].push({
+          id: uid("w"),
+          name: poll.title,
+          category: "Event",
+          source: "event",
+          pollId: poll.id,
+          groupId: poll.group_id,
+          allowSelfCheckin: poll.allow_self_checkin,
+          exercises: [exercise],
+        });
+        return st;
+      });
+      showToast("Added to your schedule");
+    } else {
+      // Remove event session for this poll
+      updateState((st) => {
+        if (!st.dailyWorkouts?.[eventDateKey]) return st;
+        const before = st.dailyWorkouts[eventDateKey].length;
+        st.dailyWorkouts[eventDateKey] = st.dailyWorkouts[eventDateKey].filter(
+          w => !(w.source === "event" && w.pollId === poll.id)
+        );
+        if (st.dailyWorkouts[eventDateKey].length === 0) delete st.dailyWorkouts[eventDateKey];
+        if (st.dailyWorkouts[eventDateKey]?.length !== before) {
+          // Only toast if we actually removed something
+        }
+        return st;
+      });
+      if (response !== null) showToast("Removed from schedule");
+    }
   }
 
   const deleteDailyWorkout = useCallback((workoutId) => {
@@ -4415,8 +4488,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                         className="btn-press"
                                         onClick={async () => {
                                           await acceptGroupInvite(inv.id);
-                                          refreshSocial();
-                                          showToast(`Joined ${inv.group?.name || "group"}!`);
+                                          // Check for required custom fields
+                                          const { data: cfData } = await getGroupCustomFields(inv.group_id);
+                                          const requiredFields = (cfData || []).filter(f => f.required);
+                                          if (requiredFields.length > 0) {
+                                            dispatchModal({
+                                              type: "OPEN_FILL_FIELDS",
+                                              payload: {
+                                                groupId: inv.group_id,
+                                                fields: cfData || [],
+                                                requiredMode: true,
+                                                onComplete: () => {
+                                                  refreshSocial();
+                                                  showToast(`Joined ${inv.group?.name || "group"}!`);
+                                                },
+                                              },
+                                            });
+                                          } else {
+                                            refreshSocial();
+                                            showToast(`Joined ${inv.group?.name || "group"}!`);
+                                          }
                                         }}
                                         style={{ ...styles.primaryBtn, padding: "6px 12px", fontSize: 12 }}
                                       >
@@ -6447,6 +6538,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         showToast={showToast}
         onUpdated={() => refreshSocial()}
         onDeleted={() => refreshSocial()}
+        onRsvpChanged={handleRsvpChanged}
       />
 
       {/* Create Announcement Modal */}
@@ -6499,6 +6591,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         showToast={showToast}
         onUpdated={() => refreshSocial()}
         onDeleted={() => refreshSocial()}
+        venmoUsername={modals.duesDetail.venmoUsername}
+      />
+
+      {/* Manage Fields Modal */}
+      <ManageFieldsModal
+        open={modals.manageFields.isOpen}
+        state={modals.manageFields}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        showToast={showToast}
+        onUpdated={() => refreshSocial()}
+      />
+
+      {/* Fill Fields Modal */}
+      <FillFieldsModal
+        open={modals.fillFields.isOpen}
+        state={modals.fillFields}
+        dispatch={dispatchModal}
+        styles={styles}
+        colors={colors}
+        showToast={showToast}
       />
 
       {/* Import Preview Modal */}
@@ -6899,6 +7013,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
           {workout.source === "group" && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>Group</span>}
+          {workout.source === "event" && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: "#9b59b622", color: "#9b59b6" }}>Event</span>}
           {overrides && <span style={{ fontSize: 11, opacity: 0.5, fontStyle: "italic" }}>(modified)</span>}
         </div>
         {onRemoveFromToday && (
