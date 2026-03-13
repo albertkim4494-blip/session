@@ -272,6 +272,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const MAX_DAILY_REFRESHES = 10;
   const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(dateKey));
   const [checkinEditSection, setCheckinEditSection] = useState(null); // null | "mood" | "sleep" | "pain"
+
+  // Sync todayCheckin when dateKey changes (e.g. date navigation, midnight rollover)
+  useEffect(() => {
+    setTodayCheckin(getTodayCheckin(dateKey));
+    setCheckinEditSection(null);
+  }, [dateKey]);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const checkinEditSectionRef = useRef(null);
   checkinEditSectionRef.current = checkinEditSection;
@@ -680,6 +686,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (!day.hasSession) continue;
       sessionsSet.add(day.dateKey);
       const dayLogs = state.logsByDate[day.dateKey];
+      if (!dayLogs) continue;
       for (const exId of Object.keys(dayLogs)) {
         const log = dayLogs[exId];
         if (!log?.sets || !Array.isArray(log.sets)) continue;
@@ -2604,7 +2611,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }
 
-  const handleCoachRefresh = useCallback(() => {
+  const handleCoachRefresh = useCallback((checkinOverride) => {
     if (coachFetchingRef.current) return;
     if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) {
       showToast("Daily refresh limit reached \u2014 insights update automatically each day");
@@ -2620,7 +2627,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
     const coachEnd = dateKey;
     const coachStart = addDays(coachEnd, -90);
-    const checkinForRefresh = getTodayCheckin(dateKey);
+    const checkinForRefresh = checkinOverride || getTodayCheckin(dateKey);
     let checkinCtx = null;
     let coachNotesData = null;
     if (checkinForRefresh) {
@@ -3521,6 +3528,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               saveCheckin(dateKey, null);
                               setTodayCheckin(null);
                               setCheckinEditSection(null);
+                              // Cancel any in-flight coach fetch and clear insights
+                              coachReqIdRef.current++;
+                              coachFetchingRef.current = false;
+                              setCoachInsights([]);
+                              setCoachStreaming(false);
+                              setCoachLoading(false);
+                              setCoachError(null);
                             }}
                           />
                         ),

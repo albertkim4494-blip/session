@@ -167,7 +167,11 @@ export function normalizeState(st) {
           aliases: ex.aliases || [],
         }))
       : [],
-    dailyWorkouts: st.dailyWorkouts && typeof st.dailyWorkouts === "object" ? st.dailyWorkouts : {},
+    dailyWorkouts: st.dailyWorkouts && typeof st.dailyWorkouts === "object"
+      ? Object.fromEntries(
+          Object.entries(st.dailyWorkouts).filter(([, v]) => Array.isArray(v))
+        )
+      : {},
     todaySessions: st.todaySessions && typeof st.todaySessions === "object" ? st.todaySessions : {},
     sessionOverrides: st.sessionOverrides && typeof st.sessionOverrides === "object" ? st.sessionOverrides : {},
     sessionAdditions: st.sessionAdditions && typeof st.sessionAdditions === "object" ? st.sessionAdditions : {},
@@ -219,6 +223,11 @@ export function normalizeState(st) {
   if (next.sessionAdditions) {
     for (const dk of Object.keys(next.sessionAdditions)) {
       if (dk < cutoffKey) delete next.sessionAdditions[dk];
+    }
+  }
+  if (next.dailyWorkouts) {
+    for (const dk of Object.keys(next.dailyWorkouts)) {
+      if (dk < cutoffKey) delete next.dailyWorkouts[dk];
     }
   }
 

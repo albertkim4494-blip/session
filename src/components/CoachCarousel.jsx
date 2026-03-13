@@ -94,7 +94,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     if (newIndex !== idx) onChangeIndex(newIndex);
   }, [clampIndex, onChangeIndex]);
 
-  // Track container width in state so it updates after mount/visibility changes
+  // Track container width in state so it updates after mount/visibility/resize changes
   const [containerWidth, setContainerWidth] = useState(0);
   useEffect(() => {
     const measure = () => {
@@ -104,7 +104,12 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     measure();
     // Re-measure on next frame in case layout hasn't settled yet (e.g. returning from another tab)
     const raf = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(raf);
+    const onResize = () => measure();
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
   }, [activeIndex]);
 
   const baseOffset = -activeIndex * containerWidth;

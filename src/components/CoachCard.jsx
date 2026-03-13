@@ -96,8 +96,8 @@ export function CoachCard({
             checkin={todayCheckin}
             onSave={(updated) => {
               onCheckinUpdate(updated);
-              // Re-fetch after edit
-              onCoachRefresh();
+              // Re-fetch with the updated data (pass directly to avoid stale localStorage read)
+              onCoachRefresh(updated);
             }}
             onCancel={() => setCheckinEditSection(null)}
             colors={colors}
