@@ -3481,6 +3481,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   display: "flex", flexDirection: "column",
                   flex: 1, gap: 16,
                   padding: "24px 0 0",
+                  justifyContent: "center",
                 }}>
                   <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3, textAlign: "center" }}>
                     {getTimeGreeting()}
@@ -3576,8 +3577,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               ) : (
                                 <>
                                   {/* Stats row */}
-                                  <div style={{ fontSize: 13, color: secondary, opacity: 0.6 }}>
-                                    {sessions} session{sessions !== 1 ? "s" : ""} {"\u00B7"} {totalSets} set{totalSets !== 1 ? "s" : ""}
+                                  <div
+                                    onClick={() => { setSummaryMode("week"); setTab("progress"); }}
+                                    style={{
+                                      fontSize: 13, color: accent, opacity: 0.7, cursor: "pointer",
+                                      textDecoration: "underline", textDecorationColor: accent + "44",
+                                      textUnderlineOffset: 3,
+                                    }}
+                                  >
+                                    {sessions} session{sessions !== 1 ? "s" : ""} {"\u00B7"} {totalSets} set{totalSets !== 1 ? "s" : ""} {"\u203A"}
                                   </div>
 
                                   {/* Progress bar */}
