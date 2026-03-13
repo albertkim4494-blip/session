@@ -3371,14 +3371,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 /* HERO STATE: greeting + swipeable coach carousel */
                 <div style={{
                   display: "flex", flexDirection: "column",
-                  flex: 1, gap: 0,
-                  padding: "0",
+                  flex: 1, gap: 8,
+                  padding: "8px 0 0",
                 }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2, textAlign: "center" }}>
+                    {getTimeGreeting()}
+                  </div>
                   <CoachCarousel
                     colors={colors}
                     activeIndex={carouselIndex}
                     onChangeIndex={setCarouselIndex}
-                    greeting={getTimeGreeting()}
                     cards={[
                       {
                         key: "checkin",
@@ -3489,6 +3491,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       },
                     ]}
                   />
+                  <div style={{ fontSize: 12, opacity: 0.3, textAlign: "center" }}>
+                    Tap + to start a session
+                  </div>
                 </div>
               ) : !isToday && !hasSessions ? (
                 /* NON-TODAY EMPTY: no logs or sessions */
