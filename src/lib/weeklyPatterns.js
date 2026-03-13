@@ -1,4 +1,4 @@
-import { addDays, weekdayMonday0 } from "./dateUtils.js";
+import { addDays, weekdayMonday0, weekdaySunday0, startOfWeekSunday } from "./dateUtils.js";
 import { dayHasCompletedSets } from "./setHelpers.js";
 
 /**
@@ -46,10 +46,10 @@ export function getUpNextSuggestion(logsByDate, programWorkouts, dailyWorkouts, 
     const dayLogs = logsByDate[dateStr];
 
     // Check if the user logged ANYTHING that entire week (not just this day)
-    const weekMonday = addDays(dateStr, -weekdayMonday0(dateStr));
+    const weekSunday = startOfWeekSunday(dateStr);
     let weekHasAnyLog = false;
     for (let d = 0; d < 7; d++) {
-      const wd = addDays(weekMonday, d);
+      const wd = addDays(weekSunday, d);
       if (logsByDate[wd] && dayHasCompletedSets(logsByDate[wd])) {
         weekHasAnyLog = true;
         break;
@@ -123,10 +123,10 @@ function fallbackStaleness(logsByDate, programWorkouts, todayKey) {
   }
 
   // Find which workouts were done this week
-  const weekMonday = addDays(todayKey, -weekdayMonday0(todayKey));
+  const weekSunday = startOfWeekSunday(todayKey);
   const doneThisWeek = new Set();
   for (let d = 0; d < 7; d++) {
-    const dateStr = addDays(weekMonday, d);
+    const dateStr = addDays(weekSunday, d);
     const dayLogs = logsByDate[dateStr];
     if (!dayLogs) continue;
     for (const exId of Object.keys(dayLogs)) {

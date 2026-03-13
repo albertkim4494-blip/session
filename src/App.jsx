@@ -653,14 +653,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // Weekly summary for the Coach Carousel "Your Week" card
   const weeklySummary = useMemo(() => {
-    const weekStart = startOfWeekMonday(dateKey);
-    const weekEnd = addDays(weekStart, 6); // Sunday
+    const weekStart = startOfWeekSunday(dateKey);
+    const weekEnd = addDays(weekStart, 6); // Saturday
 
     const sessionsSet = new Set();
     let totalSets = 0;
 
-    // Build day-of-week row data (Mon=0 .. Sun=6)
-    const dayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+    // Build day-of-week row data (Sun=0 .. Sat=6)
+    const dayLabels = ["Su", "M", "Tu", "W", "Th", "F", "Sa"];
     const days = dayLabels.map((label, i) => {
       const d = addDays(weekStart, i);
       const logs = (state.logsByDate || {})[d];
