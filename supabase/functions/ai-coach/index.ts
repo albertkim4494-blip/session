@@ -233,7 +233,9 @@ Deno.serve(async (req) => {
             const pct = totalSets > 0 ? Math.round(((v as number) / totalSets) * 100) : 0;
             return `  ${(g as string).replace(/_/g, " ").toLowerCase()}: ${v} ${setsLabel} (${pct}%)`;
           });
-          muscleVolumeSection = `\nMUSCLE GROUP VOLUME (effective ${setsLabel}, secondary muscles counted at 0.5× — ${totalSets} total):\n${lines.join("\n")}\n`;
+          const daysInRange = Math.max(1, Math.round((new Date(dateRange?.end || Date.now()).getTime() - new Date(dateRange?.start || Date.now()).getTime()) / 86400000));
+          const weeksInRange = Math.max(1, Math.round(daysInRange / 7));
+          muscleVolumeSection = `\nMUSCLE GROUP VOLUME (effective ${setsLabel} over ~${weeksInRange} weeks, secondary at 0.5× — ${totalSets} total):\n${lines.join("\n")}\nNote: percentages show distribution across muscle groups. A low percentage does NOT mean low volume — judge by absolute ${setsLabel} count relative to the ${weeksInRange}-week period.\n`;
         }
       }
     }
