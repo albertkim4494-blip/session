@@ -370,17 +370,16 @@ function buildCoachingHistoryPayload(historyState, followUpContext) {
   if (!history || history.length === 0) return null;
 
   return {
-    entries: history.map((h) => ({
+    entries: history.slice(0, 5).map((h) => ({
       title: h.title,
       type: h.type,
       severity: h.severity || "LOW",
-      message: h.message || "",
+      message: (h.message || "").slice(0, 150),
       suggestions: h.suggestions || [],
       shownCount: h.shownCount,
-      firstShown: h.firstShown,
       lastShown: h.lastShown,
     })),
-    followUps: followUpContext || [],
+    followUps: (followUpContext || []).slice(0, 3),
   };
 }
 
@@ -1218,6 +1217,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     }
     catalogEntries = catalog
       .filter((e) => !userNames.has(e.name.toLowerCase()))
+      .slice(0, 30) // Cap catalog size to reduce payload
       .map((e) => ({
         id: e.id,
         name: e.name,
@@ -1318,7 +1318,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     catalogEntries,
     equipment: equipment || ["full_gym"],
     weightUnit: weightLabel,
-    enrichedLogSummary,
+    enrichedLogSummary: enrichedLogSummary?.slice(0, 3000) || null,
     progressionTrends,
     volumeLoadTrends,
     estimated1RMTrends,
@@ -1327,12 +1327,12 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     coachingHistory,
     sportTraits: sportTraitsPayload?.aggregated || null,
     muscleSetsSummary,
-    muscleVolumeDetail,
-    recentHistory: tieredHistory.recentHistory,
-    olderHistory: tieredHistory.olderHistory,
+    muscleVolumeDetail: null, // Omitted for speed — muscleSetsSummary has the numbers
+    recentHistory: tieredHistory.recentHistory?.slice(0, 1500) || null,
+    olderHistory: tieredHistory.olderHistory?.slice(0, 800) || null,
     modelHint,
     checkin: checkinContext?.today || null,
-    checkinHistory: checkinContext?.history || null,
+    checkinHistory: (checkinContext?.history || []).slice(0, 7),
     moodPattern: checkinContext?.moodPattern || null,
     coachNotes: coachNotesFromStorage || null,
   };
