@@ -7,7 +7,7 @@ const CACHE_KEY = "wt_coach_cache";
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 const LAST_INSIGHTS_KEY = "wt_coach_last_insights";
 
-const MOOD_LABELS = { "-2": "terrible", "-1": "rough", "0": "okay", "1": "good", "2": "great" };
+const MOOD_LABELS = { "-2": "brutal", "-1": "tough", "0": "okay", "1": "good", "2": "great" };
 
 /**
  * Build a fingerprint string from the inputs so we know when to invalidate cache.
@@ -610,7 +610,6 @@ const NOTABLE_NOTE_KEYWORDS = /\b(pain|hurt|injury|injured|sore|soreness|tight|t
  * @returns {{ recentHistory: string|null, olderHistory: string|null }}
  */
 function buildTieredHistory(logsByDate, allWorkouts, currentRange, catalogMap, weightLabel = "lb") {
-  const MOOD_LABELS = { "2": "great", "1": "good", "0": "okay", "-1": "rough", "-2": "terrible" };
   const DURATION_FACTORS = { sec: 1 / 60, min: 1, hrs: 60 };
 
   // Date boundaries
@@ -635,8 +634,8 @@ function buildTieredHistory(logsByDate, allWorkouts, currentRange, catalogMap, w
 
   // Accumulators for each tier
   const tiers = {
-    recent: { sessions: 0, exercises: {}, moods: { great: 0, good: 0, okay: 0, rough: 0, terrible: 0 }, notableNotes: [], muscleSets: {} },
-    older:  { sessions: 0, exercises: {}, moods: { great: 0, good: 0, okay: 0, rough: 0, terrible: 0 }, notableNotes: [], firstDate: null, lastDate: null },
+    recent: { sessions: 0, exercises: {}, moods: { great: 0, good: 0, okay: 0, tough: 0, brutal: 0 }, notableNotes: [], muscleSets: {} },
+    older:  { sessions: 0, exercises: {}, moods: { great: 0, good: 0, okay: 0, tough: 0, brutal: 0 }, notableNotes: [], firstDate: null, lastDate: null },
   };
 
   for (const [dateKey, dayLogs] of Object.entries(logsByDate || {})) {
@@ -803,7 +802,7 @@ function buildTieredHistory(logsByDate, allWorkouts, currentRange, catalogMap, w
     const totalMoods = Object.values(o.moods).reduce((a, b) => a + b, 0);
     if (totalMoods > 0) {
       const positive = o.moods.great + o.moods.good;
-      const negative = o.moods.rough + o.moods.terrible;
+      const negative = o.moods.tough + o.moods.brutal;
       const ratio = positive / totalMoods;
       const trend = ratio >= 0.7 ? "mostly positive" : ratio >= 0.4 ? "mixed" : "mostly rough";
       lines.push(`Overall mood: ${trend} (${totalMoods} entries)`);

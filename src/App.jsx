@@ -14,7 +14,7 @@ import {
   endOfWeekSunday, endOfMonth, endOfYear,
   inRangeInclusive, isValidDateKey,
 } from "./lib/dateUtils";
-import { uid, loadState, normalizeState, persistState, makeDefaultState, safeParse, migrateCompletedFlag, findExerciseById, forEachExercise } from "./lib/stateUtils";
+import { uid, loadState, normalizeState, persistState, makeDefaultState, safeParse, findExerciseById, forEachExercise } from "./lib/stateUtils";
 import {
   validateExerciseName, validateWorkoutName,
   toNumberOrNull, formatMaxWeight,
@@ -65,6 +65,7 @@ import { ImportPreviewModal } from "./components/ImportPreviewModal";
 import { stateToCSV, detectCSVFormat, parseStrongCSV, parseHevyCSV, buildImportState, mergeImportedData } from "./lib/importExport";
 import { GroupDetailView } from "./components/GroupDetailView";
 import { calcEventDurationMinutes } from "./lib/pollUtils";
+import { formatTimeAgo } from "./lib/announcementUtils";
 import { CircuitTimer } from "./components/CircuitTimer";
 import {
   getFriends, getPendingRequests, getInbox, getUnreadCount,
@@ -2611,10 +2612,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }
 
-  const handleCoachRefresh = useCallback((checkinOverride) => {
+  // Shared coach fetch logic used by both refresh and check-in submit
+  const doCoachFetch = useCallback(({ checkinData, checkinOverride, showLimitToast } = {}) => {
     if (coachFetchingRef.current) return;
     if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) {
-      showToast("Daily refresh limit reached \u2014 insights update automatically each day");
+      if (showLimitToast) showToast("Daily refresh limit reached \u2014 insights update automatically each day");
       return;
     }
     incrementDailyRefresh();
@@ -2623,17 +2625,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setCoachInsights([]);
     setCoachStreaming(true);
     setCoachError(null);
-    const refreshExNames = progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name));
+
     const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
     const coachEnd = dateKey;
     const coachStart = addDays(coachEnd, -90);
-    const checkinForRefresh = checkinOverride || getTodayCheckin(dateKey);
+    const checkinForFetch = checkinData || checkinOverride || getTodayCheckin(dateKey);
     let checkinCtx = null;
     let coachNotesData = null;
-    if (checkinForRefresh) {
-      checkinCtx = buildCheckinContext(checkinForRefresh, loadCheckins(), state.logsByDate);
+    if (checkinForFetch) {
+      checkinCtx = buildCheckinContext(checkinForFetch, loadCheckins(), state.logsByDate);
       coachNotesData = loadCoachNotes();
     }
+
     fetchCoachInsights({
       profile, state, dateRange: { start: coachStart, end: coachEnd },
       options: { forceRefresh: true }, catalog: refreshCatalog, equipment,
@@ -2662,14 +2665,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       })
       .catch((err) => {
         if (coachReqIdRef.current !== reqId) return;
-        console.error("AI Coach refresh error:", err);
         if (coachInsights.length === 0) {
           const coachDR = { start: addDays(dateKey, -90), end: dateKey };
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDR, catalogMap);
-          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, userExerciseNames: refreshExNames, checkin: checkinForRefresh }));
+          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, checkin: checkinForFetch }));
         }
         const detail = err?.message || String(err);
-        setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
+        setCoachError(`AI coach unavailable \u2014 showing basic analysis${detail ? ` (${detail})` : ""}`);
       })
       .finally(() => {
         coachFetchingRef.current = false;
@@ -2678,7 +2680,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           setCoachStreaming(false);
         }
       });
-  }, [progressWorkouts, fullCatalog, equipment, dateKey, profile, state, coachSignature, coachInsights, session?.user?.id, catalogMap]);
+  }, [fullCatalog, equipment, dateKey, profile, state, coachSignature, coachInsights, session?.user?.id, catalogMap]);
+
+  const handleCoachRefresh = useCallback((checkinOverride) => {
+    doCoachFetch({ checkinOverride, showLimitToast: true });
+  }, [doCoachFetch]);
 
   // Save check-in without triggering coach refresh (for inline pill edits)
   const handleCheckinUpdate = useCallback((checkinData) => {
@@ -2691,72 +2697,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     saveCheckin(dateKey, checkinData);
     setTodayCheckin(checkinData);
     setCheckinEditSection(null);
-
-    // Trigger coach fetch with check-in context (skip if already fetching)
-    if (coachFetchingRef.current) return;
-    if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) return;
-    incrementDailyRefresh();
-    const reqId = ++coachReqIdRef.current;
-    coachFetchingRef.current = true;
-    setCoachInsights([]);
-    setCoachStreaming(true);
-    setCoachError(null);
-
-    const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
-    const coachEnd = dateKey;
-    const coachStart = addDays(coachEnd, -90);
-
-    const allCheckins = loadCheckins();
-    const checkinCtx = buildCheckinContext(checkinData, allCheckins, state.logsByDate);
-    const coachNotesData = loadCoachNotes();
-
-    fetchCoachInsights({
-      profile, state,
-      dateRange: { start: coachStart, end: coachEnd },
-      options: { forceRefresh: true },
-      catalog: refreshCatalog, equipment,
-      measurementSystem: state.preferences?.measurementSystem,
-      checkinContext: checkinCtx,
-      coachNotesFromStorage: coachNotesData,
-      onInsight: (insight) => {
-        if (coachReqIdRef.current === reqId) {
-          setCoachInsights(prev => [...prev, insight]);
-        }
-      },
-    })
-      .then(({ insights, coachNotes: returnedNotes }) => {
-        if (coachReqIdRef.current !== reqId) return;
-        setCoachInsights(insights);
-        setCoachUnseen(true);
-        coachLastSignatureRef.current = coachSignature;
-        coachLastFetchRef.current = Date.now();
-        coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
-        const cacheKey = `wt_coach_v2:${session.user.id}:${dateKey}`;
-        try { localStorage.setItem(cacheKey, JSON.stringify({ insights, signature: coachSignature, createdAt: Date.now() })); } catch {}
-        if (returnedNotes?.length > 0) {
-          const existing = loadCoachNotes();
-          const merged = mergeCoachNotes(existing, returnedNotes);
-          saveCoachNotes(merged);
-        }
-      })
-      .catch((err) => {
-        if (coachReqIdRef.current !== reqId) return;
-        console.error("AI Coach check-in error:", err);
-        if (coachInsights.length === 0) {
-          const coachDR = { start: addDays(dateKey, -90), end: dateKey };
-          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDR, catalogMap);
-          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, checkin: checkinData }));
-        }
-        setCoachError(`AI coach unavailable \u2014 showing basic analysis`);
-      })
-      .finally(() => {
-        coachFetchingRef.current = false;
-        if (coachReqIdRef.current === reqId) {
-          setCoachLoading(false);
-          setCoachStreaming(false);
-        }
-      });
-  }, [dateKey, fullCatalog, equipment, profile, state, coachSignature, session?.user?.id, catalogMap, coachInsights]);
+    doCoachFetch({ checkinData });
+  }, [dateKey, doCoachFetch]);
 
   const confirmAddSuggestion = useCallback((workoutIdOrIds, exerciseName) => {
     // Look up catalogId by name
@@ -3544,7 +3486,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         label: "Your Week",
                         content: (() => {
                           const accent = colors.accent || "#3b82f6";
-                          const secondary = colors.textSecondary || colors.text;
+                          const secondary = colors.textSecondary;
                           const { sessions, totalSets, days, daysPerWeek, weekStreak, upNext } = weeklySummary;
                           const progress = Math.min(sessions / daysPerWeek, 1);
                           const hasProgram = (state.program?.workouts || []).length > 0;
@@ -3669,7 +3611,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   />
                   <div style={{
                     textAlign: "center", padding: "16px 0 0",
-                    fontSize: 13, opacity: 0.3, color: colors.textSecondary || colors.text,
+                    fontSize: 13, opacity: 0.3, color: colors.textSecondary,
                   }}>
                     Tap <span style={{ fontWeight: 700, opacity: 1 }}>+</span> to start a session
                   </div>
@@ -6705,18 +6647,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 // SOCIAL HELPERS
 // ============================================================================
 
-function formatSocialTime(dateStr) {
-  if (!dateStr) return "";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
-}
+// formatSocialTime is an alias for the shared formatTimeAgo from announcementUtils
+const formatSocialTime = formatTimeAgo;
 
 // ============================================================================
 // MOOD PICKER - SVG face icons for workout feel
@@ -6782,7 +6714,7 @@ function MoodPicker({ value, onChange, colors }) {
             key={face.value}
             face={face}
             selected={value === face.value}
-            color={colors.textSecondary || colors.text}
+            color={colors.textSecondary}
             onSelect={(v) => onChange(value === v ? null : v)}
           />
         ))}

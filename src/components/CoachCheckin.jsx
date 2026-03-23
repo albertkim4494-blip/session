@@ -114,7 +114,7 @@ function CheckinMoodPicker({ value, onChange, colors }) {
             key={face.value}
             face={face}
             selected={value === face.value}
-            color={colors.textSecondary || colors.text}
+            color={colors.textSecondary}
             onSelect={(v) => onChange(value === v ? null : v)}
           />
         ))}

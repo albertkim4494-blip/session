@@ -155,7 +155,7 @@ export function CoachCard({
                   {[0, 1, 2].map((i) => (
                     <div key={i} style={{
                       width: 6, height: 6, borderRadius: "50%",
-                      background: colors.textSecondary || colors.text,
+                      background: colors.textSecondary,
                       animation: `coachDotPulse 1s ease-in-out ${i * 0.2}s infinite`,
                     }} />
                   ))}
@@ -171,7 +171,7 @@ export function CoachCard({
               {[0, 1, 2].map((i) => (
                 <div key={i} style={{
                   width: 6, height: 6, borderRadius: "50%",
-                  background: colors.textSecondary || colors.text,
+                  background: colors.textSecondary,
                   animation: `coachDotPulse 1s ease-in-out ${i * 0.2}s infinite`,
                 }} />
               ))}
@@ -186,7 +186,7 @@ export function CoachCard({
             </div>
           ) : (
             /* Checked in but no insights yet */
-            <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary || colors.text }}>
+            <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary }}>
               {coachError || (
                 <button
                   onClick={onCoachRefresh}

@@ -77,23 +77,3 @@ export function incrementDailyRefresh() {
   }
 }
 
-export function getAiMetrics() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const entries = raw ? JSON.parse(raw) : [];
-    const byEvent = {};
-    const byFeature = {};
-    for (const e of entries) {
-      byEvent[e.event] = (byEvent[e.event] || 0) + 1;
-      byFeature[e.feature] = (byFeature[e.feature] || 0) + 1;
-    }
-    return {
-      total: entries.length,
-      byEvent,
-      byFeature,
-      last10: entries.slice(-10),
-    };
-  } catch {
-    return { total: 0, byEvent: {}, byFeature: {}, last10: [] };
-  }
-}

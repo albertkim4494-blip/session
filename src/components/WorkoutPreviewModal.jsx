@@ -1,6 +1,7 @@
 import React from "react";
 import { Modal } from "./Modal";
 import { getUnit } from "../lib/constants";
+import { formatTimeAgo } from "../lib/announcementUtils";
 
 export function WorkoutPreviewModal({ open, state: previewState, dispatch, styles, colors, onImport }) {
   if (!open) return null;
@@ -165,15 +166,3 @@ export function WorkoutPreviewModal({ open, state: previewState, dispatch, style
   );
 }
 
-function formatTimeAgo(dateStr) {
-  if (!dateStr) return "";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
-}

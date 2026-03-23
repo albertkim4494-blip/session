@@ -32,6 +32,7 @@ const THEMES = {
   dark: {
     appBg: "#0d1117",
     text: "#e8eef7",
+    textSecondary: "rgba(232,238,247,0.55)",
     border: "rgba(255,255,255,0.06)",
     cardBg: "#161b22",
     cardAltBg: "#0d1117",
@@ -54,6 +55,7 @@ const THEMES = {
   light: {
     appBg: "#f8f9fa",
     text: "#1f2933",
+    textSecondary: "rgba(31,41,51,0.55)",
     border: "rgba(0,0,0,0.08)",
     cardBg: "#ffffff",
     cardAltBg: "#f1f3f5",
@@ -76,6 +78,7 @@ const THEMES = {
   japandi: {
     appBg: "#F5F1E8",
     text: "#3d3529",
+    textSecondary: "rgba(61,53,41,0.55)",
     border: "rgba(61,53,41,0.12)",
     cardBg: "#FBF8F2",
     cardAltBg: "#F5F1E8",
@@ -98,6 +101,7 @@ const THEMES = {
   spring: {
     appBg: "#f7f5f0",
     text: "#2d3a2e",
+    textSecondary: "rgba(45,58,46,0.55)",
     border: "rgba(45,58,46,0.12)",
     cardBg: "#eceae4",
     cardAltBg: "#e2dfda",
@@ -120,6 +124,7 @@ const THEMES = {
   whimsical: {
     appBg: "#f3f0f8",
     text: "#2d2640",
+    textSecondary: "rgba(45,38,64,0.55)",
     border: "rgba(45,38,64,0.12)",
     cardBg: "#e9e4f0",
     cardAltBg: "#dfd9e8",
@@ -142,6 +147,7 @@ const THEMES = {
   pastel: {
     appBg: "#eef7f3",
     text: "#2d3d35",
+    textSecondary: "rgba(45,61,53,0.55)",
     border: "rgba(45,61,53,0.10)",
     cardBg: "#e2f0e9",
     cardAltBg: "#d6e8de",
