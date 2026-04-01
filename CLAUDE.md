@@ -23,15 +23,15 @@ src/
   lib/               — Pure logic: constants, dateUtils, validation, stateUtils, modalReducer,
                        coachApi, coachNormalize, supabaseSync, userIdentity, supabase,
                        exerciseCatalog, exerciseCatalogUtils, setHelpers, greetings,
-                       workoutGenerator, workoutGeneratorApi, animationData, exerciseAnimationApi
+                       workoutGenerator, workoutGeneratorApi, aiMetrics
   hooks/             — useSwipe, useKeyboardInset
   components/        — Modal, PillTabs, ProfileModal, CoachInsights, AuthGate, AuthScreen,
                        OnboardingScreen, CatalogBrowseModal, ErrorBoundary, ExerciseTimer,
-                       CircuitTimer, ExerciseViewer3D, ExerciseScene3D
+                       CircuitTimer
   components/profile/ — AvatarUpload, ProfileTab, SettingsTab, ChangeUsernameModal, ChangePasswordModal
   styles/theme.js    — Theme definitions, getColors(), getStyles()
-supabase/functions/  — Edge functions (ai-coach, ai-exercise-animation, etc.)
-scripts/             — Utility scripts (generate-animations.js, etc.)
+supabase/functions/  — Edge functions (ai-coach, ai-workout-generator, ai-exercise-enrichment, exercise-gif)
+scripts/             — Utility scripts
 ```
 
 ## Architecture Patterns

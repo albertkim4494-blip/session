@@ -26,6 +26,7 @@ function buildProgramPrompt(payload: {
   history: string;
   daysPerWeek: number;
   duration: number;
+  exerciseCount?: number;
   goal: string;
   sportName: string;
   sportDays: string[];
@@ -74,7 +75,7 @@ function buildProgramPrompt(payload: {
     .map((e) => `${e.id} | ${e.name} | ${e.muscles} | ${e.tags} | ${e.unit || "reps"}`)
     .join("\n");
 
-  const exerciseCount = duration <= 15 ? 2 : duration <= 30 ? Math.min(4, Math.max(3, Math.round(duration / 8))) : Math.max(4, Math.min(10, Math.round(duration / 7)));
+  const exerciseCount = payload.exerciseCount || (duration <= 15 ? 2 : duration <= 30 ? Math.min(4, Math.max(3, Math.round(duration / 8))) : Math.max(4, Math.min(10, Math.round(duration / 7))));
 
   const sportDayCount = Array.isArray(sportDays) ? sportDays.length : 0;
   const sportDayList = Array.isArray(sportDays) ? sportDays.join(", ") : "";
@@ -169,6 +170,7 @@ function buildTodayPrompt(payload: {
   profile: Record<string, unknown>;
   equipment: string;
   duration: number;
+  exerciseCount?: number;
   catalog: Array<{ id: string; name: string; muscles: string; tags: string; unit?: string }>;
   history: string;
   muscleRecency: Record<string, number | null>;
@@ -222,7 +224,7 @@ function buildTodayPrompt(payload: {
 
   const goal = (profile.goal as string) || "General Fitness";
   const dur = duration || 60;
-  const exerciseCount = dur <= 15 ? 2 : dur <= 30 ? Math.min(4, Math.max(3, Math.round(dur / 8))) : Math.max(4, Math.min(10, Math.round(dur / 7)));
+  const exerciseCount = payload.exerciseCount || (dur <= 15 ? 2 : dur <= 30 ? Math.min(4, Math.max(3, Math.round(dur / 8))) : Math.max(4, Math.min(10, Math.round(dur / 7))));
 
   // Sport biomechanics instruction (when profile.sports exists)
   let sportBioSection = "";

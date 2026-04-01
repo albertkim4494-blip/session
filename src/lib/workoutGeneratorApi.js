@@ -6,7 +6,8 @@
 import { supabase } from "./supabase";
 import { exerciseFitsEquipment } from "./exerciseCatalog";
 import { buildCatalogMap } from "./exerciseCatalogUtils";
-import { analyzeMuscleRecency } from "./workoutGenerator";
+import { analyzeMuscleRecency, exerciseCountFromDuration } from "./workoutGenerator";
+import { isSetCompleted, dayHasCompletedSetsSets } from "./setHelpers";
 import { recordAiEvent } from "./aiMetrics";
 
 // ---------------------------------------------------------------------------
@@ -73,9 +74,6 @@ function buildHistorySummary(state, catalog, weightLabel = "lb") {
     .reverse()
     .slice(0, 14);
 
-  // Helper: check if a set is completed (mirrors setHelpers.isSetCompleted)
-  const isSetDone = (s) => s.completed !== undefined ? s.completed : Number(s.reps) > 0;
-
   const lines = [];
   for (const dateKey of dateKeys) {
     const dayLogs = logs[dateKey];
@@ -85,7 +83,7 @@ function buildHistorySummary(state, catalog, weightLabel = "lb") {
       if (!info || !log?.sets || !Array.isArray(log.sets)) continue;
 
       // Only include completed sets in history summary
-      const completedSets = log.sets.filter(isSetDone);
+      const completedSets = log.sets.filter(isSetCompleted);
       if (completedSets.length === 0) continue;
 
       const setCount = completedSets.length;
@@ -212,14 +210,6 @@ function buildFatigueSignals(state, catalog, todayKey) {
   const logs = state.logsByDate || {};
   const today = todayKey || new Date().toISOString().slice(0, 10);
 
-  // Helper: check if a set is completed
-  const isSetDone = (s) => s.completed !== undefined ? s.completed : Number(s.reps) > 0;
-  const dayHasCompleted = (dayLogs) => {
-    if (!dayLogs || typeof dayLogs !== "object") return false;
-    return Object.values(dayLogs).some(
-      (log) => Array.isArray(log?.sets) && log.sets.some(isSetDone)
-    );
-  };
 
   // Recent moods (last 7 days)
   const recentDates = Object.keys(logs)
@@ -232,12 +222,12 @@ function buildFatigueSignals(state, catalog, todayKey) {
   const rpes = [];
   for (const dk of recentDates) {
     const dayLogs = logs[dk];
-    if (!dayHasCompleted(dayLogs)) continue;
+    if (!dayHasCompletedSets(dayLogs)) continue;
     for (const log of Object.values(dayLogs)) {
       if (log.mood != null) moods.push({ date: dk, mood: Number(log.mood), label: MOOD_LABELS[String(log.mood)] || "unknown" });
       if (Array.isArray(log.sets)) {
         for (const s of log.sets) {
-          if (isSetDone(s) && s.targetRpe && Number(s.targetRpe) > 0) rpes.push(Number(s.targetRpe));
+          if (isSetCompleted(s) && s.targetRpe && Number(s.targetRpe) > 0) rpes.push(Number(s.targetRpe));
         }
       }
     }
@@ -260,7 +250,7 @@ function buildFatigueSignals(state, catalog, todayKey) {
     }
 
     for (const [exId, log] of Object.entries(todayLogs)) {
-      if (!Array.isArray(log?.sets) || !log.sets.some(isSetDone)) continue;
+      if (!Array.isArray(log?.sets) || !log.sets.some(isSetCompleted)) continue;
       const ex = exMap.get(exId);
       if (!ex) continue;
       todayExercises.push(ex.name);
@@ -277,7 +267,7 @@ function buildFatigueSignals(state, catalog, todayKey) {
   for (let i = 1; i <= 7; i++) {
     d.setDate(d.getDate() - 1);
     const dk = d.toISOString().slice(0, 10);
-    if (dayHasCompleted(logs[dk])) {
+    if (dayHasCompletedSets(logs[dk])) {
       consecutiveDays++;
     } else {
       break;
@@ -330,6 +320,7 @@ export async function generateProgramAI({
           history,
           daysPerWeek,
           duration,
+          exerciseCount: exerciseCountFromDuration(duration),
           goal: goal || profile?.goal || "General Fitness",
           sportName: sportName || "",
           sportDays: sportDays || [],
@@ -405,6 +396,7 @@ export async function generateTodayAI({
           profile: profile || {},
           equipment,
           duration: duration || 60,
+          exerciseCount: exerciseCountFromDuration(duration),
           catalog: catalogPayload,
           history,
           muscleRecency,

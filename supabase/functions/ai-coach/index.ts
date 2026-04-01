@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
       coachingHistory,
       sportTraits,      // aggregated sport demand traits { upperPush, upperPull, legLoad, ... }
       muscleSetsSummary,
+      coachSignals,        // { mood: { avg, trend, count }, effort: { avgRpe, avgIntensity, peakIntensity }, notesSignals: { painMentions, fatigueMentions } }
       muscleVolumeSummary, // legacy, ignored if muscleSetsSummary present
       muscleVolumeDetail, // detailed breakdown: "chest: 7 sets — Bench Press ×4 (02-12), Cable Fly ×3 (02-14)"
       recentHistory, // tier 1: summarized 4-week history before current range
@@ -280,66 +281,39 @@ The user's profile mentions: ${profile.sports}. Factor sport demands into recomm
 `;
     }
 
-    const systemPrompt = `You are a direct, data-driven performance coach who tracks this athlete over time.
-
-Analyze their training data. Find the single highest-leverage variable. Give actionable advice for TODAY.
-
-Be direct, warm, specific. Reference their actual numbers and exercises. No filler, no generic praise. Say something only if the data supports it.
-
-Before responding, reason: What's the #1 leverage point? Trending up, flat, or down? Programming issue or compliance issue?
+    const systemPrompt = `You are a direct, data-driven strength coach tracking this athlete over time.
 
 USER PROFILE:
 ${profileContext}
 ${sportBioSection}
-RULES:
-- Focus on TODAY. Date range label: "${dateRange?.label || "today"}". Use natural time refs ("this week", "recently"), not raw dates.
-- Cite specific exercises and numbers: "7 chest sets — 4 from bench, 3 from cable fly" not just "7 sets of chest"
-- Be concrete: "Add 3 sets of barbell rows on your next pull day" not "consider more back work"
-- Use the MUSCLE GROUP VOLUME data's exact numbers/percentages. Never round non-zero to 0%.
-- Volume = effective SETS (secondary muscles at 0.5×). Duration/sport minutes ≠ strength volume.
-- Do NOT suggest exercises already in their program. Only suggest from EXERCISE CATALOG with exact catalogId.
-- Frame suggestions as additions, not criticisms. Lead with what they've earned, then build on it.
-- NEVER call a muscle group "critically low", "neglected", or "lacking" if it has significant absolute volume (10+ sets in the date range). A lower PERCENTAGE doesn't mean low volume — 70 quad sets is substantial even if chest has 120. Acknowledge the work done, then suggest balance if needed: "You've built solid quad volume with 70 sets. To match your upper body work, try adding..." NOT "Your quad volume is critically low."
-- If someone has logged hundreds or thousands of reps/sets, acknowledge it. Don't skip past impressive consistency to nitpick ratios.
-- Sparse data (<4 sessions): encourage + one actionable tip. No overtraining warnings unless mood/notes show pain or exhaustion.
-- Recovery advice needs evidence: mood trends, pain notes, regressions, or 5+ sessions/week. Not just low session count.
-- Read their About field for health conditions, experience, limitations. Adjust accordingly.
-- Sport activities: frame gym work as complementing their sport. Explain WHY specific exercises help.
-- Bodyweight exercise difficulty varies hugely: 10 pull-ups > 30 push-ups in relative effort. Don't equate raw reps.
-- Isolation exercises use less weight than compounds — flat isolation weight is normal, suggest more reps/sets first.
-- RPE/Intensity: reference when present ("RPE 8 on squats — solid effort"), ignore if not logged.
-- Coaching history: build on past advice, don't repeat verbatim. Escalate specificity if issues persist (shownCount 1→suggestion, 2→directive, 3+→exact prescription).
-- If user acted on advice, acknowledge it. If they didn't, try a new angle.
-
-LOG FORMATS:
-- Strength: "8@185 RPE8" = 8 reps at 185 ${wUnit}
-- Duration: "45 min total" — time-based, NOT strength reps
-- Distance: "3.5 miles"
-- Pace: "pace:7:30" — lower = faster = better
-- Never mix unit types in comparisons.
-
-HISTORY TIERS:
-- Current range logs = primary data (HIGH weight)
-- Recent history (prior 4 weeks) = context for trends (MEDIUM weight). Muscle trained recently but not this week = normal rotation, not neglect.
-- Older history = long-term progression only (LOW weight). Don't cite as actionable.
-
-CHECK-IN (when present — HIGHEST PRIORITY):
-Your first insight MUST acknowledge their mood, sleep, and pain. Then filter all advice through it:
-- Good/great mood → push them. Okay → standard advice. Tough/brutal → "showing up matters", suggest lighter alternatives.
-- Poor sleep → drop intensity 10-15%. Pain → avoid loading that area, suggest specific alternatives.
-- If today's logs also exist, compare check-in state vs actual performance. Celebrate positive shifts ("came in rough, put in real work").
+PRIORITY 1 — CHECK-IN & LOG SIGNALS (read first, filter ALL advice through this):
+When check-in or training log signals are present, your first insight MUST acknowledge mood, sleep, and pain before anything else.
+- Great/good mood → push them. Okay → standard. Rough/terrible → "showing up matters", suggest lighter alternatives.
+- Poor sleep → suggest dropping intensity 10-15%. Pain → avoid loading that area, name specific swaps.
+- If workout log signals show RPE trending high, mood trending down, or pain/fatigue in notes — weigh this alongside the check-in.
 - If mood pattern shows they feel better after training, mention it.
+- If check-in state conflicts with actual logged performance, acknowledge the positive shift.
 
-COACH NOTES:
-Return "coachNotes" array with any new patterns worth remembering. { "topic": "key", "detail": "observation", "date": "YYYY-MM-DD" }. Empty array if nothing new.
+PRIORITY 2 — ANALYSIS RULES:
+- Focus on TODAY. Date range label: "${dateRange?.label || "today"}". Use natural time refs ("this week", "recently"), not raw dates.
+- Be direct, warm, specific. Reference actual exercises and numbers. No filler, no generic praise.
+- Cite breakdowns: "7 chest sets — 4 from bench, 3 from cable fly" not just "7 sets of chest".
+- Be concrete: "Add 3 sets of barbell rows on your next pull day" not "consider more back work".
+- Volume = effective SETS (secondary muscles at 0.5×). Judge by absolute sets, not percentages. 10+ sets = solid work — never call it "critically low" or "neglected." Frame balance as building on strength: "70 quad sets is strong — to match your upper body, try adding..." NOT "quads are critically low."
+- Units matter: duration activities (water polo 1 hr, running 45 min) are measured in TIME — 1 session of water polo is a massive training load, not "1 rep." Weight × reps determines strength effort — 10 reps at 225 ${wUnit} is far harder than 20 reps at 45 ${wUnit}. Never compare raw rep counts across different exercises or unit types.
+- Sparse data (<4 sessions): encourage + one tip. No overtraining warnings without evidence (mood/pain trends, regressions, or 5+ sessions/week).
+- Only suggest exercises from the EXERCISE CATALOG using exact catalogId. Never suggest exercises already in their program.
+- Read their About field for health conditions and adjust accordingly.
+- Coaching history: build on past advice, don't repeat. Escalate if issues persist (1st→suggest, 2nd→direct, 3rd+→prescribe). Acknowledge when user acted on advice.
+- Prioritize recent data over older history. A muscle trained recently but not this specific week is normal rotation, not neglect.
 
-RESPONSE — return ONLY valid JSON:
+RESPONSE — return ONLY valid JSON, no markdown fences:
 {
   "trend_status": "improving|plateauing|regressing|mixed",
   "primary_focus": "highest leverage focus for today",
   "today_action": "specific instruction for next session",
-  "insights": [1-3 objects: { "type": "IMBALANCE|NEGLECTED|OVERTRAINING|POSITIVE|TIP|RECOVERY|PROGRESSION", "severity": "HIGH|MEDIUM|LOW|INFO", "title": "emoji + short title", "message": "2-3 sentences, specific numbers, concrete action", "suggestions": [{"catalogId":"id","exercise":"name","muscleGroup":"GROUP"}], "confidence": 0.0-1.0, "evidence": "data points", "expected_outcome": "what improves" }],
-  "coachNotes": []
+  "insights": [1-3 objects: { "type": "IMBALANCE|NEGLECTED|OVERTRAINING|POSITIVE|TIP|RECOVERY|PROGRESSION", "severity": "HIGH|MEDIUM|LOW|INFO", "title": "emoji + short title", "message": "2-3 sentences with specific numbers and concrete action", "suggestions": [{"catalogId":"id","exercise":"name","muscleGroup":"GROUP"}], "confidence": 0.0-1.0, "evidence": "data points supporting this", "expected_outcome": "what improves if they follow this" }],
+  "coachNotes": [{ "topic": "key", "detail": "new pattern observed", "date": "YYYY-MM-DD" }]
 }`;
 
     // Build volume-load trends section
@@ -358,6 +332,34 @@ RESPONSE — return ONLY valid JSON:
     let fatigueSection = "";
     if (fatigueTrend && typeof fatigueTrend === "string" && fatigueTrend.trim()) {
       fatigueSection = `\nFATIGUE TREND (last 7 days):\n${fatigueTrend.split("\n").map((l: string) => `  ${l}`).join("\n")}\n`;
+    }
+
+    // Build workout log signals section (mood/effort/pain extracted from training logs, NOT check-in)
+    let logSignalsSection = "";
+    if (coachSignals && typeof coachSignals === "object") {
+      const parts: string[] = [];
+      const m = coachSignals.mood;
+      if (m && m.count > 0) {
+        parts.push(`Workout mood: avg ${m.avg}/2 (${m.trend} trend, ${m.count} entries)`);
+      }
+      const e = coachSignals.effort;
+      if (e) {
+        if (e.avgRpe) parts.push(`Avg RPE: ${e.avgRpe} (${e.rpeCount} sets logged)`);
+        if (e.avgIntensity) parts.push(`Avg perceived intensity: ${e.avgIntensity}/10`);
+        if (e.peakIntensity) parts.push(`Peak intensity: ${e.peakIntensity.value}/10 on ${e.peakIntensity.activity} (${e.peakIntensity.date})`);
+      }
+      const ns = coachSignals.notesSignals;
+      if (ns) {
+        if (Array.isArray(ns.painMentions) && ns.painMentions.length > 0) {
+          parts.push(`Pain mentions in notes: ${ns.painMentions.map((p: { date: string; text: string }) => `"${p.text}" (${p.date})`).join(", ")}`);
+        }
+        if (Array.isArray(ns.fatigueMentions) && ns.fatigueMentions.length > 0) {
+          parts.push(`Fatigue mentions in notes: ${ns.fatigueMentions.map((f: { date: string; text: string }) => `"${f.text}" (${f.date})`).join(", ")}`);
+        }
+      }
+      if (parts.length > 0) {
+        logSignalsSection = `\nTRAINING LOG SIGNALS (from workout entries, not check-in):\n${parts.map(p => `- ${p}`).join("\n")}\n`;
+      }
     }
 
     // Build tiered historical context sections
@@ -408,7 +410,7 @@ ${programSummary}
 
 RECENT TRAINING LOGS:
 ${logSummary}
-${catalogSection}${fatigueSection}${recentHistorySection}${olderHistorySection}${adherenceSection}${coachingHistorySection}
+${catalogSection}${fatigueSection}${logSignalsSection}${recentHistorySection}${olderHistorySection}${adherenceSection}${coachingHistorySection}
 Analyze this data and return JSON insights.`;
 
     const openaiBody = JSON.stringify({
@@ -481,6 +483,7 @@ Analyze this data and return JSON insights.`;
       const sseStream = new ReadableStream({
         async start(controller) {
           let fullText = "";
+          let insightsSent = 0; // tracks how many insights we've already forwarded to client
 
           try {
             let sseBuffer = "";
@@ -507,84 +510,50 @@ Analyze this data and return JSON insights.`;
                 }
               }
 
-              // Try to extract complete insight objects from accumulated text
-              // Look for the "insights" array and extract complete objects
+              // Try to extract complete insight objects from accumulated text.
+              // Single pass: find the "insights" array, walk through with brace-depth
+              // tracking, and send only newly completed objects.
               const insightsMatch = fullText.match(/"insights"\s*:\s*\[/);
               if (insightsMatch) {
                 const arrayStart = fullText.indexOf("[", insightsMatch.index);
                 let depth = 0;
                 let objStart = -1;
-                let insightsSent = 0;
-                // Count how many insights we've already sent
-                const sentMarker = "\u0000"; // Track sent objects
-                let searchFrom = arrayStart + 1;
+                let objectIndex = 0;
 
-                // Count already-sent insights by counting complete objects
-                let tempDepth = 0;
-                let tempObjStart = -1;
-                let completeObjects = 0;
                 for (let i = arrayStart + 1; i < fullText.length; i++) {
                   const ch = fullText[i];
+                  // Skip string contents to avoid counting braces inside strings
                   if (ch === '"') {
-                    // Skip string contents
                     i++;
                     while (i < fullText.length && fullText[i] !== '"') {
-                      if (fullText[i] === '\\') i++;
+                      if (fullText[i] === '\\') i++; // skip escaped char
                       i++;
                     }
                     continue;
                   }
                   if (ch === '{') {
-                    if (tempDepth === 0) tempObjStart = i;
-                    tempDepth++;
+                    if (depth === 0) objStart = i;
+                    depth++;
                   } else if (ch === '}') {
-                    tempDepth--;
-                    if (tempDepth === 0 && tempObjStart >= 0) {
-                      completeObjects++;
-                      tempObjStart = -1;
-                    }
-                  }
-                }
-
-                // Send any newly completed insight objects
-                if (completeObjects > insightsSent) {
-                  // Re-parse to extract individual objects
-                  let d = 0;
-                  let oStart = -1;
-                  let objectIndex = 0;
-                  for (let i = arrayStart + 1; i < fullText.length; i++) {
-                    const ch = fullText[i];
-                    if (ch === '"') {
-                      i++;
-                      while (i < fullText.length && fullText[i] !== '"') {
-                        if (fullText[i] === '\\') i++;
-                        i++;
-                      }
-                      continue;
-                    }
-                    if (ch === '{') {
-                      if (d === 0) oStart = i;
-                      d++;
-                    } else if (ch === '}') {
-                      d--;
-                      if (d === 0 && oStart >= 0) {
-                        if (objectIndex >= insightsSent) {
-                          const objStr = fullText.slice(oStart, i + 1);
-                          try {
-                            const insight = JSON.parse(objStr);
-                            controller.enqueue(
-                              encoder.encode(`data: ${JSON.stringify({ type: "insight", data: insight })}\n\n`)
-                            );
-                          } catch {
-                            // Incomplete or malformed — skip
-                          }
+                    depth--;
+                    if (depth === 0 && objStart >= 0) {
+                      // Complete object found — only send if we haven't already
+                      if (objectIndex >= insightsSent) {
+                        const objStr = fullText.slice(objStart, i + 1);
+                        try {
+                          const insight = JSON.parse(objStr);
+                          controller.enqueue(
+                            encoder.encode(`data: ${JSON.stringify({ type: "insight", data: insight })}\n\n`)
+                          );
+                          insightsSent = objectIndex + 1;
+                        } catch {
+                          // Malformed object — skip, will retry on next chunk
                         }
-                        objectIndex++;
-                        oStart = -1;
                       }
+                      objectIndex++;
+                      objStart = -1;
                     }
                   }
-                  insightsSent = completeObjects;
                 }
               }
             }

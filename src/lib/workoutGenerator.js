@@ -74,7 +74,7 @@ export const SET_REP_SCHEMES = {
  * Estimate exercise count from workout duration (minutes).
  * Roughly ~6 min per exercise (warm-up sets + working sets + rest).
  */
-function exerciseCountFromDuration(duration) {
+export function exerciseCountFromDuration(duration) {
   const mins = duration || 60;
   if (mins <= 15) return 2;
   if (mins <= 30) return Math.min(4, Math.max(3, Math.round(mins / 8)));

@@ -2637,6 +2637,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       coachNotesData = loadCoachNotes();
     }
 
+    let streamedCount = 0;
+
     fetchCoachInsights({
       profile, state, dateRange: { start: coachStart, end: coachEnd },
       options: { forceRefresh: true }, catalog: refreshCatalog, equipment,
@@ -2644,6 +2646,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       checkinContext: checkinCtx, coachNotesFromStorage: coachNotesData,
       onInsight: (insight) => {
         if (coachReqIdRef.current === reqId) {
+          streamedCount++;
           setCoachInsights(prev => [...prev, insight]);
         }
       },
@@ -2665,7 +2668,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       })
       .catch((err) => {
         if (coachReqIdRef.current !== reqId) return;
-        if (coachInsights.length === 0) {
+        if (streamedCount === 0) {
           const coachDR = { start: addDays(dateKey, -90), end: dateKey };
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDR, catalogMap);
           setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, checkin: checkinForFetch }));
@@ -2680,7 +2683,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           setCoachStreaming(false);
         }
       });
-  }, [fullCatalog, equipment, dateKey, profile, state, coachSignature, coachInsights, session?.user?.id, catalogMap]);
+  }, [fullCatalog, equipment, dateKey, profile, state, coachSignature, session?.user?.id, catalogMap]);
 
   const handleCoachRefresh = useCallback((checkinOverride) => {
     doCoachFetch({ checkinOverride, showLimitToast: true });

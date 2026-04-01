@@ -1248,6 +1248,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   let muscleSetsSummary = null;
   let muscleVolumeDetail = null;
   let sportTraitsPayload = null;
+  let coachSignals = null;
   let tieredHistory = { recentHistory: null, olderHistory: null };
   const catalogMap = catalog?.length > 0 ? buildCatalogMap(catalog) : null;
   if (catalogMap) {
@@ -1255,6 +1256,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     if (analysis.muscleGroupSetsEffective && Object.keys(analysis.muscleGroupSetsEffective).length > 0) {
       muscleSetsSummary = analysis.muscleGroupSetsEffective;
     }
+    coachSignals = analysis.coachSignals || null;
     muscleVolumeDetail = buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap);
     // Merge logged sport traits with profile-declared sports (logged takes precedence)
     sportTraitsPayload = mergeSportTraits(analysis.sportTraits, profile?.sports);
@@ -1292,7 +1294,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     hasHistory: !!(tieredHistory.recentHistory || tieredHistory.olderHistory),
     previousInsightCount: coachingHistory?.entries?.length || 0,
   });
-  const modelHint = "gpt-4o-mini";
+  const modelHint = complexityScore >= 4 ? "gpt-4o" : "gpt-4o-mini";
 
   // Ensure we have a fresh session token before calling the edge function
   const { data: { session: authSession } } = await supabase.auth.getSession();
@@ -1326,6 +1328,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     coachingHistory,
     sportTraits: sportTraitsPayload?.aggregated || null,
     muscleSetsSummary,
+    coachSignals,
     muscleVolumeDetail: null, // Omitted for speed — muscleSetsSummary has the numbers
     recentHistory: tieredHistory.recentHistory?.slice(0, 1500) || null,
     olderHistory: tieredHistory.olderHistory?.slice(0, 800) || null,
@@ -1407,15 +1410,20 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
         return postProcess(insights, data.coachNotes);
       }
 
-      // SSE stream
+      // SSE stream with timeout — abort if no data for 30s
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let sseBuffer = "";
       const allInsights = [];
       let doneData = null;
+      const STREAM_TIMEOUT = 30000;
 
       while (true) {
-        const { done, value } = await reader.read();
+        let timeoutId;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("Stream timeout")), STREAM_TIMEOUT);
+        });
+        const { done, value } = await Promise.race([reader.read(), timeoutPromise]).finally(() => clearTimeout(timeoutId));
         if (done) break;
         sseBuffer += decoder.decode(value, { stream: true });
 
