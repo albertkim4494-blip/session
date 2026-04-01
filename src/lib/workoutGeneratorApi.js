@@ -7,7 +7,7 @@ import { supabase } from "./supabase";
 import { exerciseFitsEquipment } from "./exerciseCatalog";
 import { buildCatalogMap } from "./exerciseCatalogUtils";
 import { analyzeMuscleRecency, exerciseCountFromDuration } from "./workoutGenerator";
-import { isSetCompleted, dayHasCompletedSetsSets } from "./setHelpers";
+import { isSetCompleted, dayHasCompletedSets } from "./setHelpers";
 import { recordAiEvent } from "./aiMetrics";
 
 // ---------------------------------------------------------------------------

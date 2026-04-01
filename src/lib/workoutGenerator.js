@@ -130,8 +130,8 @@ function pickExercisesForWorkout(muscles, equipment, goal, catalog, duration) {
     const compounds = shuffle(
       available.filter(
         (e) =>
-          e.muscles.primary.includes(muscle) &&
-          e.tags.includes("compound") &&
+          e.muscles?.primary?.includes(muscle) &&
+          e.tags?.includes("compound") &&
           !pickedIds.has(e.id)
       )
     );
@@ -143,8 +143,8 @@ function pickExercisesForWorkout(muscles, equipment, goal, catalog, duration) {
   // Phase 2: Fill with isolation exercises for uncovered muscles
   const coveredMuscles = new Set();
   for (const e of picked) {
-    for (const m of e.muscles.primary) coveredMuscles.add(m);
-    for (const m of (e.muscles.secondary || [])) coveredMuscles.add(m);
+    for (const m of (e.muscles?.primary || [])) coveredMuscles.add(m);
+    for (const m of (e.muscles?.secondary || [])) coveredMuscles.add(m);
   }
   for (const muscle of muscles) {
     if (picked.length >= targetCount) break;
@@ -152,7 +152,7 @@ function pickExercisesForWorkout(muscles, equipment, goal, catalog, duration) {
       const isolations = shuffle(
         available.filter(
           (e) =>
-            e.muscles.primary.includes(muscle) &&
+            e.muscles?.primary?.includes(muscle) &&
             !pickedIds.has(e.id)
         )
       );
@@ -165,7 +165,7 @@ function pickExercisesForWorkout(muscles, equipment, goal, catalog, duration) {
     const remaining = shuffle(
       available.filter(
         (e) =>
-          e.muscles.primary.some((m) => muscles.includes(m)) &&
+          e.muscles?.primary?.some((m) => muscles.includes(m)) &&
           !pickedIds.has(e.id)
       )
     );

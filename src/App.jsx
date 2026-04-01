@@ -563,24 +563,29 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Fetch social data when social tab is opened
   const refreshSocial = useCallback(async () => {
     setSocialLoading(true);
-    const [friendsRes, pendingRes, inboxRes, badgeRes, groupsRes, groupInvitesRes, groupInviteCountRes, pendingPollsRes] = await Promise.all([
-      getFriends(),
-      getPendingRequests(),
-      getInbox(),
-      getUnreadCount(),
-      getMyGroups(),
-      getGroupInvites(),
-      getGroupInviteCount(),
-      getPendingPollCount(),
-    ]);
-    setSocialFriends(friendsRes.data || []);
-    setSocialPending(pendingRes.data || []);
-    setSocialInbox(inboxRes.data || []);
-    setSocialGroups(groupsRes.data || []);
-    setSocialGroupInvites(groupInvitesRes.data || []);
-    const totalBadge = (badgeRes.data || 0) + (groupInviteCountRes.data || 0) + (pendingPollsRes.data || 0);
-    setSocialBadge(totalBadge);
-    setSocialLoading(false);
+    try {
+      const [friendsRes, pendingRes, inboxRes, badgeRes, groupsRes, groupInvitesRes, groupInviteCountRes, pendingPollsRes] = await Promise.all([
+        getFriends(),
+        getPendingRequests(),
+        getInbox(),
+        getUnreadCount(),
+        getMyGroups(),
+        getGroupInvites(),
+        getGroupInviteCount(),
+        getPendingPollCount(),
+      ]);
+      setSocialFriends(friendsRes.data || []);
+      setSocialPending(pendingRes.data || []);
+      setSocialInbox(inboxRes.data || []);
+      setSocialGroups(groupsRes.data || []);
+      setSocialGroupInvites(groupInvitesRes.data || []);
+      const totalBadge = (badgeRes.data || 0) + (groupInviteCountRes.data || 0) + (pendingPollsRes.data || 0);
+      setSocialBadge(totalBadge);
+    } catch (err) {
+      console.warn("Social refresh failed:", err.message);
+    } finally {
+      setSocialLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -756,7 +761,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     );
     if (loggedExIds.size === 0) return EMPTY_ARRAY;
     const already = new Set(todaySessionIds);
-    return effectiveWorkouts.filter(w => !already.has(w.id) && w.exercises.some(ex => loggedExIds.has(ex.id)));
+    return effectiveWorkouts.filter(w => !already.has(w.id) && w.exercises?.some(ex => loggedExIds.has(ex.id)));
   }, [isToday, logsForDate, todaySessionIds, effectiveWorkouts]);
 
   // Combine explicitly-added sessions + auto-detected from logs

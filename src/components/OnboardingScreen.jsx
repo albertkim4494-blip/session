@@ -68,7 +68,7 @@ export default function OnboardingScreen({ session, onComplete, onUpdatePreferen
 
     const wMin = measurementSystem === "metric" ? 23 : 50;
     const wMax = measurementSystem === "metric" ? 454 : 1000;
-    if (weightNum < wMin || weightNum > wMax) {
+    if (isNaN(weightNum) || weightNum < wMin || weightNum > wMax) {
       setError(`Weight must be between ${wMin} and ${wMax} ${measurementSystem === "metric" ? "kg" : "lbs"}.`);
       return;
     }

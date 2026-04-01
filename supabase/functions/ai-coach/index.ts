@@ -545,10 +545,10 @@ Analyze this data and return JSON insights.`;
                           controller.enqueue(
                             encoder.encode(`data: ${JSON.stringify({ type: "insight", data: insight })}\n\n`)
                           );
-                          insightsSent = objectIndex + 1;
                         } catch {
-                          // Malformed object — skip, will retry on next chunk
+                          // Malformed object — skip it permanently
                         }
+                        insightsSent = objectIndex + 1;
                       }
                       objectIndex++;
                       objStart = -1;
@@ -565,7 +565,7 @@ Analyze this data and return JSON insights.`;
               parsed = JSON.parse(cleaned);
             } catch {
               console.log(JSON.stringify({ event: "ai_parse_fail", feature: "coach", contentPreview: fullText.slice(0, 200) }));
-              parsed = { insights: [] };
+              parsed = { insights: [], coachNotes: [], trend_status: null };
             }
 
             const returnedCoachNotes = Array.isArray(parsed.coachNotes) ? parsed.coachNotes : [];
@@ -625,7 +625,7 @@ Analyze this data and return JSON insights.`;
     } catch {
       console.log(JSON.stringify({ event: "ai_parse_fail", feature: "coach", contentPreview: content.slice(0, 200) }));
       console.error("Failed to parse AI response:", content);
-      parsed = { insights: [] };
+      parsed = { insights: [], coachNotes: [], trend_status: null };
     }
 
     // Validate structure
