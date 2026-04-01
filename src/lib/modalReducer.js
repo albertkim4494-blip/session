@@ -42,6 +42,7 @@ export const initialModalState = {
     birthdate: "",
     gender: "",
     weightLbs: "",
+    heightInches: "",
     goal: "",
     sports: "",
     about: "",

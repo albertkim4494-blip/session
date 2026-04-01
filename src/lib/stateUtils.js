@@ -55,12 +55,15 @@ export function forEachExercise(st, callback) {
     for (const ex of (wk.exercises || [])) callback(ex);
   }
   for (const key of Object.keys(st.dailyWorkouts || {})) {
-    for (const wk of st.dailyWorkouts[key]) {
+    const dayWorkouts = st.dailyWorkouts[key];
+    if (!Array.isArray(dayWorkouts)) continue;
+    for (const wk of dayWorkouts) {
       for (const ex of (wk.exercises || [])) callback(ex);
     }
   }
   for (const key of Object.keys(st.sessionAdditions || {})) {
     for (const exArr of Object.values(st.sessionAdditions[key] || {})) {
+      if (!Array.isArray(exArr)) continue;
       for (const ex of exArr) callback(ex);
     }
   }

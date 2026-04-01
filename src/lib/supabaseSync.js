@@ -40,6 +40,8 @@ export function createDebouncedSaver(delayMs = 2000) {
   let timerId = null;
   let inFlight = false;
   let queued = null; // { userId, state }
+  let lastUserId = null;
+  let lastState = null;
 
   async function flush(userId, state) {
     inFlight = true;
@@ -60,6 +62,9 @@ export function createDebouncedSaver(delayMs = 2000) {
   }
 
   function trigger(userId, state) {
+    lastUserId = userId;
+    lastState = state;
+
     if (timerId) clearTimeout(timerId);
 
     if (inFlight) {
@@ -76,7 +81,7 @@ export function createDebouncedSaver(delayMs = 2000) {
 
   /**
    * Immediately flush any pending debounced save (best-effort, for beforeunload).
-   * Uses navigator.sendBeacon if available for reliability during page unload.
+   * Cancels the pending timer and fires the save with the latest known state.
    */
   function flushSync() {
     if (!timerId && !queued) return; // nothing pending
@@ -84,9 +89,11 @@ export function createDebouncedSaver(delayMs = 2000) {
       clearTimeout(timerId);
       timerId = null;
     }
-    // If we had a queued save, use it; otherwise the timer hadn't fired yet
-    // so there's a pending userId/state we can't access from here.
-    // The caller should pass the latest state to flushNow() instead.
+    const pending = queued || (lastUserId && lastState ? { userId: lastUserId, state: lastState } : null);
+    queued = null;
+    if (pending) {
+      flush(pending.userId, pending.state);
+    }
   }
 
   function cancel() {

@@ -362,7 +362,7 @@ export function CoachInsightsCard({
               {showMore && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
                   {rest.map((item, idx) => (
-                    <CompactInsight key={idx} item={item} onAddExercise={onAddExercise} colors={colors} />
+                    <CompactInsight key={item.title || idx} item={item} onAddExercise={onAddExercise} colors={colors} />
                   ))}
                 </div>
               )}

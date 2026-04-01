@@ -592,6 +592,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     if (tab === "social") refreshSocial();
   }, [tab]);
 
+  // Auto-advance dateKey at midnight if user was viewing "today"
+  useEffect(() => {
+    const checkMidnight = () => {
+      const now = yyyyMmDd(new Date());
+      setDateKey(prev => {
+        // Only advance if prev was yesterday (meaning it was "today" before midnight crossed)
+        // If user is browsing an older date intentionally, leave them alone
+        if (prev !== now && prev === addDays(now, -1)) return now;
+        return prev;
+      });
+    };
+    const iv = setInterval(checkMidnight, 60000);
+    const onVisible = () => { if (!document.hidden) checkMidnight(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(iv); document.removeEventListener("visibilitychange", onVisible); };
+  }, []);
+
   const todayKey = yyyyMmDd(new Date());
 
   // ---------------------------------------------------------------------------
