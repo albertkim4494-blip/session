@@ -67,6 +67,31 @@ export async function getMyGroups() {
       ...m.group,
     }));
 
+  // Fetch member counts + facepile avatars for each group
+  if (groups.length > 0) {
+    const groupIds = groups.map(g => g.id);
+    const { data: allMembers } = await supabase
+      .from("group_members")
+      .select("group_id, user_id, role, profile:profiles!group_members_user_id_fkey(avatar_url, username)")
+      .in("group_id", groupIds)
+      .eq("status", "accepted");
+
+    const byGroup = {};
+    for (const m of allMembers || []) {
+      if (!byGroup[m.group_id]) byGroup[m.group_id] = [];
+      byGroup[m.group_id].push(m);
+    }
+    for (const g of groups) {
+      const members = byGroup[g.id] || [];
+      g.member_count = members.length;
+      g.facepile = members.slice(0, 4).map(m => ({
+        avatar_url: m.profile?.avatar_url || null,
+        username: m.profile?.username || "?",
+        isAdmin: m.role === "admin",
+      }));
+    }
+  }
+
   return { data: groups, error };
 }
 
@@ -724,4 +749,47 @@ export async function getPendingPollCount() {
   const pending = openPolls.filter((p) => !respondedPollIds.has(p.id)).length;
 
   return { data: pending, error: null };
+}
+
+/**
+ * Fetch active polls across all of the user's groups (open, deadline not passed).
+ */
+export async function getActivePolls() {
+  const { data, error } = await supabase
+    .from("group_polls")
+    .select(`
+      id, group_id, created_by, title, description, event_date, event_time, event_end_time,
+      deadline, allow_self_checkin, closed, created_at,
+      created_by_profile:profiles!group_polls_created_by_fkey(id, username, display_name, avatar_url),
+      poll_responses(id, poll_id, user_id, response, attended, responded_at),
+      group:groups!group_polls_group_id_fkey(id, name)
+    `)
+    .eq("closed", false)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) return { data: [], error };
+
+  // Filter out polls with passed deadlines
+  const now = Date.now();
+  const active = (data || []).filter(p => !p.deadline || new Date(p.deadline).getTime() > now);
+  return { data: active, error: null };
+}
+
+/**
+ * Fetch recent announcements across all of the user's groups.
+ */
+export async function getRecentAnnouncements() {
+  const { data, error } = await supabase
+    .from("group_announcements")
+    .select(`
+      id, group_id, author_id, body, pinned, created_at,
+      author_profile:profiles!group_announcements_author_id_fkey(id, username, display_name, avatar_url),
+      announcement_reactions(id, announcement_id, user_id, emoji, created_at),
+      group:groups!group_announcements_group_id_fkey(id, name)
+    `)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  return { data: data || [], error };
 }

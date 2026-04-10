@@ -78,6 +78,7 @@ import {
   getMyGroups, getGroupInvites, getGroupInviteCount,
   acceptGroupInvite, declineGroupInvite, getPendingPollCount,
   markAttendance, getGroupCustomFields,
+  getActivePolls, getRecentAnnouncements, toggleReaction, respondToPoll,
 } from "./lib/groupApi";
 
 // Exercise catalog
@@ -253,6 +254,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [feedLoading, setFeedLoading] = useState(false);
   const [feedCursor, setFeedCursor] = useState(null);
   const [feedHasMore, setFeedHasMore] = useState(true);
+
+  // Groups aggregated data
+  const [activePolls, setActivePolls] = useState([]);
+  const [recentAnnouncements, setRecentAnnouncements] = useState([]);
 
   // Log card flip state (log ↔ exercise detail)
   const [logFlipped, setLogFlipped] = useState(false);
@@ -590,7 +595,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const refreshSocial = useCallback(async () => {
     setSocialLoading(true);
     try {
-      const [friendsRes, pendingRes, inboxRes, badgeRes, groupsRes, groupInvitesRes, groupInviteCountRes, pendingPollsRes] = await Promise.all([
+      const [friendsRes, pendingRes, inboxRes, badgeRes, groupsRes, groupInvitesRes, groupInviteCountRes, pendingPollsRes, activePollsRes, announcementsRes] = await Promise.all([
         getFriends(),
         getPendingRequests(),
         getInbox(),
@@ -599,12 +604,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         getGroupInvites(),
         getGroupInviteCount(),
         getPendingPollCount(),
+        getActivePolls(),
+        getRecentAnnouncements(),
       ]);
       setSocialFriends(friendsRes.data || []);
       setSocialPending(pendingRes.data || []);
       setSocialInbox(inboxRes.data || []);
       setSocialGroups(groupsRes.data || []);
       setSocialGroupInvites(groupInvitesRes.data || []);
+      setActivePolls(activePollsRes.data || []);
+      setRecentAnnouncements(announcementsRes.data || []);
       const totalBadge = (badgeRes.data || 0) + (groupInviteCountRes.data || 0) + (pendingPollsRes.data || 0);
       setSocialBadge(totalBadge);
     } catch (err) {
@@ -4401,7 +4410,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
           {/* SOCIAL TAB */}
           {tab === "social" ? (
-            <div key="social" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
+            <div key="social" style={{ ...styles.section, marginTop: -8, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
               {(() => {
                 const socialTab = modals.social.tab || "feed";
                 const pendingInboxCount = socialInbox.filter((i) => i.status === "pending").length + socialPending.length;
@@ -4413,9 +4422,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   { value: "inbox", label: `Inbox${pendingInboxCount ? ` (${pendingInboxCount})` : ""}` },
                 ];
                 return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                    {/* Underline-style tabs */}
-                    <nav style={{ display: "flex", gap: 32 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* Underline-style tabs — sticky, flush with top */}
+                    <nav style={{
+                      display: "flex", gap: 28,
+                      position: "sticky", top: -22, zIndex: 5,
+                      background: colors.appBg,
+                      paddingTop: 22, paddingBottom: 8,
+                      marginTop: -14,
+                    }}>
                       {socialTabs.map((t) => {
                         const active = t.value === socialTab;
                         return (
@@ -4424,16 +4439,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             onClick={() => { setActiveGroupId(null); dispatchModal({ type: "UPDATE_SOCIAL", payload: { tab: t.value } }); }}
                             style={{
                               background: "none", border: "none", cursor: "pointer",
-                              padding: "2px 0 10px",
-                              fontSize: 15, fontWeight: 700,
+                              padding: "6px 0 8px",
+                              fontSize: 14, fontWeight: 700,
                               color: active ? colors.accent : colors.text,
                               opacity: active ? 1 : 0.35,
-                              borderBottom: active ? `3px solid ${colors.accent}` : "3px solid transparent",
-                              transition: "all 0.2s",
-                              letterSpacing: "-0.01em",
+                              position: "relative",
+                              transition: "color 0.2s, opacity 0.2s",
                             }}
                           >
                             {t.label}
+                            {active && (
+                              <span style={{
+                                position: "absolute",
+                                bottom: 0, left: 0, right: 0,
+                                height: 2,
+                                background: colors.accent,
+                                borderRadius: 0,
+                              }} />
+                            )}
                           </button>
                         );
                       })}
@@ -4455,7 +4478,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       />
                     ) : socialTab === "groups" ? (
                       /* Groups sub-tab */
-                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                         {activeGroupId ? (
                           <GroupDetailView
                             groupId={activeGroupId}
@@ -4489,130 +4512,249 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             refreshSocial={refreshSocial}
                           />
                         ) : (
-                          <>
-                            <button
-                              className="btn-press"
-                              onClick={() => dispatchModal({ type: "OPEN_CREATE_GROUP" })}
-                              style={{ ...styles.primaryBtn, width: "100%", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "12px 14px" }}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
-                              Create Group
-                            </button>
-
+                          <div style={{ display: "flex", flexDirection: "column", gap: 28, paddingBottom: 70 }}>
                             {socialLoading && socialGroups.length === 0 && socialGroupInvites.length === 0 && (
-                              <div style={{ textAlign: "center", padding: 20, opacity: 0.5, fontSize: 13 }}>Loading...</div>
+                              <div style={{ textAlign: "center", padding: 24, opacity: 0.5, fontSize: 13 }}>Loading...</div>
                             )}
 
                             {/* Group invites */}
                             {socialGroupInvites.length > 0 && (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.7 }}>
-                                  Invites ({socialGroupInvites.length})
+                              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <div style={{ fontSize: 15, fontWeight: 700 }}>Invites</div>
+                                  <div style={{ width: 20, height: 20, borderRadius: 999, background: colors.accent, color: colors.primaryText, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{socialGroupInvites.length}</div>
                                 </div>
                                 {socialGroupInvites.map((inv) => (
-                                  <div
-                                    key={inv.id}
-                                    style={{
-                                      display: "flex", alignItems: "center", gap: 10,
-                                      padding: "12px 14px", borderRadius: 12,
-                                      background: colors.accentBg,
-                                      border: `1px solid ${colors.accentBorder}`,
-                                    }}
-                                  >
+                                  <div key={inv.id} style={{ padding: 16, borderRadius: 16, background: colors.subtleBg, display: "flex", alignItems: "center", gap: 14 }}>
+                                    <div style={{ width: 44, height: 44, borderRadius: 12, background: colors.accent + "18", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>
+                                    </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: 14, fontWeight: 700 }}>{inv.group?.name || "Group"}</div>
-                                      <div style={{ fontSize: 12, opacity: 0.6 }}>
-                                        from @{inv.inviter?.username || "unknown"}
-                                      </div>
+                                      <div style={{ fontSize: 15, fontWeight: 700 }}>{inv.group?.name || "Group"}</div>
+                                      <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>from @{inv.inviter?.username || "unknown"}</div>
                                     </div>
                                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                                      <button
-                                        className="btn-press"
-                                        onClick={async () => {
-                                          await acceptGroupInvite(inv.id);
-                                          // Check for required custom fields
-                                          const { data: cfData } = await getGroupCustomFields(inv.group_id);
-                                          const requiredFields = (cfData || []).filter(f => f.required);
-                                          if (requiredFields.length > 0) {
-                                            dispatchModal({
-                                              type: "OPEN_FILL_FIELDS",
-                                              payload: {
-                                                groupId: inv.group_id,
-                                                fields: cfData || [],
-                                                requiredMode: true,
-                                                onComplete: () => {
-                                                  refreshSocial();
-                                                  showToast(`Joined ${inv.group?.name || "group"}!`);
-                                                },
-                                              },
-                                            });
-                                          } else {
-                                            refreshSocial();
-                                            showToast(`Joined ${inv.group?.name || "group"}!`);
-                                          }
-                                        }}
-                                        style={{ ...styles.primaryBtn, padding: "6px 12px", fontSize: 12 }}
-                                      >
-                                        Join
-                                      </button>
-                                      <button
-                                        className="btn-press"
-                                        onClick={async () => {
-                                          await declineGroupInvite(inv.id);
-                                          refreshSocial();
-                                        }}
-                                        style={{ ...styles.secondaryBtn, padding: "6px 10px", fontSize: 12 }}
-                                      >
-                                        Decline
-                                      </button>
+                                      <button className="btn-press" onClick={async () => { await acceptGroupInvite(inv.id); const { data: cfData } = await getGroupCustomFields(inv.group_id); const requiredFields = (cfData || []).filter(f => f.required); if (requiredFields.length > 0) { dispatchModal({ type: "OPEN_FILL_FIELDS", payload: { groupId: inv.group_id, fields: cfData || [], requiredMode: true, onComplete: () => { refreshSocial(); showToast(`Joined ${inv.group?.name || "group"}!`); } } }); } else { refreshSocial(); showToast(`Joined ${inv.group?.name || "group"}!`); } }} style={{ ...styles.primaryBtn, padding: "8px 16px", fontSize: 12, borderRadius: 999 }}>Join</button>
+                                      <button className="btn-press" onClick={async () => { await declineGroupInvite(inv.id); refreshSocial(); }} style={{ padding: "8px 12px", fontSize: 12, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer", opacity: 0.6 }}>Decline</button>
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             )}
 
-                            {/* Groups list */}
-                            {socialGroups.length === 0 && !socialLoading && socialGroupInvites.length === 0 ? (
-                              <div style={{ textAlign: "center", padding: 20, opacity: 0.5, fontSize: 13 }}>
-                                No groups yet. Create one or get invited!
-                              </div>
-                            ) : (
-                              socialGroups.map((g) => (
-                                <div
-                                  key={g.id}
-                                  className="btn-press"
-                                  onClick={() => setActiveGroupId(g.id)}
-                                  style={{
-                                    display: "flex", alignItems: "center", gap: 10,
-                                    padding: "12px 14px", borderRadius: 12,
-                                    background: colors.cardBg,
-                                    border: `1px solid ${colors.border}`,
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  <div style={{
-                                    width: 36, height: 36, borderRadius: 10,
-                                    background: colors.accent + "22", color: colors.accent,
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    fontSize: 16, fontWeight: 700, flexShrink: 0,
-                                  }}>
-                                    {(g.name || "G")[0].toUpperCase()}
-                                  </div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</div>
-                                    {g.description && <div style={{ fontSize: 12, opacity: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.description}</div>}
-                                  </div>
-                                  <span style={{
-                                    fontSize: 10, fontWeight: 600, padding: "2px 8px",
-                                    borderRadius: 999, background: colors.subtleBg, opacity: 0.6,
-                                  }}>
-                                    {g.role}
-                                  </span>
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}><polyline points="9 18 15 12 9 6" /></svg>
+                            {/* Active Groups */}
+                            {socialGroups.length > 0 && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <div style={{ fontSize: 18, fontWeight: 700 }}>Active Groups</div>
+                                  <div style={{ width: 6, height: 6, borderRadius: 999, background: colors.accent, opacity: 0.7 }} />
                                 </div>
-                              ))
+                                {socialGroups.map((g) => {
+                                  const facepile = g.facepile || [];
+                                  const extraCount = Math.max(0, (g.member_count || 0) - facepile.length);
+                                  return (
+                                    <div
+                                      key={g.id}
+                                      className="btn-press"
+                                      onClick={() => setActiveGroupId(g.id)}
+                                      style={{ cursor: "pointer", padding: "16px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}
+                                    >
+                                      {/* Icon + member count row */}
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                                        <div style={{ width: 36, height: 36, borderRadius: 10, background: colors.accent + "15", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>
+                                        </div>
+                                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.4, marginTop: 4 }}>
+                                          {g.member_count ? `${g.member_count} Members` : ""}
+                                        </div>
+                                      </div>
+                                      {/* Name + admin badge */}
+                                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                                        <div style={{ fontSize: 15, fontWeight: 700 }}>{g.name}</div>
+                                        {g.role === "admin" && (
+                                          <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 999, background: colors.accent + "18", color: colors.accent }}>Admin</span>
+                                        )}
+                                      </div>
+                                      {/* Description */}
+                                      {g.description && <div style={{ fontSize: 13, opacity: 0.5, lineHeight: 1.45, marginBottom: 10 }}>{g.description}</div>}
+                                      {/* Facepile — real member avatars */}
+                                      <div style={{ display: "flex", alignItems: "center" }}>
+                                        {facepile.map((m, i) => (
+                                          <div key={i} style={{
+                                            width: 28, height: 28, borderRadius: 999,
+                                            border: `2px solid ${colors.appBg}`,
+                                            marginLeft: i > 0 ? -8 : 0,
+                                            background: colors.accent + "22", color: colors.accent,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            fontSize: 10, fontWeight: 700, flexShrink: 0, overflow: "hidden",
+                                          }}>
+                                            {m.avatar_url ? (
+                                              <img src={m.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover" }} />
+                                            ) : (
+                                              (m.username || "?")[0].toUpperCase()
+                                            )}
+                                          </div>
+                                        ))}
+                                        {extraCount > 0 && (
+                                          <div style={{
+                                            width: 28, height: 28, borderRadius: 999,
+                                            border: `2px solid ${colors.appBg}`,
+                                            marginLeft: -8,
+                                            background: colors.subtleBg,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            fontSize: 9, fontWeight: 700, opacity: 0.6,
+                                          }}>
+                                            +{extraCount}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             )}
-                          </>
+
+                            {/* Active Polls */}
+                            {activePolls.length > 0 && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                                <div style={{ fontSize: 18, fontWeight: 700 }}>Active Polls</div>
+                                {activePolls.map((poll) => {
+                                  const myResponse = (poll.poll_responses || []).find(r => r.user_id === session.user.id);
+                                  const totalVotes = (poll.poll_responses || []).length;
+                                  const deadlineMs = poll.deadline ? new Date(poll.deadline).getTime() - Date.now() : null;
+                                  const daysLeft = deadlineMs ? Math.max(0, Math.ceil(deadlineMs / 86400000)) : null;
+                                  return (
+                                    <div key={poll.id} style={{ padding: "16px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}>
+                                      {/* Icon + title */}
+                                      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+                                        <div style={{ width: 32, height: 32, borderRadius: 8, background: colors.accent + "15", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" /></svg>
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>{poll.title}</div>
+                                          {poll.description && <div style={{ fontSize: 13, opacity: 0.5, lineHeight: 1.4, marginTop: 4 }}>{poll.description}</div>}
+                                        </div>
+                                      </div>
+                                      {/* Vote buttons */}
+                                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                                        {["Yes", "Maybe", "No"].map((opt) => {
+                                          const optLower = opt.toLowerCase();
+                                          const isSelected = myResponse?.response === optLower;
+                                          return (
+                                            <button
+                                              key={opt}
+                                              className="btn-press"
+                                              onClick={async () => { await respondToPoll(poll.id, optLower); const res = await getActivePolls(); setActivePolls(res.data || []); }}
+                                              style={{
+                                                flex: 1, minWidth: 70, padding: "12px 0", borderRadius: 999,
+                                                background: isSelected ? colors.accent : colors.cardBg,
+                                                color: isSelected ? colors.primaryText : colors.text,
+                                                border: "none", cursor: "pointer",
+                                                fontSize: 13, fontWeight: 700,
+                                              }}
+                                            >
+                                              {opt}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                      {/* Meta row */}
+                                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.3 }}>
+                                        <span>{totalVotes} votes cast</span>
+                                        {daysLeft != null && <span>{daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining</span>}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Announcements */}
+                            {recentAnnouncements.length > 0 && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                                <div style={{ fontSize: 18, fontWeight: 700 }}>Announcements</div>
+                                {recentAnnouncements.slice(0, 5).map((ann) => {
+                                  const author = ann.author_profile;
+                                  const reactions = ann.announcement_reactions || [];
+                                  const grouped = {};
+                                  for (const r of reactions) {
+                                    if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, userReacted: false };
+                                    grouped[r.emoji].count++;
+                                    if (r.user_id === session.user.id) grouped[r.emoji].userReacted = true;
+                                  }
+                                  const timeAgo = (() => {
+                                    const diff = Date.now() - new Date(ann.created_at).getTime();
+                                    const hrs = Math.floor(diff / 3600000);
+                                    if (hrs < 1) return "Just now";
+                                    if (hrs < 24) return `${hrs} hours ago`;
+                                    const days = Math.floor(hrs / 24);
+                                    if (days === 1) return "Yesterday";
+                                    return `${days} days ago`;
+                                  })();
+                                  return (
+                                    <div key={ann.id} style={{ display: "flex", gap: 12, padding: "16px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}>
+                                      {/* Avatar */}
+                                      <div style={{
+                                        width: 32, height: 32, borderRadius: 999,
+                                        background: colors.accent, color: colors.primaryText,
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: 13, fontWeight: 700, flexShrink: 0, overflow: "hidden", marginTop: 2,
+                                      }}>
+                                        {author?.avatar_url ? (
+                                          <img src={author.avatar_url} alt="" style={{ width: 32, height: 32, borderRadius: 999, objectFit: "cover" }} />
+                                        ) : (
+                                          (author?.username || "?")[0].toUpperCase()
+                                        )}
+                                      </div>
+                                      {/* Content — indented */}
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2 }}>
+                                          <span style={{ fontSize: 13, fontWeight: 700 }}>{author?.display_name || `@${author?.username}`}</span>
+                                          <span style={{ fontSize: 10, opacity: 0.3, textTransform: "uppercase", letterSpacing: "0.03em" }}>{timeAgo}</span>
+                                        </div>
+                                        {/* Body */}
+                                        <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.55, marginBottom: 10 }}>{ann.body}</div>
+                                        {/* Reaction chips */}
+                                        {Object.keys(grouped).length > 0 && (
+                                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                            {Object.entries(grouped).map(([emoji, info]) => (
+                                              <button
+                                                key={emoji}
+                                                className="btn-press"
+                                                onClick={async () => { await toggleReaction(ann.id, emoji); const res = await getRecentAnnouncements(); setRecentAnnouncements(res.data || []); }}
+                                                style={{
+                                                  display: "flex", alignItems: "center", gap: 5,
+                                                  padding: "6px 12px", borderRadius: 999,
+                                                  background: info.userReacted ? colors.accentBg : colors.cardBg,
+                                                  border: "none", cursor: "pointer",
+                                                  fontSize: 12, color: colors.text,
+                                                }}
+                                              >
+                                                {emoji} <span style={{ fontWeight: 700 }}>{info.count}</span>
+                                              </button>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Empty state */}
+                            {socialGroups.length === 0 && !socialLoading && socialGroupInvites.length === 0 && (
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "40px 20px", textAlign: "center" }}>
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.25 }}>
+                                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+                                </svg>
+                                <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.5 }}>No groups yet</div>
+                                <div style={{ fontSize: 12, opacity: 0.35, maxWidth: 220 }}>Create a group or get invited by friends to train together.</div>
+                              </div>
+                            )}
+
+                            {/* Create Group FAB — rendered outside scroll, see below */}
+                          </div>
                         )}
                       </div>
                     ) : (
@@ -4743,6 +4885,34 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             </div>
           ) : null}
         </div>
+
+        {/* Create Group FAB — fixed, outside scroll */}
+        {tab === "social" && (modals.social.tab || "feed") === "groups" && !activeGroupId && (
+          <button
+            className="btn-press"
+            onClick={() => dispatchModal({ type: "OPEN_CREATE_GROUP" })}
+            style={{
+              position: "fixed",
+              bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
+              right: "max(16px, calc(50vw - 360px))",
+              zIndex: 20,
+              background: colors.accent,
+              color: "#fff",
+              border: "none",
+              padding: "16px 24px",
+              borderRadius: 999,
+              display: "flex", alignItems: "center", gap: 8,
+              fontSize: 13, fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+              cursor: "pointer",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Create Group
+          </button>
+        )}
 
         {/* FAB + Panel for Sessions tab */}
         {tab === "train" && (
