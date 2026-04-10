@@ -759,7 +759,7 @@ export async function getActivePolls() {
     .from("group_polls")
     .select(`
       id, group_id, created_by, title, description, event_date, event_time, event_end_time,
-      deadline, allow_self_checkin, closed, created_at,
+      deadline, allow_self_checkin, closed, max_participants, created_at,
       created_by_profile:profiles!group_polls_created_by_fkey(id, username, display_name, avatar_url),
       poll_responses(id, poll_id, user_id, response, attended, responded_at),
       group:groups!group_polls_group_id_fkey(id, name)

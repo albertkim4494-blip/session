@@ -4614,44 +4614,105 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                 <div style={{ fontSize: 18, fontWeight: 700 }}>Active Polls</div>
                                 {activePolls.map((poll) => {
                                   const myResponse = (poll.poll_responses || []).find(r => r.user_id === session.user.id);
+                                  const yesCount = (poll.poll_responses || []).filter(r => r.response === "yes").length;
                                   const totalVotes = (poll.poll_responses || []).length;
-                                  const deadlineMs = poll.deadline ? new Date(poll.deadline).getTime() - Date.now() : null;
-                                  const daysLeft = deadlineMs ? Math.max(0, Math.ceil(deadlineMs / 86400000)) : null;
+                                  // Deadline: explicit deadline, or fall back to event start time
+                                  let effectiveDeadline = poll.deadline ? new Date(poll.deadline).getTime() : null;
+                                  if (!effectiveDeadline && poll.event_date) {
+                                    const eventStr = poll.event_time ? `${poll.event_date}T${poll.event_time}` : `${poll.event_date}T00:00:00`;
+                                    effectiveDeadline = new Date(eventStr).getTime();
+                                  }
+                                  const deadlineMs = effectiveDeadline ? effectiveDeadline - Date.now() : null;
+                                  const daysLeft = deadlineMs != null ? Math.max(0, Math.ceil(deadlineMs / 86400000)) : null;
+                                  const maxP = poll.max_participants;
+                                  const spotsLeft = maxP ? Math.max(0, maxP - yesCount) : null;
+                                  // Format event date/time
+                                  let eventLine = "";
+                                  if (poll.event_date) {
+                                    const d = new Date(poll.event_date + "T00:00:00");
+                                    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                                    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                    eventLine = `${dayNames[d.getDay()]}, ${monthNames[d.getMonth()]} ${d.getDate()}`;
+                                    if (poll.event_time) {
+                                      const [h, m] = poll.event_time.split(":");
+                                      const hr = parseInt(h, 10);
+                                      const ampm = hr >= 12 ? "PM" : "AM";
+                                      const hr12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
+                                      eventLine += ` at ${hr12}:${m} ${ampm}`;
+                                    }
+                                  }
                                   return (
-                                    <div key={poll.id} style={{ padding: "16px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}>
-                                      {/* Icon + title */}
-                                      <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-                                        <div style={{ width: 32, height: 32, borderRadius: 8, background: colors.accent + "15", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
-                                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" /></svg>
+                                    <div key={poll.id} style={{ padding: "20px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}>
+                                      {/* Icon + title + description */}
+                                      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                                        <div style={{ width: 36, height: 36, borderRadius: 10, background: colors.accent + "15", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" /></svg>
                                         </div>
                                         <div style={{ flex: 1 }}>
-                                          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>{poll.title}</div>
-                                          {poll.description && <div style={{ fontSize: 13, opacity: 0.5, lineHeight: 1.4, marginTop: 4 }}>{poll.description}</div>}
+                                          <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.25, marginBottom: 4 }}>{poll.title}</div>
+                                          {poll.description && <div style={{ fontSize: 13, opacity: 0.5, lineHeight: 1.45 }}>{poll.description}</div>}
                                         </div>
+                                        {/* Event date/time — inline under description */}
+                                        {eventLine && (
+                                          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35 }}>
+                                              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                                            </svg>
+                                            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.45 }}>{eventLine}</span>
+                                          </div>
+                                        )}
+                                        {/* Spots remaining */}
+                                        {spotsLeft != null && (
+                                          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4 }}>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={spotsLeft <= 3 ? colors.accent : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.45 }}>
+                                              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+                                            </svg>
+                                            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, color: spotsLeft <= 3 ? colors.accent : undefined }}>
+                                              {spotsLeft === 0 ? "Full" : `${spotsLeft} spot${spotsLeft !== 1 ? "s" : ""} left`}
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
-                                      {/* Vote buttons */}
-                                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                                        {["Yes", "Maybe", "No"].map((opt) => {
-                                          const optLower = opt.toLowerCase();
-                                          const isSelected = myResponse?.response === optLower;
-                                          return (
-                                            <button
-                                              key={opt}
-                                              className="btn-press"
-                                              onClick={async () => { await respondToPoll(poll.id, optLower); const res = await getActivePolls(); setActivePolls(res.data || []); }}
-                                              style={{
-                                                flex: 1, minWidth: 70, padding: "12px 0", borderRadius: 999,
-                                                background: isSelected ? colors.accent : colors.cardBg,
-                                                color: isSelected ? colors.primaryText : colors.text,
-                                                border: "none", cursor: "pointer",
-                                                fontSize: 13, fontWeight: 700,
-                                              }}
-                                            >
-                                              {opt}
-                                            </button>
-                                          );
-                                        })}
+
+                                      {/* Vote buttons — 2 + 1 layout like Stitch */}
+                                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                          {["Yes", "Maybe"].map((opt) => {
+                                            const optLower = opt.toLowerCase();
+                                            const isSelected = myResponse?.response === optLower;
+                                            return (
+                                              <button
+                                                key={opt}
+                                                className="btn-press"
+                                                onClick={async () => { await respondToPoll(poll.id, optLower); const res = await getActivePolls(); setActivePolls(res.data || []); }}
+                                                style={{
+                                                  flex: 1, padding: "12px 0", borderRadius: 12,
+                                                  background: isSelected ? colors.accent : colors.cardBg,
+                                                  color: isSelected ? colors.primaryText : colors.text,
+                                                  border: "none", cursor: "pointer",
+                                                  fontSize: 14, fontWeight: 700,
+                                                }}
+                                              >
+                                                {opt}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                        <button
+                                          className="btn-press"
+                                          onClick={async () => { await respondToPoll(poll.id, "no"); const res = await getActivePolls(); setActivePolls(res.data || []); }}
+                                          style={{
+                                            width: "100%", padding: "12px 0", borderRadius: 12,
+                                            background: myResponse?.response === "no" ? colors.accent : colors.cardBg,
+                                            color: myResponse?.response === "no" ? colors.primaryText : colors.text,
+                                            border: "none", cursor: "pointer",
+                                            fontSize: 14, fontWeight: 700,
+                                          }}
+                                        >
+                                          No
+                                        </button>
                                       </div>
+
                                       {/* Meta row */}
                                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.3 }}>
                                         <span>{totalVotes} votes cast</span>
@@ -4678,13 +4739,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                   }
                                   const timeAgo = (() => {
                                     const diff = Date.now() - new Date(ann.created_at).getTime();
-                                    const hrs = Math.floor(diff / 3600000);
-                                    if (hrs < 1) return "Just now";
-                                    if (hrs < 24) return `${hrs} hours ago`;
+                                    const mins = Math.floor(diff / 60000);
+                                    if (mins < 1) return "Just now";
+                                    if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""} ago`;
+                                    const hrs = Math.floor(mins / 60);
+                                    if (hrs < 24) return `${hrs} hour${hrs !== 1 ? "s" : ""} ago`;
                                     const days = Math.floor(hrs / 24);
                                     if (days === 1) return "Yesterday";
-                                    return `${days} days ago`;
+                                    return `${days} day${days !== 1 ? "s" : ""} ago`;
                                   })();
+                                  const emojiMap = { thumbsup: "\u{1F44D}", fire: "\u{1F525}", heart: "\u2764\uFE0F", clap: "\u{1F44F}", "100": "\u{1F4AF}" };
                                   return (
                                     <div key={ann.id} style={{ display: "flex", gap: 12, padding: "16px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}>
                                       {/* Avatar */}
@@ -4724,7 +4788,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                                   fontSize: 12, color: colors.text,
                                                 }}
                                               >
-                                                {emoji} <span style={{ fontWeight: 700 }}>{info.count}</span>
+                                                {emojiMap[emoji] || emoji} <span style={{ fontWeight: 700 }}>{info.count}</span>
                                               </button>
                                             ))}
                                           </div>
