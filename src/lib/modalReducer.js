@@ -628,7 +628,7 @@ export function modalReducer(state, action) {
     case "OPEN_SOCIAL":
       return {
         ...state,
-        social: { isOpen: true, tab: action.payload?.tab || "friends" },
+        social: { isOpen: true, tab: action.payload?.tab || "feed" },
       };
 
     case "UPDATE_SOCIAL":

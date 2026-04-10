@@ -49,10 +49,11 @@ export async function getMyGroups() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: [], error: { message: "Not authenticated" } };
 
+  // Single query: get user's memberships with group info
   const { data, error } = await supabase
     .from("group_members")
     .select(`
-      id, role, status, joined_at,
+      id, role, status, joined_at, group_id,
       group:groups(id, name, description, created_by, created_at)
     `)
     .eq("user_id", user.id)
@@ -67,29 +68,29 @@ export async function getMyGroups() {
       ...m.group,
     }));
 
-  // Fetch member counts + facepile avatars for each group
-  if (groups.length > 0) {
-    const groupIds = groups.map(g => g.id);
-    const { data: allMembers } = await supabase
-      .from("group_members")
-      .select("group_id, user_id, role, profile:profiles!group_members_user_id_fkey(avatar_url, username)")
-      .in("group_id", groupIds)
-      .eq("status", "accepted");
+  if (groups.length === 0) return { data: groups, error };
 
-    const byGroup = {};
-    for (const m of allMembers || []) {
-      if (!byGroup[m.group_id]) byGroup[m.group_id] = [];
-      byGroup[m.group_id].push(m);
-    }
-    for (const g of groups) {
-      const members = byGroup[g.id] || [];
-      g.member_count = members.length;
-      g.facepile = members.slice(0, 4).map(m => ({
-        avatar_url: m.profile?.avatar_url || null,
-        username: m.profile?.username || "?",
-        isAdmin: m.role === "admin",
-      }));
-    }
+  // Parallel fetch: all accepted members for all user's groups (single query, not N+1)
+  const groupIds = groups.map(g => g.id);
+  const { data: allMembers } = await supabase
+    .from("group_members")
+    .select("group_id, role, profile:profiles!group_members_user_id_fkey(avatar_url, username)")
+    .in("group_id", groupIds)
+    .eq("status", "accepted");
+
+  const byGroup = {};
+  for (const m of allMembers || []) {
+    if (!byGroup[m.group_id]) byGroup[m.group_id] = [];
+    byGroup[m.group_id].push(m);
+  }
+  for (const g of groups) {
+    const members = byGroup[g.id] || [];
+    g.member_count = members.length;
+    g.facepile = members.slice(0, 4).map(m => ({
+      avatar_url: m.profile?.avatar_url || null,
+      username: m.profile?.username || "?",
+      isAdmin: m.role === "admin",
+    }));
   }
 
   return { data: groups, error };
@@ -754,7 +755,22 @@ export async function getPendingPollCount() {
 /**
  * Fetch active polls across all of the user's groups (open, deadline not passed).
  */
+// Helper: get IDs of groups the user belongs to
+async function getMyGroupIds() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from("group_members")
+    .select("group_id")
+    .eq("user_id", user.id)
+    .eq("status", "accepted");
+  return (data || []).map(m => m.group_id);
+}
+
 export async function getActivePolls() {
+  const groupIds = await getMyGroupIds();
+  if (groupIds.length === 0) return { data: [], error: null };
+
   const { data, error } = await supabase
     .from("group_polls")
     .select(`
@@ -764,6 +780,7 @@ export async function getActivePolls() {
       poll_responses(id, poll_id, user_id, response, attended, responded_at),
       group:groups!group_polls_group_id_fkey(id, name)
     `)
+    .in("group_id", groupIds)
     .eq("closed", false)
     .order("created_at", { ascending: false })
     .limit(10);
@@ -777,9 +794,12 @@ export async function getActivePolls() {
 }
 
 /**
- * Fetch recent announcements across all of the user's groups.
+ * Fetch recent announcements from the user's groups only.
  */
 export async function getRecentAnnouncements() {
+  const groupIds = await getMyGroupIds();
+  if (groupIds.length === 0) return { data: [], error: null };
+
   const { data, error } = await supabase
     .from("group_announcements")
     .select(`
@@ -788,6 +808,7 @@ export async function getRecentAnnouncements() {
       announcement_reactions(id, announcement_id, user_id, emoji, created_at),
       group:groups!group_announcements_group_id_fkey(id, name)
     `)
+    .in("group_id", groupIds)
     .order("created_at", { ascending: false })
     .limit(10);
 
