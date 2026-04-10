@@ -790,19 +790,18 @@ const SEVERITY_RANK = { HIGH: 3, MEDIUM: 2, LOW: 1, INFO: 0 };
 
 /**
  * Normalize a raw insight into a UI-friendly shape.
- * { title, message, severity, suggestions[] } → { headline, detail, severity, cta? }
+ * { title, message, severity, suggestions[] } → { headline, detail, severity, ctas[] }
  */
 export function normalizeInsight(insight) {
   if (!insight) return null;
-  const cta =
-    Array.isArray(insight.suggestions) && insight.suggestions.length > 0
-      ? insight.suggestions[0]
-      : null;
+  const ctas = Array.isArray(insight.suggestions)
+    ? insight.suggestions.filter(Boolean)
+    : [];
   return {
     headline: (insight.title || "Insight").replace(/^[\u2600-\u27BF\uFE00-\uFE0F\u{1F000}-\u{1FFFF}]\s*/u, ""),
     detail: insight.message || "",
     severity: insight.severity || "INFO",
-    cta,
+    ctas,
     evidence: insight.evidence || "",
     expectedOutcome: insight.expected_outcome || "",
     confidence: typeof insight.confidence === "number" ? insight.confidence : null,

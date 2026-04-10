@@ -43,6 +43,47 @@ function renderSupportLine(label, text, style = {}) {
   );
 }
 
+function filterInsightCtas(ctas, existingNames) {
+  return (Array.isArray(ctas) ? ctas : []).filter((cta) => {
+    const name = cta?.exercise?.toLowerCase();
+    return name && !existingNames.has(name);
+  });
+}
+
+function renderInsightCtas(ctas, onAddExercise, colors, accentColor, compact = false) {
+  if (!Array.isArray(ctas) || ctas.length === 0) return null;
+  return (
+    <div style={{
+      display: "flex",
+      flexWrap: "wrap",
+      gap: compact ? 6 : 8,
+      justifyContent: compact ? "flex-start" : "center",
+      marginTop: compact ? 6 : 12,
+    }}>
+      {ctas.map((cta) => (
+        <button
+          key={`${cta.catalogId || cta.exercise}-${cta.exercise}`}
+          onClick={() => onAddExercise(cta.exercise)}
+          className="btn-press"
+          style={{
+            padding: compact ? "4px 10px" : "6px 12px",
+            fontSize: compact ? 12 : 12,
+            fontWeight: compact ? 600 : 700,
+            borderRadius: compact ? 6 : 8,
+            border: `1px solid ${compact ? colors.border : `${accentColor}44`}`,
+            background: compact ? "transparent" : `${accentColor}18`,
+            color: colors.text,
+            cursor: "pointer",
+            opacity: compact ? 0.75 : 1,
+          }}
+        >
+          + Add {cta.exercise}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // CoachHeroInsight — Lightweight inline insight for the sessions hero state
 // ---------------------------------------------------------------------------
@@ -64,8 +105,8 @@ export function CoachHeroInsight({
 
   const topRaw = selectTopInsight(insights);
   const hero = topRaw ? normalizeInsight(topRaw) : null;
-  if (hero && hero.cta && existingNames.has(hero.cta.exercise.toLowerCase())) {
-    hero.cta = null;
+  if (hero) {
+    hero.ctas = filterInsightCtas(hero.ctas, existingNames);
   }
 
   useEffect(() => { ensureAnimation(); }, []);
@@ -159,21 +200,7 @@ export function CoachHeroInsight({
             maxWidth: 320,
             margin: "8px auto 0",
           })}
-          {hero.cta && (
-            <button
-              onClick={() => onAddExercise(hero.cta.exercise)}
-              className="btn-press"
-              style={{
-                marginTop: 12, padding: "8px 18px", fontSize: 13, fontWeight: 700,
-                borderRadius: 10, border: `1px solid ${colors.border}`,
-                background: colors.cardBg, color: colors.text,
-                cursor: "pointer",
-                boxShadow: colors.shadow,
-              }}
-            >
-              + Add {hero.cta.exercise}
-            </button>
-          )}
+          {renderInsightCtas(hero.ctas, onAddExercise, colors, accentColor)}
         </div>
       )}
       {onRefresh && !loading && (
@@ -225,16 +252,16 @@ export function CoachInsightsCard({
   const normalized = hasInsights
     ? insights.map((i) => {
         const n = normalizeInsight(i);
-        if (n && n.cta && existingNames.has(n.cta.exercise.toLowerCase())) {
-          n.cta = null;
+        if (n) {
+          n.ctas = filterInsightCtas(n.ctas, existingNames);
         }
         return n;
       }).filter(Boolean)
     : [];
   const topRaw = selectTopInsight(insights);
   const hero = topRaw ? normalizeInsight(topRaw) : null;
-  if (hero && hero.cta && existingNames.has(hero.cta.exercise.toLowerCase())) {
-    hero.cta = null;
+  if (hero) {
+    hero.ctas = filterInsightCtas(hero.ctas, existingNames);
   }
   const rest = normalized.filter((n) => n !== hero && n.headline !== hero?.headline);
 
@@ -363,19 +390,7 @@ export function CoachInsightsCard({
                 lineHeight: 1.45,
                 marginTop: 4,
               })}
-              {hero.cta && (
-                <button
-                  onClick={() => onAddExercise(hero.cta.exercise)}
-                  style={{
-                    marginTop: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700,
-                    borderRadius: 8, border: `1px solid ${accentColor}44`,
-                    background: `${accentColor}18`, color: colors.text,
-                    cursor: "pointer",
-                  }}
-                >
-                  + Add {hero.cta.exercise}
-                </button>
-              )}
+              {renderInsightCtas(hero.ctas, onAddExercise, colors, accentColor)}
             </div>
           )}
 
@@ -446,19 +461,7 @@ function CompactInsight({ item, onAddExercise, colors }) {
         lineHeight: 1.4,
         marginTop: 4,
       })}
-      {item.cta && (
-        <button
-          onClick={() => onAddExercise(item.cta.exercise)}
-          style={{
-            marginTop: 4, padding: "4px 10px", fontSize: 12, fontWeight: 600,
-            borderRadius: 6, border: `1px solid ${colors.border}`,
-            background: "transparent", color: colors.text,
-            cursor: "pointer", opacity: 0.7,
-          }}
-        >
-          + Add {item.cta.exercise}
-        </button>
-      )}
+      {renderInsightCtas(item.ctas, onAddExercise, colors, accent, true)}
     </div>
   );
 }

@@ -1182,11 +1182,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       profile, state, dateRange: coachDateRange, catalog: filteredCatalog, equipment,
       measurementSystem: state.preferences?.measurementSystem,
       checkinContext: autoCheckinCtx, coachNotesFromStorage: autoCoachNotes,
-      onInsight: (insight) => {
-        if (!cancelled && coachReqIdRef.current === reqId) {
-          setCoachInsights(prev => [...prev, insight]);
-        }
-      },
+      onInsight: () => {},
     })
       .then(({ insights, fromCache, coachNotes: returnedNotes }) => {
         if (cancelled || coachReqIdRef.current !== reqId) return;
@@ -2718,19 +2714,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       coachNotesData = loadCoachNotes();
     }
 
-    let streamedCount = 0;
-
     fetchCoachInsights({
       profile, state, dateRange: coachDateRange,
       options: { forceRefresh: true }, catalog: refreshCatalog, equipment,
       measurementSystem: state.preferences?.measurementSystem,
       checkinContext: checkinCtx, coachNotesFromStorage: coachNotesData,
-      onInsight: (insight) => {
-        if (coachReqIdRef.current === reqId) {
-          streamedCount++;
-          setCoachInsights(prev => [...prev, insight]);
-        }
-      },
+      onInsight: () => {},
     })
       .then(({ insights, coachNotes: returnedNotes }) => {
         if (coachReqIdRef.current !== reqId) return;
@@ -2759,14 +2748,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       })
       .catch((err) => {
         if (coachReqIdRef.current !== reqId) return;
-        if (streamedCount === 0) {
-          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDateRange, catalogMap);
-          setCoachInsights(detectImbalancesNormalized(analysis, {
-            catalog: refreshCatalog,
-            checkin: checkinForFetch,
-            userExerciseNames: (state.program?.workouts || []).flatMap((w) => (w.exercises || []).map((ex) => ex.name)),
-          }));
-        }
+        const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDateRange, catalogMap);
+        setCoachInsights(detectImbalancesNormalized(analysis, {
+          catalog: refreshCatalog,
+          checkin: checkinForFetch,
+          userExerciseNames: (state.program?.workouts || []).flatMap((w) => (w.exercises || []).map((ex) => ex.name)),
+        }));
         const detail = err?.message || String(err);
         setCoachError(`AI coach unavailable \u2014 showing basic analysis${detail ? ` (${detail})` : ""}`);
       })
