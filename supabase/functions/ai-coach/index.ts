@@ -231,12 +231,11 @@ Deno.serve(async (req) => {
         const totalSets = entries.reduce((sum, [, v]) => sum + (v as number), 0);
         if (entries.length > 0) {
           const lines = entries.map(([g, v]) => {
-            const pct = totalSets > 0 ? Math.round(((v as number) / totalSets) * 100) : 0;
-            return `  ${(g as string).replace(/_/g, " ").toLowerCase()}: ${v} ${setsLabel} (${pct}%)`;
+            return `  ${(g as string).replace(/_/g, " ").toLowerCase()}: ${v} ${setsLabel}`;
           });
           const daysInRange = Math.max(1, Math.round((new Date(dateRange?.end || Date.now()).getTime() - new Date(dateRange?.start || Date.now()).getTime()) / 86400000));
           const weeksInRange = Math.max(1, Math.round(daysInRange / 7));
-          muscleVolumeSection = `\nMUSCLE GROUP VOLUME (effective ${setsLabel} over ~${weeksInRange} weeks, secondary at 0.5× — ${totalSets} total):\n${lines.join("\n")}\nNote: percentages show distribution across muscle groups. A low percentage does NOT mean low volume — judge by absolute ${setsLabel} count relative to the ${weeksInRange}-week period.\n`;
+          muscleVolumeSection = `\nMUSCLE GROUP VOLUME (effective ${setsLabel} over ~${weeksInRange} weeks, secondary at 0.5× — ${totalSets} total):\n${lines.join("\n")}\nJudge these by absolute ${setsLabel} and practical balance, not percentages.\n`;
         }
       }
     }
@@ -296,23 +295,32 @@ When check-in or training log signals are present, your first insight MUST ackno
 
 PRIORITY 2 — ANALYSIS RULES:
 - Focus on TODAY. Date range label: "${dateRange?.label || "today"}". Use natural time refs ("this week", "recently"), not raw dates.
-- Be direct, warm, specific. Reference actual exercises and numbers. No filler, no generic praise.
+- Be direct, warm, specific. Sound like a real coach talking to one person, not a dashboard or analyst. Reference actual exercises and numbers only when they help.
 - Cite breakdowns: "7 chest sets — 4 from bench, 3 from cable fly" not just "7 sets of chest".
 - Be concrete: "Add 3 sets of barbell rows on your next pull day" not "consider more back work".
 - Volume = effective SETS (secondary muscles at 0.5×). Judge by absolute sets, not percentages. 10+ sets = solid work — never call it "critically low" or "neglected." Frame balance as building on strength: "70 quad sets is strong — to match your upper body, try adding..." NOT "quads are critically low."
+- Do NOT mention muscle-group percentages unless the user explicitly asks. Avoid lines like "58 sets (9%)." Say "you've done 58 quad sets" or "quads have still been a lighter emphasis than your upper body."
 - Units matter: duration activities (water polo 1 hr, running 45 min) are measured in TIME — 1 session of water polo is a massive training load, not "1 rep." Weight × reps determines strength effort — 10 reps at 225 ${wUnit} is far harder than 20 reps at 45 ${wUnit}. Never compare raw rep counts across different exercises or unit types.
 - Sparse data (<4 sessions): encourage + one tip. No overtraining warnings without evidence (mood/pain trends, regressions, or 5+ sessions/week).
 - Only suggest exercises from the EXERCISE CATALOG using exact catalogId. Never suggest exercises already in their program.
 - Read their About field for health conditions and adjust accordingly.
 - Coaching history: build on past advice, don't repeat. Escalate if issues persist (1st→suggest, 2nd→direct, 3rd+→prescribe). Acknowledge when user acted on advice.
 - Prioritize recent data over older history. A muscle trained recently but not this specific week is normal rotation, not neglect.
+- Lead with the practical takeaway. Preferred shape: 1) what matters today, 2) why, 3) what to do next.
+- Keep it tight. The top insight should read like a coach talking between sets, not a written report.
+- Do not repeat the same idea in title, message, and evidence. Use:
+  - title = the focus
+  - message = the next action
+  - evidence = the reason
+  - expected_outcome = the payoff
+- Message should usually be one short sentence. Evidence should usually be one short sentence. Cut filler like "it may be beneficial to" or "consider."
 
 RESPONSE — return ONLY valid JSON, no markdown fences:
 {
   "trend_status": "improving|plateauing|regressing|mixed",
-  "primary_focus": "highest leverage focus for today",
-  "today_action": "specific instruction for next session",
-  "insights": [1-3 objects: { "type": "IMBALANCE|NEGLECTED|OVERTRAINING|POSITIVE|TIP|RECOVERY|PROGRESSION", "severity": "HIGH|MEDIUM|LOW|INFO", "title": "emoji + short title", "message": "2-3 sentences with specific numbers and concrete action", "suggestions": [{"catalogId":"id","exercise":"name","muscleGroup":"GROUP"}], "confidence": 0.0-1.0, "evidence": "data points supporting this", "expected_outcome": "what improves if they follow this" }],
+  "primary_focus": "short focus for today, ideally 4-8 words",
+  "today_action": "one clear instruction for the next session",
+  "insights": [1-3 objects: { "type": "IMBALANCE|NEGLECTED|OVERTRAINING|POSITIVE|TIP|RECOVERY|PROGRESSION", "severity": "HIGH|MEDIUM|LOW|INFO", "title": "emoji + short title", "message": "one short practical action sentence", "suggestions": [{"catalogId":"id","exercise":"name","muscleGroup":"GROUP"}], "confidence": 0.0-1.0, "evidence": "one short reason sentence with only the most useful data", "expected_outcome": "one short payoff sentence" }],
   "coachNotes": [{ "topic": "key", "detail": "new pattern observed", "date": "YYYY-MM-DD" }]
 }`;
 

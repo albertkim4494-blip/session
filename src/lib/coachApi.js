@@ -883,7 +883,7 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
     }
   }
 
-  // Format each muscle group with percentages
+  // Format each muscle group with plain-language workload detail.
   const lines = [];
   const sortedGroups = Object.entries(muscleExercises).sort(
     ([, a], [, b]) => b.reduce((s, e) => s + e.sets, 0) - a.reduce((s, e) => s + e.sets, 0)
@@ -893,7 +893,6 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
   );
   for (const [group, entries] of sortedGroups) {
     const totalSets = entries.reduce((s, e) => s + e.sets, 0);
-    const pct = grandTotalSets > 0 ? Math.round((totalSets / grandTotalSets) * 100) : 0;
     // Merge same-exercise entries across dates
     const byName = {};
     for (const e of entries) {
@@ -903,12 +902,12 @@ function buildMuscleVolumeDetail(recentLogs, allWorkouts, dateRange, catalogMap)
       if (!byName[e.name].dates.includes(shortDate)) byName[e.name].dates.push(shortDate);
     }
     const parts = Object.entries(byName).map(
-      ([name, d]) => `${name} ×${d.sets} (${d.dates.join(", ")})`
+      ([name, d]) => `${name} x${d.sets} (${d.dates.join(", ")})`
     );
-    lines.push(`  ${group.replace(/_/g, " ").toLowerCase()}: ${totalSets} sets (${pct}%) — ${parts.join(", ")}`);
+    lines.push(`  ${group.replace(/_/g, " ").toLowerCase()}: ${totalSets} sets - ${parts.join(", ")}`);
   }
 
-  return lines.length > 0 ? `Total: ${grandTotalSets} effective sets (incl. secondary at 0.5×)\n${lines.join("\n")}` : null;
+  return lines.length > 0 ? `Total: ${grandTotalSets} effective sets (incl. secondary at 0.5x)\n${lines.join("\n")}` : null;
 }
 
 /**
@@ -1329,7 +1328,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     sportTraits: sportTraitsPayload?.aggregated || null,
     muscleSetsSummary,
     coachSignals,
-    muscleVolumeDetail: null, // Omitted for speed — muscleSetsSummary has the numbers
+    muscleVolumeDetail: muscleVolumeDetail?.slice(0, 1600) || null,
     recentHistory: tieredHistory.recentHistory?.slice(0, 1500) || null,
     olderHistory: tieredHistory.olderHistory?.slice(0, 800) || null,
     modelHint,
@@ -1371,7 +1370,7 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     });
 
     const combinedParts = [];
-    if (todayAction) combinedParts.push(`Next: ${todayAction}`);
+    if (todayAction) combinedParts.push(todayAction);
     if (baseInsight.message) combinedParts.push(baseInsight.message);
 
     const heroInsight = normalizeInsightFields({
@@ -1385,9 +1384,83 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
     return [heroInsight, ...restInsights];
   }
 
+  function softenCoachVoice(text) {
+    if (typeof text !== "string" || !text.trim()) return text || "";
+
+    return text
+      .replace(/\s*\(\d{1,3}%\)/g, "")
+      .replace(/\b(remains low|is low|was low) at (\d+(?:\.\d+)?) sets\b/gi, "has been light at $2 sets")
+      .replace(/\b(\d+(?:\.\d+)?) sets? \((?:\d{1,3})%\)/gi, "$1 sets")
+      .replace(/\bNo direct ([a-z ]+) sets logged this period\b/gi, "You have not logged direct $1 work lately")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
+  function splitSentences(text) {
+    return softenCoachVoice(text)
+      .split(/(?<=[.!?])\s+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
+  function trimInsightMessage(text, maxSentences = 2) {
+    const sentences = splitSentences(text);
+    if (sentences.length === 0) return "";
+    return sentences.slice(0, maxSentences).join(" ");
+  }
+
+  function shortenHeadline(text) {
+    const cleaned = softenCoachVoice(text)
+      .replace(/\b(today|right now|for today)\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    if (!cleaned) return "Today's focus";
+    return cleaned.length > 48 ? `${cleaned.slice(0, 45).trim()}...` : cleaned;
+  }
+
+  function toCoachLine(text, prefix) {
+    const line = trimInsightMessage(text, 1);
+    if (!line) return "";
+    const normalized = line.replace(/[.!?]+$/, "");
+    return prefix ? `${prefix}: ${normalized}` : normalized;
+  }
+
+  function humanizeInsight(insight) {
+    return {
+      ...insight,
+      title: shortenHeadline(insight?.title || "Insight"),
+      message: trimInsightMessage(insight?.message || "", 2),
+      evidence: toCoachLine(insight?.evidence || "", ""),
+      expected_outcome: toCoachLine(insight?.expected_outcome || "", ""),
+    };
+  }
+
+  function formatStructuredInsights(insights) {
+    if (!Array.isArray(insights) || insights.length === 0) return [];
+    const [hero, ...rest] = insights;
+    const heroSentences = splitSentences(hero?.message || "");
+    const formattedHero = hero ? {
+      ...hero,
+      message: heroSentences[0] ? toCoachLine(heroSentences[0], "Next") : "",
+      evidence: hero.evidence || heroSentences[1] || "",
+      expected_outcome: hero.expected_outcome || "",
+    } : null;
+
+    const formattedRest = rest.map((insight) => ({
+      ...insight,
+      message: trimInsightMessage(insight.message, 1),
+      evidence: toCoachLine(insight.evidence || "", ""),
+      expected_outcome: toCoachLine(insight.expected_outcome || "", ""),
+    }));
+
+    return formattedHero ? [formattedHero, ...formattedRest] : formattedRest;
+  }
+
   // Helper: post-process insights (save history, filter, cache)
   function postProcess(insights, coachNotesData, summaryData) {
-    const enhancedInsights = buildHeroSummaryInsight(insights, summaryData);
+    const enhancedInsights = formatStructuredInsights(
+      buildHeroSummaryInsight(insights, summaryData).map(humanizeInsight)
+    );
     const updatedHistory = saveInsightHistory(enhancedInsights, insightHistory, {
       muscleSetsSummary,
       progressionTrends,

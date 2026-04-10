@@ -586,8 +586,8 @@ export function detectImbalancesNormalized(analysis, opts) {
         severity: 'LOW',
         title: `\uD83D\uDCCA ${groupName} needs attention`,
         message: groupSets === 0
-          ? `No direct ${groupName} sets logged this period. Consider adding some targeted work.`
-          : `${groupSets} direct ${groupName} set${groupSets !== 1 ? 's' : ''} — could benefit from a bit more volume.`,
+          ? `You have not logged any direct ${groupName} work lately. A little targeted work would round things out.`
+          : `You have only logged ${groupSets} direct ${groupName} set${groupSets !== 1 ? 's' : ''} lately. A bit more volume here would help balance things out.`,
         suggestions: getSuggestionsForMuscleGroup(group, catalog, userExerciseNames)
       });
     }

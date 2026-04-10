@@ -162,6 +162,23 @@ function formatPace(h, m, s) {
   return `${m}:${ss}`;
 }
 
+function serializeCoachCheckin(checkin) {
+  if (!checkin) return "none";
+  const pain = (checkin.pain || [])
+    .map((entry) => `${entry.area || ""}:${entry.severity || ""}`)
+    .sort()
+    .join("|");
+  return `${checkin.mood ?? ""}|${checkin.sleep ?? ""}|${pain}`;
+}
+
+function buildCoachContextSignature(coachTodayKey, coachSignature, todayCheckin) {
+  return `${coachTodayKey}|${coachSignature}|${serializeCoachCheckin(todayCheckin)}`;
+}
+
+function getCoachCacheKey(userId, coachTodayKey) {
+  return `wt_coach_v2:${userId}:${coachTodayKey}`;
+}
+
 // ============================================================================
 // MAIN APP COMPONENT
 // ============================================================================
@@ -181,6 +198,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [summaryMode, setSummaryMode] = useState("week");
   const [summaryOffset, setSummaryOffset] = useState(0);
   const [dateKey, setDateKey] = useState(() => yyyyMmDd(new Date()));
+  const [coachTodayKey, setCoachTodayKey] = useState(() => yyyyMmDd(new Date()));
   const [manageWorkoutId, setManageWorkoutId] = useState(null);
   const [collapsedManage, setCollapsedManage] = useState(() => {
     try {
@@ -271,14 +289,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const coachFetchingRef = useRef(false);  // lock to prevent concurrent fetches
   const [coachUnseen, setCoachUnseen] = useState(false);
   const MAX_DAILY_REFRESHES = 10;
-  const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(dateKey));
+  const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(yyyyMmDd(new Date())));
   const [checkinEditSection, setCheckinEditSection] = useState(null); // null | "mood" | "sleep" | "pain"
 
-  // Sync todayCheckin when dateKey changes (e.g. date navigation, midnight rollover)
+  // Coach check-in is anchored to actual today, not the browsed calendar date.
   useEffect(() => {
-    setTodayCheckin(getTodayCheckin(dateKey));
+    setTodayCheckin(getTodayCheckin(coachTodayKey));
     setCheckinEditSection(null);
-  }, [dateKey]);
+  }, [coachTodayKey]);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const checkinEditSectionRef = useRef(null);
   checkinEditSectionRef.current = checkinEditSection;
@@ -596,6 +614,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   useEffect(() => {
     const checkMidnight = () => {
       const now = yyyyMmDd(new Date());
+      setCoachTodayKey(now);
       setDateKey(prev => {
         // Only advance if prev was yesterday (meaning it was "today" before midnight crossed)
         // If user is browsing an older date intentionally, leave them alone
@@ -1082,48 +1101,69 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     () => computeCoachSignature(state),
     [state.logsByDate, state.program.workouts]
   );
+  const coachContextSignature = useMemo(
+    () => buildCoachContextSignature(coachTodayKey, coachSignature, todayCheckin),
+    [coachTodayKey, coachSignature, todayCheckin]
+  );
+  const coachDateRange = useMemo(() => {
+    const end = coachTodayKey;
+    return { start: addDays(end, -90), end };
+  }, [coachTodayKey]);
 
-  // AI Coach — once-per-day auto-fetch, cached insights otherwise
-  // Coach always analyzes last 90 days (decoupled from progress tab time range)
   useEffect(() => {
-    if (!dataReady || !profile) return;
+    if (!dataReady || !profile || !session?.user?.id) return;
 
-    const userId = session.user.id;
-    const cacheKey = `wt_coach_v2:${userId}:${dateKey}`;
-    const autoDateKey = "wt_coach_last_auto_date";
+    const cacheKey = getCoachCacheKey(session.user.id, coachTodayKey);
 
-    // Fixed 90-day range for coach analysis
-    const coachEnd = dateKey;
-    const coachStart = addDays(coachEnd, -90);
-    const coachDateRange = { start: coachStart, end: coachEnd };
-
-    // 1. Try localStorage persisted cache — always show cached insights immediately
     try {
       const stored = JSON.parse(localStorage.getItem(cacheKey));
-      if (stored && stored.insights?.length > 0 && Date.now() - stored.createdAt < COACH_CACHE_TTL_MS) {
+      const isFresh = stored && Date.now() - stored.createdAt < COACH_CACHE_TTL_MS;
+      const isMatch = stored?.contextSignature === coachContextSignature;
+      if (isFresh && isMatch && stored.insights?.length > 0) {
         setCoachInsights(stored.insights);
-        coachLastSignatureRef.current = stored.signature;
+        setCoachError(null);
+        coachLastSignatureRef.current = stored.signature || coachSignature;
         coachLastFetchRef.current = stored.createdAt;
       }
     } catch {}
 
-    // 2. Check in-memory cache
-    const memCached = coachCacheRef.current.get(coachSignature);
+    const memCached = coachCacheRef.current.get(coachContextSignature);
     if (memCached && Date.now() - memCached.createdAt < COACH_CACHE_TTL_MS) {
       setCoachInsights(memCached.insights);
       setCoachError(null);
+      coachLastSignatureRef.current = coachSignature;
+      coachLastFetchRef.current = memCached.createdAt;
     }
+  }, [coachContextSignature, coachSignature, coachTodayKey, dataReady, profile, session?.user?.id]);
 
-    // 3. Only auto-fetch if user already checked in today
-    const autoCheckin = getTodayCheckin(dateKey);
-    if (!autoCheckin) return; // No check-in yet — wait until user submits one
+  // AI Coach — once-per-day auto-fetch, cached insights otherwise
+  // Coach always analyzes last 90 days (decoupled from progress tab time range)
+  useEffect(() => {
+    if (!dataReady || !profile || !session?.user?.id) return;
+    if (!todayCheckin) return;
+    if (coachFetchingRef.current) return;
 
-    // 4. Once-per-session auto-fetch: fetch once per app launch (sessionStorage clears on restart)
-    const today = new Date().toISOString().slice(0, 10);
+    const userId = session.user.id;
+    const cacheKey = getCoachCacheKey(userId, coachTodayKey);
+    const autoDateKey = `wt_coach_last_auto_date:${userId}`;
+
+    // Once-per-session auto-fetch: fetch once per app launch for today's coach.
+    const today = coachTodayKey;
     const lastAutoDate = sessionStorage.getItem(autoDateKey);
-    if (lastAutoDate === today) return; // Already fetched today — use cached insights
+    if (lastAutoDate === today) return;
 
-    // 5. Fetch from AI with streaming
+    // If we already have a fresh cache for the same workout + check-in context, skip the paid call.
+    try {
+      const stored = JSON.parse(localStorage.getItem(cacheKey));
+      const isFresh = stored && Date.now() - stored.createdAt < COACH_CACHE_TTL_MS;
+      const isMatch = stored?.contextSignature === coachContextSignature;
+      if (isFresh && isMatch && stored.insights?.length > 0) {
+        sessionStorage.setItem(autoDateKey, today);
+        return;
+      }
+    } catch {}
+
+    // Fetch from AI with streaming
     coachLastSignatureRef.current = coachSignature;
     let cancelled = false;
     const reqId = ++coachReqIdRef.current;
@@ -1131,12 +1171,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     coachFetchingRef.current = true;
     setCoachLoading(true);
     setCoachStreaming(true);
-    setCoachInsights([]);
 
     const filteredCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
     const coachOpts = { catalog: filteredCatalog };
 
-    const autoCheckinCtx = buildCheckinContext(autoCheckin, loadCheckins(), state.logsByDate);
+    const autoCheckinCtx = buildCheckinContext(todayCheckin, loadCheckins(), state.logsByDate);
     const autoCoachNotes = loadCoachNotes();
 
     fetchCoachInsights({
@@ -1155,10 +1194,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         setCoachError(null);
         coachLastSignatureRef.current = coachSignature;
         coachLastFetchRef.current = Date.now();
-        coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
+        coachCacheRef.current.set(coachContextSignature, { insights, createdAt: Date.now() });
         try {
           localStorage.setItem(cacheKey, JSON.stringify({
-            insights, signature: coachSignature, createdAt: Date.now(),
+            insights,
+            signature: coachSignature,
+            contextSignature: coachContextSignature,
+            createdAt: Date.now(),
           }));
         } catch {}
         try { sessionStorage.setItem(autoDateKey, today); } catch {}
@@ -1175,7 +1217,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDateRange, catalogMap);
           setCoachInsights(detectImbalancesNormalized(analysis, {
             ...coachOpts,
-            checkin: autoCheckin,
+            checkin: todayCheckin,
             userExerciseNames: (state.program?.workouts || []).flatMap((w) => (w.exercises || []).map((ex) => ex.name)),
           }));
         }
@@ -1191,7 +1233,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       });
 
     return () => { cancelled = true; };
-  }, [dataReady, profile]);
+  }, [
+    catalogMap,
+    coachContextSignature,
+    coachDateRange,
+    coachSignature,
+    coachTodayKey,
+    dataReady,
+    equipment,
+    fullCatalog,
+    profile,
+    session?.user?.id,
+    state,
+    todayCheckin,
+  ]);
 
   // ---------------------------------------------------------------------------
   // EFFECTS
@@ -2650,14 +2705,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const reqId = ++coachReqIdRef.current;
     coachFetchingRef.current = true;
     setCoachLoading(true);
-    setCoachInsights([]);
     setCoachStreaming(true);
     setCoachError(null);
 
     const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
-    const coachEnd = dateKey;
-    const coachStart = addDays(coachEnd, -90);
-    const checkinForFetch = checkinData || checkinOverride || getTodayCheckin(dateKey);
+    const checkinForFetch = checkinData || checkinOverride || getTodayCheckin(coachTodayKey);
+    const fetchContextSignature = buildCoachContextSignature(coachTodayKey, coachSignature, checkinForFetch);
     let checkinCtx = null;
     let coachNotesData = null;
     if (checkinForFetch) {
@@ -2668,7 +2721,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     let streamedCount = 0;
 
     fetchCoachInsights({
-      profile, state, dateRange: { start: coachStart, end: coachEnd },
+      profile, state, dateRange: coachDateRange,
       options: { forceRefresh: true }, catalog: refreshCatalog, equipment,
       measurementSystem: state.preferences?.measurementSystem,
       checkinContext: checkinCtx, coachNotesFromStorage: coachNotesData,
@@ -2685,9 +2738,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         setCoachUnseen(true);
         coachLastSignatureRef.current = coachSignature;
         coachLastFetchRef.current = Date.now();
-        coachCacheRef.current.set(coachSignature, { insights, createdAt: Date.now() });
-        const cacheKey = `wt_coach_v2:${session.user.id}:${dateKey}`;
-        try { localStorage.setItem(cacheKey, JSON.stringify({ insights, signature: coachSignature, createdAt: Date.now() })); } catch {}
+        coachCacheRef.current.set(fetchContextSignature, { insights, createdAt: Date.now() });
+        const cacheKey = getCoachCacheKey(session.user.id, coachTodayKey);
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({
+            insights,
+            signature: coachSignature,
+            contextSignature: fetchContextSignature,
+            createdAt: Date.now(),
+          }));
+        } catch {}
+        try {
+          sessionStorage.setItem(`wt_coach_last_auto_date:${session.user.id}`, coachTodayKey);
+        } catch {}
         if (returnedNotes?.length > 0) {
           const existing = loadCoachNotes();
           const merged = mergeCoachNotes(existing, returnedNotes);
@@ -2697,8 +2760,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       .catch((err) => {
         if (coachReqIdRef.current !== reqId) return;
         if (streamedCount === 0) {
-          const coachDR = { start: addDays(dateKey, -90), end: dateKey };
-          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDR, catalogMap);
+          const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDateRange, catalogMap);
           setCoachInsights(detectImbalancesNormalized(analysis, {
             catalog: refreshCatalog,
             checkin: checkinForFetch,
@@ -2715,7 +2777,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           setCoachStreaming(false);
         }
       });
-  }, [fullCatalog, equipment, dateKey, profile, state, coachSignature, session?.user?.id, catalogMap]);
+  }, [coachDateRange, coachSignature, coachTodayKey, fullCatalog, equipment, profile, showToast, state, session?.user?.id, catalogMap]);
 
   const handleCoachRefresh = useCallback((checkinOverride) => {
     doCoachFetch({ checkinOverride, showLimitToast: true });
@@ -2723,20 +2785,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // Save check-in without triggering coach refresh (for inline pill edits)
   const handleCheckinUpdate = useCallback((checkinData) => {
-    saveCheckin(dateKey, checkinData);
+    saveCheckin(coachTodayKey, checkinData);
     setTodayCheckin(checkinData);
     setCheckinEditSection(null);
-  }, [dateKey]);
+  }, [coachTodayKey]);
 
   const handleCheckinSubmit = useCallback((checkinData) => {
-    saveCheckin(dateKey, checkinData);
+    saveCheckin(coachTodayKey, checkinData);
     setTodayCheckin(checkinData);
     setCheckinEditSection(null);
     doCoachFetch({ checkinData });
-  }, [dateKey, doCoachFetch]);
+  }, [coachTodayKey, doCoachFetch]);
 
   const clearTodayCheckinAndCoach = useCallback(() => {
-    saveCheckin(dateKey, null);
+    saveCheckin(coachTodayKey, null);
     setTodayCheckin(null);
     setCheckinEditSection(null);
     setCoachUnseen(false);
@@ -2747,7 +2809,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setCoachStreaming(false);
     setCoachLoading(false);
     setCoachError(null);
-  }, [dateKey]);
+    coachCacheRef.current.delete(coachContextSignature);
+    try {
+      localStorage.removeItem(getCoachCacheKey(session?.user?.id, coachTodayKey));
+      sessionStorage.removeItem(`wt_coach_last_auto_date:${session?.user?.id}`);
+    } catch {}
+  }, [coachContextSignature, coachTodayKey, session?.user?.id]);
 
   const confirmAddSuggestion = useCallback((workoutIdOrIds, exerciseName) => {
     // Look up catalogId by name
