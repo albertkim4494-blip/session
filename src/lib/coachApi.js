@@ -996,8 +996,8 @@ function computeEstimated1RMTrends(recentLogs, allWorkouts, weightLabel = "lb") 
     entries.sort((a, b) => a.date.localeCompare(b.date));
     const first = entries[0].e1rm;
     const last = entries[entries.length - 1].e1rm;
-    const dir = last > first ? "UP" : last < first ? "DOWN" : "FLAT";
-    trends.push(`${name}: e1RM ${first} → ${last} ${weightLabel} (${dir})`);
+    const dir = last > first ? "up" : last < first ? "down" : "flat";
+    trends.push(`${name}: estimated max ${first} to ${last} ${weightLabel} (${dir})`);
   }
 
   return trends.length > 0 ? trends : null;
@@ -1389,6 +1389,8 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
 
     return text
       .replace(/\s*\(\d{1,3}%\)/g, "")
+      .replace(/\be1RM\b/gi, "estimated max")
+      .replace(/\bestimated 1RM\b/gi, "estimated max")
       .replace(/\b(remains low|is low|was low) at (\d+(?:\.\d+)?) sets\b/gi, "has been light at $2 sets")
       .replace(/\b(\d+(?:\.\d+)?) sets? \((?:\d{1,3})%\)/gi, "$1 sets")
       .replace(/\bNo direct ([a-z ]+) sets logged this period\b/gi, "You have not logged direct $1 work lately")
@@ -1415,7 +1417,8 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       .replace(/\s{2,}/g, " ")
       .trim();
     if (!cleaned) return "Today's focus";
-    return cleaned.length > 48 ? `${cleaned.slice(0, 45).trim()}...` : cleaned;
+    const capped = cleaned[0].toUpperCase() + cleaned.slice(1);
+    return capped.length > 48 ? `${capped.slice(0, 45).trim()}...` : capped;
   }
 
   function toCoachLine(text, prefix) {

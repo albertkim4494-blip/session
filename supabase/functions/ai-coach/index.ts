@@ -288,7 +288,7 @@ ${sportBioSection}
 PRIORITY 1 — CHECK-IN & LOG SIGNALS (read first, filter ALL advice through this):
 When check-in or training log signals are present, your first insight MUST acknowledge mood, sleep, and pain before anything else.
 - Great/good mood → push them. Okay → standard. Rough/terrible → "showing up matters", suggest lighter alternatives.
-- Poor sleep → suggest dropping intensity 10-15%. Pain → avoid loading that area, name specific swaps.
+- Restless sleep → suggest dropping intensity 10-15%. Pain → avoid loading that area, name specific swaps.
 - If workout log signals show RPE trending high, mood trending down, or pain/fatigue in notes — weigh this alongside the check-in.
 - If mood pattern shows they feel better after training, mention it.
 - If check-in state conflicts with actual logged performance, acknowledge the positive shift.
@@ -300,6 +300,7 @@ PRIORITY 2 — ANALYSIS RULES:
 - Be concrete: "Add 3 sets of barbell rows on your next pull day" not "consider more back work".
 - Volume = effective SETS (secondary muscles at 0.5×). Judge by absolute sets, not percentages. 10+ sets = solid work — never call it "critically low" or "neglected." Frame balance as building on strength: "70 quad sets is strong — to match your upper body, try adding..." NOT "quads are critically low."
 - Do NOT mention muscle-group percentages unless the user explicitly asks. Avoid lines like "58 sets (9%)." Say "you've done 58 quad sets" or "quads have still been a lighter emphasis than your upper body."
+- Do NOT use technical acronyms in user-facing copy. Translate e1RM / estimated 1RM to "estimated max" or "estimated strength."
 - Units matter: duration activities (water polo 1 hr, running 45 min) are measured in TIME — 1 session of water polo is a massive training load, not "1 rep." Weight × reps determines strength effort — 10 reps at 225 ${wUnit} is far harder than 20 reps at 45 ${wUnit}. Never compare raw rep counts across different exercises or unit types.
 - Sparse data (<4 sessions): encourage + one tip. No overtraining warnings without evidence (mood/pain trends, regressions, or 5+ sessions/week).
 - Only suggest exercises from the EXERCISE CATALOG using exact catalogId. Never suggest exercises already in their program.
@@ -330,10 +331,10 @@ RESPONSE — return ONLY valid JSON, no markdown fences:
       volumeLoadSection = `\nVOLUME-LOAD TRENDS (total reps × weight per session):\n${volumeLoadTrends.map((t: string) => `  ${t}`).join("\n")}\n`;
     }
 
-    // Build estimated 1RM trends section
+    // Build estimated max trends section
     let e1rmSection = "";
     if (Array.isArray(estimated1RMTrends) && estimated1RMTrends.length > 0) {
-      e1rmSection = `\nESTIMATED 1RM TRENDS (Epley formula):\n${estimated1RMTrends.map((t: string) => `  ${t}`).join("\n")}\n`;
+      e1rmSection = `\nESTIMATED MAX TRENDS (formula-based, not tested maxes):\n${estimated1RMTrends.map((t: string) => `  ${t}`).join("\n")}\n`;
     }
 
     // Build fatigue trend section

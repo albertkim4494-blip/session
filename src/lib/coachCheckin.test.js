@@ -27,11 +27,11 @@ delete store[CHECKIN_KEY];
 delete store[NOTES_KEY];
 
 // --- saveCheckin + loadCheckins roundtrip ---
-saveCheckin("2026-02-20", { mood: 1, sleep: "okay", pain: [] });
-saveCheckin("2026-02-21", { mood: -1, sleep: "poor", pain: [{ area: "Shoulders", severity: "mild" }] });
+saveCheckin("2026-02-20", { mood: 1, sleep: "rested", pain: [] });
+saveCheckin("2026-02-21", { mood: -1, sleep: "restless", pain: [{ area: "Shoulders", severity: "mild" }] });
 const all = loadCheckins();
 assert(all["2026-02-20"]?.mood === 1, "roundtrip: mood saved");
-assert(all["2026-02-21"]?.sleep === "poor", "roundtrip: sleep saved");
+assert(all["2026-02-21"]?.sleep === "restless", "roundtrip: sleep saved");
 assert(all["2026-02-21"]?.pain?.[0]?.area === "Shoulders", "roundtrip: pain saved");
 assert(typeof all["2026-02-20"]?.submittedAt === "string", "roundtrip: submittedAt auto-filled");
 
@@ -39,7 +39,7 @@ assert(typeof all["2026-02-20"]?.submittedAt === "string", "roundtrip: submitted
 delete store[CHECKIN_KEY];
 for (let i = 0; i < 35; i++) {
   const d = `2026-01-${String(i + 1).padStart(2, "0")}`;
-  saveCheckin(d, { mood: 0, sleep: "okay", pain: [] });
+  saveCheckin(d, { mood: 0, sleep: "rested", pain: [] });
 }
 const pruned = loadCheckins();
 const prunedKeys = Object.keys(pruned);
@@ -50,7 +50,7 @@ assert(pruned["2026-01-06"], "prune: 6th day kept");
 
 // --- getTodayCheckin ---
 delete store[CHECKIN_KEY];
-saveCheckin("2026-02-26", { mood: 2, sleep: "great", pain: [] });
+saveCheckin("2026-02-26", { mood: 2, sleep: "rested", pain: [] });
 assert(getTodayCheckin("2026-02-26")?.mood === 2, "getTodayCheckin: returns today's data");
 assert(getTodayCheckin("2026-02-25") === null, "getTodayCheckin: returns null for missing date");
 

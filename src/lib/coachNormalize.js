@@ -700,7 +700,7 @@ export function detectImbalancesNormalized(analysis, opts) {
 
     // Feeling rough/brutal but still showed up → lead with real encouragement
     if (checkin.mood <= -1 && insights.length < 3) {
-      const sleepBit = checkin.sleep === "poor" ? " on bad sleep" : "";
+      const sleepBit = checkin.sleep === "restless" ? " on bad sleep" : "";
       const painBit = hasAnyPain
         ? " Go lighter on anything that hurts and focus on movements that feel good."
         : " Even a lighter session today keeps the momentum going.";
@@ -715,9 +715,9 @@ export function detectImbalancesNormalized(analysis, opts) {
 
     // Feeling okay/good → acknowledge and set the tone
     if (checkin.mood >= 0 && checkin.mood <= 1 && !hasSeverePain && insights.length < 3) {
-      const sleepNote = checkin.sleep === "poor"
+      const sleepNote = checkin.sleep === "restless"
         ? " Sleep wasn't great though — consider dropping intensity a notch. A solid session at 80% beats grinding at 100% on bad sleep."
-        : checkin.sleep === "great"
+        : checkin.sleep === "rested"
           ? " Good sleep too — your body's ready to work."
           : "";
       const painNote = hasAnyPain
@@ -727,7 +727,7 @@ export function detectImbalancesNormalized(analysis, opts) {
         type: "TIP",
         severity: "INFO",
         title: checkin.mood === 1 ? "\uD83D\uDC4A Good to go" : "\u2705 Solid foundation today",
-        message: `Feeling ${moodLabel}, slept ${checkin.sleep || "okay"} — ${hasAnyPain ? "workable with some adjustments" : "good foundation for a productive session"}.${volumeAck}${sleepNote}${painNote}`,
+        message: `Feeling ${moodLabel}, slept ${checkin.sleep || "rested"} — ${hasAnyPain ? "workable with some adjustments" : "good foundation for a productive session"}.${volumeAck}${sleepNote}${painNote}`,
         suggestions: [],
       });
     }
@@ -738,7 +738,7 @@ export function detectImbalancesNormalized(analysis, opts) {
         type: "POSITIVE",
         severity: "INFO",
         title: "\uD83D\uDE80 Green light",
-        message: `Feeling great${checkin.sleep === "great" ? ", well rested" : ""} — today's a good day to push.${volumeAck}${hasAnyPain ? ` Just be mindful of the ${painAreas.map((p) => p.area.toLowerCase()).join(" and ")}.` : ""}`,
+        message: `Feeling great${checkin.sleep === "rested" ? ", well rested" : ""} — today's a good day to push.${volumeAck}${hasAnyPain ? ` Just be mindful of the ${painAreas.map((p) => p.area.toLowerCase()).join(" and ")}.` : ""}`,
         suggestions: [],
       });
     }
