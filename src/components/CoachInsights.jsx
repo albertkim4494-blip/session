@@ -285,7 +285,7 @@ export function CoachInsightsCard({
   const accentColor = hero ? (SEVERITY_COLORS[hero.severity] || "#6b7280") : "#6b7280";
 
   return (
-    <div style={{ padding: "4px 0" }}>
+    <div style={{ padding: "16px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}>
       {/* Header row — clickable to collapse */}
       <div
         onClick={() => setCollapsed((v) => !v)}
