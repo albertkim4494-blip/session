@@ -1739,6 +1739,7 @@ export function CircuitTimer({
                       updated[i] = { ...updated[i], reps: e.target.value.replace(/[^\d.]/g, "") };
                       setLocalSets(updated);
                     }}
+                    onFocus={(e) => requestAnimationFrame(() => e.target.select())}
                     onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
                     enterKeyHint="done"
                     style={{
@@ -1763,6 +1764,7 @@ export function CircuitTimer({
                         updated[i] = { ...updated[i], weight: e.target.value.replace(/[^\d.]/g, "") };
                         setLocalSets(updated);
                       }}
+                      onFocus={(e) => requestAnimationFrame(() => e.target.select())}
                       onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
                       enterKeyHint="done"
                       style={{

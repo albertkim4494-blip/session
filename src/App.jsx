@@ -5098,6 +5098,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       newSets[i] = { ...newSets[i], reps: v };
                       dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                     }}
+                    onFocus={(e) => requestAnimationFrame(() => e.target.select())}
                     onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
                     enterKeyHint="done"
                     step={logUnit.allowDecimal ? "0.01" : "1"}
@@ -5117,6 +5118,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         newSets[i] = { ...newSets[i], weight: w };
                         dispatchModal({ type: "UPDATE_LOG_SETS", payload: newSets });
                       }}
+                      onFocus={(e) => requestAnimationFrame(() => e.target.select())}
                       onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
                       enterKeyHint="done"
                       step="0.01"

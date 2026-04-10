@@ -6,15 +6,36 @@ import AuthScreen from "./AuthScreen";
 import OnboardingScreen from "./OnboardingScreen";
 import App from "../App";
 
+// Read Supabase's cached session from localStorage for instant offline startup.
+// This avoids blocking on getSession() which requires network.
+function getCachedSession() {
+  try {
+    const url = import.meta.env.VITE_SUPABASE_URL || "";
+    const projectRef = url.replace("https://", "").split(".")[0];
+    const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Supabase stores { access_token, refresh_token, user, ... }
+    if (parsed?.access_token && parsed?.user) {
+      return { access_token: parsed.access_token, refresh_token: parsed.refresh_token, user: parsed.user };
+    }
+  } catch {}
+  return null;
+}
+
 export default function AuthGate() {
-  const [session, setSession] = useState(undefined); // undefined=loading, null=logged out
+  // Use cached session for instant render, then validate with getSession() in background
+  const [session, setSession] = useState(() => {
+    const cached = getCachedSession();
+    return cached || undefined; // undefined=loading, null=logged out
+  });
   const [profileReady, setProfileReady] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const sessionRef = useRef(null);
+  const sessionRef = useRef(session || null);
   const profileCheckedForRef = useRef(null);
 
   useEffect(() => {
-    // getSession for initial load (INITIAL_SESSION may not exist in older supabase-js)
+    // Validate/refresh session in background (non-blocking if cached session was used)
     supabase.auth.getSession().then(({ data: { session } }) => {
       sessionRef.current = session;
       setSession(session ?? null);
