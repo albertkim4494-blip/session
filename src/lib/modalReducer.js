@@ -141,7 +141,7 @@ export const initialModalState = {
     gifUrl: null,
   },
   exerciseDetail: { isOpen: false, entry: null, entries: [], flipDir: "left" },
-  social: { isOpen: false, tab: "friends" },
+  social: { isOpen: false, tab: "feed" },
   friendSearch: { isOpen: false, query: "", results: [], searching: false },
   shareWorkout: {
     isOpen: false, workoutId: null, workoutName: "",

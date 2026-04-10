@@ -67,6 +67,8 @@ import { GroupDetailView } from "./components/GroupDetailView";
 import { calcEventDurationMinutes } from "./lib/pollUtils";
 import { formatTimeAgo } from "./lib/announcementUtils";
 import { CircuitTimer } from "./components/CircuitTimer";
+import { ActivityFeed } from "./components/ActivityFeed";
+import { getFeed, publishWorkoutCompletion, toggleFeedReaction } from "./lib/feedApi";
 import {
   getFriends, getPendingRequests, getInbox, getUnreadCount,
   acceptFriendRequest, declineFriendRequest, removeFriend,
@@ -245,6 +247,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [socialGroups, setSocialGroups] = useState([]);
   const [socialGroupInvites, setSocialGroupInvites] = useState([]);
   const [activeGroupId, setActiveGroupId] = useState(null);
+
+  // Feed state
+  const [feedItems, setFeedItems] = useState([]);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedCursor, setFeedCursor] = useState(null);
+  const [feedHasMore, setFeedHasMore] = useState(true);
 
   // Log card flip state (log ↔ exercise detail)
   const [logFlipped, setLogFlipped] = useState(false);
@@ -606,8 +614,105 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, []);
 
+  const refreshFeed = useCallback(async (cursor = null) => {
+    setFeedLoading(true);
+    try {
+      const { data } = await getFeed(cursor);
+      if (cursor) {
+        setFeedItems(prev => [...prev, ...data]);
+      } else {
+        setFeedItems(data);
+      }
+      setFeedHasMore(data.length >= 30);
+      if (data.length > 0) {
+        setFeedCursor(data[data.length - 1].created_at);
+      }
+    } catch (err) {
+      console.warn("Feed refresh failed:", err.message);
+    } finally {
+      setFeedLoading(false);
+    }
+  }, []);
+
+  const handleFeedReaction = useCallback(async (feedEventId, emoji) => {
+    const { removed } = await toggleFeedReaction(feedEventId, emoji);
+    // Optimistic update
+    setFeedItems(prev => prev.map(item => {
+      if (item.id !== feedEventId) return item;
+      const reactions = [...(item.reactions || [])];
+      if (removed) {
+        const idx = reactions.findIndex(r => r.user_id === session.user.id && r.emoji === emoji);
+        if (idx >= 0) reactions.splice(idx, 1);
+      } else {
+        reactions.push({ user_id: session.user.id, emoji, id: "temp_" + Date.now() });
+      }
+      return { ...item, reactions };
+    }));
+  }, [session?.user?.id]);
+
+  const handlePublishToFeed = useCallback(async () => {
+    if (!state.logsByDate?.[dateKey]) {
+      showToast("No logged sets today");
+      return;
+    }
+    const todayLogs = state.logsByDate[dateKey];
+    const allWorkouts = [...(state.program?.workouts || []), ...(state.dailyWorkouts?.[dateKey] || [])];
+    let totalSets = 0;
+    let totalVolume = 0;
+    const exerciseNames = [];
+    for (const [exId, log] of Object.entries(todayLogs)) {
+      if (!log?.sets) continue;
+      const completedSets = log.sets.filter(s => s.completed);
+      totalSets += completedSets.length;
+      for (const s of completedSets) {
+        const reps = parseFloat(s.reps) || 0;
+        const weight = parseFloat(s.weight) || 0;
+        totalVolume += reps * weight;
+      }
+      // Find exercise name
+      for (const w of allWorkouts) {
+        const ex = (w.exercises || []).find(e => e.id === exId);
+        if (ex && !exerciseNames.includes(ex.name)) {
+          exerciseNames.push(ex.name);
+          break;
+        }
+      }
+    }
+    if (totalSets === 0) {
+      showToast("No completed sets to share");
+      return;
+    }
+    // Find workout name (first workout with logged exercises)
+    let workoutName = "Workout";
+    for (const w of allWorkouts) {
+      if ((w.exercises || []).some(e => todayLogs[e.id]?.sets?.some(s => s.completed))) {
+        workoutName = w.name || w.category || "Workout";
+        break;
+      }
+    }
+    const ms = state.preferences?.measurementSystem;
+    const { error } = await publishWorkoutCompletion({
+      workoutName,
+      category: allWorkouts[0]?.category || "Workout",
+      exerciseCount: exerciseNames.length,
+      totalSets,
+      totalVolume: Math.round(totalVolume),
+      exercises: exerciseNames,
+      measurementSystem: ms,
+    }, dateKey);
+    if (error) {
+      showToast("Failed to post — " + (error.message || "try again"));
+    } else {
+      showToast("Posted to feed!");
+      refreshFeed();
+    }
+  }, [state, dateKey, refreshFeed, showToast]);
+
   useEffect(() => {
-    if (tab === "social") refreshSocial();
+    if (tab === "social") {
+      refreshSocial();
+      refreshFeed();
+    }
   }, [tab]);
 
   // Auto-advance dateKey at midnight if user was viewing "today"
@@ -4298,166 +4403,56 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {tab === "social" ? (
             <div key="social" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
               {(() => {
-                const socialTab = modals.social.tab || "friends";
-                const pendingInboxCount = socialInbox.filter((i) => i.status === "pending").length;
+                const socialTab = modals.social.tab || "feed";
+                const pendingInboxCount = socialInbox.filter((i) => i.status === "pending").length + socialPending.length;
                 const groupInviteCount = socialGroupInvites.length;
+                const todayHasLogs = state.logsByDate?.[dateKey] && Object.values(state.logsByDate[dateKey]).some(log => log?.sets?.some(s => s.completed));
+                const socialTabs = [
+                  { value: "feed", label: "Feed" },
+                  { value: "groups", label: "Groups" },
+                  { value: "inbox", label: `Inbox${pendingInboxCount ? ` (${pendingInboxCount})` : ""}` },
+                ];
                 return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <PillTabs
-                      tabs={[
-                        { value: "friends", label: `Friends${socialFriends.length ? ` (${socialFriends.length})` : ""}` },
-                        { value: "groups", label: `Groups${socialGroups.length ? ` (${socialGroups.length})` : ""}${groupInviteCount ? " ●" : ""}` },
-                        { value: "inbox", label: `Inbox${pendingInboxCount ? ` (${pendingInboxCount})` : ""}` },
-                      ]}
-                      value={socialTab}
-                      onChange={(v) => { setActiveGroupId(null); dispatchModal({ type: "UPDATE_SOCIAL", payload: { tab: v } }); }}
-                      styles={styles}
-                    />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                    {/* Underline-style tabs */}
+                    <nav style={{ display: "flex", gap: 32 }}>
+                      {socialTabs.map((t) => {
+                        const active = t.value === socialTab;
+                        return (
+                          <button
+                            key={t.value}
+                            onClick={() => { setActiveGroupId(null); dispatchModal({ type: "UPDATE_SOCIAL", payload: { tab: t.value } }); }}
+                            style={{
+                              background: "none", border: "none", cursor: "pointer",
+                              padding: "2px 0 10px",
+                              fontSize: 15, fontWeight: 700,
+                              color: active ? colors.accent : colors.text,
+                              opacity: active ? 1 : 0.35,
+                              borderBottom: active ? `3px solid ${colors.accent}` : "3px solid transparent",
+                              transition: "all 0.2s",
+                              letterSpacing: "-0.01em",
+                            }}
+                          >
+                            {t.label}
+                          </button>
+                        );
+                      })}
+                    </nav>
 
-                    {socialTab === "friends" ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        <button
-                          className="btn-press"
-                          onClick={() => dispatchModal({ type: "OPEN_FRIEND_SEARCH" })}
-                          style={{ ...styles.primaryBtn, width: "100%", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "12px 14px" }}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" /></svg>
-                          Add Friend
-                        </button>
-
-                        {socialLoading && socialFriends.length === 0 && (
-                          <div style={{ textAlign: "center", padding: 20, opacity: 0.5, fontSize: 13 }}>Loading...</div>
-                        )}
-
-                        {/* Friends list */}
-                        {socialFriends.length === 0 && !socialLoading ? (
-                          <div style={{ textAlign: "center", padding: 20, opacity: 0.5, fontSize: 13 }}>
-                            No friends yet. Search for users to connect!
-                          </div>
-                        ) : (
-                          socialFriends.map((f) => (
-                            <div
-                              key={f.friendshipId}
-                              style={{
-                                display: "flex", alignItems: "center", gap: 10,
-                                padding: "12px 14px", borderRadius: 12,
-                                background: colors.cardBg,
-                                border: `1px solid ${colors.border}`,
-                              }}
-                            >
-                              <div style={{
-                                width: 36, height: 36, borderRadius: 999,
-                                background: colors.accent + "22", color: colors.accent,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 14, fontWeight: 700, flexShrink: 0,
-                                overflow: "hidden",
-                              }}>
-                                {f.avatar_url ? (
-                                  <img src={f.avatar_url} alt="" style={{ width: 36, height: 36, borderRadius: 999, objectFit: "cover" }} />
-                                ) : (
-                                  (f.username || "?")[0].toUpperCase()
-                                )}
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 14, fontWeight: 700 }}>@{f.username}</div>
-                                {f.display_name && <div style={{ fontSize: 12, opacity: 0.6 }}>{f.display_name}</div>}
-                              </div>
-                              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                                <button
-                                  className="btn-press"
-                                  onClick={() => dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { selectedFriendId: f.id } })}
-                                  style={{ ...styles.secondaryBtn, padding: "6px 10px", fontSize: 12 }}
-                                >
-                                  Share
-                                </button>
-                                <button
-                                  className="btn-press"
-                                  onClick={() => {
-                                    dispatchModal({
-                                      type: "OPEN_CONFIRM",
-                                      payload: {
-                                        title: "Remove Friend",
-                                        message: `Remove @${f.username} from your friends?`,
-                                        confirmText: "Remove",
-                                        onConfirm: async () => {
-                                          await removeFriend(f.friendshipId);
-                                          dispatchModal({ type: "CLOSE_CONFIRM" });
-                                          refreshSocial();
-                                        },
-                                      },
-                                    });
-                                  }}
-                                  style={{ ...styles.secondaryBtn, padding: "6px 10px", fontSize: 12, opacity: 0.5 }}
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-
-                        {/* Pending Requests */}
-                        {socialPending.length > 0 && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.7 }}>
-                              Pending Requests ({socialPending.length})
-                            </div>
-                            {socialPending.map((r) => (
-                              <div
-                                key={r.friendshipId}
-                                style={{
-                                  display: "flex", alignItems: "center", gap: 10,
-                                  padding: "12px 14px", borderRadius: 12,
-                                  background: colors.accentBg,
-                                  border: `1px solid ${colors.accentBorder}`,
-                                }}
-                              >
-                                <div style={{
-                                  width: 32, height: 32, borderRadius: 999,
-                                  background: colors.accent + "22", color: colors.accent,
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                  fontSize: 13, fontWeight: 700, flexShrink: 0,
-                                  overflow: "hidden",
-                                }}>
-                                  {r.avatar_url ? (
-                                    <img src={r.avatar_url} alt="" style={{ width: 32, height: 32, borderRadius: 999, objectFit: "cover" }} />
-                                  ) : (
-                                    (r.username || "?")[0].toUpperCase()
-                                  )}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 13, fontWeight: 600 }}>
-                                    @{r.username} wants to be friends
-                                  </div>
-                                </div>
-                                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                                  <button
-                                    className="btn-press"
-                                    onClick={async () => {
-                                      await acceptFriendRequest(r.friendshipId);
-                                      refreshSocial();
-                                      showToast(`You and @${r.username} are now friends!`);
-                                    }}
-                                    style={{ ...styles.primaryBtn, padding: "6px 12px", fontSize: 12 }}
-                                  >
-                                    Accept
-                                  </button>
-                                  <button
-                                    className="btn-press"
-                                    onClick={async () => {
-                                      await declineFriendRequest(r.friendshipId);
-                                      refreshSocial();
-                                    }}
-                                    style={{ ...styles.secondaryBtn, padding: "6px 10px", fontSize: 12 }}
-                                  >
-                                    Decline
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                    {socialTab === "feed" ? (
+                      <ActivityFeed
+                        items={feedItems}
+                        loading={feedLoading}
+                        userId={session.user.id}
+                        colors={colors}
+                        styles={styles}
+                        hasMore={feedHasMore}
+                        onLoadMore={() => refreshFeed(feedCursor)}
+                        onReact={handleFeedReaction}
+                        onPublish={handlePublishToFeed}
+                        canPublish={todayHasLogs}
+                        friendCount={socialFriends.length}
+                      />
                     ) : socialTab === "groups" ? (
                       /* Groups sub-tab */
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -4621,73 +4616,125 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         )}
                       </div>
                     ) : (
-                      /* Inbox sub-tab */
-                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        {socialLoading && socialInbox.length === 0 && (
-                          <div style={{ textAlign: "center", padding: 20, opacity: 0.5, fontSize: 13 }}>Loading...</div>
-                        )}
-                        {socialInbox.length === 0 && !socialLoading ? (
-                          <div style={{ textAlign: "center", padding: 20, opacity: 0.5, fontSize: 13 }}>
-                            No shared workouts yet
+                      /* Inbox sub-tab — shared workouts + friend requests + friends list */
+                      <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+                        {/* Editorial headline */}
+                        <div>
+                          <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.02em", marginBottom: 16 }}>
+                            Stay in sync with your circle.
                           </div>
-                        ) : (
-                          socialInbox.map((sw) => {
-                            const workout = sw.workout_snapshot;
-                            const fromUser = sw.from_profile;
-                            const isPending = sw.status === "pending";
-                            return (
-                              <div
-                                key={sw.id}
-                                style={{
-                                  padding: "12px 14px", borderRadius: 12,
-                                  background: isPending ? colors.cardBg : colors.subtleBg,
-                                  border: `1px solid ${isPending ? colors.accentBorder : colors.border}`,
-                                  opacity: isPending ? 1 : 0.6,
-                                }}
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                  <span style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>
-                                    {workout?.name || "Workout"}
-                                  </span>
-                                  {!isPending && (
-                                    <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.5 }}>
-                                      {sw.status === "accepted" ? "Added" : "Dismissed"}
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{ fontSize: 12, opacity: 0.6, marginBottom: sw.message ? 4 : 0 }}>
-                                  from @{fromUser?.username || "unknown"} · {formatSocialTime(sw.created_at)}
-                                </div>
-                                {sw.message && (
-                                  <div style={{ fontSize: 13, fontStyle: "italic", opacity: 0.7, marginBottom: 8 }}>
-                                    "{sw.message}"
-                                  </div>
-                                )}
-                                {isPending && (
-                                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                                    <button
-                                      className="btn-press"
-                                      onClick={() => dispatchModal({ type: "OPEN_WORKOUT_PREVIEW", payload: { sharedWorkout: sw } })}
-                                      style={{ ...styles.primaryBtn, padding: "8px 14px", fontSize: 12 }}
-                                    >
-                                      Preview
-                                    </button>
-                                    <button
-                                      className="btn-press"
-                                      onClick={async () => {
-                                        await dismissSharedWorkout(sw.id);
-                                        refreshSocial();
-                                      }}
-                                      style={{ ...styles.secondaryBtn, padding: "8px 14px", fontSize: 12 }}
-                                    >
-                                      Dismiss
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })
+                          <div
+                            onClick={() => dispatchModal({ type: "OPEN_FRIEND_SEARCH" })}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              padding: "14px 16px", borderRadius: 999,
+                              background: colors.subtleBg, cursor: "pointer",
+                            }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            </svg>
+                            <span style={{ fontSize: 14, opacity: 0.35 }}>Find friends or trainers...</span>
+                          </div>
+                        </div>
+
+                        {socialLoading && socialInbox.length === 0 && socialFriends.length === 0 && (
+                          <div style={{ textAlign: "center", padding: 24, opacity: 0.5, fontSize: 13 }}>Loading...</div>
                         )}
+
+                        {/* Shared with You */}
+                        {socialInbox.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <div style={{ fontSize: 18, fontWeight: 700 }}>Shared with You</div>
+                              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.45 }}>
+                                {socialInbox.filter(sw => sw.status === "pending").length} New Workouts
+                              </div>
+                            </div>
+                            {socialInbox.map((sw) => {
+                              const workout = sw.workout_snapshot;
+                              const fromUser = sw.from_profile;
+                              const exCount = workout?.exercises?.length || 0;
+                              const isPending = sw.status === "pending";
+                              return (
+                                <div key={sw.id} style={{ background: colors.cardBg, borderRadius: 16, overflow: "hidden", opacity: isPending ? 1 : 0.55 }}>
+                                  <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+                                    {/* Sender chip */}
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <div style={{ width: 24, height: 24, borderRadius: 999, background: colors.accent + "22", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                                        {fromUser?.avatar_url ? <img src={fromUser.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: 999, objectFit: "cover" }} /> : (fromUser?.username || "?")[0].toUpperCase()}
+                                      </div>
+                                      <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.6 }}>@{fromUser?.username || "unknown"}</span>
+                                    </div>
+                                    {/* Workout title */}
+                                    <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.2 }}>{workout?.name || "Workout"}</div>
+                                    {sw.message && <div style={{ fontSize: 13, opacity: 0.55, lineHeight: 1.5 }}>"{sw.message}"</div>}
+                                    {/* Meta + action */}
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.35 }}>
+                                        {exCount > 0 ? `${exCount} exercises` : ""}{exCount > 0 && workout?.category ? " \u00B7 " : ""}{workout?.category || ""}
+                                      </span>
+                                      {isPending ? (
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                          <button className="btn-press" onClick={() => dispatchModal({ type: "OPEN_WORKOUT_PREVIEW", payload: { sharedWorkout: sw } })} style={{ ...styles.primaryBtn, padding: "8px 18px", fontSize: 12, borderRadius: 999 }}>Import</button>
+                                          <button className="btn-press" onClick={async () => { await dismissSharedWorkout(sw.id); refreshSocial(); }} style={{ padding: "8px 14px", fontSize: 12, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer", opacity: 0.5 }}>Dismiss</button>
+                                        </div>
+                                      ) : (
+                                        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.5 }}>{sw.status === "accepted" ? "Imported" : "Dismissed"}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Friend Requests */}
+                        {socialPending.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <div style={{ fontSize: 15, fontWeight: 700 }}>Requests</div>
+                              <div style={{ width: 20, height: 20, borderRadius: 999, background: colors.accent, color: colors.primaryText, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{socialPending.length}</div>
+                            </div>
+                            {socialPending.map((r) => (
+                              <div key={r.friendshipId} style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, background: colors.subtleBg }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 999, background: colors.accent + "22", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                                  {r.avatar_url ? <img src={r.avatar_url} alt="" style={{ width: 44, height: 44, borderRadius: 999, objectFit: "cover" }} /> : (r.username || "?")[0].toUpperCase()}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 14, fontWeight: 700 }}>@{r.username}</div>
+                                  {r.display_name && <div style={{ fontSize: 12, opacity: 0.5, marginTop: 1 }}>{r.display_name}</div>}
+                                </div>
+                                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                  <button className="btn-press" onClick={async () => { await acceptFriendRequest(r.friendshipId); refreshSocial(); showToast(`You and @${r.username} are now friends!`); }} style={{ ...styles.primaryBtn, padding: "7px 14px", fontSize: 12, borderRadius: 999 }}>Accept</button>
+                                  <button className="btn-press" onClick={async () => { await declineFriendRequest(r.friendshipId); refreshSocial(); }} style={{ padding: "7px 10px", fontSize: 12, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer", opacity: 0.6 }}>Decline</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Friends list */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          <div style={{ fontSize: 15, fontWeight: 700 }}>Current Friends</div>
+                          {socialFriends.length === 0 && !socialLoading ? (
+                            <div style={{ textAlign: "center", padding: "20px 0", opacity: 0.4, fontSize: 13 }}>No friends yet. Tap Add to search for users.</div>
+                          ) : (
+                            socialFriends.map((f) => (
+                              <div key={f.friendshipId} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${colors.border}` }}>
+                                <div style={{ width: 40, height: 40, borderRadius: 999, background: colors.accent + "22", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                                  {f.avatar_url ? <img src={f.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: 999, objectFit: "cover" }} /> : (f.username || "?")[0].toUpperCase()}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 14, fontWeight: 700 }}>@{f.username}</div>
+                                  {f.display_name && <div style={{ fontSize: 12, opacity: 0.5, marginTop: 1 }}>{f.display_name}</div>}
+                                </div>
+                                <button className="btn-press" onClick={() => dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { selectedFriendId: f.id } })} style={{ padding: "6px 14px", fontSize: 12, fontWeight: 700, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer" }}>Share</button>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -6481,6 +6528,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         styles={styles}
         colors={colors}
         onRequestSent={refreshSocial}
+        friends={socialFriends}
       />
 
       {/* Share Workout Modal */}
