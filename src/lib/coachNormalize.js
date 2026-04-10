@@ -8,7 +8,7 @@
 /** Conversion factors to minutes */
 export const DURATION_UNITS = { sec: 1 / 60, min: 1, hrs: 60 };
 
-export const DISTANCE_UNITS = new Set(["miles", "yards", "laps", "steps"]);
+const DISTANCE_UNITS = new Set(["miles", "yards", "laps", "steps"]);
 
 export const SPORT_KEYWORDS = [
   "polo", "soccer", "basketball", "football", "baseball", "softball",

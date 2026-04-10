@@ -237,7 +237,7 @@ const neglected = {
 };
 const neglInsights = detectImbalancesNormalized(neglected);
 assert(neglInsights.some((i) => i.type === "NEGLECTED"), "missing back → NEGLECTED insight");
-assert(neglInsights.some((i) => i.message.includes("No direct back")), "0 sets → 'No direct' message");
+assert(neglInsights.some((i) => i.message.includes("not logged any direct back")), "0 sets → 'not logged' message");
 
 // --- Summary ---
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);

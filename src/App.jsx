@@ -2965,9 +2965,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           w => !(w.source === "event" && w.pollId === poll.id)
         );
         if (st.dailyWorkouts[eventDateKey].length === 0) delete st.dailyWorkouts[eventDateKey];
-        if (st.dailyWorkouts[eventDateKey]?.length !== before) {
-          // Only toast if we actually removed something
-        }
         return st;
       });
       if (response !== null) showToast("Removed from schedule");

@@ -508,6 +508,7 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
     } else {
       onConfirm([...checked], exerciseName);
     }
+    setAdded(true);
   };
 
   const canConfirm = mode === "today" || checked.size > 0;
@@ -561,7 +562,7 @@ export function AddSuggestedExerciseModal({ open, exerciseName, workouts, onCanc
                 borderRadius: 12, border: `1px solid ${colors.border}`,
                 background: colors.cardBg, maxHeight: 180, overflowY: "auto",
               }}>
-                {workouts.map((w) => {
+                {(workouts || []).map((w) => {
                   const isChecked = checked.has(w.id);
                   return (
                     <button

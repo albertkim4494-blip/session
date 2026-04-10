@@ -39,6 +39,9 @@ export default function AuthGate() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       sessionRef.current = session;
       setSession(session ?? null);
+    }).catch(() => {
+      // Network error — keep cached session if available, otherwise mark logged out
+      setSession(prev => prev === undefined ? null : prev);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

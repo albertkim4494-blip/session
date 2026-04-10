@@ -5,7 +5,7 @@ import { LS_KEY, LS_BACKUP_KEY } from "./constants";
  * Past data with reps > 0 → completed; today's data → not completed.
  * Mutates the state object in place.
  */
-export function migrateCompletedFlag(st) {
+function migrateCompletedFlag(st) {
   if (!st?.logsByDate || typeof st.logsByDate !== "object") return;
   const todayKey = new Date().toISOString().slice(0, 10);
 
