@@ -1351,17 +1351,49 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       confidence: typeof i.confidence === "number" ? i.confidence : null,
       evidence: typeof i.evidence === "string" ? i.evidence : "",
       expected_outcome: typeof i.expected_outcome === "string" ? i.expected_outcome : "",
+      showAsHero: !!i.showAsHero,
+      salience: typeof i.salience === "number" ? i.salience : null,
     };
   }
 
+  function buildHeroSummaryInsight(insights, summaryData) {
+    const primaryFocus = summaryData?.primaryFocus?.trim();
+    const todayAction = summaryData?.todayAction?.trim();
+    if (!primaryFocus && !todayAction) return insights;
+
+    const [firstInsight, ...restInsights] = Array.isArray(insights) ? insights : [];
+    const baseInsight = firstInsight ? normalizeInsightFields(firstInsight) : normalizeInsightFields({
+      type: "TIP",
+      severity: "INFO",
+      title: "Today's focus",
+      message: "",
+      suggestions: [],
+    });
+
+    const combinedParts = [];
+    if (todayAction) combinedParts.push(`Next: ${todayAction}`);
+    if (baseInsight.message) combinedParts.push(baseInsight.message);
+
+    const heroInsight = normalizeInsightFields({
+      ...baseInsight,
+      title: primaryFocus || baseInsight.title,
+      message: combinedParts.join(" "),
+      showAsHero: true,
+      salience: 100,
+    });
+
+    return [heroInsight, ...restInsights];
+  }
+
   // Helper: post-process insights (save history, filter, cache)
-  function postProcess(insights, coachNotesData) {
-    const updatedHistory = saveInsightHistory(insights, insightHistory, {
+  function postProcess(insights, coachNotesData, summaryData) {
+    const enhancedInsights = buildHeroSummaryInsight(insights, summaryData);
+    const updatedHistory = saveInsightHistory(enhancedInsights, insightHistory, {
       muscleSetsSummary,
       progressionTrends,
       adherence,
     });
-    const filtered = filterRepetitiveInsights(insights, updatedHistory);
+    const filtered = filterRepetitiveInsights(enhancedInsights, updatedHistory);
     try {
       localStorage.setItem(
         CACHE_KEY,
@@ -1407,7 +1439,11 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
         recordAiEvent("ai_success", "coach", { model: modelHint, complexityScore });
         const insights = (data.insights || []).map(normalizeInsightFields);
         for (const ins of insights) onInsight(ins);
-        return postProcess(insights, data.coachNotes);
+        return postProcess(insights, data.coachNotes, {
+          trendStatus: data?.trendStatus,
+          primaryFocus: data?.primaryFocus,
+          todayAction: data?.todayAction,
+        });
       }
 
       // SSE stream with timeout — abort if no data for 30s
@@ -1454,7 +1490,11 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
       }
 
       recordAiEvent("ai_success", "coach", { model: modelHint, complexityScore, streamed: true });
-      return postProcess(allInsights, doneData?.coachNotes || []);
+      return postProcess(allInsights, doneData?.coachNotes || [], {
+        trendStatus: doneData?.trendStatus,
+        primaryFocus: doneData?.primaryFocus,
+        todayAction: doneData?.todayAction,
+      });
     } catch (streamErr) {
       console.warn("Streaming failed, falling back to blocking:", streamErr.message);
       // Fall through to blocking path below
@@ -1492,5 +1532,9 @@ export async function fetchCoachInsights({ profile, state, dateRange, options, c
   if (typeof onInsight === "function") {
     for (const ins of insights) onInsight(ins);
   }
-  return postProcess(insights, data?.coachNotes);
+  return postProcess(insights, data?.coachNotes, {
+    trendStatus: data?.trendStatus,
+    primaryFocus: data?.primaryFocus,
+    todayAction: data?.todayAction,
+  });
 }

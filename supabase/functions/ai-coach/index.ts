@@ -569,13 +569,18 @@ Analyze this data and return JSON insights.`;
             }
 
             const returnedCoachNotes = Array.isArray(parsed.coachNotes) ? parsed.coachNotes : [];
+            const trendStatus = typeof parsed.trend_status === "string" ? parsed.trend_status : null;
+            const primaryFocus = typeof parsed.primary_focus === "string" ? parsed.primary_focus : null;
+            const todayAction = typeof parsed.today_action === "string" ? parsed.today_action : null;
 
             // Send final done event with metadata
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({
                 type: "done",
                 coachNotes: returnedCoachNotes,
-                trendStatus: parsed.trend_status || null,
+                trendStatus: trendStatus,
+                primaryFocus,
+                todayAction,
               })}\n\n`)
             );
 
@@ -631,6 +636,9 @@ Analyze this data and return JSON insights.`;
     // Validate structure
     const insights = Array.isArray(parsed.insights) ? parsed.insights.slice(0, 3) : [];
     const returnedCoachNotes = Array.isArray(parsed.coachNotes) ? parsed.coachNotes : [];
+    const trendStatus = typeof parsed.trend_status === "string" ? parsed.trend_status : null;
+    const primaryFocus = typeof parsed.primary_focus === "string" ? parsed.primary_focus : null;
+    const todayAction = typeof parsed.today_action === "string" ? parsed.today_action : null;
 
     console.log(JSON.stringify({
       event: "ai_success",
@@ -645,7 +653,13 @@ Analyze this data and return JSON insights.`;
     }));
 
     return new Response(
-      JSON.stringify({ insights, coachNotes: returnedCoachNotes }),
+      JSON.stringify({
+        insights,
+        coachNotes: returnedCoachNotes,
+        trendStatus,
+        primaryFocus,
+        todayAction,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

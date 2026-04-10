@@ -34,6 +34,15 @@ function ensureAnimation() {
   document.head.appendChild(style);
 }
 
+function renderSupportLine(label, text, style = {}) {
+  if (!text) return null;
+  return (
+    <div style={style}>
+      <span style={{ opacity: 0.55 }}>{label}:</span> {text}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // CoachHeroInsight — Lightweight inline insight for the sessions hero state
 // ---------------------------------------------------------------------------
@@ -132,11 +141,24 @@ export function CoachHeroInsight({
       {hero && (
         <div>
           <div style={{
+            fontSize: 16, fontWeight: 700, lineHeight: 1.35,
+            maxWidth: 320, margin: "0 auto 6px",
+          }}>
+            {hero.headline}
+          </div>
+          <div style={{
             fontSize: 15, lineHeight: 1.5, opacity: 0.7,
             maxWidth: 320, margin: "0 auto",
           }}>
             {hero.detail}
           </div>
+          {renderSupportLine("Why", hero.evidence, {
+            fontSize: 12,
+            lineHeight: 1.45,
+            opacity: 0.62,
+            maxWidth: 320,
+            margin: "8px auto 0",
+          })}
           {hero.cta && (
             <button
               onClick={() => onAddExercise(hero.cta.exercise)}
@@ -329,6 +351,18 @@ export function CoachInsightsCard({
               <div style={{ fontSize: 13, opacity: 0.7, lineHeight: 1.45 }}>
                 {hero.detail}
               </div>
+              {renderSupportLine("Why", hero.evidence, {
+                fontSize: 12,
+                opacity: 0.62,
+                lineHeight: 1.45,
+                marginTop: 6,
+              })}
+              {renderSupportLine("Result", hero.expectedOutcome, {
+                fontSize: 12,
+                opacity: 0.62,
+                lineHeight: 1.45,
+                marginTop: 4,
+              })}
               {hero.cta && (
                 <button
                   onClick={() => onAddExercise(hero.cta.exercise)}
@@ -406,6 +440,12 @@ function CompactInsight({ item, onAddExercise, colors }) {
     }}>
       <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{item.headline}</div>
       <div style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.4 }}>{item.detail}</div>
+      {renderSupportLine("Why", item.evidence, {
+        fontSize: 11,
+        opacity: 0.58,
+        lineHeight: 1.4,
+        marginTop: 4,
+      })}
       {item.cta && (
         <button
           onClick={() => onAddExercise(item.cta.exercise)}

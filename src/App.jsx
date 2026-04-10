@@ -1129,6 +1129,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const reqId = ++coachReqIdRef.current;
 
     coachFetchingRef.current = true;
+    setCoachLoading(true);
     setCoachStreaming(true);
     setCoachInsights([]);
 
@@ -1172,7 +1173,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         console.error("AI Coach error:", err);
         if (coachInsights.length === 0) {
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDateRange, catalogMap);
-          setCoachInsights(detectImbalancesNormalized(analysis, { ...coachOpts, checkin: autoCheckin }));
+          setCoachInsights(detectImbalancesNormalized(analysis, {
+            ...coachOpts,
+            checkin: autoCheckin,
+            userExerciseNames: (state.program?.workouts || []).flatMap((w) => (w.exercises || []).map((ex) => ex.name)),
+          }));
         }
         const detail = err?.message || String(err);
         setCoachError(`AI coach unavailable \u2014 showing basic analysis (${detail})`);
@@ -2644,6 +2649,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     incrementDailyRefresh();
     const reqId = ++coachReqIdRef.current;
     coachFetchingRef.current = true;
+    setCoachLoading(true);
     setCoachInsights([]);
     setCoachStreaming(true);
     setCoachError(null);
@@ -2693,7 +2699,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (streamedCount === 0) {
           const coachDR = { start: addDays(dateKey, -90), end: dateKey };
           const analysis = buildNormalizedAnalysis(state.program.workouts, state.logsByDate, coachDR, catalogMap);
-          setCoachInsights(detectImbalancesNormalized(analysis, { catalog: refreshCatalog, checkin: checkinForFetch }));
+          setCoachInsights(detectImbalancesNormalized(analysis, {
+            catalog: refreshCatalog,
+            checkin: checkinForFetch,
+            userExerciseNames: (state.program?.workouts || []).flatMap((w) => (w.exercises || []).map((ex) => ex.name)),
+          }));
         }
         const detail = err?.message || String(err);
         setCoachError(`AI coach unavailable \u2014 showing basic analysis${detail ? ` (${detail})` : ""}`);
@@ -2724,6 +2734,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setCheckinEditSection(null);
     doCoachFetch({ checkinData });
   }, [dateKey, doCoachFetch]);
+
+  const clearTodayCheckinAndCoach = useCallback(() => {
+    saveCheckin(dateKey, null);
+    setTodayCheckin(null);
+    setCheckinEditSection(null);
+    setCoachUnseen(false);
+    // Cancel any in-flight coach fetch and clear visible coach state.
+    coachReqIdRef.current++;
+    coachFetchingRef.current = false;
+    setCoachInsights([]);
+    setCoachStreaming(false);
+    setCoachLoading(false);
+    setCoachError(null);
+  }, [dateKey]);
 
   const confirmAddSuggestion = useCallback((workoutIdOrIds, exerciseName) => {
     // Look up catalogId by name
@@ -3491,18 +3515,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             onAddSuggestion={handleAddSuggestion}
                             userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
                             colors={colors}
-                            onClearCheckin={() => {
-                              saveCheckin(dateKey, null);
-                              setTodayCheckin(null);
-                              setCheckinEditSection(null);
-                              // Cancel any in-flight coach fetch and clear insights
-                              coachReqIdRef.current++;
-                              coachFetchingRef.current = false;
-                              setCoachInsights([]);
-                              setCoachStreaming(false);
-                              setCoachLoading(false);
-                              setCoachError(null);
-                            }}
+                            onClearCheckin={clearTodayCheckinAndCoach}
                           />
                         ),
                       },
@@ -3673,11 +3686,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         <CheckinSummary
                           checkin={todayCheckin || { mood: null, sleep: null, pain: [] }}
                           onEdit={(section) => setCheckinEditSection(section)}
-                          onClear={todayCheckin ? () => {
-                            saveCheckin(dateKey, null);
-                            setTodayCheckin(null);
-                            setCheckinEditSection(null);
-                          } : undefined}
+                          onClear={todayCheckin ? clearTodayCheckinAndCoach : undefined}
                           colors={colors}
                         />
                       }
@@ -3687,9 +3696,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             section={checkinEditSection}
                             checkin={todayCheckin || { mood: null, sleep: null, pain: [] }}
                             onSave={(updated) => {
-                              saveCheckin(dateKey, updated);
-                              setTodayCheckin(updated);
-                              setCheckinEditSection(null);
+                              handleCheckinUpdate(updated);
+                              handleCoachRefresh(updated);
                             }}
                             onCancel={() => setCheckinEditSection(null)}
                             colors={colors}
@@ -6128,7 +6136,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
           dispatchModal({ type: "OPEN_CUSTOM_EXERCISE", payload: { workoutId: wId } });
         }}
-        catalog={fullCatalog}
       />
 
       {/* Custom Exercise Modal (AI-enriched) */}

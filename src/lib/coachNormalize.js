@@ -803,6 +803,9 @@ export function normalizeInsight(insight) {
     detail: insight.message || "",
     severity: insight.severity || "INFO",
     cta,
+    evidence: insight.evidence || "",
+    expectedOutcome: insight.expected_outcome || "",
+    confidence: typeof insight.confidence === "number" ? insight.confidence : null,
     _raw: insight,
   };
 }
