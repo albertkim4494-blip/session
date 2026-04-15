@@ -56,3 +56,37 @@ export function calculateWeekStreak(weekMap) {
   }
   return streak;
 }
+
+/**
+ * Longest consecutive run of weeks with 2+ sessions. Accounts for gap
+ * weeks not in the map (gaps break runs).
+ * @param {Object} weekMap - { weekStartKey: sessionCount }
+ * @returns {number}
+ */
+export function longestWeekStreak(weekMap) {
+  const weekKeys = Object.keys(weekMap).sort();
+  if (weekKeys.length === 0) return 0;
+
+  const first = weekKeys[0];
+  const last = weekKeys[weekKeys.length - 1];
+  const allWeeks = [];
+  let cursor = first;
+  while (cursor <= last) {
+    allWeeks.push(cursor);
+    const d = new Date(cursor + "T00:00:00");
+    d.setDate(d.getDate() + 7);
+    cursor = d.toISOString().slice(0, 10);
+  }
+
+  let best = 0;
+  let run = 0;
+  for (const wk of allWeeks) {
+    if ((weekMap[wk] || 0) >= 2) {
+      run++;
+      if (run > best) best = run;
+    } else {
+      run = 0;
+    }
+  }
+  return best;
+}

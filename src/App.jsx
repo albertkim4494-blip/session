@@ -87,7 +87,7 @@ import { buildCatalogMap, isBodyweightOnly } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
-import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak } from "./lib/setHelpers";
+import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 import { CheckinSummary, CheckinEditSection } from "./components/CoachCheckin";
@@ -1093,6 +1093,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return {
       logged, total, totalSets,
       weekStreak: calculateWeekStreak(weekMap),
+      longestStreak: longestWeekStreak(weekMap),
       bestReps: bestOf(exReps),
       bestVolume: bestOf(exVol),
       bestLift: bestOf(exLift),
@@ -4120,8 +4121,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           </div>
                         ) : (
                           <div style={badgeStyle}>
-                            <div style={{ ...valStyle, color: summaryStats.weekStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.weekStreak}</div>
-                            <div style={subStyle}>Week Streak</div>
+                            <div style={{ ...valStyle, color: summaryStats.longestStreak > 0 ? "#2ecc71" : "inherit" }}>{summaryStats.longestStreak}</div>
+                            <div style={subStyle}>Best Streak</div>
                           </div>
                         )}
                         {statBadges.length === 1 && statBadges[0]}
