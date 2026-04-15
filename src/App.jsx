@@ -3252,12 +3252,48 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }
 
   function removeSessionFromToday(workoutId) {
-    updateState((st) => {
-      if (!st.todaySessions?.[dateKey]) return st;
-      st.todaySessions[dateKey] = st.todaySessions[dateKey].filter(id => id !== workoutId);
-      if (st.todaySessions[dateKey].length === 0) delete st.todaySessions[dateKey];
-      return st;
-    });
+    const w = workoutById.get(workoutId);
+    const dayLogs = state.logsByDate?.[dateKey] || {};
+    const adds = state.sessionAdditions?.[dateKey]?.[workoutId] || [];
+    const exIds = [
+      ...((w?.exercises || []).map(e => e.id)),
+      ...adds.map(e => e.id),
+    ];
+    const hasLoggedSets = exIds.some(id =>
+      (dayLogs[id]?.sets || []).some(s => isSetCompleted(s))
+    );
+
+    const doRemove = () => {
+      updateState((st) => {
+        if (st.todaySessions?.[dateKey]) {
+          st.todaySessions[dateKey] = st.todaySessions[dateKey].filter(id => id !== workoutId);
+          if (st.todaySessions[dateKey].length === 0) delete st.todaySessions[dateKey];
+        }
+        if (st.logsByDate?.[dateKey]) {
+          for (const id of exIds) delete st.logsByDate[dateKey][id];
+          if (Object.keys(st.logsByDate[dateKey]).length === 0) delete st.logsByDate[dateKey];
+        }
+        if (st.sessionAdditions?.[dateKey]?.[workoutId]) {
+          delete st.sessionAdditions[dateKey][workoutId];
+          if (Object.keys(st.sessionAdditions[dateKey]).length === 0) delete st.sessionAdditions[dateKey];
+        }
+        return st;
+      });
+    };
+
+    if (hasLoggedSets) {
+      dispatchModal({
+        type: "OPEN_CONFIRM",
+        payload: {
+          title: "Remove from today?",
+          message: `Remove "${w?.name || "this workout"}" from today? Your logged sets for today will also be deleted.`,
+          confirmText: "Remove",
+          onConfirm: () => { dispatchModal({ type: "CLOSE_CONFIRM" }); doRemove(); },
+        },
+      });
+    } else {
+      doRemove();
+    }
   }
 
   function highlightAndScrollToCard(workoutId) {
