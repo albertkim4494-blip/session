@@ -2534,20 +2534,40 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, []);
 
   const removeSessionAddition = useCallback((workoutId, exerciseId) => {
-    updateState((st) => {
-      const adds = st.sessionAdditions?.[dateKey]?.[workoutId];
-      if (!adds) return st;
-      st.sessionAdditions[dateKey][workoutId] = adds.filter(ex => ex.id !== exerciseId);
-      if (st.sessionAdditions[dateKey][workoutId].length === 0) delete st.sessionAdditions[dateKey][workoutId];
-      if (Object.keys(st.sessionAdditions[dateKey] || {}).length === 0) delete st.sessionAdditions[dateKey];
-      // Clear logs for the removed exercise
-      if (st.logsByDate[dateKey]?.[exerciseId]) {
-        delete st.logsByDate[dateKey][exerciseId];
-      }
-      return st;
-    });
-    showToast("Exercise removed");
-  }, [dateKey, showToast]);
+    const adds = state.sessionAdditions?.[dateKey]?.[workoutId] || [];
+    const ex = adds.find(e => e.id === exerciseId);
+    const hasLog = (state.logsByDate?.[dateKey]?.[exerciseId]?.sets || []).some(s => isSetCompleted(s));
+
+    const doRemove = () => {
+      updateState((st) => {
+        const curAdds = st.sessionAdditions?.[dateKey]?.[workoutId];
+        if (!curAdds) return st;
+        st.sessionAdditions[dateKey][workoutId] = curAdds.filter(e => e.id !== exerciseId);
+        if (st.sessionAdditions[dateKey][workoutId].length === 0) delete st.sessionAdditions[dateKey][workoutId];
+        if (Object.keys(st.sessionAdditions[dateKey] || {}).length === 0) delete st.sessionAdditions[dateKey];
+        if (st.logsByDate[dateKey]?.[exerciseId]) {
+          delete st.logsByDate[dateKey][exerciseId];
+          if (Object.keys(st.logsByDate[dateKey]).length === 0) delete st.logsByDate[dateKey];
+        }
+        return st;
+      });
+      showToast("Exercise removed");
+    };
+
+    if (hasLog) {
+      dispatchModal({
+        type: "OPEN_CONFIRM",
+        payload: {
+          title: "Remove exercise?",
+          message: `Remove "${ex?.name || "this exercise"}"? Your logged sets for today will also be deleted.`,
+          confirmText: "Remove",
+          onConfirm: () => { dispatchModal({ type: "CLOSE_CONFIRM" }); doRemove(); },
+        },
+      });
+    } else {
+      doRemove();
+    }
+  }, [dateKey, showToast, state.sessionAdditions, state.logsByDate]);
 
   const promoteSessionAddition = useCallback((workoutId, exerciseId) => {
     const adds = state.sessionAdditions?.[dateKey]?.[workoutId];
@@ -3132,17 +3152,30 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const deleteDailyWorkout = useCallback((workoutId) => {
     const w = workoutById.get(workoutId);
+    const dayLogs = state.logsByDate?.[dateKey] || {};
+    const hasLoggedSets = (w?.exercises || []).some(ex =>
+      (dayLogs[ex.id]?.sets || []).some(s => isSetCompleted(s))
+    );
     dispatchModal({
       type: "OPEN_CONFIRM",
       payload: {
         title: "Remove workout?",
-        message: `Remove "${w?.name || "this workout"}"?`,
+        message: hasLoggedSets
+          ? `Remove "${w?.name || "this workout"}"? Your logged sets for today will also be deleted.`
+          : `Remove "${w?.name || "this workout"}"?`,
         confirmText: "Remove",
         onConfirm: () => {
           updateState((st) => {
             if (!st.dailyWorkouts?.[dateKey]) return st;
+            const removed = st.dailyWorkouts[dateKey].find(dw => dw.id === workoutId);
             st.dailyWorkouts[dateKey] = st.dailyWorkouts[dateKey].filter(dw => dw.id !== workoutId);
             if (st.dailyWorkouts[dateKey].length === 0) delete st.dailyWorkouts[dateKey];
+            if (removed && st.logsByDate?.[dateKey]) {
+              for (const ex of removed.exercises || []) {
+                delete st.logsByDate[dateKey][ex.id];
+              }
+              if (Object.keys(st.logsByDate[dateKey]).length === 0) delete st.logsByDate[dateKey];
+            }
             return st;
           });
           dispatchModal({ type: "CLOSE_CONFIRM" });
@@ -3155,13 +3188,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const w = workoutById.get(workoutId);
     const ex = w?.exercises?.find(e => e.id === exerciseId);
     const isLast = w?.exercises?.length <= 1;
+    const dayLogs = state.logsByDate?.[dateKey] || {};
+    const exHasLog = (dayLogs[exerciseId]?.sets || []).some(s => isSetCompleted(s));
+    const anyHasLog = isLast
+      ? (w?.exercises || []).some(e => (dayLogs[e.id]?.sets || []).some(s => isSetCompleted(s)))
+      : exHasLog;
+    const logNote = anyHasLog ? " Your logged sets for today will also be deleted." : "";
     dispatchModal({
       type: "OPEN_CONFIRM",
       payload: {
         title: isLast ? "Remove workout?" : "Remove exercise?",
         message: isLast
-          ? `"${ex?.name || "This exercise"}" is the last exercise. This will remove the entire workout.`
-          : `Remove "${ex?.name || "this exercise"}" from ${w?.name || "this workout"}?`,
+          ? `"${ex?.name || "This exercise"}" is the last exercise. This will remove the entire workout.${logNote}`
+          : `Remove "${ex?.name || "this exercise"}" from ${w?.name || "this workout"}?${logNote}`,
         confirmText: "Remove",
         onConfirm: () => {
           updateState((st) => {
@@ -3172,8 +3211,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             if (wk.exercises.length <= 1) {
               st.dailyWorkouts[dateKey] = dayWs.filter(dw => dw.id !== workoutId);
               if (st.dailyWorkouts[dateKey].length === 0) delete st.dailyWorkouts[dateKey];
+              if (st.logsByDate?.[dateKey]) {
+                for (const ex of wk.exercises || []) {
+                  delete st.logsByDate[dateKey][ex.id];
+                }
+                if (Object.keys(st.logsByDate[dateKey]).length === 0) delete st.logsByDate[dateKey];
+              }
             } else {
               wk.exercises = wk.exercises.filter(e => e.id !== exerciseId);
+              if (st.logsByDate?.[dateKey]?.[exerciseId]) {
+                delete st.logsByDate[dateKey][exerciseId];
+                if (Object.keys(st.logsByDate[dateKey]).length === 0) delete st.logsByDate[dateKey];
+              }
             }
             return st;
           });
