@@ -1704,14 +1704,55 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }
 
-  function findMostRecentLogBefore(exerciseId, beforeDateKey) {
+  function findMostRecentLogBefore(exerciseId, beforeDateKey, matchMeta = null) {
     const keys = Object.keys(state.logsByDate).filter(
       (k) => isValidDateKey(k) && k < beforeDateKey
     );
     keys.sort((a, b) => (a > b ? -1 : 1));
+
+    // Pass 1: exact instance-id match
     for (const k of keys) {
       const exLog = state.logsByDate[k]?.[exerciseId];
       if (exLog && Array.isArray(exLog.sets)) return exLog;
+    }
+
+    // Pass 2: match by catalogId or name across other instance ids
+    const wantCatalog = matchMeta?.catalogId || null;
+    const wantName = matchMeta?.name ? matchMeta.name.toLowerCase() : null;
+    if (!wantCatalog && !wantName) return null;
+
+    const resolveMeta = (eid, dk) => {
+      for (const w of state.program.workouts || []) {
+        const hit = (w.exercises || []).find((e) => e.id === eid);
+        if (hit) return hit;
+      }
+      const adds = state.sessionAdditions?.[dk];
+      if (adds) {
+        for (const arr of Object.values(adds)) {
+          const hit = (arr || []).find((e) => e.id === eid);
+          if (hit) return hit;
+        }
+      }
+      const daily = state.dailyWorkouts?.[dk];
+      if (daily) {
+        for (const w of daily) {
+          const hit = (w.exercises || []).find((e) => e.id === eid);
+          if (hit) return hit;
+        }
+      }
+      return null;
+    };
+
+    for (const k of keys) {
+      const dayLogs = state.logsByDate[k];
+      if (!dayLogs) continue;
+      for (const [eid, exLog] of Object.entries(dayLogs)) {
+        if (!exLog || !Array.isArray(exLog.sets) || exLog.sets.length === 0) continue;
+        const meta = resolveMeta(eid, k);
+        if (!meta) continue;
+        if (wantCatalog && meta.catalogId && meta.catalogId === wantCatalog) return exLog;
+        if (!wantCatalog && wantName && (meta.name || "").toLowerCase() === wantName) return exLog;
+      }
     }
     return null;
   }
@@ -1780,7 +1821,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     (workoutId, exercise) => {
       const exerciseId = exercise.id;
       const existing = state.logsByDate[dateKey]?.[exerciseId] ?? null;
-      const template = findMostRecentLogBefore(exerciseId, dateKey);
+      const template = findMostRecentLogBefore(exerciseId, dateKey, {
+        catalogId: exercise.catalogId || null,
+        name: exercise.name || null,
+      });
       const prior = existing ?? template;
 
       const workout = workoutById.get(workoutId);
