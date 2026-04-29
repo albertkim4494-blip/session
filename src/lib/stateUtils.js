@@ -26,7 +26,7 @@ function migrateCompletedFlag(st) {
 
 /**
  * Find an exercise by ID across all state locations:
- * program workouts, daily workouts, and session additions.
+ * program workouts, daily workouts, session additions, and session-override swap replacements.
  */
 export function findExerciseById(st, exerciseId) {
   for (const wk of (st.program?.workouts || [])) {
@@ -41,6 +41,13 @@ export function findExerciseById(st, exerciseId) {
     for (const exArr of Object.values(dateAdds || {})) {
       const found = exArr.find((e) => e.id === exerciseId);
       if (found) return found;
+    }
+  }
+  for (const wOverrides of Object.values(st.sessionOverrides || {})) {
+    for (const exOverrides of Object.values(wOverrides || {})) {
+      for (const ov of Object.values(exOverrides || {})) {
+        if (ov?.type === "swap" && ov.replacement?.id === exerciseId) return ov.replacement;
+      }
     }
   }
   return null;
@@ -65,6 +72,13 @@ export function forEachExercise(st, callback) {
     for (const exArr of Object.values(st.sessionAdditions[key] || {})) {
       if (!Array.isArray(exArr)) continue;
       for (const ex of exArr) callback(ex);
+    }
+  }
+  for (const wOverrides of Object.values(st.sessionOverrides || {})) {
+    for (const exOverrides of Object.values(wOverrides || {})) {
+      for (const ov of Object.values(exOverrides || {})) {
+        if (ov?.type === "swap" && ov.replacement) callback(ov.replacement);
+      }
     }
   }
 }
