@@ -360,6 +360,26 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </div>
           </div>
 
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Backups</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
+                Restore from snapshot
+              </span>
+              <button
+                type="button"
+                className="btn-press"
+                onClick={() => dispatch({ type: "OPEN_RESTORE_HISTORY" })}
+                style={{ ...styles.secondaryBtn, padding: "4px 10px", fontSize: 12 }}
+              >
+                Open
+              </button>
+            </div>
+            <span style={{ fontSize: 11, opacity: 0.5, marginTop: 4, display: "block" }}>
+              Your data is snapshotted on every save. Up to 50 versions kept.
+            </span>
+          </div>
+
         </div>
       </div>
 

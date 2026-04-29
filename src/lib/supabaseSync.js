@@ -32,6 +32,23 @@ export async function saveCloudState(userId, state) {
 }
 
 /**
+ * Fetch the rolling history of state snapshots for the current user.
+ * The snapshots are written by a Postgres trigger on user_state and
+ * pruned to the last 50 versions per user.
+ * Returns rows ordered newest-first.
+ */
+export async function fetchHistorySnapshots(userId) {
+  const { data, error } = await supabase
+    .from("user_state_history")
+    .select("id, created_at, state")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
  * Creates a debounced saver that collapses rapid state changes into a single
  * Supabase write. If a save is already in-flight when the timer fires, the
  * pending save is queued and executed after the current one finishes.

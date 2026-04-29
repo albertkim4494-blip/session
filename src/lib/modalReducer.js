@@ -162,6 +162,15 @@ export const initialModalState = {
   manageFields: { isOpen: false, groupId: null, fields: [], loading: false },
   fillFields: { isOpen: false, groupId: null, fields: [], values: {}, requiredMode: false, saving: false, onComplete: null },
   importPreview: { isOpen: false, format: null, sessions: [], stats: null, importData: null, mode: "merge" },
+  restoreHistory: {
+    isOpen: false,
+    snapshots: [],
+    loading: false,
+    expandedId: null,
+    confirmId: null,
+    restoring: false,
+    error: "",
+  },
 };
 
 export function modalReducer(state, action) {
@@ -1038,6 +1047,25 @@ export function modalReducer(state, action) {
       return {
         ...state,
         importPreview: initialModalState.importPreview,
+      };
+
+    // ===== RESTORE HISTORY MODAL =====
+    case "OPEN_RESTORE_HISTORY":
+      return {
+        ...state,
+        restoreHistory: { ...initialModalState.restoreHistory, isOpen: true, loading: true },
+      };
+
+    case "UPDATE_RESTORE_HISTORY":
+      return {
+        ...state,
+        restoreHistory: { ...state.restoreHistory, ...action.payload },
+      };
+
+    case "CLOSE_RESTORE_HISTORY":
+      return {
+        ...state,
+        restoreHistory: initialModalState.restoreHistory,
       };
 
     // ===== CLOSE ALL (for back-button navigation) =====

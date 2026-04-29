@@ -141,7 +141,7 @@ export function makeDefaultState() {
     },
     meta: {
       createdAt: Date.now(),
-      updatedAt: Date.now(),
+      updatedAt: 0,
     },
   };
 }
@@ -179,7 +179,10 @@ export function normalizeState(st) {
     sessionOverrides: st.sessionOverrides && typeof st.sessionOverrides === "object" ? st.sessionOverrides : {},
     sessionAdditions: st.sessionAdditions && typeof st.sessionAdditions === "object" ? st.sessionAdditions : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
-    meta: { ...(st.meta ?? {}), updatedAt: Date.now() },
+    meta: {
+      createdAt: st.meta?.createdAt ?? Date.now(),
+      updatedAt: st.meta?.updatedAt ?? 0,
+    },
   };
 
   // Merge preferences with defaults for existing users

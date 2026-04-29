@@ -33,6 +33,7 @@ import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { ProfileModal } from "./components/ProfileModal";
 import { ChangeUsernameModal } from "./components/profile/ChangeUsernameModal";
 import { ChangePasswordModal } from "./components/profile/ChangePasswordModal";
+import { RestoreFromHistoryModal } from "./components/profile/RestoreFromHistoryModal";
 import { CoachInsightsCard, CoachHeroInsight, AddSuggestedExerciseModal } from "./components/CoachInsights";
 import { TimeRangeControl } from "./components/TimeRangeControl";
 import { ExerciseListTable } from "./components/ExerciseListTable";
@@ -521,26 +522,44 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
         if (cancelled) return;
 
-        if (cloudState && typeof cloudState === "object" && Object.keys(cloudState).length > 0) {
-          // Normalize cloud data the same way as localStorage (merge defaults, migrate flags)
+        const localState = loadState();
+        const cloudHasData =
+          cloudState && typeof cloudState === "object" && Object.keys(cloudState).length > 0;
+
+        // "Empty default" = no logs, no daily workouts, no custom exercises, no session data.
+        // This is what loadState() returns when LS_KEY is missing (fresh device, browser eviction,
+        // PWA reinstall, post-logout). It must NEVER overwrite a populated cloud state.
+        const localIsEmptyDefault =
+          Object.keys(localState.logsByDate || {}).length === 0 &&
+          Object.keys(localState.dailyWorkouts || {}).length === 0 &&
+          (localState.customExercises || []).length === 0 &&
+          Object.keys(localState.todaySessions || {}).length === 0 &&
+          Object.keys(localState.sessionAdditions || {}).length === 0 &&
+          Object.keys(localState.sessionOverrides || {}).length === 0;
+
+        if (cloudHasData) {
           const normalized = normalizeState(cloudState);
-          const localState = loadState();
 
-          // Compare timestamps — use whichever is newer to avoid overwriting
-          // unsaved local changes (e.g. preference change where cloud save was still debouncing)
-          const cloudTs = normalized.meta?.updatedAt || 0;
-          const localTs = localState.meta?.updatedAt || 0;
-
-          if (localTs > cloudTs) {
-            // Local is newer — keep it and push to cloud
-            setState(localState);
-            await saveCloudState(session.user.id, localState);
-          } else {
+          if (localIsEmptyDefault) {
+            // Fresh device / wiped localStorage — always trust cloud, never push empty up
             setState(normalized);
             persistState(normalized);
+          } else {
+            // Both have data — use whichever is newer
+            const cloudTs = normalized.meta?.updatedAt || 0;
+            const localTs = localState.meta?.updatedAt || 0;
+
+            if (localTs > cloudTs) {
+              setState(localState);
+              await saveCloudState(session.user.id, localState);
+            } else {
+              setState(normalized);
+              persistState(normalized);
+            }
           }
         } else {
-          const localState = loadState();
+          // No cloud row yet — first sign-in for this user
+          setState(localState);
           await saveCloudState(session.user.id, localState);
         }
       } catch (err) {
@@ -3060,6 +3079,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   async function handleGenerateToday(opts) {
     const eq = opts?.equipment || modals.generateToday.equipment || equipment;
     const dur = opts?.duration || modals.generateToday.duration || 60;
+    const checkinContext = buildCheckinContext(
+      getTodayCheckin(dateKey),
+      loadCheckins(),
+      state.logsByDate
+    );
 
     dispatchModal({ type: "UPDATE_GENERATE_TODAY", payload: { loading: true, error: null, preview: null } });
 
@@ -3071,6 +3095,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       catalog: fullCatalog,
       todayKey: dateKey,
       measurementSystem: state.preferences?.measurementSystem,
+      checkinContext,
     });
 
     if (result.success) {
@@ -6711,6 +6736,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         session={session}
         styles={styles}
         colors={colors}
+      />
+
+      {/* Restore From History Modal */}
+      <RestoreFromHistoryModal
+        open={modals.restoreHistory?.isOpen}
+        modalState={modals.restoreHistory}
+        dispatch={dispatchModal}
+        session={session}
+        styles={styles}
+        colors={colors}
+        onRestore={async (snapshotState) => {
+          const restored = normalizeState({
+            ...snapshotState,
+            meta: { ...(snapshotState.meta || {}), updatedAt: Date.now() },
+          });
+          setState(restored);
+          persistState(restored);
+          await saveCloudState(session.user.id, restored);
+        }}
       />
 
       {/* Billing Modal */}
