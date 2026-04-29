@@ -2399,9 +2399,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         // Collect session additions for this workout to include in the toggle
         const allDateAdds = Object.values(st.sessionAdditions || {});
         const addedExercises = allDateAdds.flatMap(dateObj => dateObj[workoutId] || []);
-        if (!wk && addedExercises.length === 0) return st;
+        // Collect swap replacements for this workout (sessionOverrides) — otherwise they're
+        // visible in the rollup but invisible to the toggle, leaving icon stuck in "mixed"
+        const swapReplacements = [];
+        for (const wOverrides of Object.values(st.sessionOverrides || {})) {
+          const exOverrides = wOverrides?.[workoutId];
+          if (!exOverrides) continue;
+          for (const ov of Object.values(exOverrides)) {
+            if (ov?.type === "swap" && ov.replacement) swapReplacements.push(ov.replacement);
+          }
+        }
+        if (!wk && addedExercises.length === 0 && swapReplacements.length === 0) return st;
         // Compute current state: are any exercises enabled?
-        const allExercises = [...(wk?.exercises || []), ...addedExercises];
+        const allExercises = [...(wk?.exercises || []), ...addedExercises, ...swapReplacements];
         const anyOn = allExercises.some((ex) =>
           ex.restTimer !== undefined ? ex.restTimer : globalEnabled
         );
@@ -2416,6 +2426,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           for (const w of st.dailyWorkouts[key]) setAll(w);
         }
         for (const ex of addedExercises) ex.restTimer = newVal;
+        for (const ex of swapReplacements) ex.restTimer = newVal;
         return st;
       });
     },
