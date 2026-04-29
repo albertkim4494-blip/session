@@ -36,6 +36,75 @@ function buildCatalogPayload(catalog, equipment) {
     }));
 }
 
+function calculateAge(birthdate) {
+  if (!birthdate) return null;
+  const born = new Date(`${birthdate}T00:00:00`);
+  if (Number.isNaN(born.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - born.getFullYear();
+  const m = today.getMonth() - born.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < born.getDate())) age--;
+  return age > 0 && age < 120 ? age : null;
+}
+
+function buildProfilePayload(profile = {}) {
+  const age = profile.age || calculateAge(profile.birthdate);
+  return {
+    age,
+    birthdate: profile.birthdate,
+    gender: profile.gender,
+    weight_lbs: profile.weight_lbs,
+    height_inches: profile.height_inches,
+    goal: profile.goal,
+    sports: profile.sports,
+    about: profile.about,
+  };
+}
+
+function buildCurrentPlanSummary(state) {
+  const workouts = state.program?.workouts || [];
+  if (!Array.isArray(workouts) || workouts.length === 0) return "";
+
+  return workouts
+    .slice(0, 8)
+    .map((w) => {
+      const names = (w.exercises || []).map((ex) => ex.name).filter(Boolean).slice(0, 8);
+      return `${w.name || "Workout"}: ${names.join(", ") || "no exercises"}`;
+    })
+    .join("\n");
+}
+
+function buildTrainingPatternSummary(state, todayKey) {
+  const logs = state.logsByDate || {};
+  const today = todayKey ? new Date(`${todayKey}T00:00:00`) : new Date();
+  const dates = Object.keys(logs)
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort()
+    .reverse();
+
+  const last28 = [];
+  const last7 = [];
+  for (const dk of dates) {
+    const date = new Date(`${dk}T00:00:00`);
+    const daysAgo = Math.floor((today - date) / (1000 * 60 * 60 * 24));
+    if (daysAgo >= 0 && daysAgo <= 27 && dayHasCompletedSets(logs[dk])) last28.push(dk);
+    if (daysAgo >= 0 && daysAgo <= 6 && dayHasCompletedSets(logs[dk])) last7.push(dk);
+  }
+
+  const plannedCount = Array.isArray(state.program?.workouts) ? state.program.workouts.length : 0;
+  const dailyCount = Object.values(state.dailyWorkouts || {})
+    .reduce((sum, ws) => sum + (Array.isArray(ws) ? ws.length : 0), 0);
+
+  return [
+    `Training days last 7 days: ${last7.length}`,
+    `Training days last 28 days: ${last28.length}`,
+    `Current program workouts: ${plannedCount}`,
+    `Generated/ad hoc workouts saved: ${dailyCount}`,
+    last7.length >= 5 ? "Recent pattern: high frequency; bias recovery and avoid redundant loading." : "",
+    last28.length <= 3 ? "Recent pattern: low consistency; bias approachable sessions and simple wins." : "",
+  ].filter(Boolean).join("\n");
+}
+
 /**
  * Build a compact training history summary from logsByDate (last 14 days).
  */
@@ -302,11 +371,16 @@ export async function generateProgramAI({
   sportName,
   sportDays,
   measurementSystem,
+  checkinContext,
+  todayKey,
 }) {
   try {
+    const appState = state || {};
     const wLabel = measurementSystem === "metric" ? "kg" : "lb";
     const catalogPayload = buildCatalogPayload(catalog, equipment);
-    const history = buildHistorySummary(state, catalog, wLabel);
+    const history = buildHistorySummary(appState, catalog, wLabel);
+    const currentPlan = buildCurrentPlanSummary(appState);
+    const trainingPattern = buildTrainingPatternSummary(appState, todayKey);
     const catalogMap = buildCatalogMap(catalog);
 
     const { data, error } = await supabase.functions.invoke(
@@ -314,10 +388,13 @@ export async function generateProgramAI({
       {
         body: {
           mode: "program",
-          profile: profile || {},
+          profile: buildProfilePayload(profile),
           equipment,
           catalog: catalogPayload,
           history,
+          currentPlan,
+          trainingPattern,
+          checkinContext: checkinContext || null,
           daysPerWeek,
           duration,
           exerciseCount: exerciseCountFromDuration(duration),
@@ -379,13 +456,17 @@ export async function generateTodayAI({
   catalog,
   todayKey,
   measurementSystem,
+  checkinContext,
 }) {
   try {
+    const appState = state || {};
     const wLabel = measurementSystem === "metric" ? "kg" : "lb";
     const catalogPayload = buildCatalogPayload(catalog, equipment);
-    const history = buildHistorySummary(state, catalog, wLabel);
-    const muscleRecency = buildMuscleRecency(state, catalog, todayKey);
-    const fatigue = buildFatigueSignals(state, catalog, todayKey);
+    const history = buildHistorySummary(appState, catalog, wLabel);
+    const muscleRecency = buildMuscleRecency(appState, catalog, todayKey);
+    const fatigue = buildFatigueSignals(appState, catalog, todayKey);
+    const currentPlan = buildCurrentPlanSummary(appState);
+    const trainingPattern = buildTrainingPatternSummary(appState, todayKey);
     const catalogMap = buildCatalogMap(catalog);
 
     const { data, error } = await supabase.functions.invoke(
@@ -393,12 +474,15 @@ export async function generateTodayAI({
       {
         body: {
           mode: "today",
-          profile: profile || {},
+          profile: buildProfilePayload(profile),
           equipment,
           duration: duration || 60,
           exerciseCount: exerciseCountFromDuration(duration),
           catalog: catalogPayload,
           history,
+          currentPlan,
+          trainingPattern,
+          checkinContext: checkinContext || null,
           muscleRecency,
           fatigue,
         },

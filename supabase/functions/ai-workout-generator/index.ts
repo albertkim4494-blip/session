@@ -15,15 +15,65 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
+interface CheckinContext {
+  today?: {
+    mood?: number;
+    moodLabel?: string;
+    sleep?: string;
+    pain?: Array<{ area: string; severity: string }>;
+  } | null;
+  history?: Array<{
+    date: string;
+    mood?: number;
+    moodLabel?: string;
+    sleep?: string;
+    pain?: Array<{ area: string; severity: string }>;
+  }>;
+  moodPattern?: string | null;
+}
+
+function formatPain(pain?: Array<{ area: string; severity: string }>): string {
+  if (!Array.isArray(pain) || pain.length === 0) return "none";
+  return pain
+    .filter((p) => p?.area || p?.severity)
+    .map((p) => `${p.area || "unknown"} (${p.severity || "unspecified"})`)
+    .join(", ") || "none";
+}
+
+function formatCheckinSection(checkinContext?: CheckinContext | null): string {
+  if (!checkinContext) return "";
+  const lines: string[] = ["", "CHECK-IN CONTEXT:"];
+  if (checkinContext.today) {
+    lines.push(`Today mood: ${checkinContext.today.moodLabel || "unknown"} (${checkinContext.today.mood ?? "n/a"}/2)`);
+    lines.push(`Today sleep: ${checkinContext.today.sleep || "unknown"}`);
+    lines.push(`Today pain: ${formatPain(checkinContext.today.pain)}`);
+  } else {
+    lines.push("Today check-in: none");
+  }
+
+  const history = Array.isArray(checkinContext.history) ? checkinContext.history.slice(0, 7) : [];
+  if (history.length > 0) {
+    lines.push("Recent check-ins:");
+    for (const c of history) {
+      lines.push(`- ${c.date}: ${c.moodLabel || "unknown"}, sleep ${c.sleep || "unknown"}, pain ${formatPain(c.pain)}`);
+    }
+  }
+  if (checkinContext.moodPattern) lines.push(`Mood pattern: ${checkinContext.moodPattern}`);
+  return lines.join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Prompt builders
 // ---------------------------------------------------------------------------
 
 function buildProgramPrompt(payload: {
   profile: Record<string, unknown>;
-  equipment: string;
+  equipment: unknown;
   catalog: Array<{ id: string; name: string; muscles: string; tags: string; unit?: string }>;
   history: string;
+  currentPlan?: string;
+  trainingPattern?: string;
+  checkinContext?: CheckinContext | null;
   daysPerWeek: number;
   duration: number;
   exerciseCount?: number;
@@ -36,6 +86,9 @@ function buildProgramPrompt(payload: {
     equipment,
     catalog,
     history,
+    currentPlan,
+    trainingPattern,
+    checkinContext,
     daysPerWeek,
     duration,
     goal,
@@ -46,6 +99,7 @@ function buildProgramPrompt(payload: {
   const profileLines: string[] = [];
   if (profile.age) profileLines.push(`Age: ${profile.age}`);
   if (profile.weight_lbs) profileLines.push(`Weight: ${profile.weight_lbs} lbs`);
+  if (profile.height_inches) profileLines.push(`Height: ${profile.height_inches} inches`);
   if (profile.gender) profileLines.push(`Gender: ${profile.gender}`);
   if (profile.goal) profileLines.push(`Goal: ${profile.goal}`);
   if (profile.sports) profileLines.push(`Sports: ${profile.sports}`);
@@ -79,6 +133,7 @@ function buildProgramPrompt(payload: {
 
   const sportDayCount = Array.isArray(sportDays) ? sportDays.length : 0;
   const sportDayList = Array.isArray(sportDays) ? sportDays.join(", ") : "";
+  const checkinSection = formatCheckinSection(checkinContext);
 
   const sportSection =
     sportName && sportDayCount > 0
@@ -113,6 +168,13 @@ Days per week: ${daysPerWeek}
 Session duration: ~${duration} minutes
 ${sportSection}${sportBioSection}
 
+CURRENT PROGRAM:
+${currentPlan || "No current program structure available."}
+
+RECENT TRAINING PATTERN:
+${trainingPattern || "No training pattern summary available."}
+${checkinSection}
+
 TRAINING HISTORY (last 14 days):
 ${history || "No recent training data."}
 Lines prefixed with [SPORT] are sport activities — do NOT include them as exercises. Use them only for understanding training load and muscle fatigue.
@@ -128,6 +190,9 @@ UNDERSTANDING THE USER:
 - Beginners need simpler programs with fewer exercises and approachable volume. Advanced lifters benefit from more variety and periodization.
 - Consider gender and body weight when selecting exercises. Lighter individuals and women may benefit from dumbbell variations over barbell for many movements, and typically start with lower absolute loads.
 - For General Fitness or Lose Fat goals, prioritize enjoyable, sustainable exercise selection over maximum intensity. The best program is the one they'll actually do.
+- Use check-in data as a recovery constraint. Restless sleep, low mood, or pain should reduce weekly volume and avoid loading painful areas. Great mood and rested sleep can support normal progression, but never override pain.
+- Use current-program context to complement what the user already has. Do not simply recreate the same workout names and exercise order unless it is clearly appropriate.
+- Use recent training pattern to match adherence. Low consistency means simple repeatable sessions; high frequency means more recovery-aware programming.
 
 RULES:
 1. Pick exercises ONLY from the catalog above, using exact catalogId values.
@@ -168,11 +233,14 @@ OUTPUT FORMAT:
 
 function buildTodayPrompt(payload: {
   profile: Record<string, unknown>;
-  equipment: string;
+  equipment: unknown;
   duration: number;
   exerciseCount?: number;
   catalog: Array<{ id: string; name: string; muscles: string; tags: string; unit?: string }>;
   history: string;
+  currentPlan?: string;
+  trainingPattern?: string;
+  checkinContext?: CheckinContext | null;
   muscleRecency: Record<string, number | null>;
   fatigue?: {
     recentMoods?: Array<{ date: string; mood: number; label: string }>;
@@ -182,11 +250,12 @@ function buildTodayPrompt(payload: {
     todayExercisesAlreadyDone?: string[];
   };
 }) {
-  const { profile, equipment, duration, catalog, history, muscleRecency, fatigue } = payload;
+  const { profile, equipment, duration, catalog, history, currentPlan, trainingPattern, checkinContext, muscleRecency, fatigue } = payload;
 
   const profileLines: string[] = [];
   if (profile.age) profileLines.push(`Age: ${profile.age}`);
   if (profile.weight_lbs) profileLines.push(`Weight: ${profile.weight_lbs} lbs`);
+  if (profile.height_inches) profileLines.push(`Height: ${profile.height_inches} inches`);
   if (profile.gender) profileLines.push(`Gender: ${profile.gender}`);
   if (profile.goal) profileLines.push(`Goal: ${profile.goal}`);
   if (profile.sports) profileLines.push(`Sports: ${profile.sports}`);
@@ -225,6 +294,7 @@ function buildTodayPrompt(payload: {
   const goal = (profile.goal as string) || "General Fitness";
   const dur = duration || 60;
   const exerciseCount = payload.exerciseCount || (dur <= 15 ? 2 : dur <= 30 ? Math.min(4, Math.max(3, Math.round(dur / 8))) : Math.max(4, Math.min(10, Math.round(dur / 7))));
+  const checkinSection = formatCheckinSection(checkinContext);
 
   // Sport biomechanics instruction (when profile.sports exists)
   let sportBioSection = "";
@@ -247,6 +317,14 @@ Equipment: ${formatEquipmentLabelToday(equipment)}
 Goal: ${goal}
 Session duration: ~${dur} minutes
 ${sportBioSection}
+
+CURRENT PROGRAM:
+${currentPlan || "No current program structure available."}
+
+RECENT TRAINING PATTERN:
+${trainingPattern || "No training pattern summary available."}
+${checkinSection}
+
 MUSCLE RECENCY (days since last trained):
 ${recencyLines}
 
@@ -263,6 +341,9 @@ UNDERSTANDING THE USER:
 - Someone with chronic fatigue or an autoimmune condition needs a lighter session than a collegiate athlete. Fewer exercises, lower volume, more recovery-friendly movements.
 - If injuries are mentioned, avoid those areas entirely — pick alternatives, not modifications.
 - Consider gender, body weight, and experience level when selecting exercises and prescribing volume. Beginners benefit from approachable volume (2-3 sets) and movements they can do with confidence.
+- Today's check-in is the highest-priority readiness signal. Low mood, restless sleep, or pain means reduce volume/intensity and avoid painful areas. If severe pain is present, choose recovery-friendly work that does not load that area.
+- Use current-program context to complement the user's plan. If today's workout is ad hoc, avoid duplicating the same muscles and exercises from a recent planned session unless recency strongly supports it.
+- Use recent training pattern to scale ambition. Low consistency should produce an easy-to-start session; high frequency should produce a recovery-aware session.
 ${(() => {
   const sections: string[] = [];
   if (fatigue) {

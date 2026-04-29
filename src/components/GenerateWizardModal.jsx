@@ -5,6 +5,8 @@ import {
 } from "../lib/workoutGenerator";
 import { generateProgramAI } from "../lib/workoutGeneratorApi";
 import { EXERCISE_CATALOG, EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
+import { buildCheckinContext, getTodayCheckin, loadCheckins } from "../lib/coachCheckin";
+import { yyyyMmDd } from "../lib/dateUtils";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -74,6 +76,12 @@ export function GenerateWizardModal({
 
     async function generate() {
       update({ loading: true, error: null });
+      const todayKey = yyyyMmDd(new Date());
+      const checkinContext = buildCheckinContext(
+        getTodayCheckin(todayKey),
+        loadCheckins(),
+        state?.logsByDate || {}
+      );
 
       const result = await generateProgramAI({
         goal,
@@ -86,6 +94,8 @@ export function GenerateWizardModal({
         sportName: hasSport ? sportName : "",
         sportDays: hasSport ? sportDays : [],
         measurementSystem,
+        checkinContext,
+        todayKey,
       });
 
       // Don't apply if a newer generation was triggered
