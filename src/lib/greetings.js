@@ -82,6 +82,18 @@ function pick(arr, seed) {
   return arr[Math.abs(seed) % arr.length];
 }
 
+/** Pick from an array, preferring items whose `message` is not in `recent`. Falls back to full pool when everything has been shown. */
+function pickAvoiding(arr, seed, recent) {
+  if (!arr.length) return null;
+  const recentList = Array.isArray(recent) ? recent : [];
+  const filtered = arr.filter((item) => {
+    const msg = typeof item === "string" ? item : item.message;
+    return !recentList.includes(msg);
+  });
+  const pool = filtered.length ? filtered : arr;
+  return pool[Math.abs(seed) % pool.length];
+}
+
 /** Simple numeric hash from a date string like "2026-02-07". */
 function dateSeed(dateKey) {
   let h = 0;
@@ -229,62 +241,45 @@ export function selectAcknowledgment(mood, dateKey, logsByDate) {
 }
 
 /**
- * Detect if the current set is a personal record (PR) for the exercise.
- * Compares weight (if present) or total reps against all prior logs.
- * @returns {boolean}
+ * Detect if the current set beats all prior sets in `priorSets`.
+ * Compares weight when present, otherwise reps. Returns false when no prior sets.
  */
-function detectPR(exerciseId, setData, logsByDate, dateKey) {
+function detectPRFromPriorSets(setData, priorSets) {
   const weight = parseFloat(setData.weight);
   const reps = Number(setData.reps) || 0;
   if (!weight && reps <= 0) return false;
+  if (!Array.isArray(priorSets) || priorSets.length === 0) return false;
 
-  let hasPriorSets = false;
-  for (const [dk, dayLogs] of Object.entries(logsByDate)) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) continue;
-    if (dk === dateKey) continue; // don't compare against today
-    const exLog = dayLogs?.[exerciseId];
-    if (!exLog?.sets) continue;
-    for (const s of exLog.sets) {
-      if (Number(s.reps) <= 0) continue;
-      hasPriorSets = true;
-      const priorWeight = parseFloat(s.weight);
-      const priorReps = Number(s.reps) || 0;
-      // If we're comparing weights: current weight must exceed ALL prior weights
-      if (weight > 0 && priorWeight > 0 && priorWeight >= weight) return false;
-      // If bodyweight/no-weight: current reps must exceed ALL prior reps
-      if (!weight && priorReps >= reps) return false;
-    }
+  let hasPrior = false;
+  for (const s of priorSets) {
+    const priorReps = Number(s.reps) || 0;
+    if (priorReps <= 0) continue;
+    hasPrior = true;
+    const priorWeight = parseFloat(s.weight);
+    if (weight > 0 && priorWeight > 0 && priorWeight >= weight) return false;
+    if (!weight && priorReps >= reps) return false;
   }
-  // Only a PR if there were prior sets to beat
-  return hasPriorSets;
-}
-
-/**
- * Check if this exercise has ever been logged before today.
- */
-function isFirstEverLog(exerciseId, logsByDate, dateKey) {
-  for (const [dk, dayLogs] of Object.entries(logsByDate)) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) continue;
-    if (dk === dateKey) continue;
-    if (dayLogs?.[exerciseId]?.sets?.some(isSetCompleted)) return false;
-  }
-  return true;
+  return hasPrior;
 }
 
 /**
  * Select a smart toast for set completion (checkmark tap).
- * Priority: PR > workout complete > first-ever > streak milestone > basic set done.
+ * Returns null for routine sets (silent — visual checkmark is enough feedback).
+ * Fires only on meaningful moments: PR, workout complete, first-ever, streak milestone,
+ * first set of an exercise, last set of an exercise.
  *
  * @param {Object} params
- * @param {string} params.exerciseId - The exercise being logged
- * @param {Object} params.setData    - { reps, weight } of the completed set
- * @param {number} params.setIndex   - 0-based set index
- * @param {number} params.totalSets  - Total expected sets for this exercise
- * @param {Object} params.logsByDate - Full logs object
- * @param {string} params.dateKey    - Today's date key
- * @param {boolean} params.isWorkoutComplete - All exercises in workout fully done
- * @param {number} params.exercisesDoneToday - Count of exercises with logs today
- * @returns {{ message: string, emoji: string, coachLine: string|null }}
+ * @param {string} params.exerciseId
+ * @param {Object} params.setData       - { reps, weight } of the completed set
+ * @param {number} params.setIndex      - 0-based set index
+ * @param {number} params.totalSets
+ * @param {Object} params.logsByDate
+ * @param {string} params.dateKey
+ * @param {boolean} params.isWorkoutComplete
+ * @param {number} params.exercisesDoneToday
+ * @param {Array<{reps:number,weight:any}>} [params.priorSets] - All prior completed sets across instance ids that share this exercise's catalogId/name. Empty array means truly first-ever.
+ * @param {string[]} [params.recentMessages] - Recently-shown toast messages to avoid repeating.
+ * @returns {{ message: string, emoji: string, coachLine: string|null } | null}
  */
 export function selectSetCompletionToast({
   exerciseId,
@@ -295,39 +290,45 @@ export function selectSetCompletionToast({
   dateKey,
   isWorkoutComplete,
   exercisesDoneToday,
+  priorSets = [],
+  recentMessages = [],
 }) {
   const seed = dateSeed(dateKey) + Date.now();
 
-  // 1. PR detection (highest priority)
-  const isPR = detectPR(exerciseId, setData, logsByDate, dateKey);
-  if (isPR) {
-    const ack = pick(PR_HIT, seed);
+  const todayExLog = logsByDate?.[dateKey]?.[exerciseId];
+  const completedTodayForEx = (todayExLog?.sets || []).filter(isSetCompleted).length;
+  const isFirstSetOfExercise = completedTodayForEx === 0;
+  const isLastSet = totalSets > 0 && setIndex === totalSets - 1;
+
+  const todayLogs = logsByDate?.[dateKey] || {};
+  let totalCompletedToday = 0;
+  for (const log of Object.values(todayLogs)) {
+    totalCompletedToday += (log?.sets || []).filter(isSetCompleted).length;
+  }
+  const isFirstSetOfDay = totalCompletedToday === 0;
+
+  // 1. PR
+  if (detectPRFromPriorSets(setData, priorSets)) {
+    const ack = pickAvoiding(PR_HIT, seed, recentMessages);
     return { message: ack.message, emoji: ack.emoji, coachLine: null };
   }
 
   // 2. Workout complete
   if (isWorkoutComplete) {
-    const ack = pick(WORKOUT_COMPLETE, seed);
+    const ack = pickAvoiding(WORKOUT_COMPLETE, seed, recentMessages);
     const volumeLine = exercisesDoneToday > 1
       ? `${exercisesDoneToday} exercises logged today`
       : null;
     return { message: ack.message, emoji: ack.emoji, coachLine: volumeLine };
   }
 
-  // 3. First-ever log for this exercise (only on the first set, not every set)
-  const todayExLog = logsByDate?.[dateKey]?.[exerciseId];
-  const hasCompletedSetsToday = todayExLog?.sets?.some((s) => isSetCompleted(s));
-  if (!hasCompletedSetsToday && isFirstEverLog(exerciseId, logsByDate, dateKey)) {
+  // 3. First-ever log of this exercise (only on the very first set today)
+  if (isFirstSetOfExercise && priorSets.length === 0) {
     return { message: FIRST_EVER.message, emoji: FIRST_EVER.emoji, coachLine: null };
   }
 
-  // 4. Streak milestones (only on first set of the day to avoid repetition)
-  const todayLogs = logsByDate?.[dateKey];
-  const isFirstSetToday = !todayLogs || Object.keys(todayLogs).length === 0 ||
-    (Object.keys(todayLogs).length === 1 && todayLogs[exerciseId] &&
-     (!todayLogs[exerciseId].sets || todayLogs[exerciseId].sets.filter((s) => isSetCompleted(s)).length === 0));
-  if (isFirstSetToday) {
-    // getStreak uses pre-update state, so +1 to include today's new log
+  // 4. Streak milestone (only on the day's first set, otherwise it'd fire repeatedly)
+  if (isFirstSetOfDay) {
     const streak = getStreak(logsByDate, dateKey) + 1;
     const milestone = [30, 14, 7, 5, 3].find((n) => streak === n);
     if (milestone) {
@@ -337,10 +338,19 @@ export function selectSetCompletionToast({
     }
   }
 
-  // 5. Basic set completion with progress context
-  const ack = pick(SET_DONE, seed);
-  const setProgress = totalSets > 0
-    ? `Set ${setIndex + 1}/${totalSets}`
-    : `Set ${setIndex + 1}`;
-  return { message: ack.message, emoji: ack.emoji, coachLine: setProgress };
+  // 5. First set of an exercise — encouraging start
+  if (isFirstSetOfExercise) {
+    const ack = pickAvoiding(SET_DONE, seed, recentMessages);
+    const setProgress = totalSets > 0 ? `Set ${setIndex + 1}/${totalSets}` : `Set ${setIndex + 1}`;
+    return { message: ack.message, emoji: ack.emoji, coachLine: setProgress };
+  }
+
+  // 6. Last set of an exercise — completion
+  if (isLastSet) {
+    const ack = pickAvoiding(SET_DONE, seed, recentMessages);
+    return { message: ack.message, emoji: ack.emoji, coachLine: "Exercise complete" };
+  }
+
+  // 7. Routine middle set — stay silent. The checkmark animation is feedback.
+  return null;
 }

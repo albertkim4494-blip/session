@@ -1777,6 +1777,60 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return null;
   }
 
+  // Collect every prior set (any reps > 0) for the exercise across instance ids that
+  // share its catalogId or name. Used by the toast selector for first-ever and PR detection.
+  function getPriorSetsForExercise(exerciseId, beforeDateKey, matchMeta = null) {
+    const keys = Object.keys(state.logsByDate).filter(
+      (k) => isValidDateKey(k) && k < beforeDateKey
+    );
+    const wantCatalog = matchMeta?.catalogId || null;
+    const wantName = matchMeta?.name ? matchMeta.name.toLowerCase() : null;
+
+    const resolveMeta = (eid, dk) => {
+      for (const w of state.program.workouts || []) {
+        const hit = (w.exercises || []).find((e) => e.id === eid);
+        if (hit) return hit;
+      }
+      const adds = state.sessionAdditions?.[dk];
+      if (adds) {
+        for (const arr of Object.values(adds)) {
+          const hit = (arr || []).find((e) => e.id === eid);
+          if (hit) return hit;
+        }
+      }
+      const daily = state.dailyWorkouts?.[dk];
+      if (daily) {
+        for (const w of daily) {
+          const hit = (w.exercises || []).find((e) => e.id === eid);
+          if (hit) return hit;
+        }
+      }
+      return null;
+    };
+
+    const collected = [];
+    for (const k of keys) {
+      const dayLogs = state.logsByDate[k];
+      if (!dayLogs) continue;
+      for (const [eid, exLog] of Object.entries(dayLogs)) {
+        if (!exLog || !Array.isArray(exLog.sets) || exLog.sets.length === 0) continue;
+        let matches = eid === exerciseId;
+        if (!matches && (wantCatalog || wantName)) {
+          const meta = resolveMeta(eid, k);
+          if (meta) {
+            if (wantCatalog && meta.catalogId === wantCatalog) matches = true;
+            else if (!wantCatalog && wantName && (meta.name || "").toLowerCase() === wantName) matches = true;
+          }
+        }
+        if (!matches) continue;
+        for (const s of exLog.sets) {
+          if (Number(s.reps) > 0) collected.push({ reps: s.reps, weight: s.weight });
+        }
+      }
+    }
+    return collected;
+  }
+
   function computeExerciseSummary(exerciseIdOrIds, startKey, endKey, unit) {
     const ids = Array.isArray(exerciseIdOrIds) ? exerciseIdOrIds : [exerciseIdOrIds];
     let totalReps = 0;
@@ -2293,6 +2347,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const schemeParsed = schemeStr ? parseScheme(schemeStr) : null;
       const totalSets = modalSets.length;
 
+      // Cross-instance prior-sets lookup so first-ever / PR detection survives id churn
+      // (same exercise re-added to a new program day, swapped, or copied gets a fresh id).
+      const exerciseObjForToast = exercises.find((e) => e.id === exerciseId) || findExerciseById(state, exerciseId);
+      const matchMeta = exerciseObjForToast
+        ? { catalogId: exerciseObjForToast.catalogId || null, name: exerciseObjForToast.name || null }
+        : null;
+      const priorSetsForToast = getPriorSetsForExercise(exerciseId, dateKey, matchMeta);
+
+      // Recently-shown toast messages — used to suppress repeats across the day/week.
+      let recentMessages = [];
+      try {
+        const raw = localStorage.getItem("wt_recent_toasts");
+        if (raw) recentMessages = JSON.parse(raw) || [];
+      } catch {}
+
       const toastObj = selectSetCompletionToast({
         exerciseId,
         setData,
@@ -2302,11 +2371,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         dateKey,
         isWorkoutComplete,
         exercisesDoneToday,
+        priorSets: priorSetsForToast,
+        recentMessages,
       });
 
-      setToast(toastObj);
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), isWorkoutComplete ? 3500 : 2000);
+      if (toastObj) {
+        try {
+          const next = [toastObj.message, ...recentMessages.filter((m) => m !== toastObj.message)].slice(0, 6);
+          localStorage.setItem("wt_recent_toasts", JSON.stringify(next));
+        } catch {}
+        setToast(toastObj);
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), isWorkoutComplete ? 3500 : 2000);
+      }
+      // If toastObj is null we stay silent — any in-flight toast finishes its scheduled time.
 
       // Rest timer decision
       const completedSetsCount = modalSets.filter((s) => isSetCompleted(s)).length;
