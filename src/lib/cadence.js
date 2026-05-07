@@ -123,7 +123,44 @@ export function defaultSplit({ id, name, mode = SPLIT_MODES.WEEKLY }) {
     members: [],
     restPattern: null,
     queuePosition: 0,
+    lastAdvancedAt: null,
   };
+}
+
+/**
+ * Resolve which workout is "next up" in a continuous split based on its queue position.
+ * Returns null for non-continuous splits, empty splits, or when the next-up member's
+ * workout has been deleted.
+ */
+export function getContinuousNextUp(split, workouts) {
+  if (!split || split.mode !== SPLIT_MODES.CONTINUOUS) return null;
+  if (!Array.isArray(split.members) || split.members.length === 0) return null;
+
+  const memberCount = split.members.length;
+  const raw = Number.isInteger(split.queuePosition) ? split.queuePosition : 0;
+  // Wrap negative or out-of-range positions back into [0, memberCount).
+  const idx = ((raw % memberCount) + memberCount) % memberCount;
+
+  const member = split.members[idx];
+  if (!member) return null;
+
+  const workout = (workouts || []).find((w) => w.id === member.workoutId);
+  if (!workout) return null;
+
+  return {
+    splitId: split.id,
+    splitName: split.name,
+    workout,
+    memberIndex: idx,
+    totalMembers: memberCount,
+  };
+}
+
+/** Days between two YYYY-MM-DD keys (later − earlier). Negative if reversed. */
+export function daysBetween(earlierKey, laterKey) {
+  const a = new Date(earlierKey + "T00:00:00").getTime();
+  const b = new Date(laterKey + "T00:00:00").getTime();
+  return Math.round((b - a) / (1000 * 60 * 60 * 24));
 }
 
 /** Coerce an unknown split value into a valid shape. */
@@ -144,6 +181,8 @@ export function normalizeSplit(raw) {
     : [];
   const queuePositionRaw = Number(raw.queuePosition);
   const queuePosition = Number.isInteger(queuePositionRaw) && queuePositionRaw >= 0 ? queuePositionRaw : 0;
+  const lastAdvancedAtRaw = Number(raw.lastAdvancedAt);
+  const lastAdvancedAt = Number.isFinite(lastAdvancedAtRaw) && lastAdvancedAtRaw > 0 ? lastAdvancedAtRaw : null;
   return {
     id: String(raw.id),
     name: String(raw.name),
@@ -151,5 +190,6 @@ export function normalizeSplit(raw) {
     members,
     restPattern: raw.restPattern && typeof raw.restPattern === "object" ? raw.restPattern : null,
     queuePosition,
+    lastAdvancedAt,
   };
 }

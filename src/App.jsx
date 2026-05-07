@@ -91,7 +91,7 @@ import { buildCatalogMap, isBodyweightOnly } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
-import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate } from "./lib/cadence";
+import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
@@ -955,9 +955,29 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     );
   }, [isToday, state.todayDismissed, dateKey, todaySessionIds, effectiveWorkouts]);
 
+  // "Next up" entries from continuous splits — one per active continuous split.
+  // Filtered to avoid duplicates with explicit sessions or scheduled cards.
+  const continuousNextUpEntries = useMemo(() => {
+    if (!isToday) return EMPTY_ARRAY;
+    const explicit = new Set(todaySessionIds);
+    const dismissed = new Set(state.todayDismissed?.[dateKey] || []);
+    const scheduledIds = new Set(scheduledTodayWorkouts.map((w) => w.id));
+    const out = [];
+    for (const s of splits) {
+      const next = getContinuousNextUp(s, effectiveWorkouts);
+      if (!next) continue;
+      if (explicit.has(next.workout.id)) continue;
+      if (scheduledIds.has(next.workout.id)) continue;
+      if (dismissed.has(next.workout.id)) continue;
+      out.push(next);
+    }
+    return out;
+  }, [isToday, splits, effectiveWorkouts, todaySessionIds, scheduledTodayWorkouts, state.todayDismissed, dateKey]);
+
   const hasSessions = displayedProgramWorkouts.length > 0
     || dailyWorkoutsToday.length > 0
-    || scheduledTodayWorkouts.length > 0;
+    || scheduledTodayWorkouts.length > 0
+    || continuousNextUpEntries.length > 0;
 
   const summaryRange = useMemo(() => {
     // Shift the anchor date by offset periods
@@ -2045,6 +2065,33 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (modals.log.mood != null) logEntry.mood = modals.log.mood;
       st.logsByDate[dateKey][logCtx.exerciseId] = logEntry;
 
+      // Advance the continuous-split queue once per day when the user logs a
+      // completed set against the current next-up member. Multiple set saves
+      // within a day stay idempotent thanks to the lastAdvancedAt date check.
+      const hasCompleted = allSets.some((s) => s.completed);
+      if (hasCompleted) {
+        for (const s of st.program?.splits || []) {
+          if (s.mode !== SPLIT_MODES.CONTINUOUS) continue;
+          if (!Array.isArray(s.members) || s.members.length === 0) continue;
+          const lastAdvancedDate = s.lastAdvancedAt
+            ? new Date(s.lastAdvancedAt).toISOString().slice(0, 10)
+            : null;
+          if (lastAdvancedDate === dateKey) continue;
+
+          const memberCount = s.members.length;
+          const idx = (((s.queuePosition || 0) % memberCount) + memberCount) % memberCount;
+          const member = s.members[idx];
+          if (!member) continue;
+          const memberWorkout = st.program.workouts.find((w) => w.id === member.workoutId);
+          if (!memberWorkout) continue;
+          const matchesNextUp = (memberWorkout.exercises || []).some((ex) => ex.id === logCtx.exerciseId);
+          if (!matchesNextUp) continue;
+
+          s.queuePosition = (idx + 1) % memberCount;
+          s.lastAdvancedAt = Date.now();
+        }
+      }
+
       return st;
     });
 
@@ -2714,6 +2761,33 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     dispatchModal({ type: "CLOSE_EDIT_SPLIT" });
   }, [modals.editSplit]);
+
+  const restartContinuousSplit = useCallback(
+    (splitId) => {
+      const s = splits.find((x) => x.id === splitId);
+      if (!s) return;
+      dispatchModal({
+        type: "OPEN_CONFIRM",
+        payload: {
+          title: "Restart sequence?",
+          message: `Reset "${s.name}" to Day 1. Logs and history are preserved — only the queue position resets.`,
+          confirmText: "Restart",
+          onConfirm: () => {
+            updateState((st) => {
+              const target = (st.program.splits || []).find((x) => x.id === splitId);
+              if (target) {
+                target.queuePosition = 0;
+                target.lastAdvancedAt = null;
+              }
+              return st;
+            });
+            dispatchModal({ type: "CLOSE_CONFIRM" });
+          },
+        },
+      });
+    },
+    [splits]
+  );
 
   const deleteSplit = useCallback(
     (splitId) => {
@@ -4354,6 +4428,61 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onPromoteSessionAddition={(exId) => promoteSessionAddition(w.id, exId)}
                       scheduledBadge
                     />
+                  ))}
+                  {/* Continuous splits — next-up workout in each active sequence */}
+                  {continuousNextUpEntries.map((entry) => (
+                    <div key={`cont-${entry.splitId}`} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <WorkoutCard
+                        cardId={`today-card-${entry.workout.id}`}
+                        workout={entry.workout}
+                        collapsed={collapsedToday.has(entry.workout.id)}
+                        onToggle={() => toggleCollapse(setCollapsedToday, entry.workout.id)}
+                        logsForDate={logsForDate}
+                        openLog={openLog}
+                        deleteLogForExercise={deleteLogForExercise}
+                        styles={styles}
+                        findPrior={findPriorForExercise}
+                        colors={colors}
+                        onToggleRestTimer={toggleWorkoutRestTimer}
+                        globalRestEnabled={state.preferences?.restTimerEnabled !== false}
+                        weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
+                        onStartCircuit={(w) => setCircuitWorkout(w)}
+                        onSwapExercise={(exId) => openSwapExercise(entry.workout.id, exId, false)}
+                        onSkipExercise={(exId) => skipExercise(entry.workout.id, exId, false)}
+                        overrides={todayOverrides[entry.workout.id] || null}
+                        onUndoOverride={(origExId) => undoOverride(entry.workout.id, origExId)}
+                        onPromoteOverride={(origExId) => promoteOverride(entry.workout.id, origExId)}
+                        onRemoveFromToday={() => dismissScheduledForToday(entry.workout.id)}
+                        highlightBorder={highlightCardId === entry.workout.id}
+                        catalogMap={catalogMap}
+                        onAddExercise={() => addExerciseForToday(entry.workout.id, false)}
+                        onRemoveSessionAddition={(exId) => removeSessionAddition(entry.workout.id, exId)}
+                        onPromoteSessionAddition={(exId) => promoteSessionAddition(entry.workout.id, exId)}
+                        continuousMeta={{
+                          splitName: entry.splitName,
+                          memberIndex: entry.memberIndex,
+                          totalMembers: entry.totalMembers,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => restartContinuousSplit(entry.splitId)}
+                        style={{
+                          alignSelf: "flex-end",
+                          background: "transparent", border: "none",
+                          color: colors.text, opacity: 0.45,
+                          fontSize: 11, fontFamily: "inherit",
+                          padding: "2px 6px", cursor: "pointer",
+                          display: "flex", alignItems: "center", gap: 4,
+                        }}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="1 4 1 10 7 10" />
+                          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                        </svg>
+                        Restart sequence
+                      </button>
+                    </div>
                   ))}
                   {/* Auto-detected workouts from logs (no remove button) */}
                   {logDetectedWorkouts.map((w) => (
@@ -7818,7 +7947,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride, cardId, onRemoveFromToday, highlightBorder, catalogMap, onAddExercise, onRemoveSessionAddition, onPromoteSessionAddition, scheduledBadge }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride, cardId, onRemoveFromToday, highlightBorder, catalogMap, onAddExercise, onRemoveSessionAddition, onPromoteSessionAddition, scheduledBadge, continuousMeta }) {
   const cat = (workout.category || "Workout").trim();
 
   // Compute rest timer state from exercises: all on, all off, or mixed
@@ -7853,6 +7982,11 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
           {workout.source === "group" && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>Group</span>}
           {workout.source === "event" && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: "#9b59b622", color: "#9b59b6" }}>Event</span>}
           {scheduledBadge && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>Scheduled</span>}
+          {continuousMeta && (
+            <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>
+              {continuousMeta.splitName} · Day {continuousMeta.memberIndex + 1}/{continuousMeta.totalMembers}
+            </span>
+          )}
           {overrides && <span style={{ fontSize: 11, opacity: 0.5, fontStyle: "italic" }}>(modified)</span>}
         </div>
         {onRemoveFromToday && (

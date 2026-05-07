@@ -13,6 +13,8 @@ const {
   defaultSplit,
   normalizeSplit,
   getScheduledForDate,
+  getContinuousNextUp,
+  daysBetween,
 } = await import("./cadence.js");
 
 let passed = 0;
@@ -183,6 +185,71 @@ assert(tueSched.length === 0, `Tue: nothing (got ${tueSched.map((x) => x.id).joi
 // Empty input
 assert(getScheduledForDate(null, "2026-05-04").length === 0, "null input → []");
 assert(getScheduledForDate([], "2026-05-04").length === 0, "empty input → []");
+
+// --- getContinuousNextUp ---
+const splitWorkouts = [
+  { id: "wPush", name: "Push" },
+  { id: "wPull", name: "Pull" },
+  { id: "wLegs", name: "Legs" },
+];
+
+const ppl = {
+  id: "pp1", name: "PPL", mode: "continuous",
+  members: [
+    { workoutId: "wPush", order: 0 },
+    { workoutId: "wPull", order: 1 },
+    { workoutId: "wLegs", order: 2 },
+  ],
+  queuePosition: 0,
+};
+
+const next0 = getContinuousNextUp(ppl, splitWorkouts);
+assert(next0?.workout?.id === "wPush", "next-up at pos 0 → Push");
+assert(next0?.memberIndex === 0, "memberIndex 0");
+assert(next0?.totalMembers === 3, "totalMembers 3");
+
+const next2 = getContinuousNextUp({ ...ppl, queuePosition: 2 }, splitWorkouts);
+assert(next2?.workout?.id === "wLegs", "next-up at pos 2 → Legs");
+
+// Wrap-around
+const next5 = getContinuousNextUp({ ...ppl, queuePosition: 5 }, splitWorkouts);
+assert(next5?.workout?.id === "wLegs", "wrap: pos 5 of 3 members → idx 2 → Legs");
+
+const nextNeg = getContinuousNextUp({ ...ppl, queuePosition: -1 }, splitWorkouts);
+assert(nextNeg?.workout?.id === "wLegs", `wrap: pos -1 → idx 2 → Legs (got ${nextNeg?.workout?.id})`);
+
+// Non-continuous → null
+assert(getContinuousNextUp({ ...ppl, mode: "weekly" }, splitWorkouts) === null, "weekly split → null");
+
+// Empty members → null
+assert(getContinuousNextUp({ ...ppl, members: [] }, splitWorkouts) === null, "empty members → null");
+
+// Missing workout (member references deleted workout)
+assert(
+  getContinuousNextUp({ ...ppl, queuePosition: 0, members: [{ workoutId: "ghost", order: 0 }] }, splitWorkouts) === null,
+  "missing workout → null"
+);
+
+// --- daysBetween ---
+assert(daysBetween("2026-05-04", "2026-05-04") === 0, "daysBetween: same day → 0");
+assert(daysBetween("2026-05-04", "2026-05-05") === 1, "daysBetween: 1 day");
+assert(daysBetween("2026-05-04", "2026-05-18") === 14, "daysBetween: 14 days");
+assert(daysBetween("2026-05-18", "2026-05-04") === -14, "daysBetween: reversed is negative");
+
+// --- normalizeSplit preserves lastAdvancedAt ---
+const splitWithAdvanced = normalizeSplit({
+  id: "s1", name: "X", mode: "continuous",
+  members: [{ workoutId: "w1", order: 0 }],
+  queuePosition: 1,
+  lastAdvancedAt: 1700000000000,
+});
+assert(splitWithAdvanced.lastAdvancedAt === 1700000000000, "normalizeSplit: lastAdvancedAt preserved");
+
+const splitNoAdvanced = normalizeSplit({ id: "s1", name: "X", mode: "weekly" });
+assert(splitNoAdvanced.lastAdvancedAt === null, "normalizeSplit: missing lastAdvancedAt → null");
+
+const splitBadAdvanced = normalizeSplit({ id: "s1", name: "X", mode: "weekly", lastAdvancedAt: -5 });
+assert(splitBadAdvanced.lastAdvancedAt === null, "normalizeSplit: negative timestamp → null");
 
 // --- Done ---
 console.log(`${passed} passed, ${failed} failed`);
