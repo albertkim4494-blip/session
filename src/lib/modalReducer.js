@@ -74,6 +74,15 @@ export const initialModalState = {
     category: "Workout",
     cadence: { mode: "whenever" },
   },
+  editSplit: {
+    isOpen: false,
+    splitId: null,           // null for new split
+    name: "",
+    mode: "weekly",          // "weekly" | "continuous"
+    members: [],             // [{ workoutId, order, days }]
+    restPattern: null,       // { type: "afterCycle", days: 1 } | null
+    queuePosition: 0,
+  },
   editExercise: {
     isOpen: false,
     workoutId: null,
@@ -389,6 +398,33 @@ export function modalReducer(state, action) {
       return {
         ...state,
         editWorkout: initialModalState.editWorkout,
+      };
+
+    // ===== EDIT SPLIT MODAL =====
+    case "OPEN_EDIT_SPLIT":
+      return {
+        ...state,
+        editSplit: {
+          isOpen: true,
+          splitId: action.payload?.splitId ?? null,
+          name: action.payload?.name ?? "",
+          mode: action.payload?.mode ?? "weekly",
+          members: Array.isArray(action.payload?.members) ? action.payload.members : [],
+          restPattern: action.payload?.restPattern ?? null,
+          queuePosition: action.payload?.queuePosition ?? 0,
+        },
+      };
+
+    case "UPDATE_EDIT_SPLIT":
+      return {
+        ...state,
+        editSplit: { ...state.editSplit, ...action.payload },
+      };
+
+    case "CLOSE_EDIT_SPLIT":
+      return {
+        ...state,
+        editSplit: initialModalState.editSplit,
       };
 
     // ===== EDIT EXERCISE MODAL =====

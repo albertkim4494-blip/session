@@ -2,7 +2,7 @@ import React from "react";
 import { CADENCE_MODES } from "../lib/cadence";
 
 // Display order: Mon → Sun. Values match JS Date#getDay (0=Sun, 1=Mon, ..., 6=Sat).
-const DISPLAY_DAYS = [
+export const DISPLAY_DAYS = [
   { label: "M", value: 1, full: "Monday" },
   { label: "T", value: 2, full: "Tuesday" },
   { label: "W", value: 3, full: "Wednesday" },
@@ -12,7 +12,7 @@ const DISPLAY_DAYS = [
   { label: "S", value: 0, full: "Sunday" },
 ];
 
-function DayChips({ selected, onToggle, colors, ariaLabel }) {
+export function DayChips({ selected, onToggle, colors, ariaLabel }) {
   const sel = Array.isArray(selected) ? selected : [];
   return (
     <div role="group" aria-label={ariaLabel} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
