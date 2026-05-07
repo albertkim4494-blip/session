@@ -1,4 +1,5 @@
 import { LS_KEY, LS_BACKUP_KEY } from "./constants";
+import { ensureCadence, normalizeSplit } from "./cadence";
 
 /**
  * Stamp `completed` flag on all log sets that are missing it.
@@ -135,6 +136,7 @@ export function makeDefaultState() {
     version: 1,
     program: {
       workouts: defaultWorkouts(),
+      splits: [],
     },
     customExercises: [],
     dailyWorkouts: {},
@@ -169,11 +171,12 @@ export function normalizeState(st) {
 
   const rawProgram = st.program && typeof st.program === "object" ? st.program : {};
   const rawWorkouts = Array.isArray(rawProgram.workouts) ? rawProgram.workouts : [];
+  const rawSplits = Array.isArray(rawProgram.splits) ? rawProgram.splits : [];
 
   const next = {
     ...makeDefaultState(),
     ...st,
-    program: { ...rawProgram, workouts: rawWorkouts },
+    program: { ...rawProgram, workouts: rawWorkouts, splits: rawSplits },
     customExercises: Array.isArray(st.customExercises)
       ? st.customExercises.map((ex) => ({
           ...ex,
@@ -253,15 +256,24 @@ export function normalizeState(st) {
 
   migrateCompletedFlag(next);
 
-  // Ensure every workout has valid structure and a category
-  next.program.workouts = next.program.workouts.map((w) => ({
-    ...w,
-    exercises: Array.isArray(w.exercises) ? w.exercises : [],
-    category:
-      typeof w.category === "string" && w.category.trim()
-        ? w.category.trim()
-        : "Workout",
-  }));
+  // Ensure every workout has valid structure, a category, and a cadence
+  next.program.workouts = next.program.workouts.map((w) => {
+    const next = {
+      ...w,
+      exercises: Array.isArray(w.exercises) ? w.exercises : [],
+      category:
+        typeof w.category === "string" && w.category.trim()
+          ? w.category.trim()
+          : "Workout",
+    };
+    ensureCadence(next);
+    return next;
+  });
+
+  // Splits collection (new in cadence v1) — coerce to valid shape, drop invalid entries
+  next.program.splits = next.program.splits
+    .map((s) => normalizeSplit(s))
+    .filter(Boolean);
 
   return next;
 }
