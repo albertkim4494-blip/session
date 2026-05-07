@@ -33,6 +33,7 @@ import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { CadenceEditor } from "./components/CadenceEditor";
 import { SplitEditorModal } from "./components/SplitEditorModal";
 import { SplitsSection } from "./components/SplitsSection";
+import { CadenceDriftPrompt } from "./components/CadenceDriftPrompt";
 import { ProfileModal } from "./components/ProfileModal";
 import { ChangeUsernameModal } from "./components/profile/ChangeUsernameModal";
 import { ChangePasswordModal } from "./components/profile/ChangePasswordModal";
@@ -91,7 +92,7 @@ import { buildCatalogMap, isBodyweightOnly } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
-import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp } from "./lib/cadence";
+import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
@@ -2762,6 +2763,101 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     dispatchModal({ type: "CLOSE_EDIT_SPLIT" });
   }, [modals.editSplit]);
 
+  // ---------------------------------------------------------------------------
+  // Cadence drift detection — surface "your schedule shifted" prompts
+  // ---------------------------------------------------------------------------
+
+  // For each workout, the dateKeys in [today - 30 days, today) where any of its
+  // exercises have completed sets. Cheap enough to compute on render — only
+  // touched when state.logsByDate or workouts changes.
+  const workoutLogDates = useMemo(() => {
+    if (!isToday) return EMPTY_OBJ;
+    const result = {};
+    const startKey = addDays(dateKey, -30);
+    const allLogs = state.logsByDate || EMPTY_OBJ;
+    const allLogKeys = Object.keys(allLogs).filter((k) => k >= startKey && k < dateKey);
+
+    for (const w of workouts) {
+      if (!Array.isArray(w.exercises) || w.exercises.length === 0) continue;
+      const exerciseIds = new Set(w.exercises.map((ex) => ex.id));
+      const dates = [];
+      for (const dk of allLogKeys) {
+        const dayLogs = allLogs[dk];
+        if (!dayLogs) continue;
+        let matched = false;
+        for (const exId of Object.keys(dayLogs)) {
+          if (!exerciseIds.has(exId)) continue;
+          const sets = dayLogs[exId]?.sets;
+          if (Array.isArray(sets) && sets.some(isSetCompleted)) { matched = true; break; }
+        }
+        if (matched) dates.push(dk);
+      }
+      result[w.id] = dates;
+    }
+    return result;
+  }, [isToday, dateKey, state.logsByDate, workouts]);
+
+  // Single drift suggestion — pick the workout with the strongest signal.
+  const driftSuggestion = useMemo(() => {
+    if (!isToday) return null;
+    const now = Date.now();
+    const dismissals = state.cadenceDriftDismissals || EMPTY_OBJ;
+
+    let best = null;
+    for (const w of workouts) {
+      if (!w.cadence || w.cadence.mode !== CADENCE_MODES.ANCHOR) continue;
+      const dismissal = dismissals[w.id];
+      if (dismissal?.until && dismissal.until > now) continue;
+
+      const dates = workoutLogDates[w.id] || EMPTY_ARRAY;
+      const drift = detectAnchorDrift(w.cadence, dates, dateKey);
+      if (!drift) continue;
+
+      if (!best || drift.occurrences > best.suggestion.occurrences) {
+        best = { workout: w, suggestion: drift };
+      }
+    }
+    return best;
+  }, [isToday, workouts, workoutLogDates, dateKey, state.cadenceDriftDismissals]);
+
+  const applyDriftSuggestion = useCallback(() => {
+    if (!driftSuggestion) return;
+    const { workout, suggestion } = driftSuggestion;
+    updateState((st) => {
+      const w = st.program.workouts.find((x) => x.id === workout.id);
+      if (!w) return st;
+      const newDays = suggestion.action === "replace"
+        ? [suggestion.suggestedDay]
+        : [...new Set([...suggestion.originalDays, suggestion.suggestedDay])].sort((a, b) => a - b);
+      w.cadence = { mode: CADENCE_MODES.ANCHOR, days: newDays };
+      if (st.cadenceDriftDismissals?.[workout.id]) {
+        delete st.cadenceDriftDismissals[workout.id];
+      }
+      return st;
+    });
+    showToast("Schedule updated.");
+  }, [driftSuggestion]);
+
+  const snoozeDriftSuggestion = useCallback(() => {
+    if (!driftSuggestion) return;
+    const wid = driftSuggestion.workout.id;
+    updateState((st) => {
+      if (!st.cadenceDriftDismissals) st.cadenceDriftDismissals = {};
+      st.cadenceDriftDismissals[wid] = { until: Date.now() + 28 * 24 * 60 * 60 * 1000 };
+      return st;
+    });
+  }, [driftSuggestion]);
+
+  const dismissDriftPermanently = useCallback(() => {
+    if (!driftSuggestion) return;
+    const wid = driftSuggestion.workout.id;
+    updateState((st) => {
+      if (!st.cadenceDriftDismissals) st.cadenceDriftDismissals = {};
+      st.cadenceDriftDismissals[wid] = { until: Date.now() + 365 * 24 * 60 * 60 * 1000 };
+      return st;
+    });
+  }, [driftSuggestion]);
+
   const restartContinuousSplit = useCallback(
     (splitId) => {
       const s = splits.find((x) => x.id === splitId);
@@ -4203,6 +4299,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)",
               ...(isToday && !hasSessions ? { flex: 1 } : {}),
             }}>
+              {isToday && driftSuggestion && (
+                <CadenceDriftPrompt
+                  workoutName={driftSuggestion.workout.name}
+                  suggestion={driftSuggestion.suggestion}
+                  onUpdate={applyDriftSuggestion}
+                  onSnooze={snoozeDriftSuggestion}
+                  onDismiss={dismissDriftPermanently}
+                  styles={styles}
+                  colors={colors}
+                />
+              )}
               {isToday && !hasSessions ? (
                 /* HERO STATE: greeting + swipeable coach carousel */
                 <div style={{

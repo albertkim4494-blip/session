@@ -163,6 +163,74 @@ export function daysBetween(earlierKey, laterKey) {
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
 }
 
+/** Add `n` days (negative ok) to a YYYY-MM-DD key. */
+export function addDays(dateKey, n) {
+  const d = new Date(dateKey + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Detect if an anchor cadence is drifting toward a different day-of-week.
+ * Triggers when the workout has been logged on the same non-anchor day 3+ times
+ * in the last 28 days. Conservative by design — false negatives are fine.
+ *
+ * Returns null if no drift, otherwise:
+ *   { type: "anchor", action: "add" | "replace",
+ *     suggestedDay: number, originalDays: number[], occurrences: number }
+ *
+ * `action`:
+ *   - "add"     when the original anchor days still have logs in the last 21 days
+ *               (practice now runs both old and new days)
+ *   - "replace" when the original anchor days have been cold for 21+ days
+ *               (practice moved entirely)
+ */
+export function detectAnchorDrift(cadence, logDates, dateKey) {
+  if (!cadence || cadence.mode !== CADENCE_MODES.ANCHOR) return null;
+  if (!Array.isArray(cadence.days) || cadence.days.length === 0) return null;
+  if (!Array.isArray(logDates) || logDates.length < 3) return null;
+
+  const anchorDaysSet = new Set(cadence.days);
+  const window4w = addDays(dateKey, -28);
+  const window3w = addDays(dateKey, -21);
+
+  // Logs strictly between (today - 28d) and today (exclusive of today).
+  const recent = logDates.filter((d) => d > window4w && d < dateKey);
+  if (recent.length < 3) return null;
+
+  const nonAnchorCounts = {};
+  let anchorDayLogsRecent = 0;
+
+  for (const d of recent) {
+    const dow = dayOfWeek(d);
+    if (anchorDaysSet.has(dow)) {
+      if (d > window3w) anchorDayLogsRecent++;
+      continue;
+    }
+    nonAnchorCounts[dow] = (nonAnchorCounts[dow] || 0) + 1;
+  }
+
+  let suggestedDay = null;
+  let maxCount = 0;
+  for (const dowStr of Object.keys(nonAnchorCounts)) {
+    const count = nonAnchorCounts[dowStr];
+    if (count >= 3 && count > maxCount) {
+      suggestedDay = Number(dowStr);
+      maxCount = count;
+    }
+  }
+
+  if (suggestedDay === null) return null;
+
+  return {
+    type: "anchor",
+    action: anchorDayLogsRecent > 0 ? "add" : "replace",
+    suggestedDay,
+    originalDays: [...cadence.days].sort((a, b) => a - b),
+    occurrences: maxCount,
+  };
+}
+
 /** Coerce an unknown split value into a valid shape. */
 export function normalizeSplit(raw) {
   if (!raw || typeof raw !== "object" || !raw.id || !raw.name) return null;

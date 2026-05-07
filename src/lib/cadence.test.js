@@ -15,6 +15,8 @@ const {
   getScheduledForDate,
   getContinuousNextUp,
   daysBetween,
+  addDays,
+  detectAnchorDrift,
 } = await import("./cadence.js");
 
 let passed = 0;
@@ -250,6 +252,90 @@ assert(splitNoAdvanced.lastAdvancedAt === null, "normalizeSplit: missing lastAdv
 
 const splitBadAdvanced = normalizeSplit({ id: "s1", name: "X", mode: "weekly", lastAdvancedAt: -5 });
 assert(splitBadAdvanced.lastAdvancedAt === null, "normalizeSplit: negative timestamp → null");
+
+// --- addDays ---
+assert(addDays("2026-05-04", 0) === "2026-05-04", "addDays: 0");
+assert(addDays("2026-05-04", 1) === "2026-05-05", "addDays: +1");
+assert(addDays("2026-05-04", -1) === "2026-05-03", "addDays: -1");
+assert(addDays("2026-05-31", 1) === "2026-06-01", "addDays: month rollover");
+assert(addDays("2026-01-01", -1) === "2025-12-31", "addDays: year rollover");
+
+// --- detectAnchorDrift ---
+// Cadence: anchor on Mon/Wed (1, 3)
+const anchorCad = { mode: "anchor", days: [1, 3] };
+const today = "2026-05-07"; // Thursday
+
+// Case 1: clean anchor adherence — no drift
+{
+  const dates = [
+    "2026-04-13", "2026-04-15",  // Mon, Wed
+    "2026-04-20", "2026-04-22",  // Mon, Wed
+    "2026-04-27", "2026-04-29",  // Mon, Wed
+    "2026-05-04", "2026-05-06",  // Mon, Wed
+  ];
+  assert(detectAnchorDrift(anchorCad, dates, today) === null, "anchor adherence: no drift");
+}
+
+// Case 2: 3 Tuesdays in a row + original days cold → "replace"
+{
+  const dates = [
+    "2026-04-21", // Tue
+    "2026-04-28", // Tue
+    "2026-05-05", // Tue
+  ];
+  const drift = detectAnchorDrift(anchorCad, dates, today);
+  assert(drift !== null, "Tue x3 cold original: drift detected");
+  assert(drift?.action === "replace", `cold original → replace (got ${drift?.action})`);
+  assert(drift?.suggestedDay === 2, `suggestedDay = Tue (got ${drift?.suggestedDay})`);
+  assert(drift?.occurrences === 3, "occurrences = 3");
+  assert(JSON.stringify(drift?.originalDays) === "[1,3]", "originalDays preserved");
+}
+
+// Case 3: 3 Tuesdays + original days still hot → "add"
+{
+  const dates = [
+    "2026-04-21", "2026-04-22",     // Tue, Wed
+    "2026-04-28", "2026-04-29",     // Tue, Wed
+    "2026-05-04", "2026-05-05",     // Mon, Tue
+  ];
+  const drift = detectAnchorDrift(anchorCad, dates, today);
+  assert(drift !== null, "Tue x3 hot original: drift detected");
+  assert(drift?.action === "add", `hot original → add (got ${drift?.action})`);
+  assert(drift?.suggestedDay === 2, "suggestedDay = Tue");
+}
+
+// Case 4: only 2 Tuesdays (below threshold) → no drift
+{
+  const dates = ["2026-04-21", "2026-05-05"];
+  assert(detectAnchorDrift(anchorCad, dates, today) === null, "2 Tuesdays: under threshold, no drift");
+}
+
+// Case 5: scattered new days (Tue, Thu, Sat each 1x) → no clear pattern
+{
+  const dates = [
+    "2026-04-21", // Tue
+    "2026-04-30", // Thu
+    "2026-05-02", // Sat
+  ];
+  assert(detectAnchorDrift(anchorCad, dates, today) === null, "scattered drift: no clear pattern");
+}
+
+// Case 6: outside 4-week window
+{
+  const dates = ["2026-03-10", "2026-03-17", "2026-03-24"]; // all > 28 days ago
+  assert(detectAnchorDrift(anchorCad, dates, today) === null, "old logs: outside window");
+}
+
+// Case 7: non-anchor cadence → null
+{
+  const weeklyCad = { mode: "weekly", perWeek: 3, preferredDays: [1, 3, 5] };
+  assert(detectAnchorDrift(weeklyCad, ["2026-04-21", "2026-04-28", "2026-05-05"], today) === null, "weekly cadence: not anchor → null");
+}
+
+// Case 8: empty anchor days → null
+{
+  assert(detectAnchorDrift({ mode: "anchor", days: [] }, ["2026-04-21"], today) === null, "empty anchor days: null");
+}
 
 // --- Done ---
 console.log(`${passed} passed, ${failed} failed`);
