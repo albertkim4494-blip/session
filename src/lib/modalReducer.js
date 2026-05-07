@@ -72,6 +72,7 @@ export const initialModalState = {
     workoutId: null,
     name: "",
     category: "Workout",
+    cadence: { mode: "whenever" },
   },
   editExercise: {
     isOpen: false,
@@ -374,6 +375,7 @@ export function modalReducer(state, action) {
           workoutId: action.payload.workoutId,
           name: action.payload.name,
           category: action.payload.category || "Workout",
+          cadence: action.payload.cadence || { mode: "whenever" },
         },
       };
 

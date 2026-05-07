@@ -30,6 +30,7 @@ import { useSwipe } from "./hooks/useSwipe";
 import { Modal, ConfirmModal, InputModal } from "./components/Modal";
 import { PillTabs } from "./components/PillTabs";
 import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
+import { CadenceEditor } from "./components/CadenceEditor";
 import { ProfileModal } from "./components/ProfileModal";
 import { ChangeUsernameModal } from "./components/profile/ChangeUsernameModal";
 import { ChangePasswordModal } from "./components/profile/ChangePasswordModal";
@@ -88,6 +89,7 @@ import { buildCatalogMap, isBodyweightOnly } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
+import { CADENCE_MODES, normalizeCadence } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
@@ -2564,6 +2566,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           workoutId,
           name: w.name,
           category: (w.category || "Workout").trim(),
+          cadence: w.cadence || { mode: "whenever" },
         },
       });
     },
@@ -2572,7 +2575,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   const saveEditWorkout = useCallback(() => {
     if (!modals.editWorkout) return;
-    const { workoutId, name, category } = modals.editWorkout;
+    const { workoutId, name, category, cadence } = modals.editWorkout;
     const validation = validateWorkoutName(name, workouts.filter((x) => x.id !== workoutId));
     if (!validation.valid) {
       showToast(validation.error);
@@ -2583,6 +2586,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (w) {
         w.name = name.trim();
         w.category = (category || "Workout").trim() || "Workout";
+        w.cadence = normalizeCadence(cadence);
       }
       return st;
     });
@@ -6919,6 +6923,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 styles={styles}
               />
             </div>
+            <CadenceEditor
+              cadence={modals.editWorkout.cadence}
+              onChange={(c) => dispatchModal({ type: "UPDATE_EDIT_WORKOUT", payload: { cadence: c } })}
+              colors={colors}
+              styles={styles}
+            />
             <div style={styles.modalFooter}>
               <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_WORKOUT" })}>
                 Cancel
