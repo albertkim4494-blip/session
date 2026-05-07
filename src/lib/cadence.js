@@ -96,6 +96,23 @@ export function weekStartKey(dateKey) {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Return the subset of `workouts` scheduled to appear on `dateKey` based on cadence.
+ * Anchors fire on their declared days. Weekly cadences fire on declared preferred
+ * days only (no preferred days = no auto-surface). Continuous mode is skipped here —
+ * its surfacing is driven by split queue position, handled separately.
+ */
+export function getScheduledForDate(workouts, dateKey) {
+  if (!Array.isArray(workouts)) return [];
+  return workouts.filter((w) => {
+    const c = w?.cadence;
+    if (!c) return false;
+    if (c.mode === CADENCE_MODES.ANCHOR) return isAnchorScheduledFor(c, dateKey);
+    if (c.mode === CADENCE_MODES.WEEKLY) return isWeeklyPreferredFor(c, dateKey);
+    return false;
+  });
+}
+
 /** Default split shape. */
 export function defaultSplit({ id, name, mode = SPLIT_MODES.WEEKLY }) {
   if (!id || !name) throw new Error("defaultSplit requires id and name");

@@ -141,6 +141,7 @@ export function makeDefaultState() {
     customExercises: [],
     dailyWorkouts: {},
     todaySessions: {},
+    todayDismissed: {},
     sessionOverrides: {},
     sessionAdditions: {},
     logsByDate: {},
@@ -193,6 +194,7 @@ export function normalizeState(st) {
         )
       : {},
     todaySessions: st.todaySessions && typeof st.todaySessions === "object" ? st.todaySessions : {},
+    todayDismissed: st.todayDismissed && typeof st.todayDismissed === "object" ? st.todayDismissed : {},
     sessionOverrides: st.sessionOverrides && typeof st.sessionOverrides === "object" ? st.sessionOverrides : {},
     sessionAdditions: st.sessionAdditions && typeof st.sessionAdditions === "object" ? st.sessionAdditions : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
@@ -241,6 +243,11 @@ export function normalizeState(st) {
   if (next.todaySessions) {
     for (const dk of Object.keys(next.todaySessions)) {
       if (dk < cutoffKey) delete next.todaySessions[dk];
+    }
+  }
+  if (next.todayDismissed) {
+    for (const dk of Object.keys(next.todayDismissed)) {
+      if (dk < cutoffKey) delete next.todayDismissed[dk];
     }
   }
   if (next.sessionAdditions) {

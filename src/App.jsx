@@ -91,7 +91,7 @@ import { buildCatalogMap, isBodyweightOnly } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
-import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit } from "./lib/cadence";
+import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
@@ -944,7 +944,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return [...todayProgramWorkouts, ...logDetectedWorkouts];
   }, [todayProgramWorkouts, logDetectedWorkouts]);
 
-  const hasSessions = displayedProgramWorkouts.length > 0 || dailyWorkoutsToday.length > 0;
+  // Workouts surfaced today by their cadence (anchor or weekly preferred), excluding
+  // any already explicitly added or that the user dismissed for this date.
+  const scheduledTodayWorkouts = useMemo(() => {
+    if (!isToday) return EMPTY_ARRAY;
+    const dismissed = new Set(state.todayDismissed?.[dateKey] || []);
+    const explicit = new Set(todaySessionIds);
+    return getScheduledForDate(effectiveWorkouts, dateKey).filter(
+      (w) => !explicit.has(w.id) && !dismissed.has(w.id)
+    );
+  }, [isToday, state.todayDismissed, dateKey, todaySessionIds, effectiveWorkouts]);
+
+  const hasSessions = displayedProgramWorkouts.length > 0
+    || dailyWorkoutsToday.length > 0
+    || scheduledTodayWorkouts.length > 0;
 
   const summaryRange = useMemo(() => {
     // Shift the anchor date by offset periods
@@ -3499,7 +3512,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   function addSessionToToday(workoutId) {
     const existing = state.todaySessions?.[dateKey] || [];
-    if (existing.includes(workoutId)) {
+    // If it's a scheduled workout shown automatically, treat the FAB add as a no-op
+    // (it's already visible). Just scroll to it.
+    const scheduledIds = new Set(scheduledTodayWorkouts.map((w) => w.id));
+    if (existing.includes(workoutId) || scheduledIds.has(workoutId)) {
       setFabOpen(false);
       highlightAndScrollToCard(workoutId);
       return;
@@ -3508,6 +3524,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (!st.todaySessions) st.todaySessions = {};
       if (!st.todaySessions[dateKey]) st.todaySessions[dateKey] = [];
       st.todaySessions[dateKey].push(workoutId);
+      // If the workout was previously dismissed for today, un-dismiss it.
+      if (st.todayDismissed?.[dateKey]) {
+        st.todayDismissed[dateKey] = st.todayDismissed[dateKey].filter((id) => id !== workoutId);
+        if (st.todayDismissed[dateKey].length === 0) delete st.todayDismissed[dateKey];
+      }
       return st;
     });
     setCollapsedToday((prev) => new Set(prev).add(workoutId));
@@ -3557,6 +3578,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     } else {
       doRemove();
     }
+  }
+
+  // Dismiss an auto-surfaced scheduled workout for today only. The schedule itself
+  // is unchanged — the workout will reappear on its next scheduled day.
+  function dismissScheduledForToday(workoutId) {
+    updateState((st) => {
+      if (!st.todayDismissed) st.todayDismissed = {};
+      const list = st.todayDismissed[dateKey] || [];
+      if (!list.includes(workoutId)) {
+        st.todayDismissed[dateKey] = [...list, workoutId];
+      }
+      return st;
+    });
   }
 
   function highlightAndScrollToCard(workoutId) {
@@ -4287,6 +4321,38 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onAddExercise={() => addExerciseForToday(w.id, false)}
                       onRemoveSessionAddition={(exId) => removeSessionAddition(w.id, exId)}
                       onPromoteSessionAddition={(exId) => promoteSessionAddition(w.id, exId)}
+                    />
+                  ))}
+                  {/* Auto-surfaced from cadence schedule — anchors and weekly preferred days */}
+                  {scheduledTodayWorkouts.map((w) => (
+                    <WorkoutCard
+                      key={`sched-${w.id}`}
+                      cardId={`today-card-${w.id}`}
+                      workout={w}
+                      collapsed={collapsedToday.has(w.id)}
+                      onToggle={() => toggleCollapse(setCollapsedToday, w.id)}
+                      logsForDate={logsForDate}
+                      openLog={openLog}
+                      deleteLogForExercise={deleteLogForExercise}
+                      styles={styles}
+                      findPrior={findPriorForExercise}
+                      colors={colors}
+                      onToggleRestTimer={toggleWorkoutRestTimer}
+                      globalRestEnabled={state.preferences?.restTimerEnabled !== false}
+                      weightLabel={getWeightLabel(state.preferences?.measurementSystem)}
+                      onStartCircuit={(w) => setCircuitWorkout(w)}
+                      onSwapExercise={(exId) => openSwapExercise(w.id, exId, false)}
+                      onSkipExercise={(exId) => skipExercise(w.id, exId, false)}
+                      overrides={todayOverrides[w.id] || null}
+                      onUndoOverride={(origExId) => undoOverride(w.id, origExId)}
+                      onPromoteOverride={(origExId) => promoteOverride(w.id, origExId)}
+                      onRemoveFromToday={() => dismissScheduledForToday(w.id)}
+                      highlightBorder={highlightCardId === w.id}
+                      catalogMap={catalogMap}
+                      onAddExercise={() => addExerciseForToday(w.id, false)}
+                      onRemoveSessionAddition={(exId) => removeSessionAddition(w.id, exId)}
+                      onPromoteSessionAddition={(exId) => promoteSessionAddition(w.id, exId)}
+                      scheduledBadge
                     />
                   ))}
                   {/* Auto-detected workouts from logs (no remove button) */}
@@ -7752,7 +7818,7 @@ function ExerciseRow({ workoutId, exercise, logsForDate, openLog, deleteLogForEx
   );
 }
 
-function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride, cardId, onRemoveFromToday, highlightBorder, catalogMap, onAddExercise, onRemoveSessionAddition, onPromoteSessionAddition }) {
+function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, deleteLogForExercise, styles, daily, onDelete, findPrior, onDeleteExercise, colors, onToggleRestTimer, globalRestEnabled, weightLabel, onStartCircuit, onSwapExercise, onSkipExercise, overrides, onUndoOverride, onPromoteOverride, cardId, onRemoveFromToday, highlightBorder, catalogMap, onAddExercise, onRemoveSessionAddition, onPromoteSessionAddition, scheduledBadge }) {
   const cat = (workout.category || "Workout").trim();
 
   // Compute rest timer state from exercises: all on, all off, or mixed
@@ -7786,6 +7852,7 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
           <span style={styles.tagMuted}>{cat}</span>
           {workout.source === "group" && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>Group</span>}
           {workout.source === "event" && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: "#9b59b622", color: "#9b59b6" }}>Event</span>}
+          {scheduledBadge && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>Scheduled</span>}
           {overrides && <span style={{ fontSize: 11, opacity: 0.5, fontStyle: "italic" }}>(modified)</span>}
         </div>
         {onRemoveFromToday && (

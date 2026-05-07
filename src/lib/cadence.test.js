@@ -12,6 +12,7 @@ const {
   weekStartKey,
   defaultSplit,
   normalizeSplit,
+  getScheduledForDate,
 } = await import("./cadence.js");
 
 let passed = 0;
@@ -152,6 +153,36 @@ const splitWeekly = normalizeSplit({
   ],
 });
 assert(JSON.stringify(splitWeekly.members[0].days) === "[1,4]", `normalizeSplit: filters bad days (got ${JSON.stringify(splitWeekly.members[0].days)})`);
+
+// --- getScheduledForDate ---
+const sampleWorkouts = [
+  { id: "w1", name: "Water polo", cadence: { mode: "anchor", days: [1, 3] } },     // Mon + Wed
+  { id: "w2", name: "A", cadence: { mode: "weekly", perWeek: 1, preferredDays: [6] } }, // Sat
+  { id: "w3", name: "B", cadence: { mode: "weekly", perWeek: 1, preferredDays: [0] } }, // Sun
+  { id: "w4", name: "Baseline", cadence: { mode: "weekly", perWeek: 3, preferredDays: [] } }, // none — no auto
+  { id: "w5", name: "Random", cadence: { mode: "whenever" } },
+  { id: "w6", name: "PPL Push", cadence: { mode: "continuous" } }, // skipped here
+];
+
+// Monday 2026-05-04
+const monSched = getScheduledForDate(sampleWorkouts, "2026-05-04");
+assert(monSched.length === 1 && monSched[0].id === "w1", `Mon: water polo only (got ${monSched.map((x) => x.id).join(",")})`);
+
+// Saturday 2026-05-09
+const satSched = getScheduledForDate(sampleWorkouts, "2026-05-09");
+assert(satSched.length === 1 && satSched[0].id === "w2", `Sat: A only (got ${satSched.map((x) => x.id).join(",")})`);
+
+// Sunday 2026-05-10
+const sunSched = getScheduledForDate(sampleWorkouts, "2026-05-10");
+assert(sunSched.length === 1 && sunSched[0].id === "w3", `Sun: B only (got ${sunSched.map((x) => x.id).join(",")})`);
+
+// Tuesday 2026-05-05 — nothing scheduled
+const tueSched = getScheduledForDate(sampleWorkouts, "2026-05-05");
+assert(tueSched.length === 0, `Tue: nothing (got ${tueSched.map((x) => x.id).join(",")})`);
+
+// Empty input
+assert(getScheduledForDate(null, "2026-05-04").length === 0, "null input → []");
+assert(getScheduledForDate([], "2026-05-04").length === 0, "empty input → []");
 
 // --- Done ---
 console.log(`${passed} passed, ${failed} failed`);
