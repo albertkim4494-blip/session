@@ -3584,21 +3584,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // ===== TODAY SESSION HANDLERS =====
 
-  function addSessionToToday(workoutId) {
-    const existing = state.todaySessions?.[dateKey] || [];
-    // If it's a scheduled workout shown automatically, treat the FAB add as a no-op
-    // (it's already visible). Just scroll to it.
-    const scheduledIds = new Set(scheduledTodayWorkouts.map((w) => w.id));
-    if (existing.includes(workoutId) || scheduledIds.has(workoutId)) {
-      setFabOpen(false);
-      highlightAndScrollToCard(workoutId);
-      return;
-    }
+  // Direct add — no conflict checks. Used by the conflict-resolution handlers
+  // and as the fast path inside addSessionToToday.
+  const addSessionToTodayDirect = useCallback((workoutId) => {
     updateState((st) => {
       if (!st.todaySessions) st.todaySessions = {};
       if (!st.todaySessions[dateKey]) st.todaySessions[dateKey] = [];
-      st.todaySessions[dateKey].push(workoutId);
-      // If the workout was previously dismissed for today, un-dismiss it.
+      if (!st.todaySessions[dateKey].includes(workoutId)) {
+        st.todaySessions[dateKey].push(workoutId);
+      }
       if (st.todayDismissed?.[dateKey]) {
         st.todayDismissed[dateKey] = st.todayDismissed[dateKey].filter((id) => id !== workoutId);
         if (st.todayDismissed[dateKey].length === 0) delete st.todayDismissed[dateKey];
@@ -3606,8 +3600,76 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return st;
     });
     setCollapsedToday((prev) => new Set(prev).add(workoutId));
+  }, [dateKey]);
+
+  function addSessionToToday(workoutId) {
+    const existing = state.todaySessions?.[dateKey] || [];
+    // Already visible? Just scroll to it.
+    const scheduledIds = new Set(scheduledTodayWorkouts.map((w) => w.id));
+    const nextUpIds = new Set(continuousNextUpEntries.map((e) => e.workout.id));
+    if (existing.includes(workoutId) || scheduledIds.has(workoutId) || nextUpIds.has(workoutId)) {
+      setFabOpen(false);
+      highlightAndScrollToCard(workoutId);
+      return;
+    }
+
+    // Continuous-split conflict: workout is a member of a continuous split, but
+    // not the current next-up. Surface the do-instead / alongside choice.
+    for (const s of splits) {
+      if (s.mode !== SPLIT_MODES.CONTINUOUS) continue;
+      const isMember = (s.members || []).some((m) => m.workoutId === workoutId);
+      if (!isMember) continue;
+      const next = getContinuousNextUp(s, effectiveWorkouts);
+      if (!next || next.workout.id === workoutId) continue;
+
+      const pickedWorkout = effectiveWorkouts.find((w) => w.id === workoutId);
+      dispatchModal({
+        type: "OPEN_CONTINUOUS_CONFLICT",
+        payload: {
+          pickedWorkoutId: workoutId,
+          pickedWorkoutName: pickedWorkout?.name || "This workout",
+          splitId: s.id,
+          splitName: s.name,
+          nextUpWorkoutId: next.workout.id,
+          nextUpWorkoutName: next.workout.name,
+        },
+      });
+      setFabOpen(false);
+      return;
+    }
+
+    addSessionToTodayDirect(workoutId);
     setFabOpen(false);
   }
+
+  // "Do instead" — log the picked workout, dismiss the original next-up for today.
+  // The queue stays where it was (the next-up wasn't logged, so queuePosition
+  // doesn't advance — that property comes for free from the saveLogData rule).
+  const continuousConflictDoInstead = useCallback(() => {
+    const cc = modals.continuousConflict;
+    if (!cc?.isOpen) return;
+    addSessionToTodayDirect(cc.pickedWorkoutId);
+    if (cc.nextUpWorkoutId) {
+      updateState((st) => {
+        if (!st.todayDismissed) st.todayDismissed = {};
+        const list = st.todayDismissed[dateKey] || [];
+        if (!list.includes(cc.nextUpWorkoutId)) {
+          st.todayDismissed[dateKey] = [...list, cc.nextUpWorkoutId];
+        }
+        return st;
+      });
+    }
+    dispatchModal({ type: "CLOSE_CONTINUOUS_CONFLICT" });
+  }, [modals.continuousConflict, dateKey, addSessionToTodayDirect]);
+
+  // "Add alongside" — log both. Queue still doesn't advance from the picked
+  // workout (it's not next-up). User can complete next-up separately to advance.
+  const continuousConflictAddAlongside = useCallback(() => {
+    const cc = modals.continuousConflict;
+    if (!cc?.isOpen) return;
+    addSessionToTodayDirect(cc.pickedWorkoutId);
+    dispatchModal({ type: "CLOSE_CONTINUOUS_CONFLICT" });
+  }, [modals.continuousConflict, addSessionToTodayDirect]);
 
   function removeSessionFromToday(workoutId) {
     const w = workoutById.get(workoutId);
@@ -7328,6 +7390,51 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           styles={styles}
           colors={colors}
         />
+      )}
+
+      {/* Continuous-split conflict modal */}
+      {modals.continuousConflict?.isOpen && (
+        <Modal
+          open={true}
+          title={`${modals.continuousConflict.pickedWorkoutName} is part of ${modals.continuousConflict.splitName}`}
+          onClose={() => dispatchModal({ type: "CLOSE_CONTINUOUS_CONFLICT" })}
+          styles={styles}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ fontSize: 13, lineHeight: 1.5, opacity: 0.75 }}>
+              Today's planned: <strong style={{ opacity: 1 }}>{modals.continuousConflict.nextUpWorkoutName}</strong>.
+              Doing {modals.continuousConflict.pickedWorkoutName} won't advance your sequence — the queue stays where it is.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                className="btn-press"
+                style={{ ...styles.primaryBtn, padding: "12px 14px", textAlign: "center" }}
+                onClick={continuousConflictDoInstead}
+              >
+                Do {modals.continuousConflict.pickedWorkoutName} instead
+              </button>
+              <button
+                className="btn-press"
+                style={{ ...styles.secondaryBtn, padding: "12px 14px", textAlign: "center" }}
+                onClick={continuousConflictAddAlongside}
+              >
+                Add alongside {modals.continuousConflict.nextUpWorkoutName}
+              </button>
+              <button
+                className="btn-press"
+                style={{
+                  background: "transparent", border: "none",
+                  color: colors.text, opacity: 0.5,
+                  fontSize: 13, padding: "8px 14px", cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+                onClick={() => dispatchModal({ type: "CLOSE_CONTINUOUS_CONFLICT" })}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Welcome Choice Modal (post-onboarding) */}

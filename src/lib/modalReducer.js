@@ -83,6 +83,15 @@ export const initialModalState = {
     restPattern: null,       // { type: "afterCycle", days: 1 } | null
     queuePosition: 0,
   },
+  continuousConflict: {
+    isOpen: false,
+    pickedWorkoutId: null,
+    pickedWorkoutName: "",
+    splitId: null,
+    splitName: "",
+    nextUpWorkoutId: null,
+    nextUpWorkoutName: "",
+  },
   editExercise: {
     isOpen: false,
     workoutId: null,
@@ -425,6 +434,27 @@ export function modalReducer(state, action) {
       return {
         ...state,
         editSplit: initialModalState.editSplit,
+      };
+
+    // ===== CONTINUOUS CONFLICT MODAL =====
+    case "OPEN_CONTINUOUS_CONFLICT":
+      return {
+        ...state,
+        continuousConflict: {
+          isOpen: true,
+          pickedWorkoutId: action.payload.pickedWorkoutId,
+          pickedWorkoutName: action.payload.pickedWorkoutName || "",
+          splitId: action.payload.splitId,
+          splitName: action.payload.splitName || "",
+          nextUpWorkoutId: action.payload.nextUpWorkoutId,
+          nextUpWorkoutName: action.payload.nextUpWorkoutName || "",
+        },
+      };
+
+    case "CLOSE_CONTINUOUS_CONFLICT":
+      return {
+        ...state,
+        continuousConflict: initialModalState.continuousConflict,
       };
 
     // ===== EDIT EXERCISE MODAL =====
