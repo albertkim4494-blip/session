@@ -4359,11 +4359,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       {
                         key: "coach",
                         label: todayCheckin ? "Coach" : "Check In",
-                        icon: (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6L12 3z" />
+                        icon: todayCheckin ? (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                            <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                            <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
                           </svg>
-                        ),
+                        ) : undefined,
                         content: (
                           <CoachCard
                             todayCheckin={todayCheckin}
@@ -4386,11 +4387,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       {
                         key: "week",
                         label: "Your Week",
-                        icon: (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />
-                          </svg>
-                        ),
                         content: (() => {
                           const accent = colors.accent || "#3b82f6";
                           const secondary = colors.textSecondary;
@@ -4510,108 +4506,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                   )}
                                 </>
                               )}
-                            </div>
-                          );
-                        })(),
-                      },
-                      {
-                        key: "plan",
-                        label: "Today's Plan",
-                        icon: (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M6 8v8M3 10v4M18 8v8M21 10v4M6 12h12" />
-                          </svg>
-                        ),
-                        content: (() => {
-                          const accent = colors.accent;
-                          const secondary = colors.textSecondary;
-                          const upNext = weeklySummary.upNext;
-                          const programWorkouts = state.program?.workouts || [];
-
-                          // Resolve a suggested workout. Prefer upNext's first name, else the
-                          // first program workout. If none, render an empty state.
-                          let suggested = null;
-                          if (upNext && !upNext.allDone && !upNext.isRestDay && upNext.workouts?.length) {
-                            suggested = programWorkouts.find((w) => w.name === upNext.workouts[0]) || null;
-                          }
-                          if (!suggested) suggested = programWorkouts[0] || null;
-
-                          if (!suggested) {
-                            return (
-                              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 6 }}>
-                                <div style={{ fontSize: 13, color: secondary }}>No plan yet.</div>
-                                <div style={{ fontSize: 12, color: colors.textTertiary, lineHeight: 1.5 }}>
-                                  Add a workout in Plan to get a suggestion here.
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          const exerciseCount = (suggested.exercises || []).length;
-                          const previewLifts = (suggested.exercises || []).slice(0, 4);
-                          const moreCount = exerciseCount - previewLifts.length;
-
-                          return (
-                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
-                              <div>
-                                <div style={{ fontSize: 13, color: secondary }}>
-                                  {upNext?.dayName ? `Suggested · ${upNext.dayName}s` : "Suggested for today"}
-                                </div>
-                                <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                  {suggested.name}
-                                </div>
-                                <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
-                                  {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
-                                </div>
-                              </div>
-                              {previewLifts.length > 0 && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                                  {previewLifts.map((ex, i) => (
-                                    <div key={ex.id} style={{
-                                      display: "flex", alignItems: "center", gap: 10,
-                                      padding: "8px 0",
-                                      borderTop: i === 0 ? "none" : `1px solid ${colors.border}`,
-                                    }}>
-                                      <div style={{
-                                        width: 22, height: 22, borderRadius: 6,
-                                        background: colors.subtleBg,
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontSize: 11, fontWeight: 700, color: secondary,
-                                      }}>
-                                        {i + 1}
-                                      </div>
-                                      <div style={{ fontSize: 14, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                        {ex.name}
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {moreCount > 0 && (
-                                    <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
-                                      + {moreCount} more
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                              <button
-                                className="btn-press"
-                                onClick={() => addSessionToToday(suggested.id)}
-                                style={{
-                                  marginTop: "auto",
-                                  width: "100%",
-                                  padding: 14, borderRadius: 14,
-                                  background: accent,
-                                  color: colors.appBg,
-                                  border: "none",
-                                  fontSize: 14, fontWeight: 700, fontFamily: "inherit",
-                                  cursor: "pointer",
-                                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                                }}
-                              >
-                                Start workout
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M5 12h14M13 5l7 7-7 7" />
-                                </svg>
-                              </button>
                             </div>
                           );
                         })(),
