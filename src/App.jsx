@@ -3735,14 +3735,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [dateKey]);
 
   // Start a workout from the Today's Plan card. Adds the picked workout AND
-  // pulls in every other currently-scheduled workout for the day in one
-  // batched state update — so anchors and other queued sessions show up in
-  // the list state automatically once the user kicks the day off.
+  // pulls in every other workout the day's schedule says should be done —
+  // explicitly ignoring todayDismissed so a user-dismissed-then-restarted day
+  // still pulls the full plan. Re-adding clears the dismissal on those ids.
   const startFromPlan = useCallback((workoutId) => {
-    const otherIds = [
-      ...continuousNextUpEntries.map((e) => e.workout.id),
-      ...scheduledTodayWorkouts.map((w) => w.id),
-    ].filter((id) => id !== workoutId);
+    const otherIds = [];
+    const seenOthers = new Set([workoutId]);
+    for (const s of splits) {
+      const next = getContinuousNextUp(s, effectiveWorkouts);
+      if (!next) continue;
+      if (seenOthers.has(next.workout.id)) continue;
+      seenOthers.add(next.workout.id);
+      otherIds.push(next.workout.id);
+    }
+    for (const w of getScheduledForDate(effectiveWorkouts, dateKey)) {
+      if (seenOthers.has(w.id)) continue;
+      seenOthers.add(w.id);
+      otherIds.push(w.id);
+    }
 
     updateState((st) => {
       if (!st.todaySessions) st.todaySessions = {};
@@ -3766,7 +3776,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       for (const id of [workoutId, ...otherIds]) next.add(id);
       return next;
     });
-  }, [dateKey, continuousNextUpEntries, scheduledTodayWorkouts]);
+  }, [dateKey, splits, effectiveWorkouts]);
 
   function addSessionToToday(workoutId) {
     const existing = state.todaySessions?.[dateKey] || [];
@@ -4593,18 +4603,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           const accent = colors.accent;
                           const secondary = colors.textSecondary;
 
-                          // Combine scheduled workouts in priority order: continuous next-up
-                          // first (the queue's pick), then anchors / weekly preferred. Dedup
-                          // by workout id in case the same workout shows up via multiple paths.
+                          // Build Today's Plan list directly from the schedule — ignoring
+                          // todayDismissed on purpose. The carousel always reflects what
+                          // the day's plan IS (anchors / continuous next-up / weekly
+                          // preferred), regardless of whether the user X'd one earlier.
+                          // Only workouts already started (in todaySessions) are filtered
+                          // out, since they belong to the session list at that point.
                           const scheduledList = (() => {
                             const seen = new Set();
+                            const explicit = new Set(todaySessionIds);
                             const out = [];
-                            for (const e of continuousNextUpEntries) {
-                              if (seen.has(e.workout.id)) continue;
-                              seen.add(e.workout.id);
-                              out.push(e.workout);
+                            // Continuous next-up first.
+                            for (const s of splits) {
+                              const next = getContinuousNextUp(s, effectiveWorkouts);
+                              if (!next) continue;
+                              if (explicit.has(next.workout.id)) continue;
+                              if (seen.has(next.workout.id)) continue;
+                              seen.add(next.workout.id);
+                              out.push(next.workout);
                             }
-                            for (const w of scheduledTodayWorkouts) {
+                            // Anchors + weekly preferred.
+                            for (const w of getScheduledForDate(effectiveWorkouts, dateKey)) {
+                              if (explicit.has(w.id)) continue;
                               if (seen.has(w.id)) continue;
                               seen.add(w.id);
                               out.push(w);
