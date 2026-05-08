@@ -120,7 +120,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
       {/* Cards container */}
       <div
         ref={containerRef}
-        style={{ overflow: "hidden", borderRadius: 16, height: "46vh" }}
+        style={{ overflow: "hidden", borderRadius: 22, flex: 1, minHeight: "44vh" }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -148,51 +148,33 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
                 style={{
                   background: colors.cardBg,
                   border: `1px solid ${colors.border}`,
-                  borderRadius: 16,
+                  borderRadius: 22,
                   boxShadow: colors.shadow,
                   height: "100%",
+                  padding: 18,
                   display: "flex",
                   flexDirection: "column",
                   overflow: "hidden",
-                  position: "relative",
                 }}
               >
-                {/* Unified card header */}
+                {/* Accented label header */}
                 {card.label && (
                   <div style={{
-                    fontSize: 11, fontWeight: 600, opacity: 0.4,
-                    textTransform: "uppercase", letterSpacing: 1,
-                    padding: "14px 18px 0",
-                    display: "flex", alignItems: "center", gap: 5,
+                    display: "flex", alignItems: "center", gap: 8,
+                    marginBottom: 14,
+                    color: colors.accent,
                   }}>
                     {card.icon}
-                    {card.label}
+                    <div style={{
+                      fontSize: 11, fontWeight: 700,
+                      letterSpacing: 1.2, textTransform: "uppercase",
+                    }}>
+                      {card.label}
+                    </div>
                   </div>
                 )}
-                <div style={{ flex: 1, overflow: "auto", padding: "10px 18px 36px", display: "flex", flexDirection: "column" }}>
+                <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
                   {card.content}
-                </div>
-                {/* Dot indicators — sticky at bottom */}
-                <div style={{
-                  position: "absolute", bottom: 0, left: 0, right: 0,
-                  display: "flex", justifyContent: "center", alignItems: "center",
-                  gap: 8, padding: "10px 0",
-                  background: `linear-gradient(transparent, ${colors.cardBg} 40%)`,
-                }}>
-                  {cards.map((c, j) => (
-                    <button
-                      key={c.key}
-                      onClick={() => onChangeIndex(j)}
-                      aria-label={`Go to card ${j + 1}`}
-                      style={{
-                        width: 8, height: 8, borderRadius: "50%", padding: 0,
-                        border: "none", cursor: "pointer",
-                        background: j === activeIndex ? (colors.accent || colors.primaryText) : colors.border,
-                        opacity: j === activeIndex ? 1 : 0.5,
-                        transition: "background 0.2s, opacity 0.2s",
-                      }}
-                    />
-                  ))}
                 </div>
               </div>
             </div>
@@ -200,6 +182,26 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
         </div>
       </div>
 
+      {/* Pill-shaped dot pager — outside the card */}
+      <div style={{
+        display: "flex", justifyContent: "center", alignItems: "center",
+        gap: 6, padding: "14px 0 10px",
+      }}>
+        {cards.map((c, j) => (
+          <button
+            key={c.key}
+            onClick={() => onChangeIndex(j)}
+            aria-label={`Go to card ${j + 1}`}
+            style={{
+              width: j === activeIndex ? 18 : 6, height: 6,
+              borderRadius: 3, padding: 0,
+              border: "none", cursor: "pointer",
+              background: j === activeIndex ? colors.accent : colors.subtleTrack,
+              transition: "all 0.25s ease",
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
