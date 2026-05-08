@@ -215,6 +215,11 @@ export function normalizeState(st) {
   // Strip legacy exerciseCategories if present (overrides/customGroups/categoryOrder removed)
   delete next.preferences.exerciseCategories;
 
+  // Coerce any retired theme keys (spring / whimsical / pastel) back to dark.
+  if (!["dark", "light", "japandi"].includes(next.preferences.theme)) {
+    next.preferences.theme = "dark";
+  }
+
   // Clean up legacy standalone localStorage keys (migration complete)
   try {
     localStorage.removeItem("wt_theme");
