@@ -4673,16 +4673,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
                             return (
                               <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                                <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
-                                  <div>
-                                    <div style={{ fontSize: 13, color: secondary }}>{eyebrow}</div>
-                                    <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                      {focused.name}
-                                    </div>
-                                    <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
-                                      {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
-                                    </div>
+                                {/* Frozen header */}
+                                <div style={{ flexShrink: 0 }}>
+                                  <div style={{ fontSize: 13, color: secondary }}>{eyebrow}</div>
+                                  <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
+                                    {focused.name}
                                   </div>
+                                  <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
+                                    {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
+                                  </div>
+                                </div>
+                                {/* Middle scroll area — lifts only */}
+                                <div style={{ flex: 1, minHeight: 0, overflow: "auto", marginTop: 12 }}>
                                   {lifts.length > 0 && (
                                     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                                       {lifts.map((ex, i) => (
@@ -4737,13 +4739,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           // to show its exercises. A single bottom CTA starts the whole day.
                           return (
                             <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                              <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-                                <div>
-                                  <div style={{ fontSize: 13, color: secondary }}>Scheduled for today</div>
-                                  <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                    {scheduledList.length} sessions planned
-                                  </div>
+                              {/* Frozen header */}
+                              <div style={{ flexShrink: 0 }}>
+                                <div style={{ fontSize: 13, color: secondary }}>Scheduled for today</div>
+                                <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
+                                  {scheduledList.length} sessions planned
                                 </div>
+                              </div>
+                              {/* Middle scroll area — workout rows only */}
+                              <div style={{ flex: 1, minHeight: 0, overflow: "auto", marginTop: 10 }}>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                 {scheduledList.map((w) => {
                                   const lifts = w.exercises || [];
