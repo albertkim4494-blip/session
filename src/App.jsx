@@ -4672,46 +4672,43 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               : () => addSessionToToday(focused.id);
 
                             return (
-                              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
-                                <div>
-                                  <div style={{ fontSize: 13, color: secondary }}>{eyebrow}</div>
-                                  <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                    {focused.name}
+                              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                                <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+                                  <div>
+                                    <div style={{ fontSize: 13, color: secondary }}>{eyebrow}</div>
+                                    <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
+                                      {focused.name}
+                                    </div>
+                                    <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
+                                      {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
+                                    </div>
                                   </div>
-                                  <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
-                                    {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
-                                  </div>
-                                </div>
-                                {lifts.length > 0 && (
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                                    {lifts.map((ex, i) => (
-                                      <div key={ex.id} style={{
-                                        display: "flex", alignItems: "center", gap: 10,
-                                        padding: "8px 0",
-                                        borderTop: i === 0 ? "none" : `1px solid ${colors.border}`,
-                                      }}>
-                                        <div style={{
-                                          width: 22, height: 22, borderRadius: 6,
-                                          background: colors.subtleBg,
-                                          display: "flex", alignItems: "center", justifyContent: "center",
-                                          fontSize: 11, fontWeight: 700, color: secondary,
-                                          flexShrink: 0,
+                                  {lifts.length > 0 && (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                                      {lifts.map((ex, i) => (
+                                        <div key={ex.id} style={{
+                                          display: "flex", alignItems: "center", gap: 10,
+                                          padding: "8px 0",
+                                          borderTop: i === 0 ? "none" : `1px solid ${colors.border}`,
                                         }}>
-                                          {i + 1}
+                                          <div style={{
+                                            width: 22, height: 22, borderRadius: 6,
+                                            background: colors.subtleBg,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            fontSize: 11, fontWeight: 700, color: secondary,
+                                            flexShrink: 0,
+                                          }}>
+                                            {i + 1}
+                                          </div>
+                                          <div style={{ fontSize: 14, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {ex.name}
+                                          </div>
                                         </div>
-                                        <div style={{ fontSize: 14, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                          {ex.name}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                <div style={{
-                                  marginTop: "auto",
-                                  position: "sticky", bottom: 0,
-                                  background: colors.cardBg,
-                                  paddingTop: 8,
-                                }}>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <div style={{ paddingTop: 12 }}>
                                   <button
                                     className="btn-press"
                                     onClick={onStart}
@@ -4739,14 +4736,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           // Multi-workout list layout (2+ scheduled). Each row is expandable
                           // to show its exercises. A single bottom CTA starts the whole day.
                           return (
-                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
-                              <div>
-                                <div style={{ fontSize: 13, color: secondary }}>Scheduled for today</div>
-                                <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                  {scheduledList.length} sessions planned
+                            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                              <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+                                <div>
+                                  <div style={{ fontSize: 13, color: secondary }}>Scheduled for today</div>
+                                  <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
+                                    {scheduledList.length} sessions planned
+                                  </div>
                                 </div>
-                              </div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                 {scheduledList.map((w) => {
                                   const lifts = w.exercises || [];
                                   const liftCount = lifts.length;
@@ -4831,13 +4829,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                     </div>
                                   );
                                 })}
+                                </div>
                               </div>
-                              <div style={{
-                                marginTop: "auto",
-                                position: "sticky", bottom: 0,
-                                background: colors.cardBg,
-                                paddingTop: 8,
-                              }}>
+                              <div style={{ paddingTop: 12 }}>
                                 <button
                                   className="btn-press"
                                   onClick={() => startFromPlan(scheduledList[0].id)}
