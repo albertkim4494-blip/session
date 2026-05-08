@@ -945,6 +945,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return [...todayProgramWorkouts, ...logDetectedWorkouts];
   }, [todayProgramWorkouts, logDetectedWorkouts]);
 
+  // Splits — derived early so the home-screen layers below can reference them.
+  const splits = useMemo(() => state.program?.splits || [], [state.program]);
+  // Map: workoutId → split (used to render members nested + filter standalone workouts).
+  const workoutToSplit = useMemo(() => {
+    const m = new Map();
+    for (const s of splits) {
+      for (const member of s.members || []) m.set(member.workoutId, s);
+    }
+    return m;
+  }, [splits]);
+
   // Workouts surfaced today by their cadence (anchor or weekly preferred), excluding
   // any already explicitly added or that the user dismissed for this date.
   const scheduledTodayWorkouts = useMemo(() => {
@@ -2658,18 +2669,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // ---------------------------------------------------------------------------
   // Splits — CRUD + cadence side effects
+  // (splits + workoutToSplit are derived earlier so home-screen layers can
+  //  reference them; only the handlers live here.)
   // ---------------------------------------------------------------------------
-  const splits = useMemo(() => state.program?.splits || [], [state.program]);
-
-  // Map: workoutId → split (used to render members nested + filter standalone workouts)
-  const workoutToSplit = useMemo(() => {
-    const m = new Map();
-    for (const s of splits) {
-      for (const member of s.members || []) m.set(member.workoutId, s);
-    }
-    return m;
-  }, [splits]);
-
   const openCreateSplit = useCallback(() => {
     dispatchModal({
       type: "OPEN_EDIT_SPLIT",
