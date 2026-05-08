@@ -988,10 +988,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     return out;
   }, [isToday, splits, effectiveWorkouts, todaySessionIds, scheduledTodayWorkouts, state.todayDismissed, dateKey]);
 
+  // Scheduled workouts (anchors / weekly preferred / continuous next-up) are
+  // intentionally NOT counted here — the hero state should stay visible until
+  // the user explicitly starts something. The Today's Plan card surfaces those
+  // scheduled items inside the carousel instead.
   const hasSessions = displayedProgramWorkouts.length > 0
-    || dailyWorkoutsToday.length > 0
-    || scheduledTodayWorkouts.length > 0
-    || continuousNextUpEntries.length > 0;
+    || dailyWorkoutsToday.length > 0;
 
   const summaryRange = useMemo(() => {
     // Shift the anchor date by offset periods
@@ -3702,6 +3704,40 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setCollapsedToday((prev) => new Set(prev).add(workoutId));
   }, [dateKey]);
 
+  // Start a workout from the Today's Plan card. Adds the picked workout AND
+  // pulls in every other currently-scheduled workout for the day in one
+  // batched state update — so anchors and other queued sessions show up in
+  // the list state automatically once the user kicks the day off.
+  const startFromPlan = useCallback((workoutId) => {
+    const otherIds = [
+      ...continuousNextUpEntries.map((e) => e.workout.id),
+      ...scheduledTodayWorkouts.map((w) => w.id),
+    ].filter((id) => id !== workoutId);
+
+    updateState((st) => {
+      if (!st.todaySessions) st.todaySessions = {};
+      if (!st.todaySessions[dateKey]) st.todaySessions[dateKey] = [];
+      const list = st.todaySessions[dateKey];
+      const seen = new Set(list);
+      for (const id of [workoutId, ...otherIds]) {
+        if (!seen.has(id)) {
+          list.push(id);
+          seen.add(id);
+        }
+      }
+      if (st.todayDismissed?.[dateKey]) {
+        st.todayDismissed[dateKey] = st.todayDismissed[dateKey].filter((id) => !seen.has(id));
+        if (st.todayDismissed[dateKey].length === 0) delete st.todayDismissed[dateKey];
+      }
+      return st;
+    });
+    setCollapsedToday((prev) => {
+      const next = new Set(prev);
+      for (const id of [workoutId, ...otherIds]) next.add(id);
+      return next;
+    });
+  }, [dateKey, continuousNextUpEntries, scheduledTodayWorkouts]);
+
   function addSessionToToday(workoutId) {
     const existing = state.todaySessions?.[dateKey] || [];
     // Already visible? Just scroll to it.
@@ -4516,18 +4552,39 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         content: (() => {
                           const accent = colors.accent;
                           const secondary = colors.textSecondary;
+
+                          // Combine scheduled workouts in priority order: continuous next-up
+                          // first (the queue's pick), then anchors / weekly preferred. Dedup
+                          // by workout id in case the same workout shows up via multiple paths.
+                          const scheduledList = (() => {
+                            const seen = new Set();
+                            const out = [];
+                            for (const e of continuousNextUpEntries) {
+                              if (seen.has(e.workout.id)) continue;
+                              seen.add(e.workout.id);
+                              out.push(e.workout);
+                            }
+                            for (const w of scheduledTodayWorkouts) {
+                              if (seen.has(w.id)) continue;
+                              seen.add(w.id);
+                              out.push(w);
+                            }
+                            return out;
+                          })();
+
+                          // Fallback when nothing is scheduled \u2014 suggest from training pattern.
                           const upNext = weeklySummary.upNext;
                           const programWorkouts = state.program?.workouts || [];
-
-                          // Resolve a suggested workout. Prefer upNext's first name, else the
-                          // first program workout. If none, render an empty state.
-                          let suggested = null;
-                          if (upNext && !upNext.allDone && !upNext.isRestDay && upNext.workouts?.length) {
-                            suggested = programWorkouts.find((w) => w.name === upNext.workouts[0]) || null;
+                          let fallbackSuggested = null;
+                          if (scheduledList.length === 0) {
+                            if (upNext && !upNext.allDone && !upNext.isRestDay && upNext.workouts?.length) {
+                              fallbackSuggested = programWorkouts.find((w) => w.name === upNext.workouts[0]) || null;
+                            }
+                            if (!fallbackSuggested) fallbackSuggested = programWorkouts[0] || null;
                           }
-                          if (!suggested) suggested = programWorkouts[0] || null;
 
-                          if (!suggested) {
+                          // Empty state \u2014 no schedule and no fallback workout to suggest.
+                          if (scheduledList.length === 0 && !fallbackSuggested) {
                             return (
                               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 6 }}>
                                 <div style={{ fontSize: 13, color: secondary }}>No plan yet.</div>
@@ -4538,71 +4595,138 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             );
                           }
 
-                          const exerciseCount = (suggested.exercises || []).length;
-                          const previewLifts = (suggested.exercises || []).slice(0, 4);
-                          const moreCount = exerciseCount - previewLifts.length;
+                          // Single-workout layout (one scheduled, OR fallback). Detail format.
+                          const focused = scheduledList.length === 1
+                            ? scheduledList[0]
+                            : (scheduledList.length === 0 ? fallbackSuggested : null);
 
+                          const eyebrow = scheduledList.length > 0
+                            ? "Scheduled for today"
+                            : (upNext?.dayName ? `Suggested \u00B7 ${upNext.dayName}s` : "Suggested for today");
+
+                          if (focused) {
+                            const exerciseCount = (focused.exercises || []).length;
+                            const previewLifts = (focused.exercises || []).slice(0, 4);
+                            const moreCount = exerciseCount - previewLifts.length;
+                            const onStart = scheduledList.length > 0
+                              ? () => startFromPlan(focused.id)
+                              : () => addSessionToToday(focused.id);
+
+                            return (
+                              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
+                                <div>
+                                  <div style={{ fontSize: 13, color: secondary }}>{eyebrow}</div>
+                                  <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
+                                    {focused.name}
+                                  </div>
+                                  <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
+                                    {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
+                                  </div>
+                                </div>
+                                {previewLifts.length > 0 && (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                                    {previewLifts.map((ex, i) => (
+                                      <div key={ex.id} style={{
+                                        display: "flex", alignItems: "center", gap: 10,
+                                        padding: "8px 0",
+                                        borderTop: i === 0 ? "none" : `1px solid ${colors.border}`,
+                                      }}>
+                                        <div style={{
+                                          width: 22, height: 22, borderRadius: 6,
+                                          background: colors.subtleBg,
+                                          display: "flex", alignItems: "center", justifyContent: "center",
+                                          fontSize: 11, fontWeight: 700, color: secondary,
+                                        }}>
+                                          {i + 1}
+                                        </div>
+                                        <div style={{ fontSize: 14, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {ex.name}
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {moreCount > 0 && (
+                                      <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
+                                        + {moreCount} more
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                <button
+                                  className="btn-press"
+                                  onClick={onStart}
+                                  style={{
+                                    marginTop: "auto",
+                                    width: "100%",
+                                    padding: 12, borderRadius: 12,
+                                    background: accent,
+                                    color: colors.appBg,
+                                    border: "none",
+                                    fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                                    cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                  }}
+                                >
+                                  Start workout
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M5 12h14M13 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          // Multi-workout list layout (2+ scheduled). Each row is tappable \u2014
+                          // tapping one starts that workout AND pulls the rest into the day.
                           return (
-                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
                               <div>
-                                <div style={{ fontSize: 13, color: secondary }}>
-                                  {upNext?.dayName ? `Suggested \u00B7 ${upNext.dayName}s` : "Suggested for today"}
-                                </div>
-                                <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                  {suggested.name}
-                                </div>
-                                <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
-                                  {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
+                                <div style={{ fontSize: 13, color: secondary }}>Scheduled for today</div>
+                                <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
+                                  {scheduledList.length} workouts planned
                                 </div>
                               </div>
-                              {previewLifts.length > 0 && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                                  {previewLifts.map((ex, i) => (
-                                    <div key={ex.id} style={{
-                                      display: "flex", alignItems: "center", gap: 10,
-                                      padding: "8px 0",
-                                      borderTop: i === 0 ? "none" : `1px solid ${colors.border}`,
-                                    }}>
-                                      <div style={{
-                                        width: 22, height: 22, borderRadius: 6,
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                {scheduledList.map((w) => {
+                                  const liftCount = (w.exercises || []).length;
+                                  return (
+                                    <button
+                                      key={w.id}
+                                      className="btn-press"
+                                      onClick={() => startFromPlan(w.id)}
+                                      style={{
+                                        display: "flex", alignItems: "center", gap: 10,
+                                        padding: "12px 14px", borderRadius: 12,
                                         background: colors.subtleBg,
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontSize: 11, fontWeight: 700, color: secondary,
+                                        border: `1px solid ${colors.border}`,
+                                        color: colors.text,
+                                        cursor: "pointer", fontFamily: "inherit",
+                                        textAlign: "left", width: "100%",
+                                      }}
+                                    >
+                                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                                        <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {w.name}
+                                        </div>
+                                        <div style={{ fontSize: 12, color: secondary }}>
+                                          {liftCount} {liftCount === 1 ? "lift" : "lifts"}
+                                        </div>
+                                      </div>
+                                      <div style={{
+                                        display: "flex", alignItems: "center", gap: 4,
+                                        fontSize: 12, fontWeight: 700, color: accent,
                                       }}>
-                                        {i + 1}
+                                        Start
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M9 6l6 6-6 6" />
+                                        </svg>
                                       </div>
-                                      <div style={{ fontSize: 14, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                        {ex.name}
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {moreCount > 0 && (
-                                    <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
-                                      + {moreCount} more
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                              <button
-                                className="btn-press"
-                                onClick={() => addSessionToToday(suggested.id)}
-                                style={{
-                                  marginTop: "auto",
-                                  width: "100%",
-                                  padding: 12, borderRadius: 12,
-                                  background: accent,
-                                  color: colors.appBg,
-                                  border: "none",
-                                  fontSize: 14, fontWeight: 700, fontFamily: "inherit",
-                                  cursor: "pointer",
-                                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                                }}
-                              >
-                                Start workout
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M5 12h14M13 5l7 7-7 7" />
-                                </svg>
-                              </button>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: "auto", textAlign: "center", lineHeight: 1.5 }}>
+                                Starting one will queue the rest in your session list.
+                              </div>
                             </div>
                           );
                         })(),
