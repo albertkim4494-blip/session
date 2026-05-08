@@ -129,7 +129,7 @@ export const TIME_OF_DAY = {
     sun: "#ffb38a",
     gradient: (themeKey) =>
       themeKey === "dark"
-        ? "radial-gradient(120% 70% at 50% -10%, rgba(255,170,140,0.22) 0%, rgba(120,90,180,0.16) 35%, rgba(13,17,23,0) 70%)"
+        ? "radial-gradient(140% 80% at 50% -5%, rgba(255,170,140,0.42) 0%, rgba(120,90,180,0.28) 38%, rgba(13,17,23,0) 78%)"
         : themeKey === "japandi"
           ? "radial-gradient(120% 70% at 50% -10%, rgba(220,150,110,0.30) 0%, rgba(200,160,180,0.18) 38%, rgba(245,241,232,0) 72%)"
           : themeKey === "light"
@@ -142,7 +142,7 @@ export const TIME_OF_DAY = {
     sun: "#fde68a",
     gradient: (themeKey) =>
       themeKey === "dark"
-        ? "radial-gradient(120% 70% at 50% -10%, rgba(125,211,252,0.22) 0%, rgba(80,140,200,0.12) 38%, rgba(13,17,23,0) 72%)"
+        ? "radial-gradient(140% 80% at 50% -5%, rgba(125,211,252,0.42) 0%, rgba(80,140,200,0.24) 40%, rgba(13,17,23,0) 80%)"
         : themeKey === "japandi"
           ? "radial-gradient(120% 70% at 50% -10%, rgba(180,200,180,0.32) 0%, rgba(220,200,170,0.22) 40%, rgba(245,241,232,0) 72%)"
           : themeKey === "light"
@@ -155,7 +155,7 @@ export const TIME_OF_DAY = {
     sun: "#fbbf24",
     gradient: (themeKey) =>
       themeKey === "dark"
-        ? "radial-gradient(120% 70% at 50% -10%, rgba(255,210,140,0.18) 0%, rgba(200,140,90,0.12) 38%, rgba(13,17,23,0) 72%)"
+        ? "radial-gradient(140% 80% at 50% -5%, rgba(255,210,140,0.38) 0%, rgba(200,140,90,0.24) 40%, rgba(13,17,23,0) 80%)"
         : themeKey === "japandi"
           ? "radial-gradient(120% 70% at 50% -10%, rgba(230,200,150,0.32) 0%, rgba(210,170,120,0.20) 40%, rgba(245,241,232,0) 72%)"
           : themeKey === "light"
@@ -168,7 +168,7 @@ export const TIME_OF_DAY = {
     sun: "#f97316",
     gradient: (themeKey) =>
       themeKey === "dark"
-        ? "radial-gradient(120% 70% at 50% -10%, rgba(255,130,90,0.22) 0%, rgba(150,70,140,0.16) 38%, rgba(13,17,23,0) 72%)"
+        ? "radial-gradient(140% 80% at 50% -5%, rgba(255,130,90,0.44) 0%, rgba(150,70,140,0.30) 40%, rgba(13,17,23,0) 80%)"
         : themeKey === "japandi"
           ? "radial-gradient(120% 70% at 50% -10%, rgba(220,130,100,0.32) 0%, rgba(180,110,140,0.20) 40%, rgba(245,241,232,0) 72%)"
           : themeKey === "light"
@@ -181,7 +181,7 @@ export const TIME_OF_DAY = {
     sun: "#818cf8",
     gradient: (themeKey) =>
       themeKey === "dark"
-        ? "radial-gradient(120% 70% at 50% -10%, rgba(80,90,180,0.22) 0%, rgba(40,30,90,0.18) 38%, rgba(13,17,23,0) 72%)"
+        ? "radial-gradient(140% 80% at 50% -5%, rgba(120,135,220,0.44) 0%, rgba(60,50,130,0.30) 40%, rgba(13,17,23,0) 80%)"
         : themeKey === "japandi"
           ? "radial-gradient(120% 70% at 50% -10%, rgba(120,130,170,0.28) 0%, rgba(100,90,130,0.18) 40%, rgba(245,241,232,0) 72%)"
           : themeKey === "light"
