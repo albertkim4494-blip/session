@@ -319,6 +319,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setCheckinEditSection(null);
   }, [coachTodayKey]);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  // Expanded workouts in the Today's Plan card (multi-workout list view).
+  const [expandedPlanRows, setExpandedPlanRows] = useState(() => new Set());
+  const togglePlanRow = useCallback((id) => {
+    setExpandedPlanRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
   const checkinEditSectionRef = useRef(null);
   checkinEditSectionRef.current = checkinEditSection;
 
@@ -4625,9 +4635,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             : (upNext?.dayName ? `Suggested \u00B7 ${upNext.dayName}s` : "Suggested for today");
 
                           if (focused) {
-                            const exerciseCount = (focused.exercises || []).length;
-                            const previewLifts = (focused.exercises || []).slice(0, 4);
-                            const moreCount = exerciseCount - previewLifts.length;
+                            const lifts = focused.exercises || [];
+                            const exerciseCount = lifts.length;
                             const onStart = scheduledList.length > 0
                               ? () => startFromPlan(focused.id)
                               : () => addSessionToToday(focused.id);
@@ -4643,9 +4652,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                     {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
                                   </div>
                                 </div>
-                                {previewLifts.length > 0 && (
+                                {lifts.length > 0 && (
                                   <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                                    {previewLifts.map((ex, i) => (
+                                    {lifts.map((ex, i) => (
                                       <div key={ex.id} style={{
                                         display: "flex", alignItems: "center", gap: 10,
                                         padding: "8px 0",
@@ -4656,6 +4665,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                           background: colors.subtleBg,
                                           display: "flex", alignItems: "center", justifyContent: "center",
                                           fontSize: 11, fontWeight: 700, color: secondary,
+                                          flexShrink: 0,
                                         }}>
                                           {i + 1}
                                         </div>
@@ -4664,11 +4674,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                         </div>
                                       </div>
                                     ))}
-                                    {moreCount > 0 && (
-                                      <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
-                                        + {moreCount} more
-                                      </div>
-                                    )}
                                   </div>
                                 )}
                                 <button
@@ -4684,6 +4689,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                     fontSize: 14, fontWeight: 700, fontFamily: "inherit",
                                     cursor: "pointer",
                                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                    position: "sticky", bottom: 0,
                                   }}
                                 >
                                   Start workout
@@ -4695,8 +4701,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             );
                           }
 
-                          // Multi-workout list layout (2+ scheduled). Each row is tappable \u2014
-                          // tapping one starts that workout AND pulls the rest into the day.
+                          // Multi-workout list layout (2+ scheduled). Each row is expandable
+                          // to show its exercises. A single bottom CTA starts the whole day.
                           return (
                             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
                               <div>
@@ -4707,46 +4713,111 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               </div>
                               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                 {scheduledList.map((w) => {
-                                  const liftCount = (w.exercises || []).length;
+                                  const lifts = w.exercises || [];
+                                  const liftCount = lifts.length;
+                                  const isExpanded = expandedPlanRows.has(w.id);
                                   return (
-                                    <button
+                                    <div
                                       key={w.id}
-                                      className="btn-press"
-                                      onClick={() => startFromPlan(w.id)}
                                       style={{
-                                        display: "flex", alignItems: "center", gap: 10,
-                                        padding: "12px 14px", borderRadius: 12,
+                                        borderRadius: 12,
                                         background: colors.subtleBg,
                                         border: `1px solid ${colors.border}`,
-                                        color: colors.text,
-                                        cursor: "pointer", fontFamily: "inherit",
-                                        textAlign: "left", width: "100%",
+                                        overflow: "hidden",
                                       }}
                                     >
-                                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                                        <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                          {w.name}
+                                      <button
+                                        className="btn-press"
+                                        onClick={() => togglePlanRow(w.id)}
+                                        aria-expanded={isExpanded}
+                                        style={{
+                                          display: "flex", alignItems: "center", gap: 10,
+                                          padding: "12px 14px",
+                                          background: "transparent",
+                                          border: "none",
+                                          color: colors.text,
+                                          cursor: "pointer", fontFamily: "inherit",
+                                          textAlign: "left", width: "100%",
+                                        }}
+                                      >
+                                        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                                          <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {w.name}
+                                          </div>
+                                          <div style={{ fontSize: 12, color: secondary }}>
+                                            {liftCount} {liftCount === 1 ? "lift" : "lifts"}
+                                          </div>
                                         </div>
-                                        <div style={{ fontSize: 12, color: secondary }}>
-                                          {liftCount} {liftCount === 1 ? "lift" : "lifts"}
-                                        </div>
-                                      </div>
-                                      <div style={{
-                                        display: "flex", alignItems: "center", gap: 4,
-                                        fontSize: 12, fontWeight: 700, color: accent,
-                                      }}>
-                                        Start
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                          <path d="M9 6l6 6-6 6" />
+                                        <svg
+                                          width="16" height="16" viewBox="0 0 24 24"
+                                          fill="none" stroke="currentColor" strokeWidth="2"
+                                          strokeLinecap="round" strokeLinejoin="round"
+                                          style={{
+                                            opacity: 0.5,
+                                            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                                            transition: "transform 0.2s ease",
+                                          }}
+                                        >
+                                          <path d="M6 9l6 6 6-6" />
                                         </svg>
-                                      </div>
-                                    </button>
+                                      </button>
+                                      {isExpanded && lifts.length > 0 && (
+                                        <div style={{
+                                          padding: "0 14px 12px",
+                                          display: "flex", flexDirection: "column", gap: 0,
+                                        }}>
+                                          {lifts.map((ex, i) => (
+                                            <div key={ex.id} style={{
+                                              display: "flex", alignItems: "center", gap: 10,
+                                              padding: "6px 0",
+                                              borderTop: `1px solid ${colors.border}`,
+                                            }}>
+                                              <div style={{
+                                                width: 20, height: 20, borderRadius: 6,
+                                                background: colors.cardBg,
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                fontSize: 10, fontWeight: 700, color: secondary,
+                                                flexShrink: 0,
+                                              }}>
+                                                {i + 1}
+                                              </div>
+                                              <div style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                {ex.name}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {isExpanded && lifts.length === 0 && (
+                                        <div style={{ padding: "0 14px 12px", fontSize: 12, color: colors.textTertiary }}>
+                                          No exercises yet.
+                                        </div>
+                                      )}
+                                    </div>
                                   );
                                 })}
                               </div>
-                              <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: "auto", textAlign: "center", lineHeight: 1.5 }}>
-                                Starting one will queue the rest in your session list.
-                              </div>
+                              <button
+                                className="btn-press"
+                                onClick={() => startFromPlan(scheduledList[0].id)}
+                                style={{
+                                  marginTop: "auto",
+                                  width: "100%",
+                                  padding: 12, borderRadius: 12,
+                                  background: accent,
+                                  color: colors.appBg,
+                                  border: "none",
+                                  fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                                  cursor: "pointer",
+                                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                  position: "sticky", bottom: 0,
+                                }}
+                              >
+                                Get started
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M5 12h14M13 5l7 7-7 7" />
+                                </svg>
+                              </button>
                             </div>
                           );
                         })(),
