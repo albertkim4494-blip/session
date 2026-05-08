@@ -33,7 +33,9 @@ const THEMES = {
     appBg: "#0d1117",
     text: "#e8eef7",
     textSecondary: "rgba(232,238,247,0.55)",
+    textTertiary: "rgba(232,238,247,0.35)",
     border: "rgba(255,255,255,0.06)",
+    borderStrong: "rgba(255,255,255,0.14)",
     cardBg: "#161b22",
     cardAltBg: "#0d1117",
     inputBg: "#161b22",
@@ -48,6 +50,7 @@ const THEMES = {
     dot: "#7dd3fc",
     accent: "#7dd3fc",
     accentBg: "rgba(125,211,252,0.1)",
+    accentSoft: "rgba(125,211,252,0.10)",
     accentBorder: "rgba(125,211,252,0.3)",
     subtleBg: "rgba(255,255,255,0.06)",
     subtleTrack: "rgba(255,255,255,0.08)",
@@ -56,7 +59,9 @@ const THEMES = {
     appBg: "#f8f9fa",
     text: "#1f2933",
     textSecondary: "rgba(31,41,51,0.55)",
+    textTertiary: "rgba(31,41,51,0.35)",
     border: "rgba(0,0,0,0.08)",
+    borderStrong: "rgba(31,41,51,0.16)",
     cardBg: "#ffffff",
     cardAltBg: "#f1f3f5",
     inputBg: "#ffffff",
@@ -71,6 +76,7 @@ const THEMES = {
     dot: "#2563eb",
     accent: "#2b5b7a",
     accentBg: "rgba(43,91,122,0.08)",
+    accentSoft: "rgba(43,91,122,0.10)",
     accentBorder: "rgba(43,91,122,0.25)",
     subtleBg: "rgba(0,0,0,0.05)",
     subtleTrack: "rgba(0,0,0,0.06)",
@@ -79,7 +85,9 @@ const THEMES = {
     appBg: "#F5F1E8",
     text: "#3d3529",
     textSecondary: "rgba(61,53,41,0.55)",
+    textTertiary: "rgba(61,53,41,0.35)",
     border: "rgba(61,53,41,0.12)",
+    borderStrong: "rgba(61,53,41,0.20)",
     cardBg: "#FBF8F2",
     cardAltBg: "#F5F1E8",
     inputBg: "#FBF8F2",
@@ -94,6 +102,7 @@ const THEMES = {
     dot: "#D97706",
     accent: "#D97706",
     accentBg: "rgba(217,119,6,0.08)",
+    accentSoft: "rgba(217,119,6,0.10)",
     accentBorder: "rgba(217,119,6,0.25)",
     subtleBg: "rgba(61,53,41,0.06)",
     subtleTrack: "rgba(61,53,41,0.08)",
@@ -102,7 +111,9 @@ const THEMES = {
     appBg: "#f7f5f0",
     text: "#2d3a2e",
     textSecondary: "rgba(45,58,46,0.55)",
+    textTertiary: "rgba(45,58,46,0.35)",
     border: "rgba(45,58,46,0.12)",
+    borderStrong: "rgba(45,58,46,0.20)",
     cardBg: "#eceae4",
     cardAltBg: "#e2dfda",
     inputBg: "#f7f5f0",
@@ -117,6 +128,7 @@ const THEMES = {
     dot: "#4a8c5c",
     accent: "#4a8c5c",
     accentBg: "rgba(74,140,92,0.12)",
+    accentSoft: "rgba(74,140,92,0.10)",
     accentBorder: "rgba(74,140,92,0.3)",
     subtleBg: "rgba(45,58,46,0.06)",
     subtleTrack: "rgba(45,58,46,0.08)",
@@ -125,7 +137,9 @@ const THEMES = {
     appBg: "#f3f0f8",
     text: "#2d2640",
     textSecondary: "rgba(45,38,64,0.55)",
+    textTertiary: "rgba(45,38,64,0.35)",
     border: "rgba(45,38,64,0.12)",
+    borderStrong: "rgba(45,38,64,0.20)",
     cardBg: "#e9e4f0",
     cardAltBg: "#dfd9e8",
     inputBg: "#f3f0f8",
@@ -140,6 +154,7 @@ const THEMES = {
     dot: "#7c6aad",
     accent: "#7c6aad",
     accentBg: "rgba(124,106,173,0.12)",
+    accentSoft: "rgba(124,106,173,0.10)",
     accentBorder: "rgba(124,106,173,0.3)",
     subtleBg: "rgba(45,38,64,0.06)",
     subtleTrack: "rgba(45,38,64,0.08)",
@@ -148,7 +163,9 @@ const THEMES = {
     appBg: "#eef7f3",
     text: "#2d3d35",
     textSecondary: "rgba(45,61,53,0.55)",
+    textTertiary: "rgba(45,61,53,0.35)",
     border: "rgba(45,61,53,0.10)",
+    borderStrong: "rgba(45,61,53,0.18)",
     cardBg: "#e2f0e9",
     cardAltBg: "#d6e8de",
     inputBg: "#eef7f3",
@@ -163,6 +180,7 @@ const THEMES = {
     dot: "#f2a593",
     accent: "#7ac4d6",
     accentBg: "rgba(122,196,214,0.14)",
+    accentSoft: "rgba(122,196,214,0.10)",
     accentBorder: "rgba(122,196,214,0.35)",
     subtleBg: "rgba(45,61,53,0.05)",
     subtleTrack: "rgba(45,61,53,0.07)",
@@ -177,6 +195,95 @@ export const THEME_LIST = [
   { key: "whimsical", label: "Dusk" },
   { key: "pastel", label: "Pastel" },
 ];
+
+// ---------------------------------------------------------------------------
+// Time-of-day atmosphere — radial wash + greeting copy used by the train tab
+// hero. Five periods covering a full day. Gradients are theme-specific;
+// themes outside {dark, light, japandi} return null and the renderer skips
+// the wash for those themes (Phase 2 decides the fallback).
+// ---------------------------------------------------------------------------
+
+export const TIME_OF_DAY = {
+  dawn: {
+    greeting: "Good morning",
+    sub: "Ease into the day",
+    sun: "#ffb38a",
+    gradient: (themeKey) =>
+      themeKey === "dark"
+        ? "radial-gradient(120% 70% at 50% -10%, rgba(255,170,140,0.22) 0%, rgba(120,90,180,0.16) 35%, rgba(13,17,23,0) 70%)"
+        : themeKey === "japandi"
+          ? "radial-gradient(120% 70% at 50% -10%, rgba(220,150,110,0.30) 0%, rgba(200,160,180,0.18) 38%, rgba(245,241,232,0) 72%)"
+          : themeKey === "light"
+            ? "radial-gradient(120% 70% at 50% -10%, rgba(255,180,150,0.45) 0%, rgba(180,160,210,0.30) 35%, rgba(248,249,250,0) 70%)"
+            : null,
+  },
+  morning: {
+    greeting: "Good morning",
+    sub: "Let’s move",
+    sun: "#fde68a",
+    gradient: (themeKey) =>
+      themeKey === "dark"
+        ? "radial-gradient(120% 70% at 50% -10%, rgba(125,211,252,0.22) 0%, rgba(80,140,200,0.12) 38%, rgba(13,17,23,0) 72%)"
+        : themeKey === "japandi"
+          ? "radial-gradient(120% 70% at 50% -10%, rgba(180,200,180,0.32) 0%, rgba(220,200,170,0.22) 40%, rgba(245,241,232,0) 72%)"
+          : themeKey === "light"
+            ? "radial-gradient(120% 70% at 50% -10%, rgba(160,210,240,0.45) 0%, rgba(200,220,200,0.25) 40%, rgba(248,249,250,0) 72%)"
+            : null,
+  },
+  afternoon: {
+    greeting: "Good afternoon",
+    sub: "Strong middle",
+    sun: "#fbbf24",
+    gradient: (themeKey) =>
+      themeKey === "dark"
+        ? "radial-gradient(120% 70% at 50% -10%, rgba(255,210,140,0.18) 0%, rgba(200,140,90,0.12) 38%, rgba(13,17,23,0) 72%)"
+        : themeKey === "japandi"
+          ? "radial-gradient(120% 70% at 50% -10%, rgba(230,200,150,0.32) 0%, rgba(210,170,120,0.20) 40%, rgba(245,241,232,0) 72%)"
+          : themeKey === "light"
+            ? "radial-gradient(120% 70% at 50% -10%, rgba(255,220,160,0.40) 0%, rgba(240,200,150,0.25) 40%, rgba(248,249,250,0) 72%)"
+            : null,
+  },
+  evening: {
+    greeting: "Good evening",
+    sub: "One more push",
+    sun: "#f97316",
+    gradient: (themeKey) =>
+      themeKey === "dark"
+        ? "radial-gradient(120% 70% at 50% -10%, rgba(255,130,90,0.22) 0%, rgba(150,70,140,0.16) 38%, rgba(13,17,23,0) 72%)"
+        : themeKey === "japandi"
+          ? "radial-gradient(120% 70% at 50% -10%, rgba(220,130,100,0.32) 0%, rgba(180,110,140,0.20) 40%, rgba(245,241,232,0) 72%)"
+          : themeKey === "light"
+            ? "radial-gradient(120% 70% at 50% -10%, rgba(255,160,120,0.42) 0%, rgba(220,140,180,0.26) 40%, rgba(248,249,250,0) 72%)"
+            : null,
+  },
+  night: {
+    greeting: "Good evening",
+    sub: "Quiet finish",
+    sun: "#818cf8",
+    gradient: (themeKey) =>
+      themeKey === "dark"
+        ? "radial-gradient(120% 70% at 50% -10%, rgba(80,90,180,0.22) 0%, rgba(40,30,90,0.18) 38%, rgba(13,17,23,0) 72%)"
+        : themeKey === "japandi"
+          ? "radial-gradient(120% 70% at 50% -10%, rgba(120,130,170,0.28) 0%, rgba(100,90,130,0.18) 40%, rgba(245,241,232,0) 72%)"
+          : themeKey === "light"
+            ? "radial-gradient(120% 70% at 50% -10%, rgba(140,150,210,0.34) 0%, rgba(110,120,180,0.20) 40%, rgba(248,249,250,0) 72%)"
+            : null,
+  },
+};
+
+/** Map a Date (or hour 0–23) to a time-of-day key. */
+export function getTimeOfDay(input) {
+  let h;
+  if (typeof input === "number") h = input;
+  else if (input instanceof Date) h = input.getHours();
+  else h = new Date().getHours();
+
+  if (h >= 5 && h < 8) return "dawn";
+  if (h >= 8 && h < 12) return "morning";
+  if (h >= 12 && h < 17) return "afternoon";
+  if (h >= 17 && h < 20) return "evening";
+  return "night";
+}
 
 export function getColors(theme) {
   return THEMES[theme] || THEMES.dark;
