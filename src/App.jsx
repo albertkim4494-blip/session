@@ -4706,27 +4706,32 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                     ))}
                                   </div>
                                 )}
-                                <button
-                                  className="btn-press"
-                                  onClick={onStart}
-                                  style={{
-                                    marginTop: "auto",
-                                    width: "100%",
-                                    padding: 12, borderRadius: 12,
-                                    background: accent,
-                                    color: colors.appBg,
-                                    border: "none",
-                                    fontSize: 14, fontWeight: 700, fontFamily: "inherit",
-                                    cursor: "pointer",
-                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                                    position: "sticky", bottom: 0,
-                                  }}
-                                >
-                                  Start Session
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M5 12h14M13 5l7 7-7 7" />
-                                  </svg>
-                                </button>
+                                <div style={{
+                                  marginTop: "auto",
+                                  position: "sticky", bottom: 0,
+                                  background: colors.cardBg,
+                                  paddingTop: 8,
+                                }}>
+                                  <button
+                                    className="btn-press"
+                                    onClick={onStart}
+                                    style={{
+                                      width: "100%",
+                                      padding: 12, borderRadius: 12,
+                                      background: accent,
+                                      color: colors.appBg,
+                                      border: "none",
+                                      fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                                      cursor: "pointer",
+                                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                    }}
+                                  >
+                                    Start session
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M5 12h14M13 5l7 7-7 7" />
+                                    </svg>
+                                  </button>
+                                </div>
                               </div>
                             );
                           }
@@ -4738,7 +4743,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               <div>
                                 <div style={{ fontSize: 13, color: secondary }}>Scheduled for today</div>
                                 <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                  {scheduledList.length} Sessions planned
+                                  {scheduledList.length} sessions planned
                                 </div>
                               </div>
                               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -4827,27 +4832,32 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                   );
                                 })}
                               </div>
-                              <button
-                                className="btn-press"
-                                onClick={() => startFromPlan(scheduledList[0].id)}
-                                style={{
-                                  marginTop: "auto",
-                                  width: "100%",
-                                  padding: 12, borderRadius: 12,
-                                  background: accent,
-                                  color: colors.appBg,
-                                  border: "none",
-                                  fontSize: 14, fontWeight: 700, fontFamily: "inherit",
-                                  cursor: "pointer",
-                                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                                  position: "sticky", bottom: 0,
-                                }}
-                              >
-                                Get started
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M5 12h14M13 5l7 7-7 7" />
-                                </svg>
-                              </button>
+                              <div style={{
+                                marginTop: "auto",
+                                position: "sticky", bottom: 0,
+                                background: colors.cardBg,
+                                paddingTop: 8,
+                              }}>
+                                <button
+                                  className="btn-press"
+                                  onClick={() => startFromPlan(scheduledList[0].id)}
+                                  style={{
+                                    width: "100%",
+                                    padding: 12, borderRadius: 12,
+                                    background: accent,
+                                    color: colors.appBg,
+                                    border: "none",
+                                    fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                                    cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                  }}
+                                >
+                                  Get started
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M5 12h14M13 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
                           );
                         })(),
