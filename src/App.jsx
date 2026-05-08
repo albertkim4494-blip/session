@@ -4001,8 +4001,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     );
   }
 
+  // Time-of-day atmosphere wash — rendered at the app root so it spans the
+  // full viewport behind the topBar, not just the body. Only on the Train tab
+  // hero state (no sessions today) since that's where the design calls for it.
+  const showAtmosphere = tab === "train" && isToday && !hasSessions;
+  const atmosphereTimeKey = getTimeOfDay();
+
   return (
     <div style={styles.app}>
+      {showAtmosphere && (
+        <Atmosphere themeKey={theme} time={atmosphereTimeKey} />
+      )}
       {/* Main content column */}
       <div style={styles.content}>
         {/* Top bar */}
@@ -4315,21 +4324,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 />
               )}
               {isToday && !hasSessions ? (
-                /* HERO STATE: atmosphere wash + sun arc + greeting + swipeable coach carousel */
+                /* HERO STATE: sun arc + greeting + swipeable coach carousel
+                 * (atmosphere wash is rendered at the app root so it spans
+                 * behind the topBar — not here) */
                 (() => {
-                  const todKey = getTimeOfDay();
+                  const todKey = atmosphereTimeKey;
                   const tod = TIME_OF_DAY[todKey];
                   const userName = (profile?.display_name || profile?.username || "").trim();
                   return (
                 <div style={{
-                  position: "relative",
                   display: "flex", flexDirection: "column",
-                  flex: 1, gap: 16,
-                  padding: "24px 0 0",
-                  justifyContent: "center",
+                  flex: 1, gap: 12,
+                  padding: "12px 0 0",
+                  minHeight: 0,
                 }}>
-                  <Atmosphere themeKey={theme} time={todKey} />
-                  <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+                  <div style={{ textAlign: "center", flexShrink: 0 }}>
                     <SunArc time={todKey} size={56} color={tod.sun} muted={colors.borderStrong} />
                     <div style={{
                       fontSize: 28, fontWeight: 700, lineHeight: 1.2,
@@ -4341,7 +4350,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       {tod.sub}
                     </div>
                   </div>
-                  <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                  <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                   <CoachCarousel
                     colors={colors}
                     activeIndex={carouselIndex}

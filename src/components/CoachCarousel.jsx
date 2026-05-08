@@ -120,7 +120,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
       {/* Cards container */}
       <div
         ref={containerRef}
-        style={{ overflow: "hidden", borderRadius: 22, flex: 1, minHeight: "44vh" }}
+        style={{ overflow: "hidden", borderRadius: 22, flex: 1, minHeight: 0 }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}

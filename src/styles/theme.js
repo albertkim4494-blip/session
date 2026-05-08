@@ -219,6 +219,7 @@ export function getStyles(colors) {
       display: "flex",
       justifyContent: "center",
       overflow: "hidden",
+      position: "relative",
     },
 
     content: {
@@ -231,12 +232,14 @@ export function getStyles(colors) {
       paddingLeft: "calc(16px + var(--safe-left, 0px))",
       paddingRight: "calc(16px + var(--safe-right, 0px))",
       paddingTop: "calc(10px + var(--safe-top, 0px))",
+      position: "relative",
+      zIndex: 1,
     },
 
     topBar: {
       flexShrink: 0,
       zIndex: 10,
-      background: colors.topBarBg,
+      background: "transparent",
       padding: "16px 0 12px",
       borderBottom: "none",
     },
