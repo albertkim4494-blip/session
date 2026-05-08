@@ -3863,6 +3863,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           delete st.sessionAdditions[dateKey][workoutId];
           if (Object.keys(st.sessionAdditions[dateKey]).length === 0) delete st.sessionAdditions[dateKey];
         }
+        // Dismiss for today so the underlying schedule (anchor / continuous
+        // next-up / weekly preferred) doesn't instantly re-add it. The user's
+        // intent in clicking X is "not today" — applies whether the workout
+        // came from the schedule or was added manually. Re-adding via the
+        // FAB or Get Started clears the dismissal.
+        if (!st.todayDismissed) st.todayDismissed = {};
+        const dlist = st.todayDismissed[dateKey] || [];
+        if (!dlist.includes(workoutId)) {
+          st.todayDismissed[dateKey] = [...dlist, workoutId];
+        }
         return st;
       });
     };
