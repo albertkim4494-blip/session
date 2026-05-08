@@ -4510,6 +4510,103 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           );
                         })(),
                       },
+                      {
+                        key: "plan",
+                        label: "Today's Plan",
+                        content: (() => {
+                          const accent = colors.accent;
+                          const secondary = colors.textSecondary;
+                          const upNext = weeklySummary.upNext;
+                          const programWorkouts = state.program?.workouts || [];
+
+                          // Resolve a suggested workout. Prefer upNext's first name, else the
+                          // first program workout. If none, render an empty state.
+                          let suggested = null;
+                          if (upNext && !upNext.allDone && !upNext.isRestDay && upNext.workouts?.length) {
+                            suggested = programWorkouts.find((w) => w.name === upNext.workouts[0]) || null;
+                          }
+                          if (!suggested) suggested = programWorkouts[0] || null;
+
+                          if (!suggested) {
+                            return (
+                              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 6 }}>
+                                <div style={{ fontSize: 13, color: secondary }}>No plan yet.</div>
+                                <div style={{ fontSize: 12, color: colors.textTertiary, lineHeight: 1.5 }}>
+                                  Add a workout in Plan to get a suggestion here.
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          const exerciseCount = (suggested.exercises || []).length;
+                          const previewLifts = (suggested.exercises || []).slice(0, 4);
+                          const moreCount = exerciseCount - previewLifts.length;
+
+                          return (
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
+                              <div>
+                                <div style={{ fontSize: 13, color: secondary }}>
+                                  {upNext?.dayName ? `Suggested \u00B7 ${upNext.dayName}s` : "Suggested for today"}
+                                </div>
+                                <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
+                                  {suggested.name}
+                                </div>
+                                <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
+                                  {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
+                                </div>
+                              </div>
+                              {previewLifts.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                                  {previewLifts.map((ex, i) => (
+                                    <div key={ex.id} style={{
+                                      display: "flex", alignItems: "center", gap: 10,
+                                      padding: "8px 0",
+                                      borderTop: i === 0 ? "none" : `1px solid ${colors.border}`,
+                                    }}>
+                                      <div style={{
+                                        width: 22, height: 22, borderRadius: 6,
+                                        background: colors.subtleBg,
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: 11, fontWeight: 700, color: secondary,
+                                      }}>
+                                        {i + 1}
+                                      </div>
+                                      <div style={{ fontSize: 14, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {ex.name}
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {moreCount > 0 && (
+                                    <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
+                                      + {moreCount} more
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <button
+                                className="btn-press"
+                                onClick={() => addSessionToToday(suggested.id)}
+                                style={{
+                                  marginTop: "auto",
+                                  width: "100%",
+                                  padding: 12, borderRadius: 12,
+                                  background: accent,
+                                  color: colors.appBg,
+                                  border: "none",
+                                  fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                                  cursor: "pointer",
+                                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                }}
+                              >
+                                Start workout
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M5 12h14M13 5l7 7-7 7" />
+                                </svg>
+                              </button>
+                            </div>
+                          );
+                        })(),
+                      },
                     ]}
                   />
                   </div>
@@ -5841,25 +5938,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             )}
             <button style={{
               ...styles.fab,
-              width: "auto",
-              height: 48,
-              borderRadius: 14,
-              padding: "0 20px",
-              gap: 6,
-              fontSize: 14,
-              fontWeight: 700,
-              fontFamily: "inherit",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
               opacity: fabOpen ? 0 : fabVisible ? 1 : 0.3,
               transform: fabOpen ? "scale(0)" : "scale(1)",
               pointerEvents: fabOpen ? "none" : "auto",
             }} onClick={() => setFabOpen(true)} aria-label="Add session">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 strokeWidth="2.5" strokeLinecap="round">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              Add Session
             </button>
           </>
         )}
