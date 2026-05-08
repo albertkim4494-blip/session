@@ -34,6 +34,8 @@ import { CadenceEditor } from "./components/CadenceEditor";
 import { SplitEditorModal } from "./components/SplitEditorModal";
 import { SplitsSection } from "./components/SplitsSection";
 import { CadenceDriftPrompt } from "./components/CadenceDriftPrompt";
+import { SunArc } from "./components/SunArc";
+import { Atmosphere } from "./components/Atmosphere";
 import { ProfileModal } from "./components/ProfileModal";
 import { ChangeUsernameModal } from "./components/profile/ChangeUsernameModal";
 import { ChangePasswordModal } from "./components/profile/ChangePasswordModal";
@@ -106,7 +108,7 @@ import { ExerciseTimer } from "./components/ExerciseTimer";
 import { RestTimerBar } from "./components/RestTimerBar";
 
 // Extracted styles
-import { getColors, getStyles } from "./styles/theme";
+import { getColors, getStyles, TIME_OF_DAY, getTimeOfDay } from "./styles/theme";
 
 // ============================================================================
 // CSS ANIMATIONS (injected once)
@@ -4313,16 +4315,33 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 />
               )}
               {isToday && !hasSessions ? (
-                /* HERO STATE: greeting + swipeable coach carousel */
+                /* HERO STATE: atmosphere wash + sun arc + greeting + swipeable coach carousel */
+                (() => {
+                  const todKey = getTimeOfDay();
+                  const tod = TIME_OF_DAY[todKey];
+                  const userName = (profile?.display_name || profile?.username || "").trim();
+                  return (
                 <div style={{
+                  position: "relative",
                   display: "flex", flexDirection: "column",
                   flex: 1, gap: 16,
                   padding: "24px 0 0",
                   justifyContent: "center",
                 }}>
-                  <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.3, textAlign: "center" }}>
-                    {getTimeGreeting()}
+                  <Atmosphere themeKey={theme} time={todKey} />
+                  <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+                    <SunArc time={todKey} size={56} color={tod.sun} muted={colors.borderStrong} />
+                    <div style={{
+                      fontSize: 28, fontWeight: 700, lineHeight: 1.2,
+                      letterSpacing: -0.5, marginTop: 8,
+                    }}>
+                      {tod.greeting}{userName ? `, ${userName.split(" ")[0]}` : ""}
+                    </div>
+                    <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
+                      {tod.sub}
+                    </div>
                   </div>
+                  <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
                   <CoachCarousel
                     colors={colors}
                     activeIndex={carouselIndex}
@@ -4484,7 +4503,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       },
                     ]}
                   />
+                  </div>
                 </div>
+                  );
+                })()
               ) : !isToday && !hasSessions ? (
                 /* NON-TODAY EMPTY: no logs or sessions */
                 <div style={{
