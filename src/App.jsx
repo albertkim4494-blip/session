@@ -366,13 +366,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, [tab]);
 
+  // Snap the body back to its rest position. Used by touchend (on a non-tab-
+  // changing swipe) and as the catch-all for touchcancel.
+  const resetBodyTransform = useCallback(() => {
+    if (!bodyRef.current) return;
+    bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+    bodyRef.current.style.transform = "translateX(0)";
+    bodyRef.current.style.opacity = "1";
+    setTimeout(() => { if (bodyRef.current) bodyRef.current.style.willChange = "auto"; }, 250);
+  }, []);
+
   const handleTouchEnd = useCallback((e) => {
+    // If we never crossed the swipe threshold, still defensively reset any
+    // lingering transform — protects against cases where a previous swipe was
+    // interrupted and left the body shifted.
     if (!touchRef.current.swiping || !bodyRef.current) {
       touchRef.current.swiping = false;
+      resetBodyTransform();
       return;
     }
 
-    const dx = e.changedTouches[0].clientX - touchRef.current.startX;
+    const dx = (e.changedTouches?.[0]?.clientX ?? touchRef.current.startX) - touchRef.current.startX;
     const idx = TAB_ORDER.indexOf(tab);
     const threshold = 60;
 
@@ -399,19 +413,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           }
         }, 200);
       } else {
-        bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
-        bodyRef.current.style.transform = "translateX(0)";
-        bodyRef.current.style.opacity = "1";
+        resetBodyTransform();
       }
     } else {
-      bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
-      bodyRef.current.style.transform = "translateX(0)";
-      bodyRef.current.style.opacity = "1";
+      resetBodyTransform();
     }
 
     touchRef.current.swiping = false;
     setTimeout(() => { if (bodyRef.current) bodyRef.current.style.willChange = "auto"; }, 450);
-  }, [tab]);
+  }, [tab, resetBodyTransform]);
+
+  // Android (and iOS in some interaction patterns) fire touchcancel instead of
+  // touchend when the OS reclaims the gesture — palm rejection, an overlay
+  // appearing, the carousel claiming its own swipe, etc. Without this handler
+  // the body would be stuck at whatever translateX the last touchmove set.
+  const handleTouchCancel = useCallback(() => {
+    touchRef.current.swiping = false;
+    touchRef.current.locked = false;
+    resetBodyTransform();
+  }, [resetBodyTransform]);
 
   function toggleCollapse(setter, id) {
     setter((prev) => {
@@ -4312,7 +4332,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         </div>
 
         {/* Main body */}
-        <div ref={bodyRef} style={styles.body} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+        <div ref={bodyRef} style={styles.body} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} onTouchCancel={handleTouchCancel}>
           {/* Set Username banner */}
           {profile && !profile.username && (
             <div style={{

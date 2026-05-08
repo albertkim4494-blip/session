@@ -94,6 +94,15 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     if (newIndex !== idx) onChangeIndex(newIndex);
   }, [clampIndex, onChangeIndex]);
 
+  // Snap back cleanly if the OS cancels the gesture mid-drag.
+  const onTouchCancel = useCallback((e) => {
+    e.stopPropagation();
+    touchRef.current = null;
+    dragRef.current = 0;
+    setDragDelta(0);
+    setIsDragging(false);
+  }, []);
+
   // Track container width in state so it updates after mount/visibility/resize changes
   const [containerWidth, setContainerWidth] = useState(0);
   useEffect(() => {
@@ -124,6 +133,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchCancel}
       >
         <div ref={stripRef} style={{
           display: "flex",
