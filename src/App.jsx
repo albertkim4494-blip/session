@@ -4722,7 +4722,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                     position: "sticky", bottom: 0,
                                   }}
                                 >
-                                  Start session
+                                  Start Session
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M5 12h14M13 5l7 7-7 7" />
                                   </svg>
@@ -4738,7 +4738,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               <div>
                                 <div style={{ fontSize: 13, color: secondary }}>Scheduled for today</div>
                                 <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                  {scheduledList.length} sessions planned
+                                  {scheduledList.length} Sessions planned
                                 </div>
                               </div>
                               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
