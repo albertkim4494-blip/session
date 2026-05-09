@@ -36,18 +36,39 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
   const count = cards.length;
   const clampIndex = useCallback((i) => Math.max(0, Math.min(count - 1, i)), [count]);
 
+  // Hard reset: throw away whatever drag state we had. Used by every interruption
+  // path (touchcancel, multi-touch, OS focus loss, page hide, parent unmount).
+  const resetDrag = useCallback(() => {
+    touchRef.current = null;
+    dragRef.current = 0;
+    setDragDelta(0);
+    setIsDragging(false);
+  }, []);
+
   // --- Touch handlers (drag-to-follow + snap) ---
   const onTouchStart = useCallback((e) => {
+    // Multi-touch — abandon. A second finger landing mid-drag was producing
+    // sticky state where touchend reported the wrong finger and the strip
+    // was left at a stale dragDelta.
+    if (e.touches.length > 1) {
+      resetDrag();
+      return;
+    }
     const t = e.touches[0];
     touchRef.current = { startX: t.clientX, startY: t.clientY, startTime: Date.now(), locked: null };
     setIsDragging(true);
     // Stop propagation so the parent tab-swipe handler doesn't also claim this touch
     e.stopPropagation();
-  }, []);
+  }, [resetDrag]);
 
   const onTouchMove = useCallback((e) => {
     const ref = touchRef.current;
     if (!ref) return;
+    // If a second finger appears mid-drag, bail rather than continue tracking.
+    if (e.touches.length > 1) {
+      resetDrag();
+      return;
+    }
     const t = e.touches[0];
     const dx = t.clientX - ref.startX;
     const dy = t.clientY - ref.startY;
@@ -63,7 +84,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     e.stopPropagation();
     dragRef.current = dx;
     setDragDelta(dx);
-  }, []);
+  }, [resetDrag]);
 
   const onTouchEnd = useCallback((e) => {
     e.stopPropagation();
@@ -97,11 +118,32 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
   // Snap back cleanly if the OS cancels the gesture mid-drag.
   const onTouchCancel = useCallback((e) => {
     e.stopPropagation();
-    touchRef.current = null;
-    dragRef.current = 0;
-    setDragDelta(0);
-    setIsDragging(false);
-  }, []);
+    resetDrag();
+  }, [resetDrag]);
+
+  // Global fallback cleanup. There are paths where neither touchend nor
+  // touchcancel reliably fires on the React tree — pulling down a notification,
+  // app-switching, the OS reclaiming the gesture for back-edge, etc. Without
+  // these listeners the strip stays at a stuck translateX and you see the
+  // partial-swipe state the user reported.
+  useEffect(() => {
+    const onGlobalCancel = () => {
+      if (touchRef.current) resetDrag();
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden && touchRef.current) resetDrag();
+    };
+    document.addEventListener("touchcancel", onGlobalCancel, { passive: true });
+    document.addEventListener("pointercancel", onGlobalCancel, { passive: true });
+    window.addEventListener("blur", onGlobalCancel);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("touchcancel", onGlobalCancel);
+      document.removeEventListener("pointercancel", onGlobalCancel);
+      window.removeEventListener("blur", onGlobalCancel);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [resetDrag]);
 
   // Track container width in state so it updates after mount/visibility/resize changes
   const [containerWidth, setContainerWidth] = useState(0);
