@@ -182,24 +182,17 @@ export function CoachHeroInsight({
       {hero && (
         <div>
           <div style={{
-            fontSize: 16, fontWeight: 700, lineHeight: 1.35,
-            maxWidth: 320, margin: "0 auto 6px",
+            fontSize: 14, fontWeight: 700, lineHeight: 1.35,
+            maxWidth: 320, margin: "0 auto 4px",
           }}>
             {hero.headline}
           </div>
           <div style={{
-            fontSize: 15, lineHeight: 1.5, opacity: 0.7,
+            fontSize: 13, lineHeight: 1.45, opacity: 0.7,
             maxWidth: 320, margin: "0 auto",
           }}>
             {hero.detail}
           </div>
-          {renderSupportLine("Why", hero.evidence, {
-            fontSize: 12,
-            lineHeight: 1.45,
-            opacity: 0.62,
-            maxWidth: 320,
-            margin: "8px auto 0",
-          })}
           {renderInsightCtas(hero.ctas, onAddExercise, colors, accentColor)}
         </div>
       )}
@@ -208,7 +201,7 @@ export function CoachHeroInsight({
           onClick={onRefresh}
           style={{
             background: "transparent", border: "none", color: colors.text,
-            opacity: 0.3, fontSize: 11, cursor: "pointer", padding: "8px 6px 0",
+            opacity: 0.3, fontSize: 11, cursor: "pointer", padding: "6px 6px 0",
             textDecoration: "underline",
           }}
         >
