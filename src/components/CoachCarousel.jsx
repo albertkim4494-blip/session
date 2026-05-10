@@ -64,19 +64,16 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
   const onTouchMove = useCallback((e) => {
     const ref = touchRef.current;
     if (!ref) return;
-    // If a second finger appears mid-drag, bail rather than continue tracking.
-    if (e.touches.length > 1) {
-      resetDrag();
-      return;
-    }
+    // Note: do NOT abort on multi-touch here. Aborting mid-drag any time a
+    // second finger registers (palm rejection misfires, accidental thumb)
+    // was making the carousel feel completely unresponsive.
     const t = e.touches[0];
+    if (!t) return;
     const dx = t.clientX - ref.startX;
     const dy = t.clientY - ref.startY;
 
-    // Lock direction on first significant move. 6 px is responsive enough to
-    // not feel laggy, and "dominant axis" picks horizontal on ties — slight
-    // initial vertical jitter doesn't hijack the gesture as long as horizontal
-    // catches up.
+    // Lock direction on first significant move. 6 px responsive, ties go
+    // horizontal so a slight initial vertical jitter doesn't hijack things.
     if (ref.locked === null) {
       const adx = Math.abs(dx);
       const ady = Math.abs(dy);
@@ -92,7 +89,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     e.stopPropagation();
     dragRef.current = dx;
     setDragDelta(dx);
-  }, [resetDrag]);
+  }, []);
 
   const onTouchEnd = useCallback((e) => {
     e.stopPropagation();
@@ -183,11 +180,6 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
           overflow: "hidden",
           borderRadius: 16,
           height: "56vh",
-          // Tell the browser: vertical scroll is native (so inner scroll
-          // areas keep working), horizontal is ours. Without this, Android
-          // sometimes claims the gesture before our handler can call
-          // preventDefault, leaving the carousel unable to respond.
-          touchAction: "pan-y",
         }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
