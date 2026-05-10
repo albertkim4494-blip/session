@@ -332,12 +332,108 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const checkinEditSectionRef = useRef(null);
   checkinEditSectionRef.current = checkinEditSection;
 
-  // Tab navigation is via the bottom nav buttons only. The previous body-
-  // level horizontal swipe was conflicting with the carousel's own swipe in
-  // ways we couldn't reliably untangle (Android event delegation quirks,
-  // partial transforms left stuck mid-animation, etc). bodyRef is still kept
-  // in case other features want to reference it.
+  // Swipe navigation between tabs.
+  const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
   const bodyRef = useRef(null);
+  const TAB_ORDER = ["train", "progress", "program", "social"];
+
+  const handleTouchStart = useCallback((e) => {
+    // If the touch lands inside an element that owns horizontal gestures
+    // (the carousel), defer this touch entirely so the body doesn't compete.
+    if (e.target?.closest?.("[data-owns-horizontal-gesture]")) {
+      touchRef.current.deferToChild = true;
+      return;
+    }
+    touchRef.current.deferToChild = false;
+    touchRef.current.startX = e.touches[0].clientX;
+    touchRef.current.startY = e.touches[0].clientY;
+    touchRef.current.swiping = false;
+    touchRef.current.locked = false;
+    try { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); } catch {}
+    if (bodyRef.current) {
+      bodyRef.current.style.transition = "none";
+      bodyRef.current.style.willChange = "transform, opacity";
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    if (touchRef.current.deferToChild) return;
+    const dx = e.touches[0].clientX - touchRef.current.startX;
+    const dy = e.touches[0].clientY - touchRef.current.startY;
+
+    if (touchRef.current.locked) return;
+
+    if (!touchRef.current.swiping && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        touchRef.current.swiping = true;
+      } else {
+        touchRef.current.locked = true;
+        return;
+      }
+    }
+
+    if (touchRef.current.swiping && bodyRef.current) {
+      const idx = TAB_ORDER.indexOf(tab);
+      let clamped = dx;
+      if (dx > 0 && idx === 0) clamped = dx * 0.2;
+      if (dx < 0 && idx === TAB_ORDER.length - 1) clamped = dx * 0.2;
+
+      bodyRef.current.style.transform = `translateX(${clamped}px)`;
+      bodyRef.current.style.opacity = `${1 - Math.min(Math.abs(clamped) / 600, 0.3)}`;
+      e.preventDefault();
+    }
+  }, [tab]);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (touchRef.current.deferToChild) {
+      touchRef.current.deferToChild = false;
+      return;
+    }
+    if (!touchRef.current.swiping || !bodyRef.current) {
+      touchRef.current.swiping = false;
+      return;
+    }
+
+    const dx = e.changedTouches[0].clientX - touchRef.current.startX;
+    const idx = TAB_ORDER.indexOf(tab);
+    const threshold = 60;
+
+    if (Math.abs(dx) > threshold) {
+      const goNext = dx < 0 && idx < TAB_ORDER.length - 1;
+      const goPrev = dx > 0 && idx > 0;
+
+      if (goNext || goPrev) {
+        const direction = goNext ? -1 : 1;
+        bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+        bodyRef.current.style.transform = `translateX(${direction * window.innerWidth}px)`;
+        bodyRef.current.style.opacity = "0.3";
+
+        setTimeout(() => {
+          setTab(goNext ? TAB_ORDER[idx + 1] : TAB_ORDER[idx - 1]);
+          if (bodyRef.current) {
+            bodyRef.current.style.transition = "none";
+            bodyRef.current.style.transform = `translateX(${-direction * window.innerWidth * 0.3}px)`;
+            bodyRef.current.style.opacity = "0.3";
+            bodyRef.current.offsetHeight;
+            bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+            bodyRef.current.style.transform = "translateX(0)";
+            bodyRef.current.style.opacity = "1";
+          }
+        }, 200);
+      } else {
+        bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+        bodyRef.current.style.transform = "translateX(0)";
+        bodyRef.current.style.opacity = "1";
+      }
+    } else {
+      bodyRef.current.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-out";
+      bodyRef.current.style.transform = "translateX(0)";
+      bodyRef.current.style.opacity = "1";
+    }
+
+    touchRef.current.swiping = false;
+    setTimeout(() => { if (bodyRef.current) bodyRef.current.style.willChange = "auto"; }, 450);
+  }, [tab]);
 
   function toggleCollapse(setter, id) {
     setter((prev) => {
@@ -4258,7 +4354,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         </div>
 
         {/* Main body */}
-        <div ref={bodyRef} style={styles.body}>
+        <div ref={bodyRef} style={styles.body} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
           {/* Set Username banner */}
           {profile && !profile.username && (
             <div style={{
