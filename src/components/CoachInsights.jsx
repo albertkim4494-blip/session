@@ -98,6 +98,7 @@ export function CoachHeroInsight({
   hideLabel,
 }) {
   const hasInsights = insights.length > 0;
+  const [expanded, setExpanded] = useState(false);
 
   const existingNames = new Set(
     (userExerciseNames || []).map((n) => n.toLowerCase())
@@ -157,12 +158,12 @@ export function CoachHeroInsight({
     ) : null;
   }
 
-  // Has insight — render inline
+  // Has insight — collapsed shows just the headline; tap to expand for Next + Why + CTAs.
   const accentColor = SEVERITY_COLORS[hero?.severity] || "#6b7280";
 
   return (
     <div style={{
-      textAlign: "center", padding: "4px 0",
+      padding: "4px 0",
       animation: "coachFadeIn 0.5s ease-out",
       opacity: loading ? 0.5 : 1,
       transition: "opacity 0.3s",
@@ -181,32 +182,73 @@ export function CoachHeroInsight({
       )}
       {hero && (
         <div>
-          <div style={{
-            fontSize: 14, fontWeight: 700, lineHeight: 1.35,
-            maxWidth: 320, margin: "0 auto 4px",
-          }}>
-            {hero.headline}
+          {/* Header row: headline (tap to toggle) + inline refresh icon */}
+          <div
+            onClick={() => setExpanded((v) => !v)}
+            role="button"
+            aria-expanded={expanded}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+            }}
+          >
+            <div style={{
+              fontSize: 14, fontWeight: 700, lineHeight: 1.35,
+              flex: 1, textAlign: "center",
+            }}>
+              {hero.headline}
+            </div>
+            {onRefresh && !loading && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+                aria-label="Refresh coach insights"
+                style={{
+                  background: "transparent", border: "none", padding: 4,
+                  color: colors.text, opacity: 0.4, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+              </button>
+            )}
           </div>
-          <div style={{
-            fontSize: 13, lineHeight: 1.45, opacity: 0.7,
-            maxWidth: 320, margin: "0 auto",
-          }}>
-            {hero.detail}
-          </div>
-          {renderInsightCtas(hero.ctas, onAddExercise, colors, accentColor)}
+
+          {/* Hint when collapsed */}
+          {!expanded && (
+            <div style={{
+              fontSize: 11, opacity: 0.4, textAlign: "center",
+              marginTop: 4,
+            }}>
+              Tap for more details
+            </div>
+          )}
+
+          {/* Expanded body: Next, Why, CTAs */}
+          {expanded && (
+            <div style={{ marginTop: 8, textAlign: "center" }}>
+              {hero.detail && (
+                <div style={{
+                  fontSize: 13, lineHeight: 1.45, opacity: 0.75,
+                  maxWidth: 320, margin: "0 auto",
+                }}>
+                  {hero.detail}
+                </div>
+              )}
+              {renderSupportLine("Why", hero.evidence, {
+                fontSize: 12, lineHeight: 1.45, opacity: 0.62,
+                maxWidth: 320, margin: "8px auto 0",
+              })}
+              {renderInsightCtas(hero.ctas, onAddExercise, colors, accentColor)}
+            </div>
+          )}
         </div>
-      )}
-      {onRefresh && !loading && (
-        <button
-          onClick={onRefresh}
-          style={{
-            background: "transparent", border: "none", color: colors.text,
-            opacity: 0.3, fontSize: 11, cursor: "pointer", padding: "6px 6px 0",
-            textDecoration: "underline",
-          }}
-        >
-          Refresh
-        </button>
       )}
     </div>
   );

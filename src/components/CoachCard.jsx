@@ -61,38 +61,127 @@ export function CoachCard({
   const hasInsights = coachInsights.length > 0;
   const hasCheckin = !!todayCheckin;
 
+  // While the user is in the full check-in form, show only that — no insight.
+  if (checkinEditSection === "full") {
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", flex: 1,
+        gap: 10, overflow: "auto",
+        animation: justSubmitted ? "coachCardFadeIn 0.3s ease-out" : undefined,
+      }}>
+        <CoachCheckin
+          colors={colors}
+          onSubmit={onCheckinSubmit}
+          onCancel={() => setCheckinEditSection(null)}
+          editValues={todayCheckin}
+          showAll
+        />
+      </div>
+    );
+  }
+
+  // Editing a single check-in field — replace the chips with the inline editor.
+  if (checkinEditSection) {
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", flex: 1,
+        gap: 10, overflow: "auto",
+        animation: justSubmitted ? "coachCardFadeIn 0.3s ease-out" : undefined,
+      }}>
+        <CheckinEditSection
+          section={checkinEditSection}
+          checkin={todayCheckin || { mood: null, sleep: null, pain: [] }}
+          onSave={(updated) => {
+            onCheckinUpdate(updated);
+            onCoachRefresh(updated);
+          }}
+          onCancel={() => setCheckinEditSection(null)}
+          colors={colors}
+        />
+      </div>
+    );
+  }
+
+  // Default: insight on top, check-in below.
   return (
     <div style={{
       display: "flex", flexDirection: "column", flex: 1,
       gap: 10, overflow: "auto",
       animation: justSubmitted ? "coachCardFadeIn 0.3s ease-out" : undefined,
     }}>
-      {/* Check-in chips / edit section at top */}
+      {/* Coach insight area */}
+      <div style={{
+        flexShrink: 0,
+        animation: justSubmitted ? "coachCardSlideUp 0.35s ease-out" : undefined,
+      }}>
+        {hasInsights ? (
+          <CoachHeroInsight
+            insights={coachInsights}
+            onAddExercise={onAddSuggestion}
+            colors={colors}
+            loading={coachLoading}
+            error={coachError}
+            userExerciseNames={userExerciseNames}
+            onRefresh={onCoachRefresh}
+            hideLabel
+            streaming={coachStreaming}
+          />
+        ) : coachStreaming ? (
+          <div style={{
+            display: "flex", justifyContent: "center",
+            gap: 4, padding: "12px 0",
+          }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: colors.textSecondary,
+                animation: `coachDotPulse 1s ease-in-out ${i * 0.2}s infinite`,
+              }} />
+            ))}
+          </div>
+        ) : coachLoading ? (
+          <div style={{
+            fontSize: 13, opacity: 0.4, padding: "8px 0", textAlign: "center",
+            animation: "coachCardFadeIn 0.4s ease-out",
+          }}>
+            Thinking...
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary, textAlign: "center", padding: "8px 0" }}>
+            {coachError || (
+              <button
+                onClick={onCoachRefresh}
+                style={{
+                  background: "transparent", border: "none", cursor: "pointer",
+                  color: colors.text, opacity: 0.45, fontSize: 13, padding: 0,
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                  <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                  <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+                </svg>
+                <span style={{ textDecoration: "underline" }}>Get coach insights</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Divider between insight and check-in */}
+      <div style={{
+        height: 1,
+        background: colors.border,
+        opacity: 0.3,
+        flexShrink: 0,
+      }} />
+
+      {/* Check-in area (chips or "How are you feeling today?" prompt) */}
       <div style={{
         flexShrink: 0,
         animation: justSubmitted ? "coachCardSlideUp 0.3s ease-out" : undefined,
       }}>
-        {checkinEditSection === "full" ? (
-          <CoachCheckin
-            colors={colors}
-            onSubmit={onCheckinSubmit}
-            onCancel={() => setCheckinEditSection(null)}
-            editValues={todayCheckin}
-            showAll
-          />
-        ) : checkinEditSection ? (
-          <CheckinEditSection
-            section={checkinEditSection}
-            checkin={todayCheckin || { mood: null, sleep: null, pain: [] }}
-            onSave={(updated) => {
-              onCheckinUpdate(updated);
-              // Re-fetch with the updated data (pass directly to avoid stale localStorage read)
-              onCoachRefresh(updated);
-            }}
-            onCancel={() => setCheckinEditSection(null)}
-            colors={colors}
-          />
-        ) : !hasCheckin ? (
+        {!hasCheckin ? (
           <button
             onClick={() => setCheckinEditSection("full")}
             style={{
@@ -101,7 +190,7 @@ export function CoachCard({
               color: colors.text,
               cursor: "pointer",
               padding: 0,
-              alignSelf: "center",
+              width: "100%",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -133,102 +222,6 @@ export function CoachCard({
           />
         )}
       </div>
-
-      {/* Divider */}
-      {!checkinEditSection && (
-        <div style={{
-          height: 1,
-          background: colors.border,
-          opacity: 0.3,
-          flexShrink: 0,
-        }} />
-      )}
-
-      {/* Coach insight area */}
-      {!checkinEditSection && (
-        <div style={{
-          display: "flex", flexDirection: "column",
-          alignItems: "center", textAlign: "center",
-          flex: 1, justifyContent: hasInsights ? "flex-start" : "center",
-          gap: 8, minHeight: 0,
-        }}>
-          {hasInsights ? (
-            /* Has insights — show them */
-            <div style={{
-              width: "100%",
-              animation: justSubmitted ? "coachCardSlideUp 0.35s ease-out" : undefined,
-            }}>
-              <CoachHeroInsight
-                insights={coachInsights}
-                onAddExercise={onAddSuggestion}
-                colors={colors}
-                loading={coachLoading}
-                error={coachError}
-                userExerciseNames={userExerciseNames}
-                onRefresh={onCoachRefresh}
-                hideLabel
-                streaming={coachStreaming}
-              />
-              {coachStreaming && (
-                <div style={{
-                  display: "flex", justifyContent: "center",
-                  gap: 4, padding: "12px 0 0",
-                }}>
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} style={{
-                      width: 6, height: 6, borderRadius: "50%",
-                      background: colors.textSecondary,
-                      animation: `coachDotPulse 1s ease-in-out ${i * 0.2}s infinite`,
-                    }} />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : coachStreaming ? (
-            /* Streaming started but no insights yet */
-            <div style={{
-              display: "flex", justifyContent: "center",
-              gap: 4, padding: "16px 0",
-            }}>
-              {[0, 1, 2].map((i) => (
-                <div key={i} style={{
-                  width: 6, height: 6, borderRadius: "50%",
-                  background: colors.textSecondary,
-                  animation: `coachDotPulse 1s ease-in-out ${i * 0.2}s infinite`,
-                }} />
-              ))}
-            </div>
-          ) : coachLoading ? (
-            /* Loading (non-streaming) */
-            <div style={{
-              fontSize: 13, opacity: 0.4, padding: "8px 0",
-              animation: "coachCardFadeIn 0.4s ease-out",
-            }}>
-              Thinking...
-            </div>
-          ) : (
-            /* Checked in but no insights yet */
-            <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary }}>
-              {coachError || (
-                <button
-                  onClick={onCoachRefresh}
-                  style={{
-                    background: "transparent", border: "none", cursor: "pointer",
-                    color: colors.text, opacity: 0.45, fontSize: 13, padding: 0,
-                    display: "inline-flex", alignItems: "center", gap: 5,
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
-                    <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
-                    <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
-                  </svg>
-                  <span style={{ textDecoration: "underline" }}>Get coach insights</span>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

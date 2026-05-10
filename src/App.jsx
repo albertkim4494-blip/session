@@ -4863,7 +4863,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
                           <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
                         </svg>
-                        Today
+                        Coach's insight
                       </div>
                       <CoachCard
                         todayCheckin={todayCheckin}
