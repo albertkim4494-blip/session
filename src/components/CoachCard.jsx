@@ -108,7 +108,7 @@ export function CoachCard({
               alignSelf: "center",
             }}
           >
-            Check in to personalize this
+            How are you feeling today?
           </button>
         ) : (
           <CheckinSummary
