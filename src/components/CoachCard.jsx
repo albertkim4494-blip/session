@@ -121,7 +121,7 @@ export function CoachCard({
               fontSize: 11,
               opacity: 0.35,
             }}>
-              Tunes today's coach insight
+              Tap to share your mood, sleep, and pain points
             </span>
           </button>
         ) : (
