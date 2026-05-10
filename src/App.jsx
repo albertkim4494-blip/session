@@ -443,6 +443,46 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     resetBodyTransform();
   }, [resetBodyTransform]);
 
+  // Document-level safety net. The body's React handlers won't fire when a
+  // child (like the carousel) calls e.stopPropagation, which means a stuck
+  // body-transform from a previous interrupted swipe has no path to clear
+  // itself once the user moves to interact with the carousel. These global
+  // listeners run regardless and reset the body if it's left in a partial-
+  // swipe state.
+  useEffect(() => {
+    const isAtRest = () => {
+      if (!bodyRef.current) return true;
+      const t = bodyRef.current.style.transform || "";
+      return t === "" || t === "translateX(0)" || t === "translateX(0px)";
+    };
+    const safeReset = () => {
+      if (touchRef.current.swiping) touchRef.current.swiping = false;
+      if (touchRef.current.locked) touchRef.current.locked = false;
+      if (!isAtRest()) resetBodyTransform();
+    };
+    // On any new touch anywhere in the document, defensively clear stuck
+    // body state from a previous interrupted gesture.
+    const onAnyTouchStart = () => {
+      if (!touchRef.current.swiping && !isAtRest()) {
+        // Stuck from before — animate back without disturbing the new touch.
+        resetBodyTransform();
+      }
+    };
+    document.addEventListener("touchstart", onAnyTouchStart, { passive: true });
+    document.addEventListener("touchcancel", safeReset, { passive: true });
+    document.addEventListener("pointercancel", safeReset, { passive: true });
+    window.addEventListener("blur", safeReset);
+    const onVisibility = () => { if (document.hidden) safeReset(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("touchstart", onAnyTouchStart);
+      document.removeEventListener("touchcancel", safeReset);
+      document.removeEventListener("pointercancel", safeReset);
+      window.removeEventListener("blur", safeReset);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [resetBodyTransform]);
+
   function toggleCollapse(setter, id) {
     setter((prev) => {
       const next = new Set(prev);

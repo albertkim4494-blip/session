@@ -73,11 +73,21 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     const dx = t.clientX - ref.startX;
     const dy = t.clientY - ref.startY;
 
-    // Lock direction on first significant move
-    if (ref.locked === null && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-      ref.locked = Math.abs(dx) >= Math.abs(dy) ? "h" : "v";
+    // Decide direction lock only once we have a clear dominant axis. The old
+    // 5-px threshold committed to vertical on tiny initial jitter and then
+    // ignored the user's actual horizontal intent. Now we require the
+    // dominant axis to lead by 1.2× and total motion to clear 12 px.
+    if (ref.locked === null) {
+      const adx = Math.abs(dx);
+      const ady = Math.abs(dy);
+      if (adx > 12 && adx > ady * 1.2) {
+        ref.locked = "h";
+      } else if (ady > 12 && ady > adx * 1.2) {
+        ref.locked = "v";
+      }
+      // No clear winner yet — keep observing.
     }
-    if (ref.locked === "v") return;
+    if (ref.locked !== "h") return;
 
     // Horizontal drag — prevent vertical scroll and tab swipe
     e.preventDefault();
@@ -171,7 +181,16 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
       {/* Cards container */}
       <div
         ref={containerRef}
-        style={{ overflow: "hidden", borderRadius: 16, height: "56vh" }}
+        style={{
+          overflow: "hidden",
+          borderRadius: 16,
+          height: "56vh",
+          // Tell the browser: vertical scroll is native (so inner scroll
+          // areas keep working), horizontal is ours. Without this, Android
+          // sometimes claims the gesture before our handler can call
+          // preventDefault, leaving the carousel unable to respond.
+          touchAction: "pan-y",
+        }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
