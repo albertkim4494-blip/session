@@ -40,7 +40,7 @@ import { ProfileModal } from "./components/ProfileModal";
 import { ChangeUsernameModal } from "./components/profile/ChangeUsernameModal";
 import { ChangePasswordModal } from "./components/profile/ChangePasswordModal";
 import { RestoreFromHistoryModal } from "./components/profile/RestoreFromHistoryModal";
-import { CoachInsightsCard, CoachHeroInsight, AddSuggestedExerciseModal } from "./components/CoachInsights";
+import { AddSuggestedExerciseModal } from "./components/CoachInsights";
 import { TimeRangeControl } from "./components/TimeRangeControl";
 import { ExerciseListTable } from "./components/ExerciseListTable";
 import { ExerciseCatalogSection } from "./components/ExerciseCatalogSection";
@@ -93,12 +93,11 @@ import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
 import { buildCatalogMap, isBodyweightOnly } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
-import { selectAcknowledgment, selectSetCompletionToast, getTimeGreeting } from "./lib/greetings";
+import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } from "./lib/greetings";
 import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
-import { CheckinSummary, CheckinEditSection } from "./components/CoachCheckin";
 import { CoachCarousel } from "./components/CoachCarousel";
 import { CoachCard } from "./components/CoachCard";
 import { getTodayCheckin, saveCheckin, buildCheckinContext, loadCheckins, loadCoachNotes, mergeCoachNotes, saveCoachNotes } from "./lib/coachCheckin";
@@ -308,10 +307,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const coachLastSignatureRef = useRef(null);
   const coachLastFetchRef = useRef(0);
   const coachFetchingRef = useRef(false);  // lock to prevent concurrent fetches
-  const [coachUnseen, setCoachUnseen] = useState(false);
   const MAX_DAILY_REFRESHES = 10;
   const [todayCheckin, setTodayCheckin] = useState(() => getTodayCheckin(yyyyMmDd(new Date())));
-  const [checkinEditSection, setCheckinEditSection] = useState(null); // null | "mood" | "sleep" | "pain"
+  const [checkinEditSection, setCheckinEditSection] = useState(null); // null | "full" | "mood" | "sleep" | "pain"
 
   // Coach check-in is anchored to actual today, not the browsed calendar date.
   useEffect(() => {
@@ -924,6 +922,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     };
   }, [state.logsByDate, state.program?.workouts, state.program?.daysPerWeek, state.preferences?.daysPerWeek, state.dailyWorkouts, dateKey]);
 
+  const heroMotivationLine = useMemo(
+    () => selectMotivationLine(state.logsByDate, dateKey),
+    [state.logsByDate, dateKey]
+  );
+
   // Catalog entry for the back face of the log card flip
   const logDetailEntry = useMemo(() => {
     const cid = modals.log.context?.catalogId;
@@ -1349,7 +1352,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Coach always analyzes last 90 days (decoupled from progress tab time range)
   useEffect(() => {
     if (!dataReady || !profile || !session?.user?.id) return;
-    if (!todayCheckin) return;
     if (coachFetchingRef.current) return;
 
     const userId = session.user.id;
@@ -1384,7 +1386,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const filteredCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
     const coachOpts = { catalog: filteredCatalog };
 
-    const autoCheckinCtx = buildCheckinContext(todayCheckin, loadCheckins(), state.logsByDate);
+    const autoCheckinCtx = todayCheckin
+      ? buildCheckinContext(todayCheckin, loadCheckins(), state.logsByDate)
+      : null;
     const autoCoachNotes = loadCoachNotes();
 
     fetchCoachInsights({
@@ -3338,9 +3342,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }
 
   // Shared coach fetch logic used by both refresh and check-in submit
-  const doCoachFetch = useCallback(({ checkinData, checkinOverride, showLimitToast } = {}) => {
+  const doCoachFetch = useCallback(({ checkinData, checkinOverride, showLimitToast, forceNoCheckin = false, bypassLimit = false } = {}) => {
     if (coachFetchingRef.current) return;
-    if (getDailyRefreshCount() >= MAX_DAILY_REFRESHES) {
+    if (!bypassLimit && getDailyRefreshCount() >= MAX_DAILY_REFRESHES) {
       if (showLimitToast) showToast("Daily refresh limit reached \u2014 insights update automatically each day");
       return;
     }
@@ -3352,13 +3356,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setCoachError(null);
 
     const refreshCatalog = fullCatalog.filter((e) => exerciseFitsEquipment(e, equipment));
-    const checkinForFetch = checkinData || checkinOverride || getTodayCheckin(coachTodayKey);
+    const checkinForFetch = forceNoCheckin ? null : (checkinData || checkinOverride || getTodayCheckin(coachTodayKey));
     const fetchContextSignature = buildCoachContextSignature(coachTodayKey, coachSignature, checkinForFetch);
     let checkinCtx = null;
-    let coachNotesData = null;
+    const coachNotesData = loadCoachNotes();
     if (checkinForFetch) {
       checkinCtx = buildCheckinContext(checkinForFetch, loadCheckins(), state.logsByDate);
-      coachNotesData = loadCoachNotes();
     }
 
     fetchCoachInsights({
@@ -3371,7 +3374,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       .then(({ insights, coachNotes: returnedNotes }) => {
         if (coachReqIdRef.current !== reqId) return;
         setCoachInsights(insights);
-        setCoachUnseen(true);
         coachLastSignatureRef.current = coachSignature;
         coachLastFetchRef.current = Date.now();
         coachCacheRef.current.set(fetchContextSignature, { insights, createdAt: Date.now() });
@@ -3424,31 +3426,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setCheckinEditSection(null);
   }, [coachTodayKey]);
 
+  const handleGenerateTodayCheckin = useCallback((checkinData) => {
+    saveCheckin(coachTodayKey, checkinData);
+    setTodayCheckin(checkinData);
+  }, [coachTodayKey]);
+
   const handleCheckinSubmit = useCallback((checkinData) => {
     saveCheckin(coachTodayKey, checkinData);
     setTodayCheckin(checkinData);
     setCheckinEditSection(null);
-    doCoachFetch({ checkinData });
+    doCoachFetch({ checkinData, bypassLimit: true });
   }, [coachTodayKey, doCoachFetch]);
 
   const clearTodayCheckinAndCoach = useCallback(() => {
     saveCheckin(coachTodayKey, null);
     setTodayCheckin(null);
     setCheckinEditSection(null);
-    setCoachUnseen(false);
-    // Cancel any in-flight coach fetch and clear visible coach state.
-    coachReqIdRef.current++;
-    coachFetchingRef.current = false;
-    setCoachInsights([]);
-    setCoachStreaming(false);
-    setCoachLoading(false);
-    setCoachError(null);
-    coachCacheRef.current.delete(coachContextSignature);
-    try {
-      localStorage.removeItem(getCoachCacheKey(session?.user?.id, coachTodayKey));
-      sessionStorage.removeItem(`wt_coach_last_auto_date:${session?.user?.id}`);
-    } catch {}
-  }, [coachContextSignature, coachTodayKey, session?.user?.id]);
+    doCoachFetch({ forceNoCheckin: true, bypassLimit: true });
+  }, [coachTodayKey, doCoachFetch]);
 
   const confirmAddSuggestion = useCallback((workoutIdOrIds, exerciseName) => {
     // Look up catalogId by name
@@ -3528,8 +3523,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   async function handleGenerateToday(opts) {
     const eq = opts?.equipment || modals.generateToday.equipment || equipment;
     const dur = opts?.duration || modals.generateToday.duration || 60;
+    const checkinData = opts?.checkinData || todayCheckin;
+    if (checkinData) {
+      saveCheckin(dateKey, checkinData);
+      setTodayCheckin(checkinData);
+    }
     const checkinContext = buildCheckinContext(
-      getTodayCheckin(dateKey),
+      checkinData || getTodayCheckin(dateKey),
       loadCheckins(),
       state.logsByDate
     );
@@ -4425,7 +4425,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       {tod.greeting}{userName ? `, ${userName.split(" ")[0]}` : ""}
                     </div>
                     <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
-                      {tod.sub}
+                      {heroMotivationLine}
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -4435,14 +4435,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     onChangeIndex={setCarouselIndex}
                     cards={[
                       {
-                        key: "coach",
-                        label: todayCheckin ? "Coach" : "Check In",
-                        icon: todayCheckin ? (
+                        key: "today",
+                        label: "Today",
+                        icon: (
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
                             <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
                             <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
                           </svg>
-                        ) : undefined,
+                        ),
                         content: (
                           <CoachCard
                             todayCheckin={todayCheckin}
@@ -4464,7 +4464,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       },
                       {
                         key: "week",
-                        label: "Your Week",
+                        label: "This Week",
                         content: (() => {
                           const accent = colors.accent || "#3b82f6";
                           const secondary = colors.textSecondary;
@@ -4875,40 +4875,41 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     {isToday ? "Today\u2019s sessions" : "Sessions logged"}
                   </div>
                   {isToday && (
-                    <CoachInsightsCard
-                      insights={coachInsights}
-                      onAddExercise={handleAddSuggestion}
-                      styles={styles}
-                      colors={colors}
-                      loading={coachLoading}
-                      error={coachError}
-                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                      onRefresh={handleCoachRefresh}
-                      hasNotification={coachUnseen}
-                      onSeen={() => setCoachUnseen(false)}
-                      checkinSlot={
-                        <CheckinSummary
-                          checkin={todayCheckin || { mood: null, sleep: null, pain: [] }}
-                          onEdit={(section) => setCheckinEditSection(section)}
-                          onClear={todayCheckin ? clearTodayCheckinAndCoach : undefined}
-                          colors={colors}
-                        />
-                      }
-                      refreshSlot={
-                        checkinEditSection ? (
-                          <CheckinEditSection
-                            section={checkinEditSection}
-                            checkin={todayCheckin || { mood: null, sleep: null, pain: [] }}
-                            onSave={(updated) => {
-                              handleCheckinUpdate(updated);
-                              handleCoachRefresh(updated);
-                            }}
-                            onCancel={() => setCheckinEditSection(null)}
-                            colors={colors}
-                          />
-                        ) : null
-                      }
-                    />
+                    <div style={{
+                      padding: "16px 18px",
+                      borderRadius: 16,
+                      background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})`,
+                      border: `1px solid ${colors.border}`,
+                      marginBottom: 14,
+                    }}>
+                      <div style={{
+                        fontSize: 12, fontWeight: 700, opacity: 0.4,
+                        letterSpacing: 0.5, textTransform: "uppercase",
+                        display: "flex", alignItems: "center", gap: 5, marginBottom: 10,
+                      }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
+                          <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
+                          <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
+                        </svg>
+                        Today
+                      </div>
+                      <CoachCard
+                        todayCheckin={todayCheckin}
+                        onCheckinSubmit={handleCheckinSubmit}
+                        onCheckinUpdate={handleCheckinUpdate}
+                        checkinEditSection={checkinEditSection}
+                        setCheckinEditSection={setCheckinEditSection}
+                        coachInsights={coachInsights}
+                        coachLoading={coachLoading}
+                        coachStreaming={coachStreaming}
+                        coachError={coachError}
+                        onCoachRefresh={handleCoachRefresh}
+                        onAddSuggestion={handleAddSuggestion}
+                        userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                        colors={colors}
+                        onClearCheckin={clearTodayCheckinAndCoach}
+                      />
+                    </div>
                   )}
                   {/* Explicitly added sessions (with remove button) — newest first */}
                   {[...todayProgramWorkouts].reverse().map((w) => (
@@ -7973,6 +7974,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         todayState={modals.generateToday}
         dispatch={dispatchModal}
         onGenerate={handleGenerateToday}
+        todayCheckin={todayCheckin}
+        onCheckinSubmit={handleGenerateTodayCheckin}
         onAccept={handleAcceptTodayWorkout}
         onClose={() => dispatchModal({ type: "CLOSE_GENERATE_TODAY" })}
         styles={styles}

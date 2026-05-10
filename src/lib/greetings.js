@@ -182,6 +182,56 @@ export function getTimeGreeting() {
     : "Still going.";
 }
 
+/**
+ * Select a stronger motivational line for the hero header.
+ * Fast, deterministic, and tuned to training context instead of generic quotes.
+ */
+export function selectMotivationLine(logsByDate, dateKey) {
+  const seed = dateSeed(dateKey) + 17;
+  const hasLoggedToday = dayHasCompletedSets(logsByDate?.[dateKey]);
+  const streak = getStreak(logsByDate || {}, dateKey);
+  const gap = daysSinceLastLog(logsByDate || {}, dateKey);
+
+  if (hasLoggedToday) {
+    return pick([
+      "You already showed up once. Keep the day moving.",
+      "Today already has a win in it. Stack another one if you want.",
+      "Momentum is on your side now. Use it.",
+    ], seed);
+  }
+
+  if (gap !== null && gap >= 4) {
+    return pick([
+      "You do not need a perfect restart. You just need today.",
+      "Forget the gap. Win this session and the rhythm comes back.",
+      "The fastest way back is one honest workout.",
+    ], seed);
+  }
+
+  if (streak >= 3) {
+    return pick([
+      "You built momentum. Protect it today.",
+      "This is where consistency starts to compound.",
+      "Another solid session keeps the standard high.",
+    ], seed);
+  }
+
+  if (gap === 1) {
+    return pick([
+      "Back-to-back days can change the whole week.",
+      "Show up again today and let the habit do its job.",
+      "A second straight day is how momentum gets real.",
+    ], seed);
+  }
+
+  return pick([
+    "You do not need perfect energy. You just need to start.",
+    "A focused session today beats waiting for the perfect day.",
+    "Show up first. The rest gets easier once you begin.",
+    "One good session today can reset the whole week.",
+  ], seed);
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------

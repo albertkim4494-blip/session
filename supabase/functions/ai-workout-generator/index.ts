@@ -73,7 +73,6 @@ function buildProgramPrompt(payload: {
   history: string;
   currentPlan?: string;
   trainingPattern?: string;
-  checkinContext?: CheckinContext | null;
   daysPerWeek: number;
   duration: number;
   exerciseCount?: number;
@@ -88,7 +87,6 @@ function buildProgramPrompt(payload: {
     history,
     currentPlan,
     trainingPattern,
-    checkinContext,
     daysPerWeek,
     duration,
     goal,
@@ -133,7 +131,6 @@ function buildProgramPrompt(payload: {
 
   const sportDayCount = Array.isArray(sportDays) ? sportDays.length : 0;
   const sportDayList = Array.isArray(sportDays) ? sportDays.join(", ") : "";
-  const checkinSection = formatCheckinSection(checkinContext);
 
   const sportSection =
     sportName && sportDayCount > 0
@@ -173,7 +170,6 @@ ${currentPlan || "No current program structure available."}
 
 RECENT TRAINING PATTERN:
 ${trainingPattern || "No training pattern summary available."}
-${checkinSection}
 
 TRAINING HISTORY (last 14 days):
 ${history || "No recent training data."}
@@ -190,7 +186,6 @@ UNDERSTANDING THE USER:
 - Beginners need simpler programs with fewer exercises and approachable volume. Advanced lifters benefit from more variety and periodization.
 - Consider gender and body weight when selecting exercises. Lighter individuals and women may benefit from dumbbell variations over barbell for many movements, and typically start with lower absolute loads.
 - For General Fitness or Lose Fat goals, prioritize enjoyable, sustainable exercise selection over maximum intensity. The best program is the one they'll actually do.
-- Use check-in data as a recovery constraint. Restless sleep, low mood, or pain should reduce weekly volume and avoid loading painful areas. Great mood and rested sleep can support normal progression, but never override pain.
 - Use current-program context to complement what the user already has. Do not simply recreate the same workout names and exercise order unless it is clearly appropriate.
 - Use recent training pattern to match adherence. Low consistency means simple repeatable sessions; high frequency means more recovery-aware programming.
 

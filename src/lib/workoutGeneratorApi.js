@@ -371,8 +371,6 @@ export async function generateProgramAI({
   sportName,
   sportDays,
   measurementSystem,
-  checkinContext,
-  todayKey,
 }) {
   try {
     const appState = state || {};
@@ -380,7 +378,7 @@ export async function generateProgramAI({
     const catalogPayload = buildCatalogPayload(catalog, equipment);
     const history = buildHistorySummary(appState, catalog, wLabel);
     const currentPlan = buildCurrentPlanSummary(appState);
-    const trainingPattern = buildTrainingPatternSummary(appState, todayKey);
+    const trainingPattern = buildTrainingPatternSummary(appState);
     const catalogMap = buildCatalogMap(catalog);
 
     const { data, error } = await supabase.functions.invoke(
@@ -394,7 +392,6 @@ export async function generateProgramAI({
           history,
           currentPlan,
           trainingPattern,
-          checkinContext: checkinContext || null,
           daysPerWeek,
           duration,
           exerciseCount: exerciseCountFromDuration(duration),

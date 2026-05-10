@@ -41,11 +41,11 @@ export function formatDeadline(deadline) {
   const dl = new Date(deadline).getTime();
   const diff = dl - now;
   if (diff <= 0) return "Closed";
-  const mins = Math.floor(diff / 60000);
+  const mins = Math.ceil(diff / 60000);
   if (mins < 60) return `Closes in ${mins}m`;
-  const hours = Math.floor(mins / 60);
+  const hours = Math.ceil(mins / 60);
   if (hours < 24) return `Closes in ${hours}h`;
-  const days = Math.floor(hours / 24);
+  const days = Math.ceil(hours / 24);
   return `Closes in ${days}d`;
 }
 

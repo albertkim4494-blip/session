@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { Modal } from "./Modal";
 import { EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
+import { CoachCheckin } from "./CoachCheckin";
 
 const DURATION_OPTIONS = [
   { value: 10, label: "10 min" },
@@ -31,38 +32,38 @@ export function GenerateTodayModal({
   todayState,
   dispatch,
   onGenerate,
+  todayCheckin,
+  onCheckinSubmit,
   onAccept,
   onClose,
   styles,
   colors,
 }) {
   const { step, duration, equipment, preview, loading, error } = todayState || {};
-  const genRef = useRef(0);
 
   const update = (payload) =>
     dispatch({ type: "UPDATE_GENERATE_TODAY", payload });
 
-  // Auto-generate when entering step 3 (preview)
+  // Auto-generate when entering step 4 (preview)
   useEffect(() => {
-    if (!open || step !== 3 || preview || loading) return;
-    const genId = ++genRef.current;
-    onGenerate({ equipment, duration });
+    if (!open || step !== 4 || preview || loading) return;
+    onGenerate({ equipment, duration, checkinData: todayCheckin });
     // onGenerate handles setting loading/preview state
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, step, preview, loading, equipment, duration]);
+  }, [open, step, preview, loading, equipment, duration, todayCheckin]);
 
   if (!open) return null;
 
-  const TOTAL_STEPS = 3; // 1=duration, 2=equipment, 3=preview
+  const TOTAL_STEPS = 4; // 1=duration, 2=equipment, 3=check-in, 4=preview
 
-  const stepTitles = ["", "How much time do you have?", "Equipment?", "Generated Workout"];
+  const stepTitles = ["", "How much time do you have?", "Equipment?", "Quick check-in", "Generated Workout"];
   const stepTitle = stepTitles[step] || "";
 
   const goNext = () => {
     if (step < TOTAL_STEPS) update({ step: step + 1 });
   };
   const goBack = () => {
-    if (step === 3) update({ step: step - 1, preview: null, loading: false, error: null });
+    if (step === 4) update({ step: step - 1, preview: null, loading: false, error: null });
     else if (step > 1) update({ step: step - 1 });
   };
 
@@ -164,8 +165,26 @@ export function GenerateTodayModal({
           </div>
         )}
 
-        {/* Step 3: Preview — loading */}
-        {step === 3 && loading && !preview && (
+        {/* Step 3: Required check-in */}
+        {step === 3 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 8 }}>
+            <div style={{ fontSize: 13, opacity: 0.65, textAlign: "center", lineHeight: 1.5 }}>
+              Today&apos;s workout uses how you feel right now, not just your history.
+            </div>
+            <CoachCheckin
+              colors={colors}
+              onSubmit={(checkinData) => {
+                onCheckinSubmit(checkinData);
+                update({ step: 4 });
+              }}
+              editValues={todayCheckin || null}
+              showAll
+            />
+          </div>
+        )}
+
+        {/* Step 4: Preview — loading */}
+        {step === 4 && loading && !preview && (
           <div style={{ textAlign: "center", padding: 32, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
             <div style={{
               width: 32, height: 32, border: `3px solid ${colors.border}`,
@@ -179,8 +198,8 @@ export function GenerateTodayModal({
           </div>
         )}
 
-        {/* Step 3: Preview — content */}
-        {step === 3 && preview && (
+        {/* Step 4: Preview — content */}
+        {step === 4 && preview && (
           <>
             {error && (
               <div style={{
@@ -252,7 +271,7 @@ export function GenerateTodayModal({
               Next
             </button>
           )}
-          {step === 3 && !loading && (
+          {step === 4 && !loading && (
             <>
               <button className="btn-press" style={styles.secondaryBtn} onClick={handleRegenerate}>
                 Regenerate

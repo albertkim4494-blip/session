@@ -58,26 +58,8 @@ export function CoachCard({
     prevCheckinRef.current = todayCheckin;
   }, [todayCheckin]);
 
-  // --- Phase 1: No check-in yet — show check-in form ---
-  if (!todayCheckin) {
-    return (
-      <div style={{
-        display: "flex", flexDirection: "column", gap: 10,
-        alignItems: "center", textAlign: "center", flex: 1,
-        justifyContent: "center",
-      }}>
-        <CoachCheckin
-          colors={colors}
-          onSubmit={onCheckinSubmit}
-          editValues={null}
-          showAll
-        />
-      </div>
-    );
-  }
-
-  // --- Phase 2-4: Check-in exists — show chips + insights ---
   const hasInsights = coachInsights.length > 0;
+  const hasCheckin = !!todayCheckin;
 
   return (
     <div style={{
@@ -90,10 +72,18 @@ export function CoachCard({
         flexShrink: 0,
         animation: justSubmitted ? "coachCardSlideUp 0.3s ease-out" : undefined,
       }}>
-        {checkinEditSection ? (
+        {checkinEditSection === "full" ? (
+          <CoachCheckin
+            colors={colors}
+            onSubmit={onCheckinSubmit}
+            onCancel={() => setCheckinEditSection(null)}
+            editValues={todayCheckin}
+            showAll
+          />
+        ) : checkinEditSection ? (
           <CheckinEditSection
             section={checkinEditSection}
-            checkin={todayCheckin}
+            checkin={todayCheckin || { mood: null, sleep: null, pain: [] }}
             onSave={(updated) => {
               onCheckinUpdate(updated);
               // Re-fetch with the updated data (pass directly to avoid stale localStorage read)
@@ -102,6 +92,24 @@ export function CoachCard({
             onCancel={() => setCheckinEditSection(null)}
             colors={colors}
           />
+        ) : !hasCheckin ? (
+          <button
+            onClick={() => setCheckinEditSection("full")}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: colors.text,
+              cursor: "pointer",
+              fontSize: 13,
+              opacity: 0.5,
+              padding: 0,
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+              alignSelf: "center",
+            }}
+          >
+            Check in to personalize this
+          </button>
         ) : (
           <CheckinSummary
             checkin={todayCheckin}
