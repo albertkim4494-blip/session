@@ -36,119 +36,108 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
   const count = cards.length;
   const clampIndex = useCallback((i) => Math.max(0, Math.min(count - 1, i)), [count]);
 
-  // Hard reset: throw away whatever drag state we had. Used by every interruption
-  // path (touchcancel, multi-touch, OS focus loss, page hide, parent unmount).
-  const resetDrag = useCallback(() => {
-    touchRef.current = null;
-    dragRef.current = 0;
-    setDragDelta(0);
-    setIsDragging(false);
-  }, []);
+  // Stable refs for handlers so the native useEffect doesn't have to re-bind.
+  const onChangeIndexRef = useRef(onChangeIndex);
+  onChangeIndexRef.current = onChangeIndex;
+  const countRef = useRef(count);
+  countRef.current = count;
 
-  // --- Touch handlers (drag-to-follow + snap) ---
-  const onTouchStart = useCallback((e) => {
-    // Multi-touch — abandon. A second finger landing mid-drag was producing
-    // sticky state where touchend reported the wrong finger and the strip
-    // was left at a stale dragDelta.
-    if (e.touches.length > 1) {
-      resetDrag();
-      return;
-    }
-    const t = e.touches[0];
-    touchRef.current = { startX: t.clientX, startY: t.clientY, startTime: Date.now(), locked: null };
-    setIsDragging(true);
-    // Stop propagation so the parent tab-swipe handler doesn't also claim this touch
-    e.stopPropagation();
-  }, [resetDrag]);
+  // Native touch listeners with passive: false. React's synthetic touch
+  // handlers default to passive in v17+, which makes preventDefault a no-op
+  // and lets the browser claim horizontal gestures before our JS can move
+  // the strip. Native listeners give us back full control.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-  const onTouchMove = useCallback((e) => {
-    const ref = touchRef.current;
-    if (!ref) return;
-    // Note: do NOT abort on multi-touch here. Aborting mid-drag any time a
-    // second finger registers (palm rejection misfires, accidental thumb)
-    // was making the carousel feel completely unresponsive.
-    const t = e.touches[0];
-    if (!t) return;
-    const dx = t.clientX - ref.startX;
-    const dy = t.clientY - ref.startY;
-
-    // Lock direction on first significant move. 6 px responsive, ties go
-    // horizontal so a slight initial vertical jitter doesn't hijack things.
-    if (ref.locked === null) {
-      const adx = Math.abs(dx);
-      const ady = Math.abs(dy);
-      if (adx > 6 || ady > 6) {
-        ref.locked = adx >= ady ? "h" : "v";
-      }
-    }
-    if (ref.locked === "v") return;
-
-    // Horizontal drag (or pre-lock follow-through) — prevent vertical scroll
-    // and tab swipe, and start moving the strip with the finger immediately.
-    e.preventDefault();
-    e.stopPropagation();
-    dragRef.current = dx;
-    setDragDelta(dx);
-  }, []);
-
-  const onTouchEnd = useCallback((e) => {
-    e.stopPropagation();
-    const ref = touchRef.current;
-    touchRef.current = null;
-    setIsDragging(false);
-
-    if (!ref || ref.locked === "v") {
+    const reset = () => {
+      touchRef.current = null;
       dragRef.current = 0;
       setDragDelta(0);
-      return;
-    }
-
-    const dx = dragRef.current;
-    const containerWidth = containerRef.current?.offsetWidth || 300;
-    const elapsed = Date.now() - ref.startTime;
-    const velocity = elapsed > 0 ? Math.abs(dx) / elapsed : 0;
-    const idx = activeRef.current;
-
-    let newIndex = idx;
-    // Snap if dragged > 25% of card width or fast flick
-    if (Math.abs(dx) > containerWidth * 0.25 || (velocity > 0.3 && Math.abs(dx) > 15)) {
-      newIndex = dx < 0 ? idx + 1 : idx - 1;
-    }
-    newIndex = clampIndex(newIndex);
-    dragRef.current = 0;
-    setDragDelta(0);
-    if (newIndex !== idx) onChangeIndex(newIndex);
-  }, [clampIndex, onChangeIndex]);
-
-  // Snap back cleanly if the OS cancels the gesture mid-drag.
-  const onTouchCancel = useCallback((e) => {
-    e.stopPropagation();
-    resetDrag();
-  }, [resetDrag]);
-
-  // Global fallback cleanup. There are paths where neither touchend nor
-  // touchcancel reliably fires on the React tree — pulling down a notification,
-  // app-switching, the OS reclaiming the gesture for back-edge, etc. Without
-  // these listeners the strip stays at a stuck translateX and you see the
-  // partial-swipe state the user reported.
-  useEffect(() => {
-    const onGlobalCancel = () => {
-      if (touchRef.current) resetDrag();
+      setIsDragging(false);
     };
-    const onVisibilityChange = () => {
-      if (document.hidden && touchRef.current) resetDrag();
+
+    const onStart = (e) => {
+      if (e.touches.length > 1) {
+        reset();
+        return;
+      }
+      const t = e.touches[0];
+      touchRef.current = { startX: t.clientX, startY: t.clientY, startTime: Date.now(), locked: null };
+      setIsDragging(true);
+      e.stopPropagation();
     };
-    document.addEventListener("touchcancel", onGlobalCancel, { passive: true });
-    document.addEventListener("pointercancel", onGlobalCancel, { passive: true });
-    window.addEventListener("blur", onGlobalCancel);
-    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const onMove = (e) => {
+      const ref = touchRef.current;
+      if (!ref) return;
+      const t = e.touches[0];
+      if (!t) return;
+      const dx = t.clientX - ref.startX;
+      const dy = t.clientY - ref.startY;
+
+      if (ref.locked === null) {
+        const adx = Math.abs(dx);
+        const ady = Math.abs(dy);
+        if (adx > 6 || ady > 6) {
+          ref.locked = adx >= ady ? "h" : "v";
+        }
+      }
+      if (ref.locked === "v") return;
+
+      // With passive: false, these actually work — block native scroll and
+      // stop propagation so the parent tab-swipe handler doesn't also fire.
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current = dx;
+      setDragDelta(dx);
+    };
+
+    const onEnd = (e) => {
+      e.stopPropagation();
+      const ref = touchRef.current;
+      touchRef.current = null;
+      setIsDragging(false);
+
+      if (!ref || ref.locked === "v") {
+        dragRef.current = 0;
+        setDragDelta(0);
+        return;
+      }
+
+      const dx = dragRef.current;
+      const containerWidth = containerRef.current?.offsetWidth || 300;
+      const elapsed = Date.now() - ref.startTime;
+      const velocity = elapsed > 0 ? Math.abs(dx) / elapsed : 0;
+      const idx = activeRef.current;
+
+      let newIndex = idx;
+      if (Math.abs(dx) > containerWidth * 0.25 || (velocity > 0.3 && Math.abs(dx) > 15)) {
+        newIndex = dx < 0 ? idx + 1 : idx - 1;
+      }
+      const c = countRef.current;
+      newIndex = Math.max(0, Math.min(c - 1, newIndex));
+      dragRef.current = 0;
+      setDragDelta(0);
+      if (newIndex !== idx) onChangeIndexRef.current(newIndex);
+    };
+
+    const onCancel = () => {
+      reset();
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: false });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: false });
+    el.addEventListener("touchcancel", onCancel, { passive: false });
+
     return () => {
-      document.removeEventListener("touchcancel", onGlobalCancel);
-      document.removeEventListener("pointercancel", onGlobalCancel);
-      window.removeEventListener("blur", onGlobalCancel);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onCancel);
     };
-  }, [resetDrag]);
+  }, []);
 
   // Track container width in state so it updates after mount/visibility/resize changes
   const [containerWidth, setContainerWidth] = useState(0);
@@ -173,7 +162,8 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
 
   return (
     <div style={{ animation: "carouselFadeIn 0.3s ease-out", flex: 1, display: "flex", flexDirection: "column" }}>
-      {/* Cards container */}
+      {/* Cards container — touch listeners are attached natively in the
+          useEffect above, with passive: false so preventDefault works. */}
       <div
         ref={containerRef}
         data-owns-horizontal-gesture="true"
@@ -182,10 +172,6 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
           borderRadius: 16,
           height: "56vh",
         }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchCancel}
       >
         <div ref={stripRef} style={{
           display: "flex",
