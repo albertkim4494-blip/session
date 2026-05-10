@@ -230,13 +230,13 @@ export function CoachCard({
                   textDecoration: "underline",
                   textUnderlineOffset: 3,
                 }}>
-                  How are you feeling today?
+                  Check in
                 </span>
                 <span style={{
                   fontSize: 11,
                   opacity: 0.35,
                 }}>
-                  Tap to share your mood, sleep, and pain points
+                  Tap to share your mood, sleep, and pain points for updated insights
                 </span>
               </button>
             )}
