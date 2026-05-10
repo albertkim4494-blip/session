@@ -4435,32 +4435,325 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     onChangeIndex={setCarouselIndex}
                     cards={[
                       {
-                        key: "today",
-                        label: "Today",
-                        icon: (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
-                            <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
-                            <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
-                          </svg>
-                        ),
-                        content: (
-                          <CoachCard
-                            todayCheckin={todayCheckin}
-                            onCheckinSubmit={handleCheckinSubmit}
-                            onCheckinUpdate={handleCheckinUpdate}
-                            checkinEditSection={checkinEditSection}
-                            setCheckinEditSection={setCheckinEditSection}
-                            coachInsights={coachInsights}
-                            coachLoading={coachLoading}
-                            coachStreaming={coachStreaming}
-                            coachError={coachError}
-                            onCoachRefresh={handleCoachRefresh}
-                            onAddSuggestion={handleAddSuggestion}
-                            userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                            colors={colors}
-                            onClearCheckin={clearTodayCheckinAndCoach}
-                          />
-                        ),
+                        key: "plan",
+                        label: "Today's Plan",
+                        content: (() => {
+                          const accent = colors.accent;
+                          const secondary = colors.textSecondary;
+
+                          // Build Today's Plan list directly from the schedule — ignoring
+                          // todayDismissed on purpose. The carousel always reflects what
+                          // the day's plan IS (anchors / continuous next-up / weekly
+                          // preferred), regardless of whether the user X'd one earlier.
+                          // Only workouts already started (in todaySessions) are filtered
+                          // out, since they belong to the session list at that point.
+                          const scheduledList = (() => {
+                            const seen = new Set();
+                            const explicit = new Set(todaySessionIds);
+                            const out = [];
+                            // Continuous next-up first.
+                            for (const s of splits) {
+                              const next = getContinuousNextUp(s, effectiveWorkouts);
+                              if (!next) continue;
+                              if (explicit.has(next.workout.id)) continue;
+                              if (seen.has(next.workout.id)) continue;
+                              seen.add(next.workout.id);
+                              out.push(next.workout);
+                            }
+                            // Anchors + weekly preferred.
+                            for (const w of getScheduledForDate(effectiveWorkouts, dateKey)) {
+                              if (explicit.has(w.id)) continue;
+                              if (seen.has(w.id)) continue;
+                              seen.add(w.id);
+                              out.push(w);
+                            }
+                            return out;
+                          })();
+
+                          // Fallback when nothing is scheduled \u2014 suggest from training pattern.
+                          const upNext = weeklySummary.upNext;
+                          const programWorkouts = state.program?.workouts || [];
+                          let fallbackSuggested = null;
+                          if (scheduledList.length === 0) {
+                            if (upNext && !upNext.allDone && !upNext.isRestDay && upNext.workouts?.length) {
+                              fallbackSuggested = programWorkouts.find((w) => w.name === upNext.workouts[0]) || null;
+                            }
+                            if (!fallbackSuggested) fallbackSuggested = programWorkouts[0] || null;
+                          }
+
+                          // Empty state \u2014 no schedule and no fallback workout to suggest.
+                          // Still surface coach insights so the page isn't blank.
+                          if (scheduledList.length === 0 && !fallbackSuggested) {
+                            return (
+                              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "auto", gap: 12 }}>
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6, padding: "12px 0" }}>
+                                  <div style={{ fontSize: 13, color: secondary }}>No plan yet.</div>
+                                  <div style={{ fontSize: 12, color: colors.textTertiary, lineHeight: 1.5 }}>
+                                    Add a workout in Plan to get a suggestion here.
+                                  </div>
+                                </div>
+                                <div style={{ paddingTop: 12, borderTop: `1px solid ${colors.border}` }}>
+                                  <CoachCard
+                                    todayCheckin={todayCheckin}
+                                    onCheckinSubmit={handleCheckinSubmit}
+                                    onCheckinUpdate={handleCheckinUpdate}
+                                    checkinEditSection={checkinEditSection}
+                                    setCheckinEditSection={setCheckinEditSection}
+                                    coachInsights={coachInsights}
+                                    coachLoading={coachLoading}
+                                    coachStreaming={coachStreaming}
+                                    coachError={coachError}
+                                    onCoachRefresh={handleCoachRefresh}
+                                    onAddSuggestion={handleAddSuggestion}
+                                    userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                                    colors={colors}
+                                    onClearCheckin={clearTodayCheckinAndCoach}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Single-workout layout (one scheduled, OR fallback). Detail format.
+                          const focused = scheduledList.length === 1
+                            ? scheduledList[0]
+                            : (scheduledList.length === 0 ? fallbackSuggested : null);
+
+                          const eyebrow = scheduledList.length > 0
+                            ? "Scheduled for today"
+                            : (upNext?.dayName ? `Suggested \u00B7 ${upNext.dayName}s` : "Suggested for today");
+
+                          if (focused) {
+                            const lifts = focused.exercises || [];
+                            const exerciseCount = lifts.length;
+                            const onStart = scheduledList.length > 0
+                              ? () => startFromPlan(focused.id)
+                              : () => addSessionToToday(focused.id);
+
+                            return (
+                              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                                {/* Frozen header */}
+                                <div style={{ flexShrink: 0 }}>
+                                  <div style={{ fontSize: 13, color: secondary }}>{eyebrow}</div>
+                                  <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
+                                    {focused.name}
+                                  </div>
+                                  <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
+                                    {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
+                                  </div>
+                                </div>
+                                {/* Middle scroll area — lifts + coach insights */}
+                                <div style={{ flex: 1, minHeight: 0, overflow: "auto", marginTop: 12 }}>
+                                  {lifts.length > 0 && (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                                      {lifts.map((ex, i) => (
+                                        <div key={ex.id} style={{
+                                          display: "flex", alignItems: "center", gap: 10,
+                                          padding: "8px 0",
+                                          borderTop: i === 0 ? "none" : `1px solid ${colors.border}`,
+                                        }}>
+                                          <div style={{
+                                            width: 22, height: 22, borderRadius: 6,
+                                            background: colors.subtleBg,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            fontSize: 11, fontWeight: 700, color: secondary,
+                                            flexShrink: 0,
+                                          }}>
+                                            {i + 1}
+                                          </div>
+                                          <div style={{ fontSize: 14, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {ex.name}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${colors.border}` }}>
+                                    <CoachCard
+                                      todayCheckin={todayCheckin}
+                                      onCheckinSubmit={handleCheckinSubmit}
+                                      onCheckinUpdate={handleCheckinUpdate}
+                                      checkinEditSection={checkinEditSection}
+                                      setCheckinEditSection={setCheckinEditSection}
+                                      coachInsights={coachInsights}
+                                      coachLoading={coachLoading}
+                                      coachStreaming={coachStreaming}
+                                      coachError={coachError}
+                                      onCoachRefresh={handleCoachRefresh}
+                                      onAddSuggestion={handleAddSuggestion}
+                                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                                      colors={colors}
+                                      onClearCheckin={clearTodayCheckinAndCoach}
+                                    />
+                                  </div>
+                                </div>
+                                <div style={{ paddingTop: 12 }}>
+                                  <button
+                                    className="btn-press"
+                                    onClick={onStart}
+                                    style={{
+                                      width: "100%",
+                                      padding: 12, borderRadius: 12,
+                                      background: accent,
+                                      color: colors.appBg,
+                                      border: "none",
+                                      fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                                      cursor: "pointer",
+                                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                    }}
+                                  >
+                                    Start session
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M5 12h14M13 5l7 7-7 7" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Multi-workout list layout (2+ scheduled). Each row is expandable
+                          // to show its exercises. A single bottom CTA starts the whole day.
+                          return (
+                            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                              {/* Frozen header */}
+                              <div style={{ flexShrink: 0 }}>
+                                <div style={{ fontSize: 13, color: secondary }}>Scheduled for today</div>
+                                <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
+                                  {scheduledList.length} sessions planned
+                                </div>
+                              </div>
+                              {/* Middle scroll area — workout rows + coach insights */}
+                              <div style={{ flex: 1, minHeight: 0, overflow: "auto", marginTop: 10 }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                                {scheduledList.map((w) => {
+                                  const lifts = w.exercises || [];
+                                  const liftCount = lifts.length;
+                                  const isExpanded = expandedPlanRows.has(w.id);
+                                  return (
+                                    <div
+                                      key={w.id}
+                                      style={{
+                                        borderRadius: 12,
+                                        background: colors.subtleBg,
+                                        border: `1px solid ${colors.border}`,
+                                        overflow: "hidden",
+                                      }}
+                                    >
+                                      <button
+                                        className="btn-press"
+                                        onClick={() => togglePlanRow(w.id)}
+                                        aria-expanded={isExpanded}
+                                        style={{
+                                          display: "flex", alignItems: "center", gap: 10,
+                                          padding: "12px 14px",
+                                          background: "transparent",
+                                          border: "none",
+                                          color: colors.text,
+                                          cursor: "pointer", fontFamily: "inherit",
+                                          textAlign: "left", width: "100%",
+                                        }}
+                                      >
+                                        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                                          <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {w.name}
+                                          </div>
+                                          <div style={{ fontSize: 12, color: secondary }}>
+                                            {liftCount} {liftCount === 1 ? "lift" : "lifts"}
+                                          </div>
+                                        </div>
+                                        <svg
+                                          width="16" height="16" viewBox="0 0 24 24"
+                                          fill="none" stroke="currentColor" strokeWidth="2"
+                                          strokeLinecap="round" strokeLinejoin="round"
+                                          style={{
+                                            opacity: 0.5,
+                                            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                                            transition: "transform 0.2s ease",
+                                          }}
+                                        >
+                                          <path d="M6 9l6 6 6-6" />
+                                        </svg>
+                                      </button>
+                                      {isExpanded && lifts.length > 0 && (
+                                        <div style={{
+                                          padding: "0 14px 12px",
+                                          display: "flex", flexDirection: "column", gap: 0,
+                                        }}>
+                                          {lifts.map((ex, i) => (
+                                            <div key={ex.id} style={{
+                                              display: "flex", alignItems: "center", gap: 10,
+                                              padding: "6px 0",
+                                              borderTop: `1px solid ${colors.border}`,
+                                            }}>
+                                              <div style={{
+                                                width: 20, height: 20, borderRadius: 6,
+                                                background: colors.cardBg,
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                fontSize: 10, fontWeight: 700, color: secondary,
+                                                flexShrink: 0,
+                                              }}>
+                                                {i + 1}
+                                              </div>
+                                              <div style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                {ex.name}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {isExpanded && lifts.length === 0 && (
+                                        <div style={{ padding: "0 14px 12px", fontSize: 12, color: colors.textTertiary }}>
+                                          No exercises yet.
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                </div>
+                                <div style={{ paddingTop: 16, borderTop: `1px solid ${colors.border}` }}>
+                                  <CoachCard
+                                    todayCheckin={todayCheckin}
+                                    onCheckinSubmit={handleCheckinSubmit}
+                                    onCheckinUpdate={handleCheckinUpdate}
+                                    checkinEditSection={checkinEditSection}
+                                    setCheckinEditSection={setCheckinEditSection}
+                                    coachInsights={coachInsights}
+                                    coachLoading={coachLoading}
+                                    coachStreaming={coachStreaming}
+                                    coachError={coachError}
+                                    onCoachRefresh={handleCoachRefresh}
+                                    onAddSuggestion={handleAddSuggestion}
+                                    userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
+                                    colors={colors}
+                                    onClearCheckin={clearTodayCheckinAndCoach}
+                                  />
+                                </div>
+                              </div>
+                              <div style={{ paddingTop: 12 }}>
+                                <button
+                                  className="btn-press"
+                                  onClick={() => startFromPlan(scheduledList[0].id)}
+                                  style={{
+                                    width: "100%",
+                                    padding: 12, borderRadius: 12,
+                                    background: accent,
+                                    color: colors.appBg,
+                                    border: "none",
+                                    fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                                    cursor: "pointer",
+                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                  }}
+                                >
+                                  Get started
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M5 12h14M13 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })(),
                       },
                       {
                         key: "week",
@@ -4584,270 +4877,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                   )}
                                 </>
                               )}
-                            </div>
-                          );
-                        })(),
-                      },
-                      {
-                        key: "plan",
-                        label: "Today's Plan",
-                        content: (() => {
-                          const accent = colors.accent;
-                          const secondary = colors.textSecondary;
-
-                          // Build Today's Plan list directly from the schedule — ignoring
-                          // todayDismissed on purpose. The carousel always reflects what
-                          // the day's plan IS (anchors / continuous next-up / weekly
-                          // preferred), regardless of whether the user X'd one earlier.
-                          // Only workouts already started (in todaySessions) are filtered
-                          // out, since they belong to the session list at that point.
-                          const scheduledList = (() => {
-                            const seen = new Set();
-                            const explicit = new Set(todaySessionIds);
-                            const out = [];
-                            // Continuous next-up first.
-                            for (const s of splits) {
-                              const next = getContinuousNextUp(s, effectiveWorkouts);
-                              if (!next) continue;
-                              if (explicit.has(next.workout.id)) continue;
-                              if (seen.has(next.workout.id)) continue;
-                              seen.add(next.workout.id);
-                              out.push(next.workout);
-                            }
-                            // Anchors + weekly preferred.
-                            for (const w of getScheduledForDate(effectiveWorkouts, dateKey)) {
-                              if (explicit.has(w.id)) continue;
-                              if (seen.has(w.id)) continue;
-                              seen.add(w.id);
-                              out.push(w);
-                            }
-                            return out;
-                          })();
-
-                          // Fallback when nothing is scheduled \u2014 suggest from training pattern.
-                          const upNext = weeklySummary.upNext;
-                          const programWorkouts = state.program?.workouts || [];
-                          let fallbackSuggested = null;
-                          if (scheduledList.length === 0) {
-                            if (upNext && !upNext.allDone && !upNext.isRestDay && upNext.workouts?.length) {
-                              fallbackSuggested = programWorkouts.find((w) => w.name === upNext.workouts[0]) || null;
-                            }
-                            if (!fallbackSuggested) fallbackSuggested = programWorkouts[0] || null;
-                          }
-
-                          // Empty state \u2014 no schedule and no fallback workout to suggest.
-                          if (scheduledList.length === 0 && !fallbackSuggested) {
-                            return (
-                              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 6 }}>
-                                <div style={{ fontSize: 13, color: secondary }}>No plan yet.</div>
-                                <div style={{ fontSize: 12, color: colors.textTertiary, lineHeight: 1.5 }}>
-                                  Add a workout in Plan to get a suggestion here.
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          // Single-workout layout (one scheduled, OR fallback). Detail format.
-                          const focused = scheduledList.length === 1
-                            ? scheduledList[0]
-                            : (scheduledList.length === 0 ? fallbackSuggested : null);
-
-                          const eyebrow = scheduledList.length > 0
-                            ? "Scheduled for today"
-                            : (upNext?.dayName ? `Suggested \u00B7 ${upNext.dayName}s` : "Suggested for today");
-
-                          if (focused) {
-                            const lifts = focused.exercises || [];
-                            const exerciseCount = lifts.length;
-                            const onStart = scheduledList.length > 0
-                              ? () => startFromPlan(focused.id)
-                              : () => addSessionToToday(focused.id);
-
-                            return (
-                              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                                {/* Frozen header */}
-                                <div style={{ flexShrink: 0 }}>
-                                  <div style={{ fontSize: 13, color: secondary }}>{eyebrow}</div>
-                                  <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                    {focused.name}
-                                  </div>
-                                  <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
-                                    {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
-                                  </div>
-                                </div>
-                                {/* Middle scroll area — lifts only */}
-                                <div style={{ flex: 1, minHeight: 0, overflow: "auto", marginTop: 12 }}>
-                                  {lifts.length > 0 && (
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                                      {lifts.map((ex, i) => (
-                                        <div key={ex.id} style={{
-                                          display: "flex", alignItems: "center", gap: 10,
-                                          padding: "8px 0",
-                                          borderTop: i === 0 ? "none" : `1px solid ${colors.border}`,
-                                        }}>
-                                          <div style={{
-                                            width: 22, height: 22, borderRadius: 6,
-                                            background: colors.subtleBg,
-                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                            fontSize: 11, fontWeight: 700, color: secondary,
-                                            flexShrink: 0,
-                                          }}>
-                                            {i + 1}
-                                          </div>
-                                          <div style={{ fontSize: 14, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                            {ex.name}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                                <div style={{ paddingTop: 12 }}>
-                                  <button
-                                    className="btn-press"
-                                    onClick={onStart}
-                                    style={{
-                                      width: "100%",
-                                      padding: 12, borderRadius: 12,
-                                      background: accent,
-                                      color: colors.appBg,
-                                      border: "none",
-                                      fontSize: 14, fontWeight: 700, fontFamily: "inherit",
-                                      cursor: "pointer",
-                                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                                    }}
-                                  >
-                                    Start session
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M5 12h14M13 5l7 7-7 7" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          // Multi-workout list layout (2+ scheduled). Each row is expandable
-                          // to show its exercises. A single bottom CTA starts the whole day.
-                          return (
-                            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                              {/* Frozen header */}
-                              <div style={{ flexShrink: 0 }}>
-                                <div style={{ fontSize: 13, color: secondary }}>Scheduled for today</div>
-                                <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, marginTop: 2 }}>
-                                  {scheduledList.length} sessions planned
-                                </div>
-                              </div>
-                              {/* Middle scroll area — workout rows only */}
-                              <div style={{ flex: 1, minHeight: 0, overflow: "auto", marginTop: 10 }}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                {scheduledList.map((w) => {
-                                  const lifts = w.exercises || [];
-                                  const liftCount = lifts.length;
-                                  const isExpanded = expandedPlanRows.has(w.id);
-                                  return (
-                                    <div
-                                      key={w.id}
-                                      style={{
-                                        borderRadius: 12,
-                                        background: colors.subtleBg,
-                                        border: `1px solid ${colors.border}`,
-                                        overflow: "hidden",
-                                      }}
-                                    >
-                                      <button
-                                        className="btn-press"
-                                        onClick={() => togglePlanRow(w.id)}
-                                        aria-expanded={isExpanded}
-                                        style={{
-                                          display: "flex", alignItems: "center", gap: 10,
-                                          padding: "12px 14px",
-                                          background: "transparent",
-                                          border: "none",
-                                          color: colors.text,
-                                          cursor: "pointer", fontFamily: "inherit",
-                                          textAlign: "left", width: "100%",
-                                        }}
-                                      >
-                                        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                                          <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                            {w.name}
-                                          </div>
-                                          <div style={{ fontSize: 12, color: secondary }}>
-                                            {liftCount} {liftCount === 1 ? "lift" : "lifts"}
-                                          </div>
-                                        </div>
-                                        <svg
-                                          width="16" height="16" viewBox="0 0 24 24"
-                                          fill="none" stroke="currentColor" strokeWidth="2"
-                                          strokeLinecap="round" strokeLinejoin="round"
-                                          style={{
-                                            opacity: 0.5,
-                                            transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                                            transition: "transform 0.2s ease",
-                                          }}
-                                        >
-                                          <path d="M6 9l6 6 6-6" />
-                                        </svg>
-                                      </button>
-                                      {isExpanded && lifts.length > 0 && (
-                                        <div style={{
-                                          padding: "0 14px 12px",
-                                          display: "flex", flexDirection: "column", gap: 0,
-                                        }}>
-                                          {lifts.map((ex, i) => (
-                                            <div key={ex.id} style={{
-                                              display: "flex", alignItems: "center", gap: 10,
-                                              padding: "6px 0",
-                                              borderTop: `1px solid ${colors.border}`,
-                                            }}>
-                                              <div style={{
-                                                width: 20, height: 20, borderRadius: 6,
-                                                background: colors.cardBg,
-                                                display: "flex", alignItems: "center", justifyContent: "center",
-                                                fontSize: 10, fontWeight: 700, color: secondary,
-                                                flexShrink: 0,
-                                              }}>
-                                                {i + 1}
-                                              </div>
-                                              <div style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                {ex.name}
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {isExpanded && lifts.length === 0 && (
-                                        <div style={{ padding: "0 14px 12px", fontSize: 12, color: colors.textTertiary }}>
-                                          No exercises yet.
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                                </div>
-                              </div>
-                              <div style={{ paddingTop: 12 }}>
-                                <button
-                                  className="btn-press"
-                                  onClick={() => startFromPlan(scheduledList[0].id)}
-                                  style={{
-                                    width: "100%",
-                                    padding: 12, borderRadius: 12,
-                                    background: accent,
-                                    color: colors.appBg,
-                                    border: "none",
-                                    fontSize: 14, fontWeight: 700, fontFamily: "inherit",
-                                    cursor: "pointer",
-                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                                  }}
-                                >
-                                  Get started
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M5 12h14M13 5l7 7-7 7" />
-                                  </svg>
-                                </button>
-                              </div>
                             </div>
                           );
                         })(),
