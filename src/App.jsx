@@ -317,6 +317,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setCheckinEditSection(null);
   }, [coachTodayKey]);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [coachExpanded, setCoachExpanded] = useState(false);
   // Expanded workouts in the Today's Plan card (multi-workout list view).
   const [expandedPlanRows, setExpandedPlanRows] = useState(() => new Set());
   const togglePlanRow = useCallback((id) => {
@@ -4847,13 +4848,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     {isToday ? "Today\u2019s sessions" : "Sessions logged"}
                   </div>
                   {isToday && (
-                    <div style={{
-                      padding: "16px 18px",
-                      borderRadius: 16,
-                      background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})`,
-                      border: `1px solid ${colors.border}`,
-                      marginBottom: 14,
-                    }}>
+                    <div
+                      onClick={() => setCoachExpanded((v) => !v)}
+                      style={{
+                        padding: "16px 18px",
+                        borderRadius: 16,
+                        background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})`,
+                        border: `1px solid ${colors.border}`,
+                        marginBottom: 14,
+                        cursor: "pointer",
+                      }}
+                    >
                       <div style={{
                         fontSize: 12, fontWeight: 700, opacity: 0.4,
                         letterSpacing: 0.5, textTransform: "uppercase",
@@ -4866,6 +4871,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         Coach's insight
                       </div>
                       <CoachCard
+                        expanded={coachExpanded}
                         todayCheckin={todayCheckin}
                         onCheckinSubmit={handleCheckinSubmit}
                         onCheckinUpdate={handleCheckinUpdate}

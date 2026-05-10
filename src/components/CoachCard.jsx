@@ -24,10 +24,15 @@ function ensureAnim() {
   document.head.appendChild(style);
 }
 
+// Wrap interactive areas inside the card so a click doesn't bubble up to the
+// wrapper's onClick (which toggles the card's expanded state).
+const stopBubble = (e) => e.stopPropagation();
+
 // ---------------------------------------------------------------------------
 // CoachCard — Combined check-in + coach insight card
 // ---------------------------------------------------------------------------
 export function CoachCard({
+  expanded = false,
   todayCheckin,
   onCheckinSubmit,
   onCheckinUpdate,
@@ -49,41 +54,34 @@ export function CoachCard({
   const [justSubmitted, setJustSubmitted] = useState(false);
   const prevCheckinRef = useRef(todayCheckin);
 
+  // Local: has the user tapped "How are you feeling today?" inside this card?
+  // Drives the inline stepwise CoachCheckin until they submit (or we collapse).
+  const [showStepwise, setShowStepwise] = useState(false);
+
   useEffect(() => {
     if (!prevCheckinRef.current && todayCheckin) {
       setJustSubmitted(true);
+      setShowStepwise(false);
       const t = setTimeout(() => setJustSubmitted(false), 500);
       return () => clearTimeout(t);
     }
     prevCheckinRef.current = todayCheckin;
   }, [todayCheckin]);
 
+  // If the card collapses, reset the stepwise flow so the next expand starts
+  // back at the prompt.
+  useEffect(() => {
+    if (!expanded) setShowStepwise(false);
+  }, [expanded]);
+
   const hasInsights = coachInsights.length > 0;
   const hasCheckin = !!todayCheckin;
 
-  // While the user is in the full check-in form, show only that — no insight.
-  if (checkinEditSection === "full") {
+  // Editing a single check-in field via chip tap — replace the chips with the
+  // inline editor (still inside the expanded card).
+  if (checkinEditSection && checkinEditSection !== "full") {
     return (
-      <div style={{
-        display: "flex", flexDirection: "column", flex: 1,
-        gap: 10, overflow: "auto",
-        animation: justSubmitted ? "coachCardFadeIn 0.3s ease-out" : undefined,
-      }}>
-        <CoachCheckin
-          colors={colors}
-          onSubmit={onCheckinSubmit}
-          onCancel={() => setCheckinEditSection(null)}
-          editValues={todayCheckin}
-          showAll
-        />
-      </div>
-    );
-  }
-
-  // Editing a single check-in field — replace the chips with the inline editor.
-  if (checkinEditSection) {
-    return (
-      <div style={{
+      <div onClick={stopBubble} style={{
         display: "flex", flexDirection: "column", flex: 1,
         gap: 10, overflow: "auto",
         animation: justSubmitted ? "coachCardFadeIn 0.3s ease-out" : undefined,
@@ -102,7 +100,7 @@ export function CoachCard({
     );
   }
 
-  // Default: insight on top, check-in below.
+  // Default: insight on top, check-in below — only when the parent says expanded.
   return (
     <div style={{
       display: "flex", flexDirection: "column", flex: 1,
@@ -116,6 +114,7 @@ export function CoachCard({
       }}>
         {hasInsights ? (
           <CoachHeroInsight
+            expanded={expanded}
             insights={coachInsights}
             onAddExercise={onAddSuggestion}
             colors={colors}
@@ -150,7 +149,7 @@ export function CoachCard({
           <div style={{ fontSize: 13, opacity: 0.45, color: colors.textSecondary, textAlign: "center", padding: "8px 0" }}>
             {coachError || (
               <button
-                onClick={onCoachRefresh}
+                onClick={(e) => { e.stopPropagation(); onCoachRefresh(); }}
                 style={{
                   background: "transparent", border: "none", cursor: "pointer",
                   color: colors.text, opacity: 0.45, fontSize: 13, padding: 0,
@@ -168,60 +167,82 @@ export function CoachCard({
         )}
       </div>
 
-      {/* Divider between insight and check-in */}
-      <div style={{
-        height: 1,
-        background: colors.border,
-        opacity: 0.3,
-        flexShrink: 0,
-      }} />
+      {/* Check-in area only appears when card is expanded */}
+      {expanded && (
+        <>
+          <div style={{
+            height: 1,
+            background: colors.border,
+            opacity: 0.3,
+            flexShrink: 0,
+          }} />
 
-      {/* Check-in area (chips or "How are you feeling today?" prompt) */}
-      <div style={{
-        flexShrink: 0,
-        animation: justSubmitted ? "coachCardSlideUp 0.3s ease-out" : undefined,
-      }}>
-        {!hasCheckin ? (
-          <button
-            onClick={() => setCheckinEditSection("full")}
+          <div
+            onClick={stopBubble}
             style={{
-              background: "transparent",
-              border: "none",
-              color: colors.text,
-              cursor: "pointer",
-              padding: 0,
-              width: "100%",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 3,
-              fontFamily: "inherit",
+              flexShrink: 0,
+              animation: justSubmitted ? "coachCardSlideUp 0.3s ease-out" : undefined,
             }}
           >
-            <span style={{
-              fontSize: 13,
-              opacity: 0.5,
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
-            }}>
-              How are you feeling today?
-            </span>
-            <span style={{
-              fontSize: 11,
-              opacity: 0.35,
-            }}>
-              Tap to share your mood, sleep, and pain points
-            </span>
-          </button>
-        ) : (
-          <CheckinSummary
-            checkin={todayCheckin}
-            onEdit={(section) => setCheckinEditSection(section)}
-            onClear={onClearCheckin}
-            colors={colors}
-          />
-        )}
-      </div>
+            {hasCheckin ? (
+              <CheckinSummary
+                checkin={todayCheckin}
+                onEdit={(section) => setCheckinEditSection(section)}
+                onClear={onClearCheckin}
+                colors={colors}
+              />
+            ) : showStepwise ? (
+              /* Inline stepwise check-in: mood → sleep → pain → submit */
+              <CoachCheckin
+                colors={colors}
+                onSubmit={(data) => {
+                  setShowStepwise(false);
+                  onCheckinSubmit(data);
+                }}
+                onCancel={() => setShowStepwise(false)}
+                editValues={null}
+                autoExpand
+              />
+            ) : (
+              /* Two-line prompt — the entry point into the stepwise flow */
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowStepwise(true);
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: colors.text,
+                  cursor: "pointer",
+                  padding: 0,
+                  width: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 3,
+                  fontFamily: "inherit",
+                }}
+              >
+                <span style={{
+                  fontSize: 13,
+                  opacity: 0.5,
+                  textDecoration: "underline",
+                  textUnderlineOffset: 3,
+                }}>
+                  How are you feeling today?
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  opacity: 0.35,
+                }}>
+                  Tap to share your mood, sleep, and pain points
+                </span>
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

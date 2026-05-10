@@ -96,9 +96,9 @@ export function CoachHeroInsight({
   onRefresh,
   userExerciseNames,
   hideLabel,
+  expanded = false,
 }) {
   const hasInsights = insights.length > 0;
-  const [expanded, setExpanded] = useState(false);
 
   const existingNames = new Set(
     (userExerciseNames || []).map((n) => n.toLowerCase())
@@ -182,18 +182,9 @@ export function CoachHeroInsight({
       )}
       {hero && (
         <div>
-          {/* Header row: headline (tap to toggle) + inline refresh icon */}
-          <div
-            onClick={() => setExpanded((v) => !v)}
-            role="button"
-            aria-expanded={expanded}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              cursor: "pointer",
-            }}
-          >
+          {/* Header row: headline + inline refresh icon. Whole card toggles
+              expand at the parent level — no click handler here. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
               fontSize: 14, fontWeight: 700, lineHeight: 1.35,
               flex: 1, textAlign: "center",
@@ -232,7 +223,7 @@ export function CoachHeroInsight({
 
           {/* Expanded body: Next, Why, CTAs */}
           {expanded && (
-            <div style={{ marginTop: 8, textAlign: "center" }}>
+            <div style={{ marginTop: 8, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
               {hero.detail && (
                 <div style={{
                   fontSize: 13, lineHeight: 1.45, opacity: 0.75,
