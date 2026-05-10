@@ -4482,33 +4482,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                           }
 
                           // Empty state \u2014 no schedule and no fallback workout to suggest.
-                          // Still surface coach insights so the page isn't blank.
                           if (scheduledList.length === 0 && !fallbackSuggested) {
                             return (
-                              <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "auto", gap: 12 }}>
-                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6, padding: "12px 0" }}>
-                                  <div style={{ fontSize: 13, color: secondary }}>No plan yet.</div>
-                                  <div style={{ fontSize: 12, color: colors.textTertiary, lineHeight: 1.5 }}>
-                                    Add a workout in Plan to get a suggestion here.
-                                  </div>
-                                </div>
-                                <div style={{ paddingTop: 12, borderTop: `1px solid ${colors.border}` }}>
-                                  <CoachCard
-                                    todayCheckin={todayCheckin}
-                                    onCheckinSubmit={handleCheckinSubmit}
-                                    onCheckinUpdate={handleCheckinUpdate}
-                                    checkinEditSection={checkinEditSection}
-                                    setCheckinEditSection={setCheckinEditSection}
-                                    coachInsights={coachInsights}
-                                    coachLoading={coachLoading}
-                                    coachStreaming={coachStreaming}
-                                    coachError={coachError}
-                                    onCoachRefresh={handleCoachRefresh}
-                                    onAddSuggestion={handleAddSuggestion}
-                                    userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                                    colors={colors}
-                                    onClearCheckin={clearTodayCheckinAndCoach}
-                                  />
+                              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 6 }}>
+                                <div style={{ fontSize: 13, color: secondary }}>No plan yet.</div>
+                                <div style={{ fontSize: 12, color: colors.textTertiary, lineHeight: 1.5 }}>
+                                  Add a workout in Plan to get a suggestion here.
                                 </div>
                               </div>
                             );
@@ -4542,7 +4521,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                     {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
                                   </div>
                                 </div>
-                                {/* Middle scroll area — lifts + coach insights */}
+                                {/* Middle scroll area — lifts only */}
                                 <div style={{ flex: 1, minHeight: 0, overflow: "auto", marginTop: 12 }}>
                                   {lifts.length > 0 && (
                                     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -4568,24 +4547,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                       ))}
                                     </div>
                                   )}
-                                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${colors.border}` }}>
-                                    <CoachCard
-                                      todayCheckin={todayCheckin}
-                                      onCheckinSubmit={handleCheckinSubmit}
-                                      onCheckinUpdate={handleCheckinUpdate}
-                                      checkinEditSection={checkinEditSection}
-                                      setCheckinEditSection={setCheckinEditSection}
-                                      coachInsights={coachInsights}
-                                      coachLoading={coachLoading}
-                                      coachStreaming={coachStreaming}
-                                      coachError={coachError}
-                                      onCoachRefresh={handleCoachRefresh}
-                                      onAddSuggestion={handleAddSuggestion}
-                                      userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                                      colors={colors}
-                                      onClearCheckin={clearTodayCheckinAndCoach}
-                                    />
-                                  </div>
                                 </div>
                                 <div style={{ paddingTop: 12 }}>
                                   <button
@@ -4623,9 +4584,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                   {scheduledList.length} sessions planned
                                 </div>
                               </div>
-                              {/* Middle scroll area — workout rows + coach insights */}
+                              {/* Middle scroll area — workout rows only */}
                               <div style={{ flex: 1, minHeight: 0, overflow: "auto", marginTop: 10 }}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                 {scheduledList.map((w) => {
                                   const lifts = w.exercises || [];
                                   const liftCount = lifts.length;
@@ -4710,24 +4671,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                     </div>
                                   );
                                 })}
-                                </div>
-                                <div style={{ paddingTop: 16, borderTop: `1px solid ${colors.border}` }}>
-                                  <CoachCard
-                                    todayCheckin={todayCheckin}
-                                    onCheckinSubmit={handleCheckinSubmit}
-                                    onCheckinUpdate={handleCheckinUpdate}
-                                    checkinEditSection={checkinEditSection}
-                                    setCheckinEditSection={setCheckinEditSection}
-                                    coachInsights={coachInsights}
-                                    coachLoading={coachLoading}
-                                    coachStreaming={coachStreaming}
-                                    coachError={coachError}
-                                    onCoachRefresh={handleCoachRefresh}
-                                    onAddSuggestion={handleAddSuggestion}
-                                    userExerciseNames={progressWorkouts.flatMap((w) => (w.exercises || []).map((e) => e.name))}
-                                    colors={colors}
-                                    onClearCheckin={clearTodayCheckinAndCoach}
-                                  />
                                 </div>
                               </div>
                               <div style={{ paddingTop: 12 }}>
