@@ -73,23 +73,21 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
     const dx = t.clientX - ref.startX;
     const dy = t.clientY - ref.startY;
 
-    // Decide direction lock only once we have a clear dominant axis. The old
-    // 5-px threshold committed to vertical on tiny initial jitter and then
-    // ignored the user's actual horizontal intent. Now we require the
-    // dominant axis to lead by 1.2× and total motion to clear 12 px.
+    // Lock direction on first significant move. 6 px is responsive enough to
+    // not feel laggy, and "dominant axis" picks horizontal on ties — slight
+    // initial vertical jitter doesn't hijack the gesture as long as horizontal
+    // catches up.
     if (ref.locked === null) {
       const adx = Math.abs(dx);
       const ady = Math.abs(dy);
-      if (adx > 12 && adx > ady * 1.2) {
-        ref.locked = "h";
-      } else if (ady > 12 && ady > adx * 1.2) {
-        ref.locked = "v";
+      if (adx > 6 || ady > 6) {
+        ref.locked = adx >= ady ? "h" : "v";
       }
-      // No clear winner yet — keep observing.
     }
-    if (ref.locked !== "h") return;
+    if (ref.locked === "v") return;
 
-    // Horizontal drag — prevent vertical scroll and tab swipe
+    // Horizontal drag (or pre-lock follow-through) — prevent vertical scroll
+    // and tab swipe, and start moving the strip with the finger immediately.
     e.preventDefault();
     e.stopPropagation();
     dragRef.current = dx;
