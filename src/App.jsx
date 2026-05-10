@@ -337,7 +337,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const bodyRef = useRef(null);
   const TAB_ORDER = ["train", "progress", "program", "social"];
 
+  // True when the touch landed on a child that wants to own horizontal gestures
+  // (e.g. the carousel). When set, the body skips its tab-swipe entirely for
+  // this touch — relying on stopPropagation alone wasn't enough on Android.
   const handleTouchStart = useCallback((e) => {
+    if (e.target?.closest?.("[data-owns-horizontal-gesture]")) {
+      touchRef.current.deferToChild = true;
+      return;
+    }
+    touchRef.current.deferToChild = false;
     touchRef.current.startX = e.touches[0].clientX;
     touchRef.current.startY = e.touches[0].clientY;
     touchRef.current.swiping = false;
@@ -350,6 +358,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, []);
 
   const handleTouchMove = useCallback((e) => {
+    if (touchRef.current.deferToChild) return;
     const dx = e.touches[0].clientX - touchRef.current.startX;
     const dy = e.touches[0].clientY - touchRef.current.startY;
 
@@ -387,6 +396,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, []);
 
   const handleTouchEnd = useCallback((e) => {
+    if (touchRef.current.deferToChild) {
+      touchRef.current.deferToChild = false;
+      return;
+    }
     // If we never crossed the swipe threshold, still defensively reset any
     // lingering transform — protects against cases where a previous swipe was
     // interrupted and left the body shifted.
@@ -440,6 +453,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const handleTouchCancel = useCallback(() => {
     touchRef.current.swiping = false;
     touchRef.current.locked = false;
+    touchRef.current.deferToChild = false;
     resetBodyTransform();
   }, [resetBodyTransform]);
 

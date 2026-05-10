@@ -176,6 +176,7 @@ export function CoachCarousel({ cards, colors, activeIndex = 0, onChangeIndex })
       {/* Cards container */}
       <div
         ref={containerRef}
+        data-owns-horizontal-gesture="true"
         style={{
           overflow: "hidden",
           borderRadius: 16,
