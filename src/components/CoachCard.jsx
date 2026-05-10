@@ -100,15 +100,29 @@ export function CoachCard({
               border: "none",
               color: colors.text,
               cursor: "pointer",
-              fontSize: 13,
-              opacity: 0.5,
               padding: 0,
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
               alignSelf: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 3,
+              fontFamily: "inherit",
             }}
           >
-            How are you feeling today?
+            <span style={{
+              fontSize: 13,
+              opacity: 0.5,
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}>
+              How are you feeling today?
+            </span>
+            <span style={{
+              fontSize: 11,
+              opacity: 0.35,
+            }}>
+              Tunes today's coach insight
+            </span>
           </button>
         ) : (
           <CheckinSummary
