@@ -194,41 +194,41 @@ export function selectMotivationLine(logsByDate, dateKey) {
 
   if (hasLoggedToday) {
     return pick([
-      "You already showed up once. Keep the day moving.",
-      "Today already has a win in it. Stack another one if you want.",
-      "Momentum is on your side now. Use it.",
+      "You already got work in today.",
+      "Nice start. Keep it moving.",
+      "You’re already in motion today.",
     ], seed);
   }
 
   if (gap !== null && gap >= 4) {
     return pick([
-      "You do not need a perfect restart. You just need today.",
-      "Forget the gap. Win this session and the rhythm comes back.",
-      "The fastest way back is one honest workout.",
+      "Good day to get back after it.",
+      "No need to overthink it. Just train today.",
+      "A simple session gets you rolling again.",
     ], seed);
   }
 
   if (streak >= 3) {
     return pick([
-      "You built momentum. Protect it today.",
-      "This is where consistency starts to compound.",
-      "Another solid session keeps the standard high.",
+      "You’ve got momentum right now.",
+      "Another session keeps the streak honest.",
+      "Consistency looks good on you.",
     ], seed);
   }
 
   if (gap === 1) {
     return pick([
-      "Back-to-back days can change the whole week.",
-      "Show up again today and let the habit do its job.",
-      "A second straight day is how momentum gets real.",
+      "Back-to-back days feel good.",
+      "Show up again today.",
+      "Another day in a row goes a long way.",
     ], seed);
   }
 
   return pick([
-    "You do not need perfect energy. You just need to start.",
-    "A focused session today beats waiting for the perfect day.",
-    "Show up first. The rest gets easier once you begin.",
-    "One good session today can reset the whole week.",
+    "Ready when you are.",
+    "Good day to train.",
+    "Let’s get some work in.",
+    "Start with one solid session.",
   ], seed);
 }
 
