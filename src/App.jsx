@@ -56,37 +56,14 @@ import { BodyDiagram } from "./components/BodyDiagram";
 import { FriendSearchModal } from "./components/FriendSearchModal";
 import { ShareWorkoutModal } from "./components/ShareWorkoutModal";
 import { WorkoutPreviewModal } from "./components/WorkoutPreviewModal";
-import { CreateGroupModal } from "./components/CreateGroupModal";
-import { InviteToGroupModal } from "./components/InviteToGroupModal";
-import { ShareToGroupModal } from "./components/ShareToGroupModal";
-import { GroupWorkoutPreviewModal } from "./components/GroupWorkoutPreviewModal";
-import { CreatePollModal } from "./components/CreatePollModal";
-import { PollDetailModal } from "./components/PollDetailModal";
-import { CreateAnnouncementModal } from "./components/CreateAnnouncementModal";
-import { AnnouncementDetailModal } from "./components/AnnouncementDetailModal";
-import { CreateDuesModal } from "./components/CreateDuesModal";
-import { DuesDetailModal } from "./components/DuesDetailModal";
-import { ManageFieldsModal } from "./components/ManageFieldsModal";
-import { FillFieldsModal } from "./components/FillFieldsModal";
 import { ImportPreviewModal } from "./components/ImportPreviewModal";
 import { stateToCSV, detectCSVFormat, parseStrongCSV, parseHevyCSV, buildImportState, mergeImportedData } from "./lib/importExport";
-import { GroupDetailView } from "./components/GroupDetailView";
-import { calcEventDurationMinutes } from "./lib/pollUtils";
-import { formatTimeAgo } from "./lib/announcementUtils";
 import { CircuitTimer } from "./components/CircuitTimer";
-import { ActivityFeed } from "./components/ActivityFeed";
-import { getFeed, publishWorkoutCompletion, toggleFeedReaction } from "./lib/feedApi";
 import {
   getFriends, getPendingRequests, getInbox, getUnreadCount,
   acceptFriendRequest, declineFriendRequest, removeFriend,
   acceptSharedWorkout, dismissSharedWorkout,
 } from "./lib/socialApi";
-import {
-  getMyGroups, getGroupInvites, getGroupInviteCount,
-  acceptGroupInvite, declineGroupInvite, getPendingPollCount,
-  markAttendance, getGroupCustomFields,
-  getActivePolls, getRecentAnnouncements, toggleReaction, respondToPoll,
-} from "./lib/groupApi";
 
 // Exercise catalog
 import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
@@ -98,7 +75,6 @@ import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getSchedu
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
-import { CoachCarousel } from "./components/CoachCarousel";
 import { CoachCard } from "./components/CoachCard";
 import { getTodayCheckin, saveCheckin, buildCheckinContext, loadCheckins, loadCoachNotes, mergeCoachNotes, saveCoachNotes } from "./lib/coachCheckin";
 
@@ -252,19 +228,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const [socialPending, setSocialPending] = useState([]);
   const [socialInbox, setSocialInbox] = useState([]);
   const [socialLoading, setSocialLoading] = useState(false);
-  const [socialGroups, setSocialGroups] = useState([]);
-  const [socialGroupInvites, setSocialGroupInvites] = useState([]);
-  const [activeGroupId, setActiveGroupId] = useState(null);
-
-  // Feed state
-  const [feedItems, setFeedItems] = useState([]);
-  const [feedLoading, setFeedLoading] = useState(false);
-  const [feedCursor, setFeedCursor] = useState(null);
-  const [feedHasMore, setFeedHasMore] = useState(true);
-
-  // Groups aggregated data
-  const [activePolls, setActivePolls] = useState([]);
-  const [recentAnnouncements, setRecentAnnouncements] = useState([]);
 
   // Log card flip state (log ↔ exercise detail)
   const [logFlipped, setLogFlipped] = useState(false);
@@ -316,7 +279,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setTodayCheckin(getTodayCheckin(coachTodayKey));
     setCheckinEditSection(null);
   }, [coachTodayKey]);
-  const [carouselIndex, setCarouselIndex] = useState(0);
   const [coachExpanded, setCoachExpanded] = useState(false);
   // Expanded workouts in the Today's Plan card (multi-workout list view).
   const [expandedPlanRows, setExpandedPlanRows] = useState(() => new Set());
@@ -642,27 +604,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const refreshSocial = useCallback(async () => {
     setSocialLoading(true);
     try {
-      const [friendsRes, pendingRes, inboxRes, badgeRes, groupsRes, groupInvitesRes, groupInviteCountRes, pendingPollsRes, activePollsRes, announcementsRes] = await Promise.all([
+      const [friendsRes, pendingRes, inboxRes, badgeRes] = await Promise.all([
         getFriends(),
         getPendingRequests(),
         getInbox(),
         getUnreadCount(),
-        getMyGroups(),
-        getGroupInvites(),
-        getGroupInviteCount(),
-        getPendingPollCount(),
-        getActivePolls(),
-        getRecentAnnouncements(),
       ]);
       setSocialFriends(friendsRes.data || []);
       setSocialPending(pendingRes.data || []);
       setSocialInbox(inboxRes.data || []);
-      setSocialGroups(groupsRes.data || []);
-      setSocialGroupInvites(groupInvitesRes.data || []);
-      setActivePolls(activePollsRes.data || []);
-      setRecentAnnouncements(announcementsRes.data || []);
-      const totalBadge = (badgeRes.data || 0) + (groupInviteCountRes.data || 0) + (pendingPollsRes.data || 0);
-      setSocialBadge(totalBadge);
+      setSocialBadge(badgeRes.data || 0);
     } catch (err) {
       console.warn("Social refresh failed:", err.message);
     } finally {
@@ -670,104 +621,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, []);
 
-  const refreshFeed = useCallback(async (cursor = null) => {
-    setFeedLoading(true);
-    try {
-      const { data } = await getFeed(cursor);
-      if (cursor) {
-        setFeedItems(prev => [...prev, ...data]);
-      } else {
-        setFeedItems(data);
-      }
-      setFeedHasMore(data.length >= 30);
-      if (data.length > 0) {
-        setFeedCursor(data[data.length - 1].created_at);
-      }
-    } catch (err) {
-      console.warn("Feed refresh failed:", err.message);
-    } finally {
-      setFeedLoading(false);
-    }
-  }, []);
-
-  const handleFeedReaction = useCallback(async (feedEventId, emoji) => {
-    const { removed } = await toggleFeedReaction(feedEventId, emoji);
-    // Optimistic update
-    setFeedItems(prev => prev.map(item => {
-      if (item.id !== feedEventId) return item;
-      const reactions = [...(item.reactions || [])];
-      if (removed) {
-        const idx = reactions.findIndex(r => r.user_id === session.user.id && r.emoji === emoji);
-        if (idx >= 0) reactions.splice(idx, 1);
-      } else {
-        reactions.push({ user_id: session.user.id, emoji, id: "temp_" + Date.now() });
-      }
-      return { ...item, reactions };
-    }));
-  }, [session?.user?.id]);
-
-  const handlePublishToFeed = useCallback(async () => {
-    if (!state.logsByDate?.[dateKey]) {
-      showToast("No logged sets today");
-      return;
-    }
-    const todayLogs = state.logsByDate[dateKey];
-    const allWorkouts = [...(state.program?.workouts || []), ...(state.dailyWorkouts?.[dateKey] || [])];
-    let totalSets = 0;
-    let totalVolume = 0;
-    const exerciseNames = [];
-    for (const [exId, log] of Object.entries(todayLogs)) {
-      if (!log?.sets) continue;
-      const completedSets = log.sets.filter(s => s.completed);
-      totalSets += completedSets.length;
-      for (const s of completedSets) {
-        const reps = parseFloat(s.reps) || 0;
-        const weight = parseFloat(s.weight) || 0;
-        totalVolume += reps * weight;
-      }
-      // Find exercise name
-      for (const w of allWorkouts) {
-        const ex = (w.exercises || []).find(e => e.id === exId);
-        if (ex && !exerciseNames.includes(ex.name)) {
-          exerciseNames.push(ex.name);
-          break;
-        }
-      }
-    }
-    if (totalSets === 0) {
-      showToast("No completed sets to share");
-      return;
-    }
-    // Find workout name (first workout with logged exercises)
-    let workoutName = "Workout";
-    for (const w of allWorkouts) {
-      if ((w.exercises || []).some(e => todayLogs[e.id]?.sets?.some(s => s.completed))) {
-        workoutName = w.name || w.category || "Workout";
-        break;
-      }
-    }
-    const ms = state.preferences?.measurementSystem;
-    const { error } = await publishWorkoutCompletion({
-      workoutName,
-      category: allWorkouts[0]?.category || "Workout",
-      exerciseCount: exerciseNames.length,
-      totalSets,
-      totalVolume: Math.round(totalVolume),
-      exercises: exerciseNames,
-      measurementSystem: ms,
-    }, dateKey);
-    if (error) {
-      showToast("Failed to post — " + (error.message || "try again"));
-    } else {
-      showToast("Posted to feed!");
-      refreshFeed();
-    }
-  }, [state, dateKey, refreshFeed, showToast]);
-
   useEffect(() => {
     if (tab === "social") {
       refreshSocial();
-      refreshFeed();
     }
   }, [tab]);
 
@@ -1071,14 +927,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const progressWorkouts = useMemo(() => {
     const dailyExercises = [];
     const coachExercises = [];
-    const groupExercises = [];
     for (const [date, ws] of Object.entries(state.dailyWorkouts || {})) {
       if (inRangeInclusive(date, summaryRange.start, summaryRange.end)) {
         for (const w of ws) {
           if (w.source === "coach") {
             coachExercises.push(...(w.exercises || []));
-          } else if (w.source === "group") {
-            groupExercises.push(...(w.exercises || []));
           } else {
             dailyExercises.push(...(w.exercises || []));
           }
@@ -1115,9 +968,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
     if (coachExercises.length > 0) {
       result.push({ id: "__coach__", name: "Coach Suggestions", category: "Coach", exercises: coachExercises });
-    }
-    if (groupExercises.length > 0) {
-      result.push({ id: "__group__", name: "Group Workouts", category: "Group", exercises: groupExercises });
     }
     return result;
   }, [workouts, state.dailyWorkouts, state.sessionOverrides, state.sessionAdditions, summaryRange]);
@@ -2166,25 +2016,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       setToast(ack);
       clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setToast(null), 2500);
-    }
-
-    // Attendance auto-sync: if exercise belongs to an event workout and has completed sets
-    const logCtx = modals.log.context;
-    const eventWorkout = (state.dailyWorkouts?.[dateKey] || []).find(
-      w => w.source === "event" && w.exercises?.some(ex => ex.id === logCtx.exerciseId)
-    );
-    if (eventWorkout?.pollId && eventWorkout.allowSelfCheckin && !eventWorkout.attendanceMarked) {
-      const hasCompleted = (modals.log.sets || []).some(s => s.completed);
-      if (hasCompleted) {
-        markAttendance(eventWorkout.pollId, session?.user?.id, true).then(() => {
-          showToast("Marked as attended");
-        }).catch(() => {});
-        updateState((st) => {
-          const dw = (st.dailyWorkouts?.[dateKey] || []).find(w => w.id === eventWorkout.id);
-          if (dw) dw.attendanceMarked = true;
-          return st;
-        });
-      }
     }
 
     // Dismiss rest timer when closing modal
@@ -3589,53 +3420,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     dispatchModal({ type: "CLOSE_GENERATE_TODAY" });
   }
 
-  // Handle RSVP changes from PollDetailModal — create/remove event session
-  function handleRsvpChanged(poll, response) {
-    if (!poll?.event_date) return;
-    const eventDateKey = poll.event_date;
-
-    if (response === "yes") {
-      // Create event session in dailyWorkouts if not already there
-      updateState((st) => {
-        if (!st.dailyWorkouts) st.dailyWorkouts = {};
-        if (!st.dailyWorkouts[eventDateKey]) st.dailyWorkouts[eventDateKey] = [];
-        // Skip if already exists for this poll
-        if (st.dailyWorkouts[eventDateKey].some(w => w.source === "event" && w.pollId === poll.id)) return st;
-        const durationMin = calcEventDurationMinutes(poll.event_time, poll.event_end_time);
-        const exercise = {
-          id: uid("ex"),
-          name: poll.title,
-          unit: "min",
-          sets: durationMin ? [{ reps: durationMin, weight: "" }] : [],
-        };
-        st.dailyWorkouts[eventDateKey].push({
-          id: uid("w"),
-          name: poll.title,
-          category: "Event",
-          source: "event",
-          pollId: poll.id,
-          groupId: poll.group_id,
-          allowSelfCheckin: poll.allow_self_checkin,
-          exercises: [exercise],
-        });
-        return st;
-      });
-      showToast("Added to your schedule");
-    } else {
-      // Remove event session for this poll
-      updateState((st) => {
-        if (!st.dailyWorkouts?.[eventDateKey]) return st;
-        const before = st.dailyWorkouts[eventDateKey].length;
-        st.dailyWorkouts[eventDateKey] = st.dailyWorkouts[eventDateKey].filter(
-          w => !(w.source === "event" && w.pollId === poll.id)
-        );
-        if (st.dailyWorkouts[eventDateKey].length === 0) delete st.dailyWorkouts[eventDateKey];
-        return st;
-      });
-      if (response !== null) showToast("Removed from schedule");
-    }
-  }
-
   const deleteDailyWorkout = useCallback((workoutId) => {
     const w = workoutById.get(workoutId);
     const dayLogs = state.logsByDate?.[dateKey] || {};
@@ -4441,15 +4225,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-                  <CoachCarousel
-                    colors={colors}
-                    activeIndex={carouselIndex}
-                    onChangeIndex={setCarouselIndex}
-                    cards={[
-                      {
-                        key: "plan",
-                        label: "Today's Plan",
-                        content: (() => {
+                  <div style={{
+                    height: "56vh",
+                    borderRadius: 16,
+                    background: colors.cardBg,
+                    border: `1px solid ${colors.border}`,
+                    boxShadow: colors.shadow,
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                  }}>
+                    <div style={{
+                      fontSize: 11, fontWeight: 600, opacity: 0.4,
+                      textTransform: "uppercase", letterSpacing: 1,
+                      padding: "14px 18px 0",
+                    }}>
+                      Today's Plan
+                    </div>
+                    <div style={{ flex: 1, overflow: "auto", padding: "10px 18px 18px", display: "flex", flexDirection: "column" }}>
+                      {(() => {
                           const accent = colors.accent;
                           const secondary = colors.textSecondary;
 
@@ -4708,136 +4502,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                               </div>
                             </div>
                           );
-                        })(),
-                      },
-                      {
-                        key: "week",
-                        label: "This Week",
-                        content: (() => {
-                          const accent = colors.accent || "#3b82f6";
-                          const secondary = colors.textSecondary;
-                          const { sessions, totalSets, days, daysPerWeek, weekStreak, upNext } = weeklySummary;
-                          const progress = Math.min(sessions / daysPerWeek, 1);
-                          const hasProgram = (state.program?.workouts || []).length > 0;
-                          const noData = sessions === 0 && !hasProgram;
-
-                          return (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1, justifyContent: noData ? "center" : "flex-start" }}>
-                              {/* Day-of-week row */}
-                              <div style={{ display: "flex", justifyContent: "space-between", padding: "0 4px" }}>
-                                {days.map((d, i) => (
-                                  <div key={i} style={{
-                                    display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                                  }}>
-                                    <div style={{
-                                      fontSize: 11, fontWeight: 600, opacity: d.isToday ? 0.9 : 0.45,
-                                      color: d.isToday ? accent : colors.text,
-                                    }}>
-                                      {d.label}
-                                    </div>
-                                    <div style={{
-                                      width: 22, height: 22, borderRadius: "50%",
-                                      display: "flex", alignItems: "center", justifyContent: "center",
-                                      border: d.isToday ? `2px solid ${accent}` : "none",
-                                      background: d.hasSession ? accent : "transparent",
-                                    }}>
-                                      {d.hasSession ? (
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                          <polyline points="20 6 9 17 4 12" />
-                                        </svg>
-                                      ) : (
-                                        <div style={{
-                                          width: 8, height: 8, borderRadius: "50%",
-                                          border: `1.5px solid ${d.isToday ? accent : (secondary)}`,
-                                          opacity: d.isToday ? 0.6 : 0.3,
-                                        }} />
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-
-                              {noData ? (
-                                <div style={{ fontSize: 13, opacity: 0.45, color: secondary, textAlign: "center" }}>
-                                  No sessions yet this week.{"\n"}Tap + to start your first workout.
-                                </div>
-                              ) : (
-                                <>
-                                  {/* Stats row */}
-                                  <div
-                                    onClick={() => { setSummaryMode("week"); setTab("progress"); }}
-                                    style={{
-                                      fontSize: 13, color: accent, opacity: 0.7, cursor: "pointer",
-                                      textDecoration: "underline", textDecorationColor: accent + "44",
-                                      textUnderlineOffset: 3,
-                                    }}
-                                  >
-                                    {sessions} session{sessions !== 1 ? "s" : ""} {"\u00B7"} {totalSets} set{totalSets !== 1 ? "s" : ""} {"\u203A"}
-                                  </div>
-
-                                  {/* Progress bar */}
-                                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <div style={{
-                                      flex: 1, height: 6, borderRadius: 3,
-                                      background: colors.border, overflow: "hidden",
-                                    }}>
-                                      <div style={{
-                                        width: `${progress * 100}%`,
-                                        height: "100%", borderRadius: 3,
-                                        background: accent,
-                                        transition: "width 0.3s ease",
-                                      }} />
-                                    </div>
-                                    <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.5, whiteSpace: "nowrap" }}>
-                                      {sessions}/{daysPerWeek} days
-                                    </div>
-                                  </div>
-
-                                  {/* Up next suggestion */}
-                                  {upNext && (
-                                    <div style={{ marginTop: 2 }}>
-                                      {upNext.allDone ? (
-                                        <div style={{ fontSize: 13, fontWeight: 600, color: accent }}>
-                                          All workouts done this week {"\u2713"}
-                                        </div>
-                                      ) : upNext.isRestDay ? (
-                                        <div style={{ fontSize: 13, color: secondary, opacity: 0.5 }}>
-                                          Rest day — you usually take {upNext.dayName}s off
-                                        </div>
-                                      ) : upNext.workouts.length > 0 ? (
-                                        <div>
-                                          <div style={{ fontSize: 13, fontWeight: 600 }}>
-                                            Up next: {upNext.workouts.join(" + ")}
-                                          </div>
-                                          {upNext.confidence >= 0.6 && upNext.dayName && (
-                                            <div style={{ fontSize: 11, color: secondary, opacity: 0.45, marginTop: 2 }}>
-                                              You usually do this on {upNext.dayName}s
-                                            </div>
-                                          )}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  )}
-                                  {!upNext && !hasProgram && (
-                                    <div style={{ fontSize: 13, color: secondary, opacity: 0.45 }}>
-                                      Tap + to start your first workout
-                                    </div>
-                                  )}
-
-                                  {/* Week streak */}
-                                  {weekStreak >= 2 && (
-                                    <div style={{ fontSize: 12, opacity: 0.55, marginTop: "auto" }}>
-                                      {"\uD83D\uDD25"} {weekStreak} week streak
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          );
-                        })(),
-                      },
-                    ]}
-                  />
+                      })()}
+                    </div>
+                  </div>
                   </div>
                 </div>
                   );
@@ -8226,13 +7893,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     </div>
   );
 }
-
-// ============================================================================
-// SOCIAL HELPERS
-// ============================================================================
-
-// formatSocialTime is an alias for the shared formatTimeAgo from announcementUtils
-const formatSocialTime = formatTimeAgo;
 
 // ============================================================================
 // MOOD PICKER - SVG face icons for workout feel
