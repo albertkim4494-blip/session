@@ -1450,10 +1450,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     modals.changePassword.isOpen || modals.welcomeChoice.isOpen || modals.editWorkout?.isOpen ||
     modals.editExercise?.isOpen || modals.catalogBrowse.isOpen || modals.generateWizard.isOpen ||
     modals.generateToday.isOpen || modals.customExercise?.isOpen || modals.billing?.isOpen ||
-    modals.social?.isOpen || modals.friendSearch?.isOpen ||
-    modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen ||
-    modals.createGroup?.isOpen || modals.inviteToGroup?.isOpen ||
-    modals.shareToGroup?.isOpen || modals.groupWorkoutPreview?.isOpen;
+    modals.friendSearch?.isOpen ||
+    modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen;
 
   const backOverrideRef = useRef(null);
   const anyModalOpenRef = useRef(false);
@@ -5209,571 +5207,128 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             </div>
           ) : null}
 
-          {/* SOCIAL TAB */}
+          {/* SOCIAL TAB — inbox only */}
           {tab === "social" ? (
-            <div key="social" style={{ ...styles.section, marginTop: -8, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
-              {(() => {
-                const socialTab = modals.social.tab || "feed";
-                const pendingInboxCount = socialInbox.filter((i) => i.status === "pending").length + socialPending.length;
-                const groupInviteCount = socialGroupInvites.length;
-                const todayHasLogs = state.logsByDate?.[dateKey] && Object.values(state.logsByDate[dateKey]).some(log => log?.sets?.some(s => s.completed));
-                const socialTabs = [
-                  { value: "feed", label: "Feed" },
-                  { value: "groups", label: "Groups" },
-                  { value: "inbox", label: `Inbox${pendingInboxCount ? ` (${pendingInboxCount})` : ""}` },
-                ];
-                return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                    {/* Underline-style tabs — sticky, flush with top */}
-                    <nav style={{
-                      display: "flex", gap: 28,
-                      position: "sticky", top: -22, zIndex: 5,
-                      background: colors.appBg,
-                      paddingTop: 22, paddingBottom: 8,
-                      marginTop: -14,
-                    }}>
-                      {socialTabs.map((t) => {
-                        const active = t.value === socialTab;
-                        return (
-                          <button
-                            key={t.value}
-                            onClick={() => { setActiveGroupId(null); dispatchModal({ type: "UPDATE_SOCIAL", payload: { tab: t.value } }); }}
-                            style={{
-                              background: "none", border: "none", cursor: "pointer",
-                              padding: "6px 0 8px",
-                              fontSize: 14, fontWeight: 700,
-                              color: active ? colors.accent : colors.text,
-                              opacity: active ? 1 : 0.35,
-                              position: "relative",
-                              transition: "color 0.2s, opacity 0.2s",
-                            }}
-                          >
-                            {t.label}
-                            {active && (
-                              <span style={{
-                                position: "absolute",
-                                bottom: 0, left: 0, right: 0,
-                                height: 2,
-                                background: colors.accent,
-                                borderRadius: 0,
-                              }} />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </nav>
-
-                    {socialTab === "feed" ? (
-                      <ActivityFeed
-                        items={feedItems}
-                        loading={feedLoading}
-                        userId={session.user.id}
-                        colors={colors}
-                        styles={styles}
-                        hasMore={feedHasMore}
-                        onLoadMore={() => refreshFeed(feedCursor)}
-                        onReact={handleFeedReaction}
-                        onPublish={handlePublishToFeed}
-                        canPublish={todayHasLogs}
-                        friendCount={socialFriends.length}
-                      />
-                    ) : socialTab === "groups" ? (
-                      /* Groups sub-tab */
-                      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                        {activeGroupId ? (
-                          <GroupDetailView
-                            groupId={activeGroupId}
-                            userId={session.user.id}
-                            dispatch={dispatchModal}
-                            styles={styles}
-                            colors={colors}
-                            onBack={() => setActiveGroupId(null)}
-                            onStartGroupWorkout={(gw) => {
-                              const snapshot = gw.workout_snapshot;
-                              updateState((st) => {
-                                if (!st.dailyWorkouts) st.dailyWorkouts = {};
-                                if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
-                                st.dailyWorkouts[dateKey].push({
-                                  id: uid("w"),
-                                  name: snapshot.name || "Group Workout",
-                                  category: snapshot.category || "Workout",
-                                  source: "group",
-                                  groupWorkoutId: gw.id,
-                                  sharedBy: gw.shared_by_profile?.username || "unknown",
-                                  exercises: (snapshot.exercises || []).map((ex) => ({
-                                    ...ex, id: uid("ex"),
-                                  })),
-                                });
-                                return st;
-                              });
-                              showToast("Workout added to today!");
-                              setTab("train");
-                            }}
-                            showToast={showToast}
-                            refreshSocial={refreshSocial}
-                          />
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 28, paddingBottom: 70 }}>
-                            {socialLoading && socialGroups.length === 0 && socialGroupInvites.length === 0 && (
-                              <div style={{ textAlign: "center", padding: 24, opacity: 0.5, fontSize: 13 }}>Loading...</div>
-                            )}
-
-                            {/* Group invites */}
-                            {socialGroupInvites.length > 0 && (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                  <div style={{ fontSize: 15, fontWeight: 700 }}>Invites</div>
-                                  <div style={{ width: 20, height: 20, borderRadius: 999, background: colors.accent, color: colors.primaryText, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{socialGroupInvites.length}</div>
-                                </div>
-                                {socialGroupInvites.map((inv) => (
-                                  <div key={inv.id} style={{ padding: 16, borderRadius: 16, background: colors.subtleBg, display: "flex", alignItems: "center", gap: 14 }}>
-                                    <div style={{ width: 44, height: 44, borderRadius: 12, background: colors.accent + "18", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: 15, fontWeight: 700 }}>{inv.group?.name || "Group"}</div>
-                                      <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>from @{inv.inviter?.username || "unknown"}</div>
-                                    </div>
-                                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                                      <button className="btn-press" onClick={async () => { await acceptGroupInvite(inv.id); const { data: cfData } = await getGroupCustomFields(inv.group_id); const requiredFields = (cfData || []).filter(f => f.required); if (requiredFields.length > 0) { dispatchModal({ type: "OPEN_FILL_FIELDS", payload: { groupId: inv.group_id, fields: cfData || [], requiredMode: true, onComplete: () => { refreshSocial(); showToast(`Joined ${inv.group?.name || "group"}!`); } } }); } else { refreshSocial(); showToast(`Joined ${inv.group?.name || "group"}!`); } }} style={{ ...styles.primaryBtn, padding: "8px 16px", fontSize: 12, borderRadius: 999 }}>Join</button>
-                                      <button className="btn-press" onClick={async () => { await declineGroupInvite(inv.id); refreshSocial(); }} style={{ padding: "8px 12px", fontSize: 12, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer", opacity: 0.6 }}>Decline</button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Active Groups */}
-                            {socialGroups.length > 0 && (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <div style={{ fontSize: 18, fontWeight: 700 }}>Active Groups</div>
-                                  <div style={{ width: 6, height: 6, borderRadius: 999, background: colors.accent, opacity: 0.7 }} />
-                                </div>
-                                {socialGroups.map((g) => {
-                                  const facepile = g.facepile || [];
-                                  const extraCount = Math.max(0, (g.member_count || 0) - facepile.length);
-                                  return (
-                                    <div
-                                      key={g.id}
-                                      className="btn-press"
-                                      onClick={() => setActiveGroupId(g.id)}
-                                      style={{ cursor: "pointer", padding: "16px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}
-                                    >
-                                      {/* Icon + member count row */}
-                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                                        <div style={{ width: 36, height: 36, borderRadius: 10, background: colors.accent + "15", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>
-                                        </div>
-                                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.4, marginTop: 4 }}>
-                                          {g.member_count ? `${g.member_count} Members` : ""}
-                                        </div>
-                                      </div>
-                                      {/* Name + admin badge */}
-                                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                                        <div style={{ fontSize: 15, fontWeight: 700 }}>{g.name}</div>
-                                        {g.role === "admin" && (
-                                          <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", padding: "2px 6px", borderRadius: 999, background: colors.accent + "18", color: colors.accent }}>Admin</span>
-                                        )}
-                                      </div>
-                                      {/* Description */}
-                                      {g.description && <div style={{ fontSize: 13, opacity: 0.5, lineHeight: 1.45, marginBottom: 10 }}>{g.description}</div>}
-                                      {/* Facepile — real member avatars */}
-                                      <div style={{ display: "flex", alignItems: "center" }}>
-                                        {facepile.map((m, i) => (
-                                          <div key={i} style={{
-                                            width: 28, height: 28, borderRadius: 999,
-                                            border: `2px solid ${colors.appBg}`,
-                                            marginLeft: i > 0 ? -8 : 0,
-                                            background: colors.accent + "22", color: colors.accent,
-                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                            fontSize: 10, fontWeight: 700, flexShrink: 0, overflow: "hidden",
-                                          }}>
-                                            {m.avatar_url ? (
-                                              <img src={m.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover" }} />
-                                            ) : (
-                                              (m.username || "?")[0].toUpperCase()
-                                            )}
-                                          </div>
-                                        ))}
-                                        {extraCount > 0 && (
-                                          <div style={{
-                                            width: 28, height: 28, borderRadius: 999,
-                                            border: `2px solid ${colors.appBg}`,
-                                            marginLeft: -8,
-                                            background: colors.subtleBg,
-                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                            fontSize: 9, fontWeight: 700, opacity: 0.6,
-                                          }}>
-                                            +{extraCount}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* Active Polls */}
-                            {activePolls.length > 0 && (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>Active Polls</div>
-                                {activePolls.map((poll) => {
-                                  const myResponse = (poll.poll_responses || []).find(r => r.user_id === session.user.id);
-                                  const yesCount = (poll.poll_responses || []).filter(r => r.response === "yes").length;
-                                  const totalVotes = (poll.poll_responses || []).length;
-                                  // Deadline: explicit deadline, or fall back to event start time
-                                  let effectiveDeadline = poll.deadline ? new Date(poll.deadline).getTime() : null;
-                                  if (!effectiveDeadline && poll.event_date) {
-                                    const eventStr = poll.event_time ? `${poll.event_date}T${poll.event_time}` : `${poll.event_date}T00:00:00`;
-                                    effectiveDeadline = new Date(eventStr).getTime();
-                                  }
-                                  const deadlineMs = effectiveDeadline ? effectiveDeadline - Date.now() : null;
-                                  const daysLeft = deadlineMs != null ? Math.max(0, Math.ceil(deadlineMs / 86400000)) : null;
-                                  const maxP = poll.max_participants;
-                                  const spotsLeft = maxP ? Math.max(0, maxP - yesCount) : null;
-                                  // Format event date/time
-                                  let eventLine = "";
-                                  if (poll.event_date) {
-                                    const d = new Date(poll.event_date + "T00:00:00");
-                                    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-                                    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                                    eventLine = `${dayNames[d.getDay()]}, ${monthNames[d.getMonth()]} ${d.getDate()}`;
-                                    if (poll.event_time) {
-                                      const [h, m] = poll.event_time.split(":");
-                                      const hr = parseInt(h, 10);
-                                      const ampm = hr >= 12 ? "PM" : "AM";
-                                      const hr12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
-                                      eventLine += ` at ${hr12}:${m} ${ampm}`;
-                                    }
-                                  }
-                                  return (
-                                    <div key={poll.id} style={{ padding: "20px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}>
-                                      {/* Icon + title + description */}
-                                      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-                                        <div style={{ width: 36, height: 36, borderRadius: 10, background: colors.accent + "15", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
-                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" /></svg>
-                                        </div>
-                                        <div style={{ flex: 1 }}>
-                                          <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.25, marginBottom: 4 }}>{poll.title}</div>
-                                          {poll.description && <div style={{ fontSize: 13, opacity: 0.5, lineHeight: 1.45 }}>{poll.description}</div>}
-                                        </div>
-                                        {/* Event date/time — inline under description */}
-                                        {eventLine && (
-                                          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35 }}>
-                                              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                                            </svg>
-                                            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.45 }}>{eventLine}</span>
-                                          </div>
-                                        )}
-                                        {/* Spots remaining */}
-                                        {spotsLeft != null && (
-                                          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4 }}>
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={spotsLeft <= 3 ? colors.accent : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.45 }}>
-                                              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
-                                            </svg>
-                                            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, color: spotsLeft <= 3 ? colors.accent : undefined }}>
-                                              {spotsLeft === 0 ? "Full" : `${spotsLeft} spot${spotsLeft !== 1 ? "s" : ""} left`}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Vote buttons — 2 + 1 layout like Stitch */}
-                                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-                                        <div style={{ display: "flex", gap: 8 }}>
-                                          {["Yes", "Maybe"].map((opt) => {
-                                            const optLower = opt.toLowerCase();
-                                            const isSelected = myResponse?.response === optLower;
-                                            return (
-                                              <button
-                                                key={opt}
-                                                className="btn-press"
-                                                onClick={async () => { await respondToPoll(poll.id, optLower); const res = await getActivePolls(); setActivePolls(res.data || []); }}
-                                                style={{
-                                                  flex: 1, padding: "12px 0", borderRadius: 12,
-                                                  background: isSelected ? colors.accent : colors.cardBg,
-                                                  color: isSelected ? colors.primaryText : colors.text,
-                                                  border: "none", cursor: "pointer",
-                                                  fontSize: 14, fontWeight: 700,
-                                                }}
-                                              >
-                                                {opt}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                        <button
-                                          className="btn-press"
-                                          onClick={async () => { await respondToPoll(poll.id, "no"); const res = await getActivePolls(); setActivePolls(res.data || []); }}
-                                          style={{
-                                            width: "100%", padding: "12px 0", borderRadius: 12,
-                                            background: myResponse?.response === "no" ? colors.accent : colors.cardBg,
-                                            color: myResponse?.response === "no" ? colors.primaryText : colors.text,
-                                            border: "none", cursor: "pointer",
-                                            fontSize: 14, fontWeight: 700,
-                                          }}
-                                        >
-                                          No
-                                        </button>
-                                      </div>
-
-                                      {/* Meta row */}
-                                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.3 }}>
-                                        <span>{totalVotes} votes cast</span>
-                                        {daysLeft != null && <span>{daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining</span>}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* Announcements */}
-                            {recentAnnouncements.length > 0 && (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>Announcements</div>
-                                {recentAnnouncements.slice(0, 5).map((ann) => {
-                                  const author = ann.author_profile;
-                                  const reactions = ann.announcement_reactions || [];
-                                  const grouped = {};
-                                  for (const r of reactions) {
-                                    if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, userReacted: false };
-                                    grouped[r.emoji].count++;
-                                    if (r.user_id === session.user.id) grouped[r.emoji].userReacted = true;
-                                  }
-                                  const timeAgo = (() => {
-                                    const diff = Date.now() - new Date(ann.created_at).getTime();
-                                    const mins = Math.floor(diff / 60000);
-                                    if (mins < 1) return "Just now";
-                                    if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""} ago`;
-                                    const hrs = Math.floor(mins / 60);
-                                    if (hrs < 24) return `${hrs} hour${hrs !== 1 ? "s" : ""} ago`;
-                                    const days = Math.floor(hrs / 24);
-                                    if (days === 1) return "Yesterday";
-                                    return `${days} day${days !== 1 ? "s" : ""} ago`;
-                                  })();
-                                  const emojiMap = { thumbsup: "\u{1F44D}", fire: "\u{1F525}", heart: "\u2764\uFE0F", clap: "\u{1F44F}", "100": "\u{1F4AF}" };
-                                  return (
-                                    <div key={ann.id} style={{ display: "flex", gap: 12, padding: "16px 24px", borderRadius: 16, background: `color-mix(in srgb, ${colors.cardBg} 40%, ${colors.appBg})` }}>
-                                      {/* Avatar */}
-                                      <div style={{
-                                        width: 32, height: 32, borderRadius: 999,
-                                        background: colors.accent, color: colors.primaryText,
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontSize: 13, fontWeight: 700, flexShrink: 0, overflow: "hidden", marginTop: 2,
-                                      }}>
-                                        {author?.avatar_url ? (
-                                          <img src={author.avatar_url} alt="" style={{ width: 32, height: 32, borderRadius: 999, objectFit: "cover" }} />
-                                        ) : (
-                                          (author?.username || "?")[0].toUpperCase()
-                                        )}
-                                      </div>
-                                      {/* Content — indented */}
-                                      <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2 }}>
-                                          <span style={{ fontSize: 13, fontWeight: 700 }}>{author?.display_name || `@${author?.username}`}</span>
-                                          <span style={{ fontSize: 10, opacity: 0.3, textTransform: "uppercase", letterSpacing: "0.03em" }}>{timeAgo}</span>
-                                        </div>
-                                        {/* Body */}
-                                        <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.55, marginBottom: 10 }}>{ann.body}</div>
-                                        {/* Reaction chips */}
-                                        {Object.keys(grouped).length > 0 && (
-                                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                            {Object.entries(grouped).map(([emoji, info]) => (
-                                              <button
-                                                key={emoji}
-                                                className="btn-press"
-                                                onClick={async () => { await toggleReaction(ann.id, emoji); const res = await getRecentAnnouncements(); setRecentAnnouncements(res.data || []); }}
-                                                style={{
-                                                  display: "flex", alignItems: "center", gap: 5,
-                                                  padding: "6px 12px", borderRadius: 999,
-                                                  background: info.userReacted ? colors.accentBg : colors.cardBg,
-                                                  border: "none", cursor: "pointer",
-                                                  fontSize: 12, color: colors.text,
-                                                }}
-                                              >
-                                                {emojiMap[emoji] || emoji} <span style={{ fontWeight: 700 }}>{info.count}</span>
-                                              </button>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* Empty state */}
-                            {socialGroups.length === 0 && !socialLoading && socialGroupInvites.length === 0 && (
-                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "40px 20px", textAlign: "center" }}>
-                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.25 }}>
-                                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
-                                </svg>
-                                <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.5 }}>No groups yet</div>
-                                <div style={{ fontSize: 12, opacity: 0.35, maxWidth: 220 }}>Create a group or get invited by friends to train together.</div>
-                              </div>
-                            )}
-
-                            {/* Create Group FAB — rendered outside scroll, see below */}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      /* Inbox sub-tab — shared workouts + friend requests + friends list */
-                      <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-                        {/* Editorial headline */}
-                        <div>
-                          <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.02em", marginBottom: 16 }}>
-                            Stay in sync with your circle.
-                          </div>
-                          <div
-                            onClick={() => dispatchModal({ type: "OPEN_FRIEND_SEARCH" })}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 10,
-                              padding: "14px 16px", borderRadius: 999,
-                              background: colors.subtleBg, cursor: "pointer",
-                            }}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
-                              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                            </svg>
-                            <span style={{ fontSize: 14, opacity: 0.35 }}>Find friends or trainers...</span>
-                          </div>
-                        </div>
-
-                        {socialLoading && socialInbox.length === 0 && socialFriends.length === 0 && (
-                          <div style={{ textAlign: "center", padding: 24, opacity: 0.5, fontSize: 13 }}>Loading...</div>
-                        )}
-
-                        {/* Shared with You */}
-                        {socialInbox.length > 0 && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                              <div style={{ fontSize: 18, fontWeight: 700 }}>Shared with You</div>
-                              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.45 }}>
-                                {socialInbox.filter(sw => sw.status === "pending").length} New Workouts
-                              </div>
-                            </div>
-                            {socialInbox.map((sw) => {
-                              const workout = sw.workout_snapshot;
-                              const fromUser = sw.from_profile;
-                              const exCount = workout?.exercises?.length || 0;
-                              const isPending = sw.status === "pending";
-                              return (
-                                <div key={sw.id} style={{ background: colors.cardBg, borderRadius: 16, overflow: "hidden", opacity: isPending ? 1 : 0.55 }}>
-                                  <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-                                    {/* Sender chip */}
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                      <div style={{ width: 24, height: 24, borderRadius: 999, background: colors.accent + "22", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                                        {fromUser?.avatar_url ? <img src={fromUser.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: 999, objectFit: "cover" }} /> : (fromUser?.username || "?")[0].toUpperCase()}
-                                      </div>
-                                      <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.6 }}>@{fromUser?.username || "unknown"}</span>
-                                    </div>
-                                    {/* Workout title */}
-                                    <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.2 }}>{workout?.name || "Workout"}</div>
-                                    {sw.message && <div style={{ fontSize: 13, opacity: 0.55, lineHeight: 1.5 }}>"{sw.message}"</div>}
-                                    {/* Meta + action */}
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-                                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.35 }}>
-                                        {exCount > 0 ? `${exCount} exercises` : ""}{exCount > 0 && workout?.category ? " \u00B7 " : ""}{workout?.category || ""}
-                                      </span>
-                                      {isPending ? (
-                                        <div style={{ display: "flex", gap: 8 }}>
-                                          <button className="btn-press" onClick={() => dispatchModal({ type: "OPEN_WORKOUT_PREVIEW", payload: { sharedWorkout: sw } })} style={{ ...styles.primaryBtn, padding: "8px 18px", fontSize: 12, borderRadius: 999 }}>Import</button>
-                                          <button className="btn-press" onClick={async () => { await dismissSharedWorkout(sw.id); refreshSocial(); }} style={{ padding: "8px 14px", fontSize: 12, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer", opacity: 0.5 }}>Dismiss</button>
-                                        </div>
-                                      ) : (
-                                        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.5 }}>{sw.status === "accepted" ? "Imported" : "Dismissed"}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Friend Requests */}
-                        {socialPending.length > 0 && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                              <div style={{ fontSize: 15, fontWeight: 700 }}>Requests</div>
-                              <div style={{ width: 20, height: 20, borderRadius: 999, background: colors.accent, color: colors.primaryText, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{socialPending.length}</div>
-                            </div>
-                            {socialPending.map((r) => (
-                              <div key={r.friendshipId} style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, background: colors.subtleBg }}>
-                                <div style={{ width: 44, height: 44, borderRadius: 999, background: colors.accent + "22", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                                  {r.avatar_url ? <img src={r.avatar_url} alt="" style={{ width: 44, height: 44, borderRadius: 999, objectFit: "cover" }} /> : (r.username || "?")[0].toUpperCase()}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 14, fontWeight: 700 }}>@{r.username}</div>
-                                  {r.display_name && <div style={{ fontSize: 12, opacity: 0.5, marginTop: 1 }}>{r.display_name}</div>}
-                                </div>
-                                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                                  <button className="btn-press" onClick={async () => { await acceptFriendRequest(r.friendshipId); refreshSocial(); showToast(`You and @${r.username} are now friends!`); }} style={{ ...styles.primaryBtn, padding: "7px 14px", fontSize: 12, borderRadius: 999 }}>Accept</button>
-                                  <button className="btn-press" onClick={async () => { await declineFriendRequest(r.friendshipId); refreshSocial(); }} style={{ padding: "7px 10px", fontSize: 12, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer", opacity: 0.6 }}>Decline</button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Friends list */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                          <div style={{ fontSize: 15, fontWeight: 700 }}>Current Friends</div>
-                          {socialFriends.length === 0 && !socialLoading ? (
-                            <div style={{ textAlign: "center", padding: "20px 0", opacity: 0.4, fontSize: 13 }}>No friends yet. Tap Add to search for users.</div>
-                          ) : (
-                            socialFriends.map((f) => (
-                              <div key={f.friendshipId} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${colors.border}` }}>
-                                <div style={{ width: 40, height: 40, borderRadius: 999, background: colors.accent + "22", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
-                                  {f.avatar_url ? <img src={f.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: 999, objectFit: "cover" }} /> : (f.username || "?")[0].toUpperCase()}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 14, fontWeight: 700 }}>@{f.username}</div>
-                                  {f.display_name && <div style={{ fontSize: 12, opacity: 0.5, marginTop: 1 }}>{f.display_name}</div>}
-                                </div>
-                                <button className="btn-press" onClick={() => dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { selectedFriendId: f.id } })} style={{ padding: "6px 14px", fontSize: 12, fontWeight: 700, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer" }}>Share</button>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    )}
+            <div key="social" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+                {/* Editorial headline + friend search */}
+                <div>
+                  <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.02em", marginBottom: 16 }}>
+                    Stay in sync with your circle.
                   </div>
-                );
-              })()}
+                  <div
+                    onClick={() => dispatchModal({ type: "OPEN_FRIEND_SEARCH" })}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "14px 16px", borderRadius: 999,
+                      background: colors.subtleBg, cursor: "pointer",
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <span style={{ fontSize: 14, opacity: 0.35 }}>Find friends or trainers...</span>
+                  </div>
+                </div>
+
+                {socialLoading && socialInbox.length === 0 && socialFriends.length === 0 && (
+                  <div style={{ textAlign: "center", padding: 24, opacity: 0.5, fontSize: 13 }}>Loading...</div>
+                )}
+
+                {/* Shared with You */}
+                {socialInbox.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>Shared with You</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.45 }}>
+                        {socialInbox.filter(sw => sw.status === "pending").length} New Workouts
+                      </div>
+                    </div>
+                    {socialInbox.map((sw) => {
+                      const workout = sw.workout_snapshot;
+                      const fromUser = sw.from_profile;
+                      const exCount = workout?.exercises?.length || 0;
+                      const isPending = sw.status === "pending";
+                      return (
+                        <div key={sw.id} style={{ background: colors.cardBg, borderRadius: 16, overflow: "hidden", opacity: isPending ? 1 : 0.55 }}>
+                          <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ width: 24, height: 24, borderRadius: 999, background: colors.accent + "22", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                                {fromUser?.avatar_url ? <img src={fromUser.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: 999, objectFit: "cover" }} /> : (fromUser?.username || "?")[0].toUpperCase()}
+                              </div>
+                              <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.6 }}>@{fromUser?.username || "unknown"}</span>
+                            </div>
+                            <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.2 }}>{workout?.name || "Workout"}</div>
+                            {sw.message && <div style={{ fontSize: 13, opacity: 0.55, lineHeight: 1.5 }}>"{sw.message}"</div>}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.35 }}>
+                                {exCount > 0 ? `${exCount} exercises` : ""}{exCount > 0 && workout?.category ? " · " : ""}{workout?.category || ""}
+                              </span>
+                              {isPending ? (
+                                <div style={{ display: "flex", gap: 8 }}>
+                                  <button className="btn-press" onClick={() => dispatchModal({ type: "OPEN_WORKOUT_PREVIEW", payload: { sharedWorkout: sw } })} style={{ ...styles.primaryBtn, padding: "8px 18px", fontSize: 12, borderRadius: 999 }}>Import</button>
+                                  <button className="btn-press" onClick={async () => { await dismissSharedWorkout(sw.id); refreshSocial(); }} style={{ padding: "8px 14px", fontSize: 12, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer", opacity: 0.5 }}>Dismiss</button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.5 }}>{sw.status === "accepted" ? "Imported" : "Dismissed"}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Friend Requests */}
+                {socialPending.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}>Requests</div>
+                      <div style={{ width: 20, height: 20, borderRadius: 999, background: colors.accent, color: colors.primaryText, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{socialPending.length}</div>
+                    </div>
+                    {socialPending.map((r) => (
+                      <div key={r.friendshipId} style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, background: colors.subtleBg }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 999, background: colors.accent + "22", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                          {r.avatar_url ? <img src={r.avatar_url} alt="" style={{ width: 44, height: 44, borderRadius: 999, objectFit: "cover" }} /> : (r.username || "?")[0].toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700 }}>@{r.username}</div>
+                          {r.display_name && <div style={{ fontSize: 12, opacity: 0.5, marginTop: 1 }}>{r.display_name}</div>}
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          <button className="btn-press" onClick={async () => { await acceptFriendRequest(r.friendshipId); refreshSocial(); showToast(`You and @${r.username} are now friends!`); }} style={{ ...styles.primaryBtn, padding: "7px 14px", fontSize: 12, borderRadius: 999 }}>Accept</button>
+                          <button className="btn-press" onClick={async () => { await declineFriendRequest(r.friendshipId); refreshSocial(); }} style={{ padding: "7px 10px", fontSize: 12, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer", opacity: 0.6 }}>Decline</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Friends list */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>Current Friends</div>
+                  {socialFriends.length === 0 && !socialLoading ? (
+                    <div style={{ textAlign: "center", padding: "20px 0", opacity: 0.4, fontSize: 13 }}>No friends yet. Tap Add to search for users.</div>
+                  ) : (
+                    socialFriends.map((f) => (
+                      <div key={f.friendshipId} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${colors.border}` }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 999, background: colors.accent + "22", color: colors.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, flexShrink: 0, overflow: "hidden" }}>
+                          {f.avatar_url ? <img src={f.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: 999, objectFit: "cover" }} /> : (f.username || "?")[0].toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700 }}>@{f.username}</div>
+                          {f.display_name && <div style={{ fontSize: 12, opacity: 0.5, marginTop: 1 }}>{f.display_name}</div>}
+                        </div>
+                        <button className="btn-press" onClick={() => dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { selectedFriendId: f.id } })} style={{ padding: "6px 14px", fontSize: 12, fontWeight: 700, borderRadius: 999, border: `1px solid ${colors.border}`, background: "transparent", color: colors.text, cursor: "pointer" }}>Share</button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           ) : null}
         </div>
-
-        {/* Create Group FAB — fixed, outside scroll */}
-        {tab === "social" && (modals.social.tab || "feed") === "groups" && !activeGroupId && (
-          <button
-            className="btn-press"
-            onClick={() => dispatchModal({ type: "OPEN_CREATE_GROUP" })}
-            style={{
-              ...styles.fab,
-              width: "auto",
-              height: 48,
-              borderRadius: 14,
-              padding: "0 20px",
-              gap: 6,
-              fontSize: 14,
-              fontWeight: 700,
-              fontFamily: "inherit",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-            Create Group
-          </button>
-        )}
 
         {/* FAB + Panel for Sessions tab */}
         {tab === "train" && (
@@ -5918,7 +5473,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           const logExercise = findExerciseById(state, logCtx?.exerciseId);
           const logUnit = logExercise ? getUnit(logExercise.unit, logExercise) : getUnit("reps");
           const logScheme = logCtx?.scheme;
-          const prescribedSets = logExercise?.prescribedSets || [];
           const showWeight = logUnit.key === "reps" && !logExercise?.bodyweight;
           const exerciseTargets = logExercise?.targets || [];
           const tCount = exerciseTargets.length;
@@ -6158,7 +5712,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               const isSetSaved = !!s.completed;
               const isNextSet = i === firstUncompleted;
               const showRestAfter = restTimer.active && restTimer.exerciseId === logCtx?.exerciseId && restTimer.completedSetIndex === i;
-              const prescribed = prescribedSets[i];
               return (
                 <React.Fragment key={i}>
                 <div style={{
@@ -6169,11 +5722,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   ...(isSetSaved ? { animation: "rowPulse 0.5s ease-out" } : {}),
                   padding: "8px 10px",
                 }}>
-                  {prescribed && (prescribed.reps || prescribed.weight || prescribed.targetTime) && (
-                    <div style={{ fontSize: 11, opacity: 0.45, marginBottom: 4, paddingLeft: 34 }}>
-                      Target: {prescribed.reps ? `${prescribed.reps}` : ""}{prescribed.reps && prescribed.weight ? ` × ${prescribed.weight}` : prescribed.weight || ""}{prescribed.targetTime || ""}{prescribed.rpe ? ` RPE ${prescribed.rpe}` : ""}{prescribed.rest ? ` · ${prescribed.rest}s rest` : ""}
-                    </div>
-                  )}
                   <div style={{
                     display: "grid",
                     gridTemplateColumns: baseGridCols,
@@ -7663,172 +7211,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         }}
       />
 
-      {/* Create Group Modal */}
-      <CreateGroupModal
-        open={modals.createGroup.isOpen}
-        state={modals.createGroup}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        onCreated={() => {
-          refreshSocial();
-          showToast("Group created!");
-        }}
-      />
-
-      {/* Invite to Group Modal */}
-      <InviteToGroupModal
-        open={modals.inviteToGroup.isOpen}
-        state={modals.inviteToGroup}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-      />
-
-      {/* Share to Group Modal */}
-      <ShareToGroupModal
-        open={modals.shareToGroup.isOpen}
-        state={modals.shareToGroup}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        onShared={() => {
-          showToast("Workout shared to group!");
-          refreshSocial();
-        }}
-      />
-
-      {/* Group Workout Preview Modal */}
-      <GroupWorkoutPreviewModal
-        open={modals.groupWorkoutPreview.isOpen}
-        state={modals.groupWorkoutPreview}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        onStartWorkout={(gw) => {
-          const snapshot = gw.workout_snapshot;
-          updateState((st) => {
-            if (!st.dailyWorkouts) st.dailyWorkouts = {};
-            if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
-            st.dailyWorkouts[dateKey].push({
-              id: uid("w"),
-              name: snapshot.name || "Group Workout",
-              category: snapshot.category || "Workout",
-              source: "group",
-              groupWorkoutId: gw.id,
-              sharedBy: gw.shared_by_profile?.username || "unknown",
-              exercises: (snapshot.exercises || []).map((ex) => ({
-                ...ex, id: uid("ex"),
-              })),
-            });
-            return st;
-          });
-          showToast("Workout added to today!");
-          setTab("train");
-        }}
-      />
-
-      {/* Create Poll Modal */}
-      <CreatePollModal
-        open={modals.createPoll.isOpen}
-        state={modals.createPoll}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        onCreated={() => {
-          showToast("Poll created!");
-          refreshSocial();
-        }}
-      />
-
-      {/* Poll Detail Modal */}
-      <PollDetailModal
-        open={modals.pollDetail.isOpen}
-        state={modals.pollDetail}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        userId={session?.user?.id}
-        showToast={showToast}
-        onUpdated={() => refreshSocial()}
-        onDeleted={() => refreshSocial()}
-        onRsvpChanged={handleRsvpChanged}
-      />
-
-      {/* Create Announcement Modal */}
-      <CreateAnnouncementModal
-        open={modals.createAnnouncement.isOpen}
-        state={modals.createAnnouncement}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        onCreated={() => {
-          showToast("Announcement posted!");
-          refreshSocial();
-        }}
-      />
-
-      {/* Announcement Detail Modal */}
-      <AnnouncementDetailModal
-        open={modals.announcementDetail.isOpen}
-        state={modals.announcementDetail}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        userId={session?.user?.id}
-        showToast={showToast}
-        onUpdated={() => refreshSocial()}
-        onDeleted={() => refreshSocial()}
-      />
-
-      {/* Create Dues Modal */}
-      <CreateDuesModal
-        open={modals.createDues.isOpen}
-        state={modals.createDues}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        onCreated={() => {
-          showToast("Dues created!");
-          refreshSocial();
-        }}
-      />
-
-      {/* Dues Detail Modal */}
-      <DuesDetailModal
-        open={modals.duesDetail.isOpen}
-        state={modals.duesDetail}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        userId={session?.user?.id}
-        showToast={showToast}
-        onUpdated={() => refreshSocial()}
-        onDeleted={() => refreshSocial()}
-        venmoUsername={modals.duesDetail.venmoUsername}
-      />
-
-      {/* Manage Fields Modal */}
-      <ManageFieldsModal
-        open={modals.manageFields.isOpen}
-        state={modals.manageFields}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        showToast={showToast}
-        onUpdated={() => refreshSocial()}
-      />
-
-      {/* Fill Fields Modal */}
-      <FillFieldsModal
-        open={modals.fillFields.isOpen}
-        state={modals.fillFields}
-        dispatch={dispatchModal}
-        styles={styles}
-        colors={colors}
-        showToast={showToast}
-      />
-
       {/* Import Preview Modal */}
       <ImportPreviewModal
         open={modals.importPreview.isOpen}
@@ -8209,8 +7591,6 @@ function WorkoutCard({ workout, collapsed, onToggle, logsForDate, openLog, delet
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
           <div style={styles.cardTitle}>{workout.name}</div>
           <span style={styles.tagMuted}>{cat}</span>
-          {workout.source === "group" && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>Group</span>}
-          {workout.source === "event" && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: "#9b59b622", color: "#9b59b6" }}>Event</span>}
           {scheduledBadge && <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>Scheduled</span>}
           {continuousMeta && (
             <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 999, background: (colors?.accent || "#4fc3f7") + "22", color: colors?.accent || "#4fc3f7" }}>
