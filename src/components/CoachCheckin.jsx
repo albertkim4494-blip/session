@@ -13,8 +13,8 @@ const MOOD_FACES = [
 ];
 
 const MOOD_LABELS = { "-2": "Brutal", "-1": "Tough", "0": "Okay", "1": "Good", "2": "Great" };
-const SLEEP_OPTIONS = ["restless", "rested"];
-const SLEEP_LABELS = { restless: "Restless", rested: "Rested" };
+const SLEEP_OPTIONS = ["rested", "okay", "restless"];
+const SLEEP_LABELS = { restless: "Restless", okay: "Okay", rested: "Rested" };
 const SEVERITY_CYCLE = [null, "mild", "moderate", "severe"];
 const SEVERITY_COLORS = { mild: "#eab308", moderate: "#f97316", severe: "#ef4444" };
 const SEVERITY_EMOJI = { mild: "\uD83D\uDFE1", moderate: "\uD83D\uDFE0", severe: "\uD83D\uDD34" };
