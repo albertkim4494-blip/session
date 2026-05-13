@@ -771,15 +771,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, [tab]);
 
-  // Auto-advance dateKey at midnight if user was viewing "today"
+  // Auto-advance dateKey at midnight if user was viewing "today".
+  //
+  // Subtle bug we hit before: the check has to know whether the calendar day
+  // ACTUALLY changed between two ticks. Comparing only against "today" makes
+  // every check while the user is on yesterday look like a midnight crossover,
+  // which yanks them back to today as soon as visibilitychange fires (modal
+  // focus shifts on Android, etc). Track the last-seen today in a ref and
+  // only advance when it changes.
   useEffect(() => {
+    let lastSeenToday = yyyyMmDd(new Date());
     const checkMidnight = () => {
       const now = yyyyMmDd(new Date());
+      if (now === lastSeenToday) return; // no calendar rollover; do nothing
+      const previousToday = lastSeenToday;
+      lastSeenToday = now;
       setCoachTodayKey(now);
       setDateKey(prev => {
-        // Only advance if prev was yesterday (meaning it was "today" before midnight crossed)
-        // If user is browsing an older date intentionally, leave them alone
-        if (prev !== now && prev === addDays(now, -1)) return now;
+        // Only advance if the user was sitting on the day that was "today"
+        // before this rollover. If they're browsing an older date, leave them.
+        if (prev === previousToday) return now;
         return prev;
       });
     };
