@@ -4508,15 +4508,66 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   );
                 })()
               ) : !isToday && !hasSessions ? (
-                /* NON-TODAY EMPTY: no logs or sessions */
-                <div style={{
-                  display: "flex", flexDirection: "column", alignItems: "center",
-                  textAlign: "center", padding: "48px 20px", gap: 8,
-                }}>
-                  <div style={{ fontSize: 14, opacity: 0.45 }}>
-                    No sessions logged.
-                  </div>
-                </div>
+                /* NON-TODAY EMPTY: no logs or sessions — backfill-friendly */
+                (() => {
+                  const pattern = getUpNextSuggestion(
+                    state.logsByDate || {},
+                    state.program?.workouts || [],
+                    state.dailyWorkouts || {},
+                    dateKey,
+                  );
+                  let contextLine = null;
+                  if (pattern?.isRestDay && pattern.dayName) {
+                    contextLine = `Looks like a typical rest day on ${pattern.dayName}s.`;
+                  } else if (pattern?.workouts?.length && pattern.confidence >= 0.5 && pattern.dayName) {
+                    contextLine = `You usually train ${pattern.workouts.join(" + ")} on ${pattern.dayName}s.`;
+                  }
+
+                  return (
+                    <div style={{
+                      display: "flex", flexDirection: "column", alignItems: "center",
+                      textAlign: "center", padding: "56px 20px 24px", gap: 14,
+                    }}>
+                      {/* Muted moon glyph — quiet day */}
+                      <svg width="32" height="32" viewBox="0 0 24 24"
+                           fill="none" stroke="currentColor" strokeWidth="1.5"
+                           strokeLinecap="round" strokeLinejoin="round"
+                           style={{ opacity: 0.25, color: colors.text }}>
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                      </svg>
+                      <div style={{ fontSize: 14, opacity: 0.55, fontWeight: 600 }}>
+                        No sessions logged
+                      </div>
+                      {contextLine && (
+                        <div style={{ fontSize: 12, opacity: 0.4, lineHeight: 1.5, maxWidth: 280 }}>
+                          {contextLine}
+                        </div>
+                      )}
+                      <button
+                        className="btn-press"
+                        onClick={() => setFabOpen(true)}
+                        style={{
+                          marginTop: 4,
+                          padding: "10px 18px",
+                          borderRadius: 999,
+                          border: `1px solid ${colors.accentBorder}`,
+                          background: colors.accentBg,
+                          color: colors.accent,
+                          fontSize: 13, fontWeight: 700, fontFamily: "inherit",
+                          cursor: "pointer",
+                          display: "inline-flex", alignItems: "center", gap: 6,
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Add session
+                      </button>
+                    </div>
+                  );
+                })()
               ) : (
                 /* HAS SESSIONS: header + cards */
                 <>
