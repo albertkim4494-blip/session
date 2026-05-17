@@ -4,7 +4,7 @@ import { useKeyboardInset } from "../hooks/useKeyboardInset";
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose, sheetAnimation, noChrome, sheetRef, footerRef, bodyRef, ariaLabel }) {
+export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose, sheetAnimation, noChrome, sheetRef, footerRef, bodyRef, ariaLabel, compactHeight }) {
   const kbInset = useKeyboardInset();
   const internalSheetRef = useRef(null);
   const previousFocusRef = useRef(null);
@@ -88,7 +88,7 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
 
   const sheetStyle = fullScreen
     ? { ...styles.modalSheet, borderRadius: 0, height: "100dvh", maxWidth: "100%", display: "flex", flexDirection: "column" }
-    : { ...styles.modalSheet, ...((footer || noChrome) ? { height: `calc(95dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column", animation: sheetAnimation || "modalSlideUp 0.25s cubic-bezier(.2,.8,.3,1)" };
+    : { ...styles.modalSheet, ...(compactHeight ? { maxHeight: `calc(95dvh - ${kbInset}px)` } : ((footer || noChrome) ? { height: `calc(95dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` })), display: "flex", flexDirection: "column", animation: sheetAnimation || "modalSlideUp 0.25s cubic-bezier(.2,.8,.3,1)" };
 
   const dialogA11y = {
     role: "dialog",

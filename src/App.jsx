@@ -45,6 +45,7 @@ import { RestoreFromHistoryModal } from "./components/profile/RestoreFromHistory
 import { AddSuggestedExerciseModal } from "./components/CoachInsights";
 import { TimeRangeControl } from "./components/TimeRangeControl";
 import { ExerciseListTable } from "./components/ExerciseListTable";
+import { ExerciseCatalogSection } from "./components/ExerciseCatalogSection";
 import { ExerciseCatalogModal } from "./components/ExerciseCatalogModal";
 import { GenerateWizardModal } from "./components/GenerateWizardModal";
 import { GenerateTodayModal } from "./components/GenerateTodayModal";
@@ -1428,7 +1429,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     modals.editExercise?.isOpen || modals.catalogBrowse.isOpen || modals.generateWizard.isOpen ||
     modals.generateToday.isOpen || modals.customExercise?.isOpen || modals.billing?.isOpen ||
     modals.friendSearch?.isOpen ||
-    modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen;
+    modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen ||
+    modals.workoutDetail?.isOpen;
 
   const backOverrideRef = useRef(null);
   const anyModalOpenRef = useRef(false);
@@ -2517,16 +2519,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const isNew = !splitId;
       const id = splitId || uid("split");
 
-      // Workouts that were members before this save but are no longer → revert to whenever.
+      // Helper: collect every other split's member ids so we don't accidentally
+      // wipe a workout's cadence when it still lives in another split.
+      const otherSplitMemberIds = new Set();
+      for (const s of (st.program.splits || [])) {
+        if (s.id === splitId) continue;
+        for (const m of (s.members || [])) otherSplitMemberIds.add(m.workoutId);
+      }
+
+      // Workouts that were members before this save but are no longer → revert to
+      // whenever, unless they're still a member of another split.
       const prevSplit = (st.program.splits || []).find((s) => s.id === splitId);
       const prevMemberIds = new Set((prevSplit?.members || []).map((m) => m.workoutId));
       const removedIds = [...prevMemberIds].filter((wid) => !memberWorkoutIds.has(wid));
       for (const wid of removedIds) {
+        if (otherSplitMemberIds.has(wid)) continue; // Still in another split
         const w = st.program.workouts.find((x) => x.id === wid);
         if (w) w.cadence = { mode: CADENCE_MODES.WHENEVER };
       }
 
-      // Apply cadence to current members based on split mode.
+      // Apply cadence to current members based on split mode. If the workout is
+      // ALSO a member of another split, the most-recently-saved split's cadence
+      // wins (last-save-wins). The user can resolve any conflict by editing.
       for (const m of members) {
         const w = st.program.workouts.find((x) => x.id === m.workoutId);
         if (!w) continue;
@@ -2703,7 +2717,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           confirmText: "Delete",
           onConfirm: () => {
             updateState((st) => {
+              // Only revert cadence for members not also in another split.
+              const otherSplitMemberIds = new Set();
+              for (const other of (st.program.splits || [])) {
+                if (other.id === splitId) continue;
+                for (const m of (other.members || [])) otherSplitMemberIds.add(m.workoutId);
+              }
               for (const m of s.members || []) {
+                if (otherSplitMemberIds.has(m.workoutId)) continue;
                 const w = st.program.workouts.find((x) => x.id === m.workoutId);
                 if (w) w.cadence = { mode: CADENCE_MODES.WHENEVER };
               }
@@ -4983,12 +5004,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </button>
               </div>
 
-              {/* Unified library feed */}
-              {splits.length === 0 && workouts.length === 0 ? (
+              {/* Empty state — no workouts AND no splits */}
+              {splits.length === 0 && workouts.length === 0 && (
                 <div style={{
                   display: "flex", flexDirection: "column", alignItems: "center",
                   padding: "40px 16px 16px", textAlign: "center",
-                  gap: 0,
                 }}>
                   <div style={{
                     width: 56, height: 56, marginBottom: 14,
@@ -5037,9 +5057,124 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     Start from scratch
                   </button>
                 </div>
-              ) : (
+              )}
+
+              {/* ===== EXERCISES SECTION ===== */}
+              <div style={{
+                fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
+                textTransform: "uppercase", color: colors.textTertiary,
+                marginTop: 6, marginBottom: -4, paddingLeft: 4,
+              }}>
+                Exercises
+              </div>
+              <ExerciseCatalogSection
+                styles={styles}
+                colors={colors}
+                catalogCount={fullCatalog.length}
+                onOpen={() => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: null } })}
+              />
+
+              {/* ===== WORKOUTS SECTION ===== */}
+              {workouts.length > 0 && (<>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
+                  textTransform: "uppercase", color: colors.textTertiary,
+                  marginTop: 12, marginBottom: -4, paddingLeft: 4,
+                }}>
+                  Workouts
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {workouts.map((w) => {
+                    const exCount = (w.exercises || []).length;
+                    const split = workoutToSplit.get(w.id) || null;
+                    const cadLabel = (() => {
+                      if (split) return split.mode === SPLIT_MODES.CONTINUOUS ? "Continuous" : "Weekly";
+                      const c = w.cadence || { mode: CADENCE_MODES.WHENEVER };
+                      if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
+                      if (c.mode === CADENCE_MODES.ANCHOR) {
+                        if (!Array.isArray(c.days) || c.days.length === 0) return null;
+                        return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
+                          .map((d) => d.full.slice(0, 3)).join(" · ");
+                      }
+                      return null;
+                    })();
+                    return (
+                      <div key={w.id} style={{
+                        background: colors.cardBg, borderRadius: 14,
+                        border: `1px solid ${colors.border}`, boxShadow: colors.shadow,
+                        overflow: "hidden",
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
+                          style={{
+                            width: "100%", minHeight: 60,
+                            padding: "12px 14px",
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                            color: colors.text,
+                            display: "flex", alignItems: "center", gap: 12,
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: 14.5, fontWeight: 700,
+                              color: colors.text, letterSpacing: -0.1,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}>{w.name}</div>
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: 6,
+                              marginTop: 3,
+                              fontSize: 11.5, color: colors.textSecondary,
+                              flexWrap: "wrap",
+                            }}>
+                              <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
+                              {w.category && (
+                                <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
+                              )}
+                              {split && (
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700,
+                                  padding: "2px 8px", borderRadius: 999,
+                                  background: colors.accentSoft,
+                                  color: colors.accent,
+                                  border: `1px solid ${colors.accentBorder}`,
+                                  marginLeft: 4,
+                                }}>In: {split.name}</span>
+                              )}
+                              {cadLabel && (
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700,
+                                  padding: "2px 8px", borderRadius: 999,
+                                  background: colors.subtleBg,
+                                  color: colors.textSecondary,
+                                  border: `1px solid ${colors.border}`,
+                                  marginLeft: split ? 0 : 4,
+                                }}>{cadLabel}</span>
+                              )}
+                            </div>
+                          </div>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>)}
+
+              {/* ===== SPLITS SECTION ===== */}
+              {splits.length > 0 && (<>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
+                  textTransform: "uppercase", color: colors.textTertiary,
+                  marginTop: 12, marginBottom: -4, paddingLeft: 4,
+                }}>
+                  Splits
+                </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {/* Splits */}
                   {splits.map((s) => {
                     const isContinuous = s.mode === SPLIT_MODES.CONTINUOUS;
                     const memberCount = (s.members || []).length;
@@ -5158,92 +5293,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       </div>
                     );
                   })}
-
-                  {/* Standalone workouts */}
-                  {(() => {
-                    const standalone = workouts.filter((w) => !workoutToSplit.has(w.id));
-                    if (standalone.length === 0) return null;
-                    return (
-                      <>
-                        {splits.length > 0 && (
-                          <div style={{
-                            fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
-                            textTransform: "uppercase", color: colors.textTertiary,
-                            marginTop: 6, marginBottom: -4, paddingLeft: 4,
-                          }}>
-                            Standalone workouts
-                          </div>
-                        )}
-                        {standalone.map((w) => {
-                          const exCount = (w.exercises || []).length;
-                          const cadLabel = (() => {
-                            const c = w.cadence || { mode: CADENCE_MODES.WHENEVER };
-                            if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
-                            if (c.mode === CADENCE_MODES.ANCHOR) {
-                              if (!Array.isArray(c.days) || c.days.length === 0) return null;
-                              return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
-                                .map((d) => d.full.slice(0, 3)).join(" · ");
-                            }
-                            return null;
-                          })();
-                          return (
-                            <div key={w.id} style={{
-                              background: colors.cardBg, borderRadius: 14,
-                              border: `1px solid ${colors.border}`, boxShadow: colors.shadow,
-                              overflow: "hidden",
-                            }}>
-                              <button
-                                type="button"
-                                onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
-                                style={{
-                                  width: "100%", minHeight: 60,
-                                  padding: "12px 14px",
-                                  background: "transparent",
-                                  border: "none",
-                                  cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                                  color: colors.text,
-                                  display: "flex", alignItems: "center", gap: 12,
-                                }}
-                              >
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{
-                                    fontSize: 14.5, fontWeight: 700,
-                                    color: colors.text, letterSpacing: -0.1,
-                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                  }}>{w.name}</div>
-                                  <div style={{
-                                    display: "flex", alignItems: "center", gap: 6,
-                                    marginTop: 3,
-                                    fontSize: 11.5, color: colors.textSecondary,
-                                  }}>
-                                    <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
-                                    {w.category && (
-                                      <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
-                                    )}
-                                    {cadLabel && (
-                                      <span style={{
-                                        fontSize: 10, fontWeight: 700,
-                                        padding: "2px 8px", borderRadius: 999,
-                                        background: colors.subtleBg,
-                                        color: colors.textSecondary,
-                                        border: `1px solid ${colors.border}`,
-                                        marginLeft: 4,
-                                      }}>{cadLabel}</span>
-                                    )}
-                                  </div>
-                                </div>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                  <polyline points="9 18 15 12 9 6" />
-                                </svg>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </>
-                    );
-                  })()}
                 </div>
-              )}
+              </>)}
 
             </div>
           ) : null}

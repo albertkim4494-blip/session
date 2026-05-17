@@ -50,13 +50,14 @@ export function SplitEditorModal({
   const { splitId, name, mode, members, restPattern } = modalState;
   const isNew = !splitId;
 
-  // Map: workoutId → splitId of any *other* split. Used to exclude workouts that
-  // are already members of a different split from the picker.
-  const ownedByOtherSplit = useMemo(() => {
+  // Map: workoutId → split name (any *other* split it belongs to). Used to show
+  // a small "Already in: X" tag in the picker, but the workout can still be
+  // added to this split too — a workout can belong to multiple splits.
+  const otherSplitNameByWorkout = useMemo(() => {
     const map = new Map();
     for (const s of splits || []) {
       if (s.id === splitId) continue;
-      for (const m of s.members || []) map.set(m.workoutId, s.id);
+      for (const m of s.members || []) map.set(m.workoutId, s.name);
     }
     return map;
   }, [splits, splitId]);
@@ -64,8 +65,8 @@ export function SplitEditorModal({
   const memberWorkoutIds = useMemo(() => new Set(members.map((m) => m.workoutId)), [members]);
 
   const availableToAdd = useMemo(
-    () => (workouts || []).filter((w) => !memberWorkoutIds.has(w.id) && !ownedByOtherSplit.has(w.id)),
-    [workouts, memberWorkoutIds, ownedByOtherSplit]
+    () => (workouts || []).filter((w) => !memberWorkoutIds.has(w.id)),
+    [workouts, memberWorkoutIds]
   );
 
   const workoutNameById = useMemo(() => {
@@ -256,28 +257,45 @@ export function SplitEditorModal({
                 + Add a workout
               </summary>
               <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
-                {availableToAdd.map((w) => (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => addMember(w.id)}
-                    style={{
-                      textAlign: "left", padding: "8px 10px", borderRadius: 8,
-                      border: `1px solid ${colors.border}`, background: "transparent",
-                      color: colors.text, fontSize: 13, cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    {w.name}
-                  </button>
-                ))}
+                {availableToAdd.map((w) => {
+                  const otherSplitName = otherSplitNameByWorkout.get(w.id);
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      onClick={() => addMember(w.id)}
+                      style={{
+                        textAlign: "left", padding: "8px 10px", borderRadius: 8,
+                        border: `1px solid ${colors.border}`, background: "transparent",
+                        color: colors.text, fontSize: 13, cursor: "pointer",
+                        fontFamily: "inherit",
+                        display: "flex", alignItems: "center", gap: 8,
+                      }}
+                    >
+                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {w.name}
+                      </span>
+                      {otherSplitName && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700,
+                          padding: "2px 7px", borderRadius: 999,
+                          background: colors.subtleBg, color: colors.textSecondary,
+                          border: `1px solid ${colors.border}`,
+                          flexShrink: 0,
+                        }}>
+                          Already in: {otherSplitName}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </details>
           )}
 
           {availableToAdd.length === 0 && members.length === 0 && (
             <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6, lineHeight: 1.5 }}>
-              No standalone workouts to add. Create a workout first, or remove one from another split.
+              No workouts to add. Create one first.
             </div>
           )}
         </div>

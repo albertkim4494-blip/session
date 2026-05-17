@@ -164,16 +164,44 @@ export function WorkoutDetailSheet({
     </div>
   );
 
+  // Lower overlay z-index so sub-modals (CatalogBrowse, EditExercise) layer on top.
+  const sheetStyles = useMemo(() => ({
+    ...styles,
+    modalOverlay: { ...styles.modalOverlay, zIndex: 45 },
+  }), [styles]);
+
+  // Footer (frozen at sheet bottom by Modal).
+  const footer = (
+    <div style={{
+      display: "flex",
+      gap: 8,
+      paddingTop: 6,
+      borderTop: `1px solid ${colors.border}`,
+    }}>
+      <ActionButton colors={colors} label="Share" onClick={() => onShareWorkout(workout.id, workout.name)}
+        icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>}
+      />
+      <ActionButton colors={colors} label="Duplicate" onClick={() => onDuplicateWorkout(workout.id)}
+        icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>}
+      />
+      <ActionButton colors={colors} label="Delete" danger onClick={() => onDeleteWorkout(workout.id)}
+        icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={colors.dangerText} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg>}
+      />
+    </div>
+  );
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      styles={styles}
+      styles={sheetStyles}
       headerContent={headerContent}
       hideClose
+      footer={footer}
+      compactHeight
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-        {/* Workout name — inline editable */}
+      {/* FROZEN HEADER BLOCK — workout name + meta chips */}
+      <div style={{ flexShrink: 0 }}>
         <input
           ref={nameInputRef}
           value={nameDraft}
@@ -197,7 +225,6 @@ export function WorkoutDetailSheet({
           }}
         />
 
-        {/* Meta chips */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
           <MetaChip label="Category" value={categoryValue} colors={colors}
             onClick={() => onOpenEditWorkout(workout.id)} />
@@ -206,10 +233,23 @@ export function WorkoutDetailSheet({
             onClick={splitForWorkout ? undefined : () => onOpenEditWorkout(workout.id)}
             disabled={!!splitForWorkout} />
         </div>
+      </div>
 
+      {/* SCROLLABLE EXERCISES AREA */}
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
+        marginTop: 22,
+        marginLeft: -4,
+        marginRight: -4,
+        paddingLeft: 4,
+        paddingRight: 4,
+        WebkitOverflowScrolling: "touch",
+        overscrollBehavior: "contain",
+      }}>
         {/* Exercises section header */}
         <div style={{
-          marginTop: 22,
           marginBottom: 10,
           display: "flex",
           alignItems: "center",
@@ -414,25 +454,6 @@ export function WorkoutDetailSheet({
               Browse exercise catalog →
             </button>
           )}
-        </div>
-
-        {/* Bottom action row */}
-        <div style={{
-          marginTop: 18,
-          paddingTop: 14,
-          borderTop: `1px solid ${colors.border}`,
-          display: "flex",
-          gap: 8,
-        }}>
-          <ActionButton colors={colors} label="Share" onClick={() => onShareWorkout(workout.id, workout.name)}
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>}
-          />
-          <ActionButton colors={colors} label="Duplicate" onClick={() => onDuplicateWorkout(workout.id)}
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>}
-          />
-          <ActionButton colors={colors} label="Delete" danger onClick={() => onDeleteWorkout(workout.id)}
-            icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={colors.dangerText} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg>}
-          />
         </div>
       </div>
     </Modal>
