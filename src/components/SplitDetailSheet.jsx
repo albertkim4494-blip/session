@@ -2,6 +2,8 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Modal } from "./Modal";
 import { SPLIT_MODES } from "../lib/cadence";
 import { DayChips } from "./CadenceEditor";
+import { useDragReorder } from "../hooks/useDragReorder";
+import { DragGrip } from "./WorkoutsList";
 
 function MetaChip({ label, value, colors }) {
   return (
@@ -73,7 +75,16 @@ export function SplitDetailSheet({
   weekStartsOn = 1,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  useEffect(() => { if (open) setPickerOpen(false); }, [open, split?.id]);
+  const [reorderMembers, setReorderMembers] = useState(false);
+  useEffect(() => { if (open) { setPickerOpen(false); setReorderMembers(false); } }, [open, split?.id]);
+
+  // Drag-to-reorder for continuous split members. Must be called before any early return.
+  const memberCountForDrag = split?.members?.length || 0;
+  const memberDrag = useDragReorder({
+    itemCount: memberCountForDrag,
+    onCommit: (from, to) => onReorderMembers?.(from, to),
+    rowHeight: 64,
+  });
 
   const workoutById = useMemo(() => {
     const m = new Map();
@@ -154,42 +165,64 @@ export function SplitDetailSheet({
           paddingLeft: 4, paddingRight: 4,
           WebkitOverflowScrolling: "touch", overscrollBehavior: "contain",
         }}>
-          {/* Section header */}
+          {/* Section header + Reorder pill (continuous splits with >1 member) */}
           <div style={{
             marginBottom: 10,
-            fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
-            textTransform: "uppercase", color: colors.textTertiary,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
-            Workouts · {members.length}
+            <div style={{
+              fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
+              textTransform: "uppercase", color: colors.textTertiary,
+            }}>
+              Workouts · {members.length}
+            </div>
+            {isContinuous && members.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setReorderMembers((v) => !v)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: reorderMembers ? colors.accentSoft : "transparent",
+                  border: `1px solid ${reorderMembers ? colors.accentBorder : colors.border}`,
+                  color: reorderMembers ? colors.accent : colors.textSecondary,
+                  fontFamily: "inherit",
+                  fontSize: 11, fontWeight: 700, letterSpacing: 0.3,
+                  cursor: "pointer",
+                  minHeight: 32,
+                }}
+              >{reorderMembers ? "Done" : "Reorder"}</button>
+            )}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {members.map((m, mi) => {
               const w = workoutById.get(m.workoutId);
               if (!w) return null;
-              const isFirst = mi === 0;
-              const isLast = mi === members.length - 1;
               const exCount = (w.exercises || []).length;
               const positionLabel = isContinuous ? `Day ${mi + 1}` : null;
               return (
                 <div
                   key={m.workoutId}
+                  ref={reorderMembers ? memberDrag.setItemRef(mi) : undefined}
                   style={{
                     background: colors.cardAltBg,
                     border: `1px solid ${colors.border}`,
                     borderRadius: 14,
                     display: "flex", flexDirection: "column",
+                    ...(reorderMembers ? memberDrag.itemStyle(mi) : {}),
                   }}
                 >
                   {/* Workout tap-target row */}
                   <button
                     type="button"
-                    onClick={() => onOpenWorkoutDetail(w.id)}
+                    onClick={reorderMembers ? undefined : () => onOpenWorkoutDetail(w.id)}
                     style={{
                       width: "100%", minHeight: 56,
                       padding: "12px 14px",
                       background: "transparent", border: "none",
-                      cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                      cursor: reorderMembers ? "default" : "pointer",
+                      textAlign: "left", fontFamily: "inherit",
                       color: colors.text,
                       display: "flex", alignItems: "center", gap: 12,
                     }}
@@ -218,59 +251,31 @@ export function SplitDetailSheet({
                     </div>
                     {/* Per-member controls */}
                     <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-                      {isContinuous && (
-                        <>
-                          <button
-                            type="button"
-                            disabled={isFirst}
-                            onClick={(e) => { e.stopPropagation(); onReorderMembers(mi, mi - 1); }}
-                            style={{
-                              background: "transparent", border: "none",
-                              color: colors.text, opacity: isFirst ? 0.15 : 0.55,
-                              padding: 4, cursor: isFirst ? "default" : "pointer",
-                              display: "flex", alignItems: "center",
-                            }}
-                            title="Move up"
-                          >
-                            <svg width="14" height="11" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isLast}
-                            onClick={(e) => { e.stopPropagation(); onReorderMembers(mi, mi + 1); }}
-                            style={{
-                              background: "transparent", border: "none",
-                              color: colors.text, opacity: isLast ? 0.15 : 0.55,
-                              padding: 4, cursor: isLast ? "default" : "pointer",
-                              display: "flex", alignItems: "center",
-                            }}
-                            title="Move down"
-                          >
-                            <svg width="14" height="11" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
-                          </button>
-                        </>
+                      {reorderMembers ? (
+                        <DragGrip {...memberDrag.handleProps(mi)} colors={colors} />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onRemoveMember(w.id); }}
+                          title="Remove from split"
+                          style={{
+                            background: "transparent", border: "none",
+                            padding: 4, marginLeft: 2,
+                            cursor: "pointer", opacity: 0.45, color: colors.text,
+                            display: "flex", alignItems: "center",
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onRemoveMember(w.id); }}
-                        title="Remove from split"
-                        style={{
-                          background: "transparent", border: "none",
-                          padding: 4, marginLeft: 2,
-                          cursor: "pointer", opacity: 0.45, color: colors.text,
-                          display: "flex", alignItems: "center",
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
                     </div>
                   </button>
 
-                  {/* Day chips for weekly splits */}
-                  {!isContinuous && (
+                  {/* Day chips for weekly splits (hidden during reorder for compactness) */}
+                  {!isContinuous && !reorderMembers && (
                     <div style={{
                       padding: "0 12px 12px",
                       borderTop: `1px solid ${colors.border}`,

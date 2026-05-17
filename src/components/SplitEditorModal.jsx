@@ -2,6 +2,8 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Modal } from "./Modal";
 import { SPLIT_MODES } from "../lib/cadence";
 import { DayChips } from "./CadenceEditor";
+import { useDragReorder } from "../hooks/useDragReorder";
+import { DragGrip } from "./WorkoutsList";
 
 function ModeButton({ active, onClick, children, colors }) {
   return (
@@ -36,11 +38,33 @@ export function SplitEditorModal({
   open, modalState, onUpdate, onClose, onSave, workouts, splits, styles, colors, weekStartsOn = 1,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [reorderMembers, setReorderMembers] = useState(false);
 
   const { splitId, name, mode, members, restPattern } = modalState;
   const isNew = !splitId;
 
-  useEffect(() => { if (open) setPickerOpen(false); }, [open, splitId]);
+  useEffect(() => {
+    if (open) {
+      setPickerOpen(false);
+      setReorderMembers(false);
+    }
+  }, [open, splitId]);
+
+  // Drag-to-reorder hook for continuous members. Members are staged here, so
+  // the commit handler shuffles modalState.members directly (no immediate
+  // persistence — Save commits everything).
+  const memberDrag = useDragReorder({
+    itemCount: (members || []).length,
+    onCommit: (from, to) => {
+      const arr = [...(members || [])];
+      if (from < 0 || from >= arr.length) return;
+      if (to < 0 || to >= arr.length) return;
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+      onUpdate({ members: arr });
+    },
+    rowHeight: 64,
+  });
 
   const workoutNameById = useMemo(() => {
     const m = new Map();
@@ -175,21 +199,40 @@ export function SplitEditorModal({
 
         {/* Members */}
         <div style={styles.fieldCol}>
-          <label style={styles.label}>Workouts in this split</label>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <label style={styles.label}>Workouts in this split</label>
+            {mode === SPLIT_MODES.CONTINUOUS && (members || []).length > 1 && (
+              <button
+                type="button"
+                onClick={() => setReorderMembers((v) => !v)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: reorderMembers ? colors.accentSoft : "transparent",
+                  border: `1px solid ${reorderMembers ? colors.accentBorder : colors.border}`,
+                  color: reorderMembers ? colors.accent : colors.textSecondary,
+                  fontFamily: "inherit",
+                  fontSize: 11, fontWeight: 700, letterSpacing: 0.3,
+                  cursor: "pointer",
+                  minHeight: 32,
+                }}
+              >{reorderMembers ? "Done" : "Reorder"}</button>
+            )}
+          </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {(members || []).map((m, i) => {
-              const isFirst = i === 0;
-              const isLast = i === (members || []).length - 1;
               const workoutName = workoutNameById.get(m.workoutId) || "(deleted workout)";
               return (
                 <div
                   key={m.workoutId}
+                  ref={reorderMembers ? memberDrag.setItemRef(i) : undefined}
                   style={{
                     background: colors.cardAltBg,
                     border: `1px solid ${colors.border}`,
                     borderRadius: 14,
                     display: "flex", flexDirection: "column",
+                    ...(reorderMembers ? memberDrag.itemStyle(i) : {}),
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px" }}>
@@ -208,57 +251,29 @@ export function SplitEditorModal({
                         }}>{workoutName}</span>
                       </div>
                     </div>
-                    {mode === SPLIT_MODES.CONTINUOUS && (
-                      <>
-                        <button
-                          type="button"
-                          disabled={isFirst}
-                          onClick={() => moveMember(m.workoutId, -1)}
-                          title="Move up"
-                          style={{
-                            background: "transparent", border: "none",
-                            color: colors.text, opacity: isFirst ? 0.15 : 0.55,
-                            padding: 4, cursor: isFirst ? "default" : "pointer",
-                            display: "flex", alignItems: "center",
-                          }}
-                        >
-                          <svg width="14" height="11" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isLast}
-                          onClick={() => moveMember(m.workoutId, 1)}
-                          title="Move down"
-                          style={{
-                            background: "transparent", border: "none",
-                            color: colors.text, opacity: isLast ? 0.15 : 0.55,
-                            padding: 4, cursor: isLast ? "default" : "pointer",
-                            display: "flex", alignItems: "center",
-                          }}
-                        >
-                          <svg width="14" height="11" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
-                        </button>
-                      </>
+                    {reorderMembers ? (
+                      <DragGrip {...memberDrag.handleProps(i)} colors={colors} />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => removeMember(m.workoutId)}
+                        title="Remove from split"
+                        style={{
+                          background: "transparent", border: "none",
+                          padding: 4, marginLeft: 2,
+                          cursor: "pointer", opacity: 0.45, color: colors.text,
+                          display: "flex", alignItems: "center",
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => removeMember(m.workoutId)}
-                      title="Remove from split"
-                      style={{
-                        background: "transparent", border: "none",
-                        padding: 4, marginLeft: 2,
-                        cursor: "pointer", opacity: 0.45, color: colors.text,
-                        display: "flex", alignItems: "center",
-                      }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
                   </div>
 
-                  {mode === SPLIT_MODES.WEEKLY && (
+                  {mode === SPLIT_MODES.WEEKLY && !reorderMembers && (
                     <div style={{
                       padding: "0 12px 12px",
                       borderTop: `1px solid ${colors.border}`,
@@ -277,8 +292,9 @@ export function SplitEditorModal({
               );
             })}
 
-            {/* Add a workout — dashed accent button + inline picker */}
-            {availableToAdd.length > 0 ? (
+            {/* Add a workout — dashed accent button + inline picker. Hidden
+                while reordering for a cleaner drag UI. */}
+            {!reorderMembers && availableToAdd.length > 0 ? (
               <>
                 <button
                   type="button"
