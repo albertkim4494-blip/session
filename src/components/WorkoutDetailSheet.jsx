@@ -140,7 +140,6 @@ export function WorkoutDetailSheet({
 
   if (!open || !workout) return null;
   const cadenceValue = splitForWorkout ? "Continuous" : cadenceLine(workout.cadence);
-  const scheduleValue = splitForWorkout ? `In split: ${splitForWorkout.name}` : "Standalone";
   const categoryValue = (workout.category || "Workout").trim();
 
   // Lower overlay z-index so sub-modals (CatalogBrowse, EditExercise) layer on top.
@@ -209,8 +208,7 @@ export function WorkoutDetailSheet({
       <div style={{ flexShrink: 0 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           <MetaChip label="Category" value={categoryValue} colors={colors} disabled />
-          <MetaChip label="Schedule" value={scheduleValue} colors={colors} disabled />
-          <MetaChip label="Cadence" value={cadenceValue} colors={colors} disabled />
+          <MetaChip label="Schedule" value={cadenceValue} colors={colors} disabled />
         </div>
       </div>
 
