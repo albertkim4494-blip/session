@@ -4994,130 +4994,125 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     <div
                       onClick={() => toggleCollapse(setCollapsedManage, "workouts")}
                       style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        display: "flex", alignItems: "center",
                         padding: "14px 16px",
-                        cursor: "pointer", userSelect: "none",
+                        cursor: "pointer", userSelect: "none", gap: 8,
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
-                          <polyline points="6 9 12 15 18 9" />
-                        </svg>
-                        <div style={{
-                          fontSize: 11, fontWeight: 600, opacity: 0.4,
-                          textTransform: "uppercase", letterSpacing: 1,
-                        }}>
-                          Workouts
-                        </div>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                      <div style={{
+                        fontSize: 11, fontWeight: 600, opacity: 0.4,
+                        textTransform: "uppercase", letterSpacing: 1,
+                      }}>
+                        Workouts
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); addWorkout(); }}
-                        aria-label="Add workout"
-                        title="Add workout"
-                        style={{
-                          width: 28, height: 28, borderRadius: 999,
-                          border: `1px solid ${colors.border}`,
-                          background: "transparent",
-                          color: colors.textSecondary,
-                          cursor: "pointer", padding: 0,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                      </button>
                     </div>
 
-                    {/* Body — flat rows separated by dividers */}
+                    {/* Body — workout rows styled like exercise rows in WorkoutDetailSheet,
+                        with a dashed "+ Add workout" button at the bottom. */}
                     {!isCollapsed && (
-                      workouts.length === 0 ? (
-                        <div style={{
-                          padding: "16px",
-                          borderTop: `1px solid ${colors.border}`,
-                          fontSize: 12.5, color: colors.textSecondary,
-                          textAlign: "center",
-                        }}>
-                          No workouts yet. Tap + to add one.
-                        </div>
-                      ) : (
-                        <div style={{ borderTop: `1px solid ${colors.border}` }}>
-                          {workouts.map((w, wi) => {
-                            const exCount = (w.exercises || []).length;
-                            const split = workoutToSplit.get(w.id) || null;
-                            const cadLabel = (() => {
-                              if (split) return split.mode === SPLIT_MODES.CONTINUOUS ? "Continuous" : "Weekly";
-                              const c = w.cadence || { mode: CADENCE_MODES.WHENEVER };
-                              if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
-                              if (c.mode === CADENCE_MODES.ANCHOR) {
-                                if (!Array.isArray(c.days) || c.days.length === 0) return null;
-                                return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
-                                  .map((d) => d.full.slice(0, 3)).join(" · ");
-                              }
-                              return null;
-                            })();
-                            const isLast = wi === workouts.length - 1;
-                            return (
-                              <button
-                                key={w.id}
-                                type="button"
-                                onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
-                                style={{
-                                  width: "100%", minHeight: 60,
-                                  padding: "12px 16px",
-                                  background: "transparent",
-                                  border: "none",
-                                  borderBottom: !isLast ? `1px solid ${colors.border}` : "none",
-                                  cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                                  color: colors.text,
-                                  display: "flex", alignItems: "center", gap: 12,
-                                }}
-                              >
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{
-                                    fontSize: 14.5, fontWeight: 700,
-                                    color: colors.text, letterSpacing: -0.1,
-                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                  }}>{w.name}</div>
-                                  <div style={{
-                                    display: "flex", alignItems: "center", gap: 6,
-                                    marginTop: 3,
-                                    fontSize: 11.5, color: colors.textSecondary,
-                                    flexWrap: "wrap",
-                                  }}>
-                                    <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
-                                    {w.category && (
-                                      <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
-                                    )}
-                                    {split && (
-                                      <span style={{
-                                        fontSize: 10, fontWeight: 700,
-                                        padding: "2px 8px", borderRadius: 999,
-                                        background: colors.accentSoft,
-                                        color: colors.accent,
-                                        border: `1px solid ${colors.accentBorder}`,
-                                        marginLeft: 4,
-                                      }}>In: {split.name}</span>
-                                    )}
-                                    {cadLabel && (
-                                      <span style={{
-                                        fontSize: 10, fontWeight: 700,
-                                        padding: "2px 8px", borderRadius: 999,
-                                        background: colors.subtleBg,
-                                        color: colors.textSecondary,
-                                        border: `1px solid ${colors.border}`,
-                                        marginLeft: split ? 0 : 4,
-                                      }}>{cadLabel}</span>
-                                    )}
-                                  </div>
+                      <div style={{
+                        padding: 12, paddingTop: 0,
+                        display: "flex", flexDirection: "column", gap: 8,
+                      }}>
+                        {workouts.map((w) => {
+                          const exCount = (w.exercises || []).length;
+                          const split = workoutToSplit.get(w.id) || null;
+                          const cadLabel = (() => {
+                            if (split) return split.mode === SPLIT_MODES.CONTINUOUS ? "Continuous" : "Weekly";
+                            const c = w.cadence || { mode: CADENCE_MODES.WHENEVER };
+                            if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
+                            if (c.mode === CADENCE_MODES.ANCHOR) {
+                              if (!Array.isArray(c.days) || c.days.length === 0) return null;
+                              return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
+                                .map((d) => d.full.slice(0, 3)).join(" · ");
+                            }
+                            return null;
+                          })();
+                          return (
+                            <button
+                              key={w.id}
+                              type="button"
+                              onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
+                              style={{
+                                width: "100%", minHeight: 60,
+                                padding: "12px 14px",
+                                borderRadius: 14,
+                                background: colors.cardAltBg,
+                                border: `1px solid ${colors.border}`,
+                                cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                                color: colors.text,
+                                display: "flex", alignItems: "center", gap: 12,
+                              }}
+                            >
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{
+                                  fontSize: 14.5, fontWeight: 700,
+                                  color: colors.text, letterSpacing: -0.1,
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                }}>{w.name}</div>
+                                <div style={{
+                                  display: "flex", alignItems: "center", gap: 6,
+                                  marginTop: 3,
+                                  fontSize: 11.5, color: colors.textSecondary,
+                                  flexWrap: "wrap",
+                                }}>
+                                  <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
+                                  {w.category && (
+                                    <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
+                                  )}
+                                  {split && (
+                                    <span style={{
+                                      fontSize: 10, fontWeight: 700,
+                                      padding: "2px 8px", borderRadius: 999,
+                                      background: colors.accentSoft,
+                                      color: colors.accent,
+                                      border: `1px solid ${colors.accentBorder}`,
+                                      marginLeft: 4,
+                                    }}>In: {split.name}</span>
+                                  )}
+                                  {cadLabel && (
+                                    <span style={{
+                                      fontSize: 10, fontWeight: 700,
+                                      padding: "2px 8px", borderRadius: 999,
+                                      background: colors.subtleBg,
+                                      color: colors.textSecondary,
+                                      border: `1px solid ${colors.border}`,
+                                      marginLeft: split ? 0 : 4,
+                                    }}>{cadLabel}</span>
+                                  )}
                                 </div>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                  <polyline points="9 18 15 12 9 6" />
-                                </svg>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )
+                              </div>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                <polyline points="9 18 15 12 9 6" />
+                              </svg>
+                            </button>
+                          );
+                        })}
+
+                        {/* Add workout — dashed button matching the +Add exercise pattern */}
+                        <button
+                          type="button"
+                          onClick={addWorkout}
+                          style={{
+                            width: "100%",
+                            padding: "13px 14px",
+                            borderRadius: 14,
+                            background: "transparent",
+                            color: colors.accent,
+                            border: `1.5px dashed ${colors.accentBorder}`,
+                            cursor: "pointer", fontFamily: "inherit",
+                            fontSize: 13, fontWeight: 700,
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                            minHeight: 48,
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                          Add workout
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
@@ -5138,52 +5133,25 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     <div
                       onClick={() => toggleCollapse(setCollapsedManage, "splits")}
                       style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        display: "flex", alignItems: "center",
                         padding: "14px 16px",
-                        cursor: "pointer", userSelect: "none",
+                        cursor: "pointer", userSelect: "none", gap: 8,
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
-                          <polyline points="6 9 12 15 18 9" />
-                        </svg>
-                        <div style={{
-                          fontSize: 11, fontWeight: 600, opacity: 0.4,
-                          textTransform: "uppercase", letterSpacing: 1,
-                        }}>
-                          Splits
-                        </div>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                      <div style={{
+                        fontSize: 11, fontWeight: 600, opacity: 0.4,
+                        textTransform: "uppercase", letterSpacing: 1,
+                      }}>
+                        Splits
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); openCreateSplit(); }}
-                        aria-label="Add split"
-                        title="Add split"
-                        style={{
-                          width: 28, height: 28, borderRadius: 999,
-                          border: `1px solid ${colors.border}`,
-                          background: "transparent",
-                          color: colors.textSecondary,
-                          cursor: "pointer", padding: 0,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                      </button>
                     </div>
 
-                    {/* Body — splits as labeled blocks separated by dividers */}
-                    {!isCollapsed && (
-                      splits.length === 0 ? (
-                        <div style={{
-                          padding: "16px",
-                          borderTop: `1px solid ${colors.border}`,
-                          fontSize: 12.5, color: colors.textSecondary,
-                          textAlign: "center",
-                        }}>
-                          No splits yet. Tap + to group workouts.
-                        </div>
-                      ) : (
+                    {/* Body — splits as labeled blocks with + Add split at the bottom */}
+                    {!isCollapsed && (<>
+                      {splits.length > 0 && (
                         <div style={{ borderTop: `1px solid ${colors.border}` }}>
                           {splits.map((s, si) => {
                             const isContinuous = s.mode === SPLIT_MODES.CONTINUOUS;
@@ -5306,8 +5274,31 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             );
                           })}
                         </div>
-                      )
-                    )}
+                      )}
+
+                      {/* Add split — dashed button matching the +Add workout / +Add exercise pattern */}
+                      <div style={{ padding: 12, paddingTop: splits.length > 0 ? 12 : 0 }}>
+                        <button
+                          type="button"
+                          onClick={openCreateSplit}
+                          style={{
+                            width: "100%",
+                            padding: "13px 14px",
+                            borderRadius: 14,
+                            background: "transparent",
+                            color: colors.accent,
+                            border: `1.5px dashed ${colors.accentBorder}`,
+                            cursor: "pointer", fontFamily: "inherit",
+                            fontSize: 13, fontWeight: 700,
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                            minHeight: 48,
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                          Add split
+                        </button>
+                      </div>
+                    </>)}
                   </div>
                 );
               })()}
