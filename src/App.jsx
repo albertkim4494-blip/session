@@ -1464,6 +1464,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       cancelReorderExercises();
       return;
     }
+    // Workout sheet has unsaved changes — show the discard confirm instead
+    // of closing the sheet (and tearing down the rest of the modal stack).
+    if (modals.workoutDetail.isOpen && isWorkoutSheetDirty) {
+      closeWorkoutSheetWithDirtyCheck();
+      return;
+    }
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
@@ -3029,6 +3035,100 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // can restore the original order. Cleared when the user explicitly taps Done.
   const workoutsReorderSnapshotRef = useRef(null);
   const exercisesReorderSnapshotRef = useRef(null);
+
+  // Workout-sheet edit snapshot — captured when the sheet opens (or you swipe
+  // to a different workout). Lets us detect "dirty" state and offer a Discard
+  // option if the user backs out before tapping Save.
+  const workoutSheetSnapshotRef = useRef(null);
+  // Recompute on every render — cheap (one JSON.stringify of the visible workout).
+  const _detailWorkoutId = modals.workoutDetail.workoutId;
+  const _detailWorkout = _detailWorkoutId ? workoutById.get(_detailWorkoutId) : null;
+  const workoutSheetSnapshotJson = useMemo(() => {
+    if (!_detailWorkout) return null;
+    return JSON.stringify({
+      name: _detailWorkout.name,
+      category: _detailWorkout.category || "",
+      cadence: _detailWorkout.cadence || { mode: "whenever" },
+      exercises: (_detailWorkout.exercises || []).map((ex) => ({
+        id: ex.id, name: ex.name, unit: ex.unit,
+        customUnitAbbr: ex.customUnitAbbr, customUnitAllowDecimal: ex.customUnitAllowDecimal,
+        catalogId: ex.catalogId,
+      })),
+    });
+  }, [_detailWorkout]);
+
+  // Reset snapshot when the sheet opens or the visible workout changes.
+  useEffect(() => {
+    if (modals.workoutDetail.isOpen && _detailWorkoutId) {
+      workoutSheetSnapshotRef.current = {
+        workoutId: _detailWorkoutId,
+        json: workoutSheetSnapshotJson,
+      };
+    } else if (!modals.workoutDetail.isOpen) {
+      workoutSheetSnapshotRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modals.workoutDetail.isOpen, _detailWorkoutId]);
+
+  const isWorkoutSheetDirty =
+    modals.workoutDetail.isOpen &&
+    workoutSheetSnapshotRef.current &&
+    workoutSheetSnapshotRef.current.workoutId === _detailWorkoutId &&
+    workoutSheetSnapshotRef.current.json !== workoutSheetSnapshotJson;
+
+  const restoreWorkoutFromSheetSnapshot = useCallback(() => {
+    const snap = workoutSheetSnapshotRef.current;
+    if (!snap) return;
+    const data = JSON.parse(snap.json);
+    updateState((st) => {
+      const w = st.program.workouts.find((x) => x.id === snap.workoutId);
+      if (!w) return st;
+      w.name = data.name;
+      w.category = data.category;
+      w.cadence = data.cadence;
+      // Preserve any fields not in the snapshot (e.g. private flags).
+      const oldExById = new Map((w.exercises || []).map((ex) => [ex.id, ex]));
+      w.exercises = data.exercises.map((snapEx) => {
+        const old = oldExById.get(snapEx.id) || {};
+        return { ...old, ...snapEx };
+      });
+      return st;
+    });
+  }, []);
+
+  // Close the sheet, restoring the snapshot first.
+  const discardAndCloseWorkoutSheet = useCallback(() => {
+    restoreWorkoutFromSheetSnapshot();
+    workoutSheetSnapshotRef.current = null;
+    dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" });
+  }, [restoreWorkoutFromSheetSnapshot]);
+
+  // Save = clear snapshot + close (changes are already persisted).
+  const saveAndCloseWorkoutSheet = useCallback(() => {
+    workoutSheetSnapshotRef.current = null;
+    dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" });
+  }, []);
+
+  // X / back close — if dirty, ask first; otherwise just close.
+  const closeWorkoutSheetWithDirtyCheck = useCallback(() => {
+    if (isWorkoutSheetDirty) {
+      dispatchModal({
+        type: "OPEN_CONFIRM",
+        payload: {
+          title: "Discard changes?",
+          message: "You have unsaved changes to this workout. Discard them?",
+          confirmText: "Discard",
+          onConfirm: () => {
+            dispatchModal({ type: "CLOSE_CONFIRM" });
+            discardAndCloseWorkoutSheet();
+          },
+        },
+      });
+      return true; // intercepted
+    }
+    dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" });
+    return false;
+  }, [isWorkoutSheetDirty, discardAndCloseWorkoutSheet]);
   const reorderWorkoutsRef = useRef(false);
   reorderWorkoutsRef.current = reorderWorkouts;
 
@@ -7252,7 +7352,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             splitForWorkout={splitForWorkout}
             reorderExercises={modals.workoutDetail.reorderExercises}
             onToggleReorderExercises={() => toggleReorderExercises(w.id)}
-            onClose={() => dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" })}
+            onClose={closeWorkoutSheetWithDirtyCheck}
+            onSave={saveAndCloseWorkoutSheet}
+            isDirty={!!isWorkoutSheetDirty}
             onRenameWorkout={renameWorkout}
             onOpenEditWorkout={openEditWorkout}
             onOpenEditExercise={openEditExercise}
