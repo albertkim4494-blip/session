@@ -1,8 +1,75 @@
-import React from "react";
+import React, { useEffect, useId, useRef } from "react";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
 
-export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose, sheetAnimation, noChrome, sheetRef, footerRef, bodyRef }) {
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+export function Modal({ open, title, headerContent, headerActions, children, footer, onClose, styles, fullScreen, hideClose, sheetAnimation, noChrome, sheetRef, footerRef, bodyRef, ariaLabel }) {
   const kbInset = useKeyboardInset();
+  const internalSheetRef = useRef(null);
+  const previousFocusRef = useRef(null);
+  const titleId = useId();
+
+  const setSheetRef = (el) => {
+    internalSheetRef.current = el;
+    if (sheetRef) {
+      if (typeof sheetRef === "function") sheetRef(el);
+      else sheetRef.current = el;
+    }
+  };
+
+  // Focus management: save the previously-focused element on open, focus the sheet,
+  // restore focus on close so keyboard users return to where they were.
+  useEffect(() => {
+    if (!open) return undefined;
+    previousFocusRef.current = document.activeElement;
+    const sheet = internalSheetRef.current;
+    if (sheet) {
+      const firstFocusable = sheet.querySelector(FOCUSABLE_SELECTOR);
+      (firstFocusable || sheet).focus({ preventScroll: true });
+    }
+    return () => {
+      const prev = previousFocusRef.current;
+      if (prev && typeof prev.focus === "function" && document.contains(prev)) {
+        prev.focus({ preventScroll: true });
+      }
+    };
+  }, [open]);
+
+  // Keyboard: Escape closes, Tab is trapped within the sheet.
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(e) {
+      if (e.key === "Escape" && onClose) {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const sheet = internalSheetRef.current;
+      if (!sheet) return;
+      const focusable = Array.from(sheet.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement
+      );
+      if (focusable.length === 0) {
+        e.preventDefault();
+        sheet.focus({ preventScroll: true });
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !sheet.contains(active))) {
+        e.preventDefault();
+        last.focus({ preventScroll: true });
+      } else if (!e.shiftKey && (active === last || !sheet.contains(active))) {
+        e.preventDefault();
+        first.focus({ preventScroll: true });
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -23,12 +90,24 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
     ? { ...styles.modalSheet, borderRadius: 0, height: "100dvh", maxWidth: "100%", display: "flex", flexDirection: "column" }
     : { ...styles.modalSheet, ...((footer || noChrome) ? { height: `calc(95dvh - ${kbInset}px)` } : { maxHeight: `calc(100dvh - ${10 + kbInset}px)` }), display: "flex", flexDirection: "column", animation: sheetAnimation || "modalSlideUp 0.25s cubic-bezier(.2,.8,.3,1)" };
 
+  const dialogA11y = {
+    role: "dialog",
+    "aria-modal": "true",
+    tabIndex: -1,
+    ...(title ? { "aria-labelledby": titleId } : ariaLabel ? { "aria-label": ariaLabel } : { "aria-label": "Dialog" }),
+  };
+
   if (noChrome) {
     // overflow:visible + transparent bg so 3D preserve-3d works (faces carry their own bg)
     const noChromeSheet = { ...sheetStyle, overflow: "visible", background: "transparent", border: "none", boxShadow: "none" };
     return (
       <div style={overlayStyle} onMouseDown={onClose}>
-        <div style={noChromeSheet} onMouseDown={(e) => e.stopPropagation()}>
+        <div
+          ref={setSheetRef}
+          style={noChromeSheet}
+          onMouseDown={(e) => e.stopPropagation()}
+          {...dialogA11y}
+        >
           {children}
         </div>
       </div>
@@ -42,12 +121,13 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
   return (
     <div style={overlayStyle} onMouseDown={fullScreen ? undefined : onClose}>
       <div
-        ref={sheetRef}
+        ref={setSheetRef}
         style={sheetStyle}
         onMouseDown={fullScreen ? undefined : (e) => e.stopPropagation()}
+        {...dialogA11y}
       >
         <div style={styles.modalHeader}>
-          {headerContent || <div style={styles.modalTitle}>{title}</div>}
+          {headerContent || <div id={titleId} style={styles.modalTitle}>{title}</div>}
           {!hideClose && (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               {headerActions}

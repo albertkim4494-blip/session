@@ -1,5 +1,5 @@
-import { LS_KEY, LS_BACKUP_KEY } from "./constants";
-import { ensureCadence, normalizeSplit } from "./cadence";
+import { LS_KEY, LS_BACKUP_KEY } from "./constants.js";
+import { ensureCadence, normalizeSplit } from "./cadence.js";
 
 /**
  * Stamp `completed` flag on all log sets that are missing it.
