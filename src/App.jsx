@@ -2782,44 +2782,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     [workoutById, manageWorkoutId]
   );
 
-  const duplicateWorkout = useCallback(
-    (workoutId) => {
-      const src = workoutById.get(workoutId);
-      if (!src) return;
-      // Pick a unique copy name: "Foo (copy)", "Foo (copy 2)", ...
-      const baseName = `${src.name} (copy)`;
-      const existingNames = new Set(workouts.map((w) => w.name));
-      let copyName = baseName;
-      let n = 2;
-      while (existingNames.has(copyName)) {
-        copyName = `${src.name} (copy ${n})`;
-        n += 1;
-      }
-      const newId = uid("workout");
-      updateState((st) => {
-        st.program.workouts.push({
-          id: newId,
-          name: copyName,
-          category: src.category || "Workout",
-          // Duplicates land as standalone (whenever) regardless of source split membership.
-          cadence: { mode: CADENCE_MODES.WHENEVER },
-          exercises: (src.exercises || []).map((ex) => ({
-            ...ex,
-            id: uid("ex"),
-          })),
-        });
-        return st;
-      });
-      showToast(`Duplicated as "${copyName}"`);
-      dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" });
-      // Open the new workout for editing right away
-      setTimeout(() => {
-        dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: newId } });
-      }, 0);
-    },
-    [workoutById, workouts, showToast]
-  );
-
   const renameWorkout = useCallback((workoutId, newName) => {
     const trimmed = (newName || "").trim();
     if (!trimmed) return;
@@ -4954,58 +4916,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* MANAGE TAB */}
           {tab === "program" ? (
             <div key="program" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
-              {/* Create row — the loudest thing on the page */}
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  className="btn-press"
-                  type="button"
-                  onClick={addWorkout}
-                  style={{
-                    flex: 1, height: 44, padding: "0 14px", borderRadius: 12,
-                    background: colors.accent, color: colors.appBg,
-                    border: `1px solid ${colors.accent}`,
-                    cursor: "pointer", fontFamily: "inherit",
-                    fontSize: 13.5, fontWeight: 700, letterSpacing: -0.1,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.appBg} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                  New workout
-                </button>
-                <button
-                  className="btn-press"
-                  type="button"
-                  onClick={openCreateSplit}
-                  style={{
-                    flex: 1, height: 44, padding: "0 14px", borderRadius: 12,
-                    background: colors.cardBg, color: colors.text,
-                    border: `1px solid ${colors.border}`,
-                    cursor: "pointer", fontFamily: "inherit",
-                    fontSize: 13.5, fontWeight: 700, letterSpacing: -0.1,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>
-                  New split
-                </button>
-                <button
-                  className="btn-press"
-                  type="button"
-                  onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
-                  aria-label="AI generate"
-                  title="Generate with AI"
-                  style={{
-                    flex: "0 0 44px", height: 44, padding: 0, borderRadius: 12,
-                    background: colors.accentSoft, color: colors.accent,
-                    border: `1px solid ${colors.accentBorder}`,
-                    cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" /></svg>
-                </button>
-              </div>
-
               {/* Empty state — no workouts AND no splits */}
               {splits.length === 0 && workouts.length === 0 && (
                 <div style={{
@@ -5061,14 +4971,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 </div>
               )}
 
-              {/* ===== EXERCISES SECTION ===== */}
-              <div style={{
-                fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
-                textTransform: "uppercase", color: colors.textTertiary,
-                marginTop: 6, marginBottom: -4, paddingLeft: 4,
-              }}>
-                Exercises
-              </div>
+              {/* Exercise catalog browse — no section header */}
               <ExerciseCatalogSection
                 styles={styles}
                 colors={colors}
@@ -5077,14 +4980,49 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               />
 
               {/* ===== WORKOUTS SECTION ===== */}
-              {workouts.length > 0 && (<>
-                <div style={{
-                  fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
-                  textTransform: "uppercase", color: colors.textTertiary,
-                  marginTop: 12, marginBottom: -4, paddingLeft: 4,
-                }}>
-                  Workouts
-                </div>
+              {(workouts.length > 0 || splits.length > 0) && (<>
+                {(() => {
+                  const isCollapsed = collapsedManage.has("workouts");
+                  return (
+                    <div
+                      onClick={() => toggleCollapse(setCollapsedManage, "workouts")}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        marginTop: 12, marginBottom: isCollapsed ? 0 : -4, paddingLeft: 4,
+                        cursor: "pointer", userSelect: "none",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                        <div style={{
+                          fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
+                          textTransform: "uppercase", color: colors.textTertiary,
+                        }}>
+                          Workouts
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); addWorkout(); }}
+                        aria-label="Add workout"
+                        title="Add workout"
+                        style={{
+                          width: 28, height: 28, borderRadius: 999,
+                          border: `1px solid ${colors.border}`,
+                          background: "transparent",
+                          color: colors.textSecondary,
+                          cursor: "pointer", padding: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                      </button>
+                    </div>
+                  );
+                })()}
+                {!collapsedManage.has("workouts") && (<>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {workouts.map((w) => {
                     const exCount = (w.exercises || []).length;
@@ -5165,17 +5103,53 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     );
                   })}
                 </div>
+                </>)}
               </>)}
 
               {/* ===== SPLITS SECTION ===== */}
-              {splits.length > 0 && (<>
-                <div style={{
-                  fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
-                  textTransform: "uppercase", color: colors.textTertiary,
-                  marginTop: 12, marginBottom: -4, paddingLeft: 4,
-                }}>
-                  Splits
-                </div>
+              {(workouts.length > 0 || splits.length > 0) && (<>
+                {(() => {
+                  const isCollapsed = collapsedManage.has("splits");
+                  return (
+                    <div
+                      onClick={() => toggleCollapse(setCollapsedManage, "splits")}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        marginTop: 12, marginBottom: isCollapsed ? 0 : -4, paddingLeft: 4,
+                        cursor: "pointer", userSelect: "none",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                        <div style={{
+                          fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
+                          textTransform: "uppercase", color: colors.textTertiary,
+                        }}>
+                          Splits
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); openCreateSplit(); }}
+                        aria-label="Add split"
+                        title="Add split"
+                        style={{
+                          width: 28, height: 28, borderRadius: 999,
+                          border: `1px solid ${colors.border}`,
+                          background: "transparent",
+                          color: colors.textSecondary,
+                          cursor: "pointer", padding: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                      </button>
+                    </div>
+                  );
+                })()}
+                {!collapsedManage.has("splits") && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {splits.map((s) => {
                     const isContinuous = s.mode === SPLIT_MODES.CONTINUOUS;
@@ -5296,6 +5270,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     );
                   })}
                 </div>
+                )}
               </>)}
 
             </div>
@@ -7132,7 +7107,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             onAddExercise={addExercise}
             onMoveExercise={moveExercise}
             onShareWorkout={(wid, wname) => dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { workoutId: wid, workoutName: wname } })}
-            onDuplicateWorkout={duplicateWorkout}
             onDeleteWorkout={deleteWorkout}
             hasPrev={!!prevWorkout}
             hasNext={!!nextWorkout}
