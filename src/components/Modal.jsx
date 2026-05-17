@@ -18,16 +18,16 @@ export function Modal({ open, title, headerContent, headerActions, children, foo
     }
   };
 
-  // Focus management: save the previously-focused element on open, focus the sheet,
-  // restore focus on close so keyboard users return to where they were.
+  // Focus management: save the previously-focused element on open, focus the
+  // sheet itself (tabIndex=-1 so no visible focus ring) — this keeps the modal
+  // accessible to keyboard users without auto-highlighting a random header
+  // button on touch. Inputs with React's `autoFocus` still get focus naturally
+  // because we don't override them after mount.
   useEffect(() => {
     if (!open) return undefined;
     previousFocusRef.current = document.activeElement;
     const sheet = internalSheetRef.current;
-    if (sheet) {
-      const firstFocusable = sheet.querySelector(FOCUSABLE_SELECTOR);
-      (firstFocusable || sheet).focus({ preventScroll: true });
-    }
+    if (sheet) sheet.focus({ preventScroll: true });
     return () => {
       const prev = previousFocusRef.current;
       if (prev && typeof prev.focus === "function" && document.contains(prev)) {
