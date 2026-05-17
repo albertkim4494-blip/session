@@ -1459,6 +1459,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       setFabOpen(false);
       return;
     }
+    // Reorder mode (workout detail sheet exercises): cancel without saving.
+    if (modals.workoutDetail.isOpen && modals.workoutDetail.reorderExercises) {
+      cancelReorderExercises();
+      return;
+    }
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
@@ -1467,6 +1472,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         } catch (_) {}
       }
       dispatchModal({ type: "CLOSE_ALL" });
+      return;
+    }
+    // Reorder mode (plans tab workouts list): cancel without saving.
+    if (reorderWorkoutsRef.current) {
+      cancelReorderWorkouts();
       return;
     }
     if (tabRef.current !== "train") {
@@ -3014,6 +3024,86 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return st;
     });
   }
+
+  // Reorder snapshots — captured when entering reorder mode so a back press
+  // can restore the original order. Cleared when the user explicitly taps Done.
+  const workoutsReorderSnapshotRef = useRef(null);
+  const exercisesReorderSnapshotRef = useRef(null);
+  const reorderWorkoutsRef = useRef(false);
+  reorderWorkoutsRef.current = reorderWorkouts;
+
+  const toggleReorderWorkouts = useCallback(() => {
+    setReorderWorkouts((prev) => {
+      const next = !prev;
+      if (next) {
+        // Enter — snapshot current order so back can restore it.
+        workoutsReorderSnapshotRef.current = (state.program?.workouts || []).map((w) => w.id);
+      } else {
+        // Done — clear snapshot, keep changes.
+        workoutsReorderSnapshotRef.current = null;
+      }
+      return next;
+    });
+  }, [state.program]);
+
+  const cancelReorderWorkouts = useCallback(() => {
+    const snapshot = workoutsReorderSnapshotRef.current;
+    workoutsReorderSnapshotRef.current = null;
+    if (snapshot) {
+      updateState((st) => {
+        const byId = new Map((st.program.workouts || []).map((w) => [w.id, w]));
+        st.program.workouts = snapshot.map((id) => byId.get(id)).filter(Boolean);
+        return st;
+      });
+    }
+    setReorderWorkouts(false);
+  }, []);
+
+  const toggleReorderExercises = useCallback((workoutId) => {
+    const current = !!modals.workoutDetail.reorderExercises;
+    const next = !current;
+    if (next) {
+      const w = workoutById.get(workoutId);
+      exercisesReorderSnapshotRef.current = w
+        ? { workoutId, ids: (w.exercises || []).map((ex) => ex.id) }
+        : null;
+    } else {
+      // Done — clear snapshot, keep changes.
+      exercisesReorderSnapshotRef.current = null;
+    }
+    dispatchModal({ type: "UPDATE_WORKOUT_DETAIL", payload: { reorderExercises: next } });
+  }, [modals.workoutDetail.reorderExercises, workoutById]);
+
+  const cancelReorderExercises = useCallback(() => {
+    const snap = exercisesReorderSnapshotRef.current;
+    exercisesReorderSnapshotRef.current = null;
+    if (snap) {
+      updateState((st) => {
+        const w = st.program.workouts.find((x) => x.id === snap.workoutId);
+        if (!w) return st;
+        const byId = new Map((w.exercises || []).map((ex) => [ex.id, ex]));
+        w.exercises = snap.ids.map((id) => byId.get(id)).filter(Boolean);
+        return st;
+      });
+    }
+    dispatchModal({ type: "UPDATE_WORKOUT_DETAIL", payload: { reorderExercises: false } });
+  }, []);
+
+  // If the workout detail closes while a reorder snapshot is still pending
+  // (e.g. user tapped X mid-reorder), restore the snapshot before unmounting.
+  useEffect(() => {
+    if (!modals.workoutDetail.isOpen && exercisesReorderSnapshotRef.current) {
+      const snap = exercisesReorderSnapshotRef.current;
+      exercisesReorderSnapshotRef.current = null;
+      updateState((st) => {
+        const w = st.program.workouts.find((x) => x.id === snap.workoutId);
+        if (!w) return st;
+        const byId = new Map((w.exercises || []).map((ex) => [ex.id, ex]));
+        w.exercises = snap.ids.map((id) => byId.get(id)).filter(Boolean);
+        return st;
+      });
+    }
+  }, [modals.workoutDetail.isOpen]);
 
   // Reorder a workout from one index to another (used by drag-to-reorder).
   function reorderWorkoutsByIndex(fromIdx, toIdx) {
@@ -5054,7 +5144,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       {!isCollapsed && workouts.length > 1 && (
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); setReorderWorkouts((v) => !v); }}
+                          onClick={(e) => { e.stopPropagation(); toggleReorderWorkouts(); }}
                           style={{
                             padding: "6px 12px",
                             borderRadius: 999,
@@ -7161,7 +7251,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             workout={w}
             splitForWorkout={splitForWorkout}
             reorderExercises={modals.workoutDetail.reorderExercises}
-            onToggleReorderExercises={() => dispatchModal({ type: "UPDATE_WORKOUT_DETAIL", payload: { reorderExercises: !modals.workoutDetail.reorderExercises } })}
+            onToggleReorderExercises={() => toggleReorderExercises(w.id)}
             onClose={() => dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" })}
             onRenameWorkout={renameWorkout}
             onOpenEditWorkout={openEditWorkout}
