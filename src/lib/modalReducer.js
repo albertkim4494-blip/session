@@ -74,6 +74,11 @@ export const initialModalState = {
     category: "Workout",
     cadence: { mode: "whenever" },
   },
+  workoutDetail: {
+    isOpen: false,
+    workoutId: null,
+    reorderExercises: false,
+  },
   editSplit: {
     isOpen: false,
     splitId: null,           // null for new split
@@ -393,6 +398,29 @@ export function modalReducer(state, action) {
       return {
         ...state,
         editWorkout: initialModalState.editWorkout,
+      };
+
+    // ===== WORKOUT DETAIL SHEET =====
+    case "OPEN_WORKOUT_DETAIL":
+      return {
+        ...state,
+        workoutDetail: {
+          isOpen: true,
+          workoutId: action.payload.workoutId,
+          reorderExercises: false,
+        },
+      };
+
+    case "UPDATE_WORKOUT_DETAIL":
+      return {
+        ...state,
+        workoutDetail: { ...state.workoutDetail, ...action.payload },
+      };
+
+    case "CLOSE_WORKOUT_DETAIL":
+      return {
+        ...state,
+        workoutDetail: initialModalState.workoutDetail,
       };
 
     // ===== EDIT SPLIT MODAL =====

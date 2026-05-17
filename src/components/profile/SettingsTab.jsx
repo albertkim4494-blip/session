@@ -18,7 +18,7 @@ const sectionHeaderStyle = {
   gap: 6,
 };
 
-export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference, styles, colors }) {
+export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference, styles, colors, onExportJson, onExportCSV, onImportFile, onResetAll }) {
   const [isSearchable, setIsSearchable] = useState(profile?.is_searchable !== false);
 
   function openChangeUsername() {
@@ -433,6 +433,89 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
           </div>
         </div>
       </div>
+
+      {/* Data */}
+      {(onExportJson || onExportCSV || onImportFile || onResetAll) && (
+        <div style={{ borderTop: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`, paddingTop: 14 }}>
+          <div style={{ ...sectionHeaderStyle, marginBottom: 10 }}>
+            Data
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5" /><path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6" /></svg>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {onExportJson && (
+              <button
+                type="button"
+                onClick={onExportJson}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors?.border}`, background: colors?.cardAltBg, color: colors?.text, cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit" }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Export JSON</div>
+                  <div style={{ fontSize: 12, opacity: 0.5 }}>Download all data as JSON</div>
+                </div>
+              </button>
+            )}
+
+            {onExportCSV && (
+              <button
+                type="button"
+                onClick={onExportCSV}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors?.border}`, background: colors?.cardAltBg, color: colors?.text, cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit" }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Export CSV</div>
+                  <div style={{ fontSize: 12, opacity: 0.5 }}>Download workout history as CSV</div>
+                </div>
+              </button>
+            )}
+
+            {onImportFile && (
+              <label
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors?.border}`, background: colors?.cardAltBg, color: colors?.text, cursor: "pointer", textAlign: "left", width: "100%" }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Import</div>
+                  <div style={{ fontSize: 12, opacity: 0.5 }}>Load from JSON or CSV file</div>
+                </div>
+                <input
+                  type="file"
+                  accept=".json,.csv"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onImportFile(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            )}
+
+            {onResetAll && (
+              <button
+                type="button"
+                onClick={onResetAll}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors?.dangerBorder}`, background: colors?.dangerBg, color: colors?.dangerText, cursor: "pointer", textAlign: "left", width: "100%", marginTop: 4, fontFamily: "inherit" }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Reset All</div>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>Delete all workouts and logs</div>
+                </div>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Coming Soon */}
       <div style={{ borderTop: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`, paddingTop: 14 }}>

@@ -25,6 +25,7 @@ import { initialModalState, modalReducer } from "./lib/modalReducer";
 
 // Extracted hooks
 import { useSwipe } from "./hooks/useSwipe";
+import { useClickOutside } from "./hooks/useClickOutside";
 
 // Extracted components
 import { Modal, ConfirmModal, InputModal } from "./components/Modal";
@@ -32,7 +33,8 @@ import { PillTabs } from "./components/PillTabs";
 import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { CadenceEditor } from "./components/CadenceEditor";
 import { SplitEditorModal } from "./components/SplitEditorModal";
-import { SplitsSection } from "./components/SplitsSection";
+import { WorkoutDetailSheet } from "./components/WorkoutDetailSheet";
+import { DISPLAY_DAYS } from "./components/CadenceEditor";
 import { CadenceDriftPrompt } from "./components/CadenceDriftPrompt";
 import { SunArc } from "./components/SunArc";
 import { Atmosphere } from "./components/Atmosphere";
@@ -43,7 +45,6 @@ import { RestoreFromHistoryModal } from "./components/profile/RestoreFromHistory
 import { AddSuggestedExerciseModal } from "./components/CoachInsights";
 import { TimeRangeControl } from "./components/TimeRangeControl";
 import { ExerciseListTable } from "./components/ExerciseListTable";
-import { ExerciseCatalogSection } from "./components/ExerciseCatalogSection";
 import { ExerciseCatalogModal } from "./components/ExerciseCatalogModal";
 import { GenerateWizardModal } from "./components/GenerateWizardModal";
 import { GenerateTodayModal } from "./components/GenerateTodayModal";
@@ -163,6 +164,36 @@ function buildCoachContextSignature(coachTodayKey, coachSignature, todayCheckin)
 
 function getCoachCacheKey(userId, coachTodayKey) {
   return `wt_coach_v2:${userId}:${coachTodayKey}`;
+}
+
+// Stable empty-collection fallbacks for `state.x?.[key] || EMPTY_ARRAY` patterns.
+// Module-scope so the same reference is reused across renders without useMemo.
+const EMPTY_ARRAY = Object.freeze([]);
+const EMPTY_OBJ = Object.freeze({});
+
+// Look up an exercise definition by id across program workouts, session additions,
+// and daily workouts. Used when matching historical logs whose original instance id
+// may have churned across program rebuilds, swaps, or copies.
+function resolveExerciseMeta(state, eid, dk) {
+  for (const w of state.program?.workouts || []) {
+    const hit = (w.exercises || []).find((e) => e.id === eid);
+    if (hit) return hit;
+  }
+  const adds = state.sessionAdditions?.[dk];
+  if (adds) {
+    for (const arr of Object.values(adds)) {
+      const hit = (arr || []).find((e) => e.id === eid);
+      if (hit) return hit;
+    }
+  }
+  const daily = state.dailyWorkouts?.[dk];
+  if (daily) {
+    for (const w of daily) {
+      const hit = (w.exercises || []).find((e) => e.id === eid);
+      if (hit) return hit;
+    }
+  }
+  return null;
 }
 
 // ============================================================================
@@ -420,75 +451,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     },
   });
 
-  // Click-outside to dismiss target config popover
-  useEffect(() => {
-    function handleDown(e) {
-      if (targetConfigRef.current && !targetConfigRef.current.contains(e.target)) {
-        setShowTargetConfig(false);
-      }
-    }
-    if (showTargetConfig) {
-      document.addEventListener("mousedown", handleDown);
-      document.addEventListener("touchstart", handleDown);
-      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
-    }
-  }, [showTargetConfig]);
-
-  // Click-outside to dismiss stats config popover
-  useEffect(() => {
-    function handleDown(e) {
-      if (statsConfigRef.current && !statsConfigRef.current.contains(e.target)) {
-        setShowStatsConfig(false);
-      }
-    }
-    if (showStatsConfig) {
-      document.addEventListener("mousedown", handleDown);
-      document.addEventListener("touchstart", handleDown);
-      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
-    }
-  }, [showStatsConfig]);
-
-  // Click-outside to dismiss pace popover
-  useEffect(() => {
-    function handleDown(e) {
-      if (pacePopoverRef.current && !pacePopoverRef.current.contains(e.target)) {
-        setPacePopoverIdx(null);
-      }
-    }
-    if (pacePopoverIdx !== null) {
-      document.addEventListener("mousedown", handleDown);
-      document.addEventListener("touchstart", handleDown);
-      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
-    }
-  }, [pacePopoverIdx]);
-
-  // Click-outside to dismiss RPE popover
-  useEffect(() => {
-    function handleDown(e) {
-      if (rpePopoverRef.current && !rpePopoverRef.current.contains(e.target)) {
-        setRpePopoverIdx(null);
-      }
-    }
-    if (rpePopoverIdx !== null) {
-      document.addEventListener("mousedown", handleDown);
-      document.addEventListener("touchstart", handleDown);
-      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
-    }
-  }, [rpePopoverIdx]);
-
-  // Click-outside to dismiss Intensity popover
-  useEffect(() => {
-    function handleDown(e) {
-      if (intensityPopoverRef.current && !intensityPopoverRef.current.contains(e.target)) {
-        setIntensityPopoverIdx(null);
-      }
-    }
-    if (intensityPopoverIdx !== null) {
-      document.addEventListener("mousedown", handleDown);
-      document.addEventListener("touchstart", handleDown);
-      return () => { document.removeEventListener("mousedown", handleDown); document.removeEventListener("touchstart", handleDown); };
-    }
-  }, [intensityPopoverIdx]);
+  useClickOutside(targetConfigRef, showTargetConfig, () => setShowTargetConfig(false));
+  useClickOutside(statsConfigRef, showStatsConfig, () => setShowStatsConfig(false));
+  useClickOutside(pacePopoverRef, pacePopoverIdx !== null, () => setPacePopoverIdx(null));
+  useClickOutside(rpePopoverRef, rpePopoverIdx !== null, () => setRpePopoverIdx(null));
+  useClickOutside(intensityPopoverRef, intensityPopoverIdx !== null, () => setIntensityPopoverIdx(null));
 
   // After onboarding, show welcome choice modal
   useEffect(() => {
@@ -666,8 +633,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const styles = useMemo(() => getStyles(colors), [colors]);
 
   const workouts = state.program.workouts;
-  const EMPTY_ARRAY = useMemo(() => [], []);
-  const EMPTY_OBJ = useMemo(() => ({}), []);
   const dailyWorkoutsToday = state.dailyWorkouts?.[dateKey] || EMPTY_ARRAY;
 
   const categoryOptions = useMemo(() => {
@@ -1386,15 +1351,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, [state, dataReady, session.user.id]);
 
-  // Flush pending cloud sync on tab close / navigation
+  // Flush pending cloud sync when the app is being put away.
+  // beforeunload is unreliable on mobile/PWA — pagehide and visibilitychange:hidden
+  // are the events that actually fire when an Android PWA gets backgrounded or closed.
+  // localStorage remains the safety net if the network request gets cut off.
   useEffect(() => {
-    const handleUnload = () => {
+    const flushIfPending = () => {
       if (cloudSaver.current && latestStateRef.current && dataReady) {
-        cloudSaver.current.flush(session.user.id, latestStateRef.current);
+        cloudSaver.current.flushSync();
       }
     };
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") flushIfPending();
+    };
+    window.addEventListener("pagehide", flushIfPending);
+    window.addEventListener("beforeunload", flushIfPending);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flushIfPending);
+      window.removeEventListener("beforeunload", flushIfPending);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [session.user.id, dataReady]);
 
   // ---------------------------------------------------------------------------
@@ -1680,34 +1657,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const wantName = matchMeta?.name ? matchMeta.name.toLowerCase() : null;
     if (!wantCatalog && !wantName) return null;
 
-    const resolveMeta = (eid, dk) => {
-      for (const w of state.program.workouts || []) {
-        const hit = (w.exercises || []).find((e) => e.id === eid);
-        if (hit) return hit;
-      }
-      const adds = state.sessionAdditions?.[dk];
-      if (adds) {
-        for (const arr of Object.values(adds)) {
-          const hit = (arr || []).find((e) => e.id === eid);
-          if (hit) return hit;
-        }
-      }
-      const daily = state.dailyWorkouts?.[dk];
-      if (daily) {
-        for (const w of daily) {
-          const hit = (w.exercises || []).find((e) => e.id === eid);
-          if (hit) return hit;
-        }
-      }
-      return null;
-    };
-
     for (const k of keys) {
       const dayLogs = state.logsByDate[k];
       if (!dayLogs) continue;
       for (const [eid, exLog] of Object.entries(dayLogs)) {
         if (!exLog || !Array.isArray(exLog.sets) || exLog.sets.length === 0) continue;
-        const meta = resolveMeta(eid, k);
+        const meta = resolveExerciseMeta(state, eid, k);
         if (!meta) continue;
         if (wantCatalog && meta.catalogId && meta.catalogId === wantCatalog) return exLog;
         if (!wantCatalog && wantName && (meta.name || "").toLowerCase() === wantName) return exLog;
@@ -1725,28 +1680,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const wantCatalog = matchMeta?.catalogId || null;
     const wantName = matchMeta?.name ? matchMeta.name.toLowerCase() : null;
 
-    const resolveMeta = (eid, dk) => {
-      for (const w of state.program.workouts || []) {
-        const hit = (w.exercises || []).find((e) => e.id === eid);
-        if (hit) return hit;
-      }
-      const adds = state.sessionAdditions?.[dk];
-      if (adds) {
-        for (const arr of Object.values(adds)) {
-          const hit = (arr || []).find((e) => e.id === eid);
-          if (hit) return hit;
-        }
-      }
-      const daily = state.dailyWorkouts?.[dk];
-      if (daily) {
-        for (const w of daily) {
-          const hit = (w.exercises || []).find((e) => e.id === eid);
-          if (hit) return hit;
-        }
-      }
-      return null;
-    };
-
     const collected = [];
     for (const k of keys) {
       const dayLogs = state.logsByDate[k];
@@ -1755,7 +1688,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         if (!exLog || !Array.isArray(exLog.sets) || exLog.sets.length === 0) continue;
         let matches = eid === exerciseId;
         if (!matches && (wantCatalog || wantName)) {
-          const meta = resolveMeta(eid, k);
+          const meta = resolveExerciseMeta(state, eid, k);
           if (meta) {
             if (wantCatalog && meta.catalogId === wantCatalog) matches = true;
             else if (!wantCatalog && wantName && (meta.name || "").toLowerCase() === wantName) matches = true;
@@ -2825,6 +2758,59 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     },
     [workoutById, manageWorkoutId]
   );
+
+  const duplicateWorkout = useCallback(
+    (workoutId) => {
+      const src = workoutById.get(workoutId);
+      if (!src) return;
+      // Pick a unique copy name: "Foo (copy)", "Foo (copy 2)", ...
+      const baseName = `${src.name} (copy)`;
+      const existingNames = new Set(workouts.map((w) => w.name));
+      let copyName = baseName;
+      let n = 2;
+      while (existingNames.has(copyName)) {
+        copyName = `${src.name} (copy ${n})`;
+        n += 1;
+      }
+      const newId = uid("workout");
+      updateState((st) => {
+        st.program.workouts.push({
+          id: newId,
+          name: copyName,
+          category: src.category || "Workout",
+          // Duplicates land as standalone (whenever) regardless of source split membership.
+          cadence: { mode: CADENCE_MODES.WHENEVER },
+          exercises: (src.exercises || []).map((ex) => ({
+            ...ex,
+            id: uid("ex"),
+          })),
+        });
+        return st;
+      });
+      showToast(`Duplicated as "${copyName}"`);
+      dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" });
+      // Open the new workout for editing right away
+      setTimeout(() => {
+        dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: newId } });
+      }, 0);
+    },
+    [workoutById, workouts, showToast]
+  );
+
+  const renameWorkout = useCallback((workoutId, newName) => {
+    const trimmed = (newName || "").trim();
+    if (!trimmed) return;
+    const validation = validateWorkoutName(trimmed, workouts.filter((x) => x.id !== workoutId));
+    if (!validation.valid) {
+      showToast(validation.error);
+      return;
+    }
+    updateState((st) => {
+      const w = st.program.workouts.find((x) => x.id === workoutId);
+      if (w) w.name = trimmed;
+      return st;
+    });
+  }, [workouts, showToast]);
 
   const addExercise = useCallback(
     (workoutId) => {
@@ -3951,25 +3937,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               </div>
           ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {(tab === "train" || tab === "program") && workouts.length > 0 && (() => {
-                  if (tab === "program") {
-                    const sections = ["programs", "data"];
-                    const allCollapsed = sections.every((s) => collapsedManage.has(s));
-                    return (
-                      <button
-                        style={{ ...styles.navArrow, opacity: 0.45 }}
-                        onClick={() => allCollapsed ? setCollapsedManage(new Set()) : setCollapsedManage(new Set(sections))}
-                        title={allCollapsed ? "Expand all" : "Collapse all"}
-                        type="button"
-                      >
-                        {allCollapsed ? (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l5 5 5-5" /><path d="M7 8l5 5 5-5" /><line x1="4" y1="16" x2="20" y2="16" /><line x1="4" y1="20" x2="20" y2="20" /></svg>
-                        ) : (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 13l5-5 5 5" /><path d="M7 19l5-5 5 5" /><line x1="4" y1="4" x2="20" y2="4" /><line x1="4" y1="8" x2="20" y2="8" /></svg>
-                        )}
-                      </button>
-                    );
-                  }
+                {tab === "train" && workouts.length > 0 && (() => {
                   const setter = setCollapsedToday;
                   const collapsed = collapsedToday;
                   const allCards = [...displayedProgramWorkouts, ...dailyWorkoutsToday];
@@ -4963,298 +4931,320 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           {/* MANAGE TAB */}
           {tab === "program" ? (
             <div key="program" style={{ ...styles.section, animation: "tabFadeIn 0.25s cubic-bezier(.2,.8,.3,1)" }}>
-              <ExerciseCatalogSection styles={styles} colors={colors} catalogCount={fullCatalog.length} onOpen={() => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: null } })} />
-
-              <SplitsSection
-                splits={splits}
-                workouts={workouts}
-                onCreateSplit={openCreateSplit}
-                onEditSplit={openEditSplit}
-                onEditWorkout={openEditWorkout}
-                styles={styles}
-                colors={colors}
-              />
-
-              <div className="card-hover" style={styles.card}>
-                <div style={collapsedManage.has("programs") ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader}>
-                  <div style={styles.cardTitle}>Programs</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {!collapsedManage.has("programs") && <>
-                      <button
-                        className="btn-press"
-                        style={{ ...(reorderWorkouts ? styles.primaryBtn : styles.secondaryBtn), display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }}
-                        onClick={() => setReorderWorkouts((v) => !v)}
-                        title={reorderWorkouts ? "Done reordering" : "Reorder workouts"}
-                      >
-                        {reorderWorkouts ? (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                        ) : (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>
-                        )}
-                      </button>
-                      <button className="btn-press" style={{ ...styles.primaryBtn, display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 10px" }} onClick={addWorkout} title="Add workout">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                      </button>
-                    </>}
-                    <button
-                      style={{ ...styles.navArrow, opacity: 0.35, padding: 4 }}
-                      onClick={() => toggleCollapse(setCollapsedManage, "programs")}
-                      type="button"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: collapsedManage.has("programs") ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                {!collapsedManage.has("programs") && (<>
-                {(() => {
-                  const visibleWorkouts = reorderWorkouts ? workouts : workouts.filter((w) => !workoutToSplit.has(w.id));
-                  if (visibleWorkouts.length === 0) {
-                    return (
-                      <div style={{ textAlign: "center", padding: "16px 12px", opacity: 0.5, fontSize: 13, lineHeight: 1.5 }}>
-                        {workouts.length === 0
-                          ? "No workouts yet. Add one manually or generate a full program with AI."
-                          : "All your workouts are part of a split. Add a new workout to see it here."}
-                      </div>
-                    );
-                  }
-                  return (
-                  <div style={styles.manageList}>
-                    {visibleWorkouts.map((w, wi) => {
-                      const active = manageWorkoutId === w.id;
-                      const isFirst = wi === 0;
-                      const isLast = wi === visibleWorkouts.length - 1;
-
-                      const iconBtn = (onClick, title, children, extraStyle) => (
-                        <button
-                          style={{ background: "transparent", border: "none", color: "inherit", padding: 4, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.45, ...extraStyle }}
-                          onClick={onClick} title={title}
-                        >
-                          {children}
-                        </button>
-                      );
-
-                      const shareIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>;
-                      const pencilIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>;
-                      const trashIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>;
-                      const plusIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>;
-                      const reorderIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" /></svg>;
-                      const checkIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
-
-                      return (
-                        <div key={w.id}>
-                          {/* Workout row */}
-                          <div
-                            style={{
-                              ...styles.manageItem,
-                              ...(active ? styles.manageItemActive : {}),
-                              display: "flex", alignItems: "center", gap: 6,
-                            }}
-                          >
-                            <div
-                              style={{ flex: 1, minWidth: 0, cursor: reorderWorkouts ? "default" : "pointer", display: "flex", alignItems: "center", gap: 8 }}
-                              onClick={() => { if (!reorderWorkouts) setManageWorkoutId(active ? null : w.id); }}
-                            >
-                              <div style={{ ...styles.manageExerciseName, fontWeight: 700 }}>{w.name}</div>
-                              <span style={styles.tagMuted}>{(w.category || "Workout").trim()}</span>
-                            </div>
-                            {reorderWorkouts ? (
-                              <div style={styles.reorderBtnGroup}>
-                                <button style={{ ...styles.reorderBtn, opacity: isFirst ? 0.15 : 0.5, padding: "0 4px" }} disabled={isFirst} onClick={() => moveWorkout(w.id, -1)} title="Move up">
-                                  <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
-                                </button>
-                                <button style={{ ...styles.reorderBtn, opacity: isLast ? 0.15 : 0.5, padding: "0 4px" }} disabled={isLast} onClick={() => moveWorkout(w.id, 1)} title="Move down">
-                                  <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
-                                </button>
-                              </div>
-                            ) : (
-                              <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-                                {iconBtn(() => dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { workoutId: w.id, workoutName: w.name } }), "Share workout", shareIcon)}
-                                {iconBtn(() => openEditWorkout(w.id), "Edit workout", pencilIcon)}
-                                {iconBtn(() => deleteWorkout(w.id), "Delete workout", trashIcon, { opacity: 0.3 })}
-                                {active && w.exercises.length > 1 && (
-                                  reorderExercises
-                                    ? iconBtn(() => setReorderExercises(false), "Done reordering", checkIcon, { opacity: 0.7 })
-                                    : iconBtn(() => setReorderExercises(true), "Reorder exercises", reorderIcon)
-                                )}
-                                {active && iconBtn(() => addExercise(w.id), "Add exercise", plusIcon)}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Inline workout detail — exercise list */}
-                          {active && !reorderWorkouts && (
-                            <div style={{
-                              marginTop: 6,
-                              marginLeft: 4,
-                              padding: "8px 12px 8px",
-                              borderLeft: `2px solid ${colors.border}`,
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 8,
-                              animation: "tabFadeIn 0.2s cubic-bezier(.2,.8,.3,1)",
-                            }}>
-                              {w.exercises.length === 0 ? (
-                                <div style={styles.emptyText}>No exercises yet.</div>
-                              ) : (
-                                w.exercises.map((ex, ei) => {
-                                  const isFirstEx = ei === 0;
-                                  const isLastEx = ei === w.exercises.length - 1;
-                                  return (
-                                    <div key={ex.id} style={styles.manageExerciseRow}>
-                                      <div style={styles.manageExerciseLeft}>
-                                        <div style={styles.manageExerciseName}>{ex.name}</div>
-                                        <span style={styles.tagMuted}>{getUnit(ex.unit, ex).abbr}</span>
-                                      </div>
-                                      {reorderExercises ? (
-                                        <div style={styles.reorderBtnGroup}>
-                                          <button style={{ ...styles.reorderBtn, opacity: isFirstEx ? 0.15 : 0.5, padding: "0 4px" }} disabled={isFirstEx} onClick={() => moveExercise(w.id, ex.id, -1)} title="Move up">
-                                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
-                                          </button>
-                                          <button style={{ ...styles.reorderBtn, opacity: isLastEx ? 0.15 : 0.5, padding: "0 4px" }} disabled={isLastEx} onClick={() => moveExercise(w.id, ex.id, 1)} title="Move down">
-                                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-                                          {iconBtn(() => openEditExercise(w.id, ex.id), "Edit exercise", pencilIcon)}
-                                          {iconBtn(() => deleteExercise(w.id, ex.id), "Delete exercise", trashIcon, { opacity: 0.3 })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  );
-                })()}
-
+              {/* Create row — the loudest thing on the page */}
+              <div style={{ display: "flex", gap: 8 }}>
                 <button
+                  className="btn-press"
+                  type="button"
+                  onClick={addWorkout}
                   style={{
-                    ...styles.secondaryBtn,
-                    width: "100%",
-                    marginTop: 8,
-                    textAlign: "center",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
+                    flex: 1, height: 44, padding: "0 14px", borderRadius: 12,
+                    background: colors.accent, color: colors.appBg,
+                    border: `1px solid ${colors.accent}`,
+                    cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 13.5, fontWeight: 700, letterSpacing: -0.1,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   }}
-                  onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#f0b429" stroke="none">
-                    <path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" />
-                    <path d="M20 3l1 3.5L24.5 8 21 9l-1 3.5L19 9l-3.5-1L19 6.5z" opacity="0.6" />
-                  </svg>
-                  Generate Program
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.appBg} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  New workout
                 </button>
-                </>)}
+                <button
+                  className="btn-press"
+                  type="button"
+                  onClick={openCreateSplit}
+                  style={{
+                    flex: 1, height: 44, padding: "0 14px", borderRadius: 12,
+                    background: colors.cardBg, color: colors.text,
+                    border: `1px solid ${colors.border}`,
+                    cursor: "pointer", fontFamily: "inherit",
+                    fontSize: 13.5, fontWeight: 700, letterSpacing: -0.1,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>
+                  New split
+                </button>
+                <button
+                  className="btn-press"
+                  type="button"
+                  onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
+                  aria-label="AI generate"
+                  title="Generate with AI"
+                  style={{
+                    flex: "0 0 44px", height: 44, padding: 0, borderRadius: 12,
+                    background: colors.accentSoft, color: colors.accent,
+                    border: `1px solid ${colors.accentBorder}`,
+                    cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" /></svg>
+                </button>
               </div>
 
-              {/* Backup section */}
-              <div className="card-hover" style={styles.card}>
-                <div style={collapsedManage.has("data") ? { ...styles.cardHeader, marginBottom: 0 } : styles.cardHeader}>
-                  <div style={styles.cardTitle}>Data</div>
+              {/* Unified library feed */}
+              {splits.length === 0 && workouts.length === 0 ? (
+                <div style={{
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  padding: "40px 16px 16px", textAlign: "center",
+                  gap: 0,
+                }}>
+                  <div style={{
+                    width: 56, height: 56, marginBottom: 14,
+                    borderRadius: 16, background: colors.accentSoft,
+                    border: `1px solid ${colors.accentBorder}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 5v14M18 5v14M2 9v6M22 9v6M6 12h12" />
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: -0.3, marginBottom: 4 }}>
+                    Build your first workout
+                  </div>
+                  <div style={{
+                    fontSize: 13, color: colors.textSecondary,
+                    lineHeight: 1.5, maxWidth: 260, marginBottom: 18,
+                  }}>
+                    Start from scratch, or have AI build a full program from your goal and equipment.
+                  </div>
                   <button
-                    style={{ ...styles.navArrow, opacity: 0.35, padding: 4 }}
-                    onClick={() => toggleCollapse(setCollapsedManage, "data")}
                     type="button"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: collapsedManage.has("data") ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </button>
-                </div>
-                {!collapsedManage.has("data") && <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <button
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors.border}`, background: colors.cardAltBg, color: colors.text, cursor: "pointer", textAlign: "left", width: "100%" }}
-                    onClick={exportJson}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>Export JSON</div>
-                      <div style={{ fontSize: 12, opacity: 0.5 }}>Download all data as JSON</div>
-                    </div>
-                  </button>
-
-                  <button
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors.border}`, background: colors.cardAltBg, color: colors.text, cursor: "pointer", textAlign: "left", width: "100%" }}
-                    onClick={exportCSV}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>Export CSV</div>
-                      <div style={{ fontSize: 12, opacity: 0.5 }}>Download workout history as CSV</div>
-                    </div>
-                  </button>
-
-                  <label
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors.border}`, background: colors.cardAltBg, color: colors.text, cursor: "pointer", textAlign: "left", width: "100%" }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>Import</div>
-                      <div style={{ fontSize: 12, opacity: 0.5 }}>Load from JSON or CSV file</div>
-                    </div>
-                    <input
-                      type="file"
-                      accept=".json,.csv"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) importFile(f);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-
-                  <button
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors.dangerBorder}`, background: colors.dangerBg, color: colors.dangerText, cursor: "pointer", textAlign: "left", width: "100%", marginTop: 4 }}
-                    onClick={() => {
-                      dispatchModal({
-                        type: "OPEN_CONFIRM",
-                        payload: {
-                          title: "Reset All Data",
-                          message: "This will delete all workouts and logs. A backup will be exported first.",
-                          confirmText: "Reset",
-                          onConfirm: () => {
-                            try {
-                              exportJson();
-                            } catch (e) {
-                              showToast("Backup export failed — reset aborted");
-                              return;
-                            }
-                            setState(makeDefaultState());
-                            setManageWorkoutId(null);
-                            dispatchModal({ type: "CLOSE_CONFIRM" });
-                          },
-                        },
-                      });
+                    onClick={() => dispatchModal({ type: "OPEN_GENERATE_WIZARD", payload: { equipment } })}
+                    style={{
+                      width: "100%", padding: "13px 14px", borderRadius: 12, border: "none",
+                      background: colors.accent, color: colors.appBg,
+                      cursor: "pointer", fontFamily: "inherit",
+                      fontSize: 14, fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                     }}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-                    </svg>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>Reset All</div>
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>Delete all workouts and logs</div>
-                    </div>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.appBg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" /></svg>
+                    Generate with AI
                   </button>
-                </div>}
-              </div>
+                  <button
+                    type="button"
+                    onClick={addWorkout}
+                    style={{
+                      marginTop: 8, width: "100%", padding: "12px 14px", borderRadius: 12,
+                      background: "transparent", color: colors.text,
+                      border: `1px solid ${colors.border}`,
+                      cursor: "pointer", fontFamily: "inherit",
+                      fontSize: 13.5, fontWeight: 600,
+                    }}
+                  >
+                    Start from scratch
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* Splits */}
+                  {splits.map((s) => {
+                    const isContinuous = s.mode === SPLIT_MODES.CONTINUOUS;
+                    const memberCount = (s.members || []).length;
+                    return (
+                      <div key={s.id} style={{
+                        background: colors.cardBg, borderRadius: 16,
+                        border: `1px solid ${colors.border}`, boxShadow: colors.shadow,
+                        overflow: "hidden",
+                      }}>
+                        {/* Split header */}
+                        <button
+                          type="button"
+                          onClick={() => openEditSplit(s.id)}
+                          style={{
+                            width: "100%", background: "transparent",
+                            border: "none",
+                            borderBottom: memberCount > 0 ? `1px solid ${colors.border}` : "none",
+                            textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+                            color: colors.text,
+                            padding: "14px 14px 12px",
+                            display: "flex", alignItems: "center", gap: 12,
+                            minHeight: 60,
+                          }}
+                        >
+                          <div style={{
+                            width: 4, alignSelf: "stretch", borderRadius: 999,
+                            background: colors.accent,
+                          }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.2, color: colors.text }}>
+                              {s.name}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 700,
+                                padding: "2px 8px", borderRadius: 999,
+                                background: colors.accentSoft,
+                                color: colors.accent,
+                                border: `1px solid ${colors.accentBorder}`,
+                                letterSpacing: 0.2,
+                              }}>
+                                {isContinuous ? "Continuous" : "Weekly"}
+                              </span>
+                              <span style={{ fontSize: 11.5, color: colors.textSecondary }}>
+                                {memberCount} {memberCount === 1 ? "workout" : "workouts"}
+                              </span>
+                            </div>
+                          </div>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </button>
+
+                        {/* Member rows */}
+                        {memberCount > 0 && (
+                          <div style={{ background: colors.cardAltBg }}>
+                            {(s.members || []).map((m, mi) => {
+                              const w = workoutById.get(m.workoutId);
+                              if (!w) return null;
+                              const isLastMember = mi === memberCount - 1;
+                              const positionLabel = isContinuous
+                                ? `Day ${mi + 1}`
+                                : (Array.isArray(m.days) && m.days.length > 0
+                                  ? DISPLAY_DAYS.filter((d) => m.days.includes(d.value)).map((d) => d.full.slice(0, 3)).join(" · ")
+                                  : "Any day");
+                              const exCount = (w.exercises || []).length;
+                              return (
+                                <button
+                                  key={m.workoutId}
+                                  type="button"
+                                  onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
+                                  style={{
+                                    width: "100%", minHeight: 60,
+                                    padding: "12px 14px",
+                                    background: "transparent",
+                                    border: "none",
+                                    borderBottom: !isLastMember ? `1px solid ${colors.border}` : "none",
+                                    cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                                    color: colors.text,
+                                    display: "flex", alignItems: "center", gap: 12,
+                                  }}
+                                >
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <span style={{
+                                        fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
+                                        textTransform: "uppercase",
+                                        color: colors.textTertiary,
+                                        minWidth: 44,
+                                      }}>{positionLabel}</span>
+                                      <span style={{
+                                        fontSize: 14.5, fontWeight: 700,
+                                        color: colors.text, letterSpacing: -0.1,
+                                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                      }}>{w.name}</span>
+                                    </div>
+                                    <div style={{
+                                      display: "flex", alignItems: "center", gap: 6,
+                                      marginTop: 3, paddingLeft: 52,
+                                      fontSize: 11.5, color: colors.textSecondary,
+                                    }}>
+                                      <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
+                                      {w.category && (
+                                        <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                    <polyline points="9 18 15 12 9 6" />
+                                  </svg>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Standalone workouts */}
+                  {(() => {
+                    const standalone = workouts.filter((w) => !workoutToSplit.has(w.id));
+                    if (standalone.length === 0) return null;
+                    return (
+                      <>
+                        {splits.length > 0 && (
+                          <div style={{
+                            fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
+                            textTransform: "uppercase", color: colors.textTertiary,
+                            marginTop: 6, marginBottom: -4, paddingLeft: 4,
+                          }}>
+                            Standalone workouts
+                          </div>
+                        )}
+                        {standalone.map((w) => {
+                          const exCount = (w.exercises || []).length;
+                          const cadLabel = (() => {
+                            const c = w.cadence || { mode: CADENCE_MODES.WHENEVER };
+                            if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
+                            if (c.mode === CADENCE_MODES.ANCHOR) {
+                              if (!Array.isArray(c.days) || c.days.length === 0) return null;
+                              return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
+                                .map((d) => d.full.slice(0, 3)).join(" · ");
+                            }
+                            return null;
+                          })();
+                          return (
+                            <div key={w.id} style={{
+                              background: colors.cardBg, borderRadius: 14,
+                              border: `1px solid ${colors.border}`, boxShadow: colors.shadow,
+                              overflow: "hidden",
+                            }}>
+                              <button
+                                type="button"
+                                onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
+                                style={{
+                                  width: "100%", minHeight: 60,
+                                  padding: "12px 14px",
+                                  background: "transparent",
+                                  border: "none",
+                                  cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                                  color: colors.text,
+                                  display: "flex", alignItems: "center", gap: 12,
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{
+                                    fontSize: 14.5, fontWeight: 700,
+                                    color: colors.text, letterSpacing: -0.1,
+                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                  }}>{w.name}</div>
+                                  <div style={{
+                                    display: "flex", alignItems: "center", gap: 6,
+                                    marginTop: 3,
+                                    fontSize: 11.5, color: colors.textSecondary,
+                                  }}>
+                                    <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
+                                    {w.category && (
+                                      <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
+                                    )}
+                                    {cadLabel && (
+                                      <span style={{
+                                        fontSize: 10, fontWeight: 700,
+                                        padding: "2px 8px", borderRadius: 999,
+                                        background: colors.subtleBg,
+                                        color: colors.textSecondary,
+                                        border: `1px solid ${colors.border}`,
+                                        marginLeft: 4,
+                                      }}>{cadLabel}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                  <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
             </div>
           ) : null}
 
@@ -6956,6 +6946,30 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         colors={colors}
         preferences={state.preferences}
         onUpdatePreference={updatePreference}
+        onExportJson={exportJson}
+        onExportCSV={exportCSV}
+        onImportFile={importFile}
+        onResetAll={() => {
+          dispatchModal({
+            type: "OPEN_CONFIRM",
+            payload: {
+              title: "Reset All Data",
+              message: "This will delete all workouts and logs. A backup will be exported first.",
+              confirmText: "Reset",
+              onConfirm: () => {
+                try {
+                  exportJson();
+                } catch (e) {
+                  showToast("Backup export failed — reset aborted");
+                  return;
+                }
+                setState(makeDefaultState());
+                setManageWorkoutId(null);
+                dispatchModal({ type: "CLOSE_CONFIRM" });
+              },
+            },
+          });
+        }}
       />
 
       {/* Change Username Modal */}
@@ -7037,6 +7051,38 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         styles={styles}
         colors={colors}
       />
+
+      {/* Workout Detail Sheet — Plans tab tap-to-open editor */}
+      {modals.workoutDetail.isOpen && (() => {
+        const w = workoutById.get(modals.workoutDetail.workoutId);
+        const splitForWorkout = workoutToSplit.get(modals.workoutDetail.workoutId) || null;
+        if (!w) {
+          // Workout was deleted while sheet was open — auto-close.
+          setTimeout(() => dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" }), 0);
+          return null;
+        }
+        return (
+          <WorkoutDetailSheet
+            open
+            workout={w}
+            splitForWorkout={splitForWorkout}
+            reorderExercises={modals.workoutDetail.reorderExercises}
+            onToggleReorderExercises={() => dispatchModal({ type: "UPDATE_WORKOUT_DETAIL", payload: { reorderExercises: !modals.workoutDetail.reorderExercises } })}
+            onClose={() => dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" })}
+            onRenameWorkout={renameWorkout}
+            onOpenEditWorkout={openEditWorkout}
+            onOpenEditExercise={openEditExercise}
+            onAddExercise={addExercise}
+            onBrowseCatalog={(wid) => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: wid } })}
+            onMoveExercise={moveExercise}
+            onShareWorkout={(wid, wname) => dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { workoutId: wid, workoutName: wname } })}
+            onDuplicateWorkout={duplicateWorkout}
+            onDeleteWorkout={deleteWorkout}
+            styles={styles}
+            colors={colors}
+          />
+        );
+      })()}
 
       {/* Edit Workout Modal */}
       {modals.editWorkout && (

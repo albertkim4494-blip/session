@@ -25,7 +25,7 @@ function isDirty(modalState, pendingPrefs) {
   return DIRTY_FIELDS.some((k) => (modalState[k] ?? "") !== (init[k] ?? ""));
 }
 
-export function ProfileModal({ open, modalState, dispatch, profile, session, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference }) {
+export function ProfileModal({ open, modalState, dispatch, profile, session, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference, onExportJson, onExportCSV, onImportFile, onResetAll }) {
   const [activeTab, setActiveTab] = useState("profile");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [pendingPrefs, setPendingPrefs] = useState({});
@@ -135,8 +135,13 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
         onUpdatePreference(key, value);
       }
       setPendingPrefs({});
-    } finally {
       dispatch({ type: "UPDATE_PROFILE_MODAL", payload: { saving: false } });
+    } catch (err) {
+      console.error("Profile save failed:", err);
+      dispatch({
+        type: "UPDATE_PROFILE_MODAL",
+        payload: { saving: false, error: err?.message || "Couldn't save changes. Please try again." },
+      });
     }
   }
 
@@ -244,6 +249,10 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
             onUpdatePreference={stagePreference}
             styles={previewStyles}
             colors={previewColors}
+            onExportJson={onExportJson}
+            onExportCSV={onExportCSV}
+            onImportFile={onImportFile}
+            onResetAll={onResetAll}
           />
         )}
       </div>
