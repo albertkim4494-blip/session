@@ -7412,8 +7412,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             open
             split={s}
             workouts={workouts}
+            splits={splits}
             onClose={() => dispatchModal({ type: "CLOSE_SPLIT_DETAIL" })}
             onOpenEditMeta={() => openEditSplit(s.id)}
+            onAddMember={(workoutId) => addSplitMember(s.id, workoutId)}
             onRemoveMember={(workoutId) => removeSplitMember(s.id, workoutId)}
             onReorderMembers={(fromIdx, toIdx) => reorderSplitMembers(s.id, fromIdx, toIdx)}
             onSetMemberDays={(workoutId, days) => setSplitMemberDays(s.id, workoutId, days)}
