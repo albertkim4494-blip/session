@@ -5077,7 +5077,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     {!isCollapsed && (
                       <WorkoutsList
                         workouts={workouts}
-                        workoutToSplit={workoutToSplit}
                         reorderWorkouts={reorderWorkouts}
                         onOpenDetail={(wid) => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: wid } })}
                         onCommitReorder={reorderWorkoutsByIndex}

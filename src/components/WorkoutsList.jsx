@@ -1,6 +1,6 @@
 import React from "react";
 import { useDragReorder } from "../hooks/useDragReorder";
-import { CADENCE_MODES, SPLIT_MODES } from "../lib/cadence";
+import { CADENCE_MODES } from "../lib/cadence";
 import { DISPLAY_DAYS } from "./CadenceEditor";
 
 /**
@@ -10,7 +10,6 @@ import { DISPLAY_DAYS } from "./CadenceEditor";
  */
 export function WorkoutsList({
   workouts,
-  workoutToSplit,
   reorderWorkouts,
   onOpenDetail,
   onCommitReorder,
@@ -30,16 +29,16 @@ export function WorkoutsList({
     }}>
       {workouts.map((w, wi) => {
         const exCount = (w.exercises || []).length;
-        const split = workoutToSplit.get(w.id) || null;
         const cadLabel = (() => {
-          if (split) return split.mode === SPLIT_MODES.CONTINUOUS ? "Continuous" : "Weekly";
           const c = w.cadence || { mode: CADENCE_MODES.WHENEVER };
-          if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
+          if (c.mode === CADENCE_MODES.CONTINUOUS) return "Continuous";
           if (c.mode === CADENCE_MODES.ANCHOR) {
             if (!Array.isArray(c.days) || c.days.length === 0) return null;
             return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
               .map((d) => d.full.slice(0, 3)).join(" · ");
           }
+          // Legacy weekly — kept rendering until the user edits the schedule.
+          if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
           return null;
         })();
 
@@ -85,16 +84,6 @@ export function WorkoutsList({
                   {w.category && (
                     <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
                   )}
-                  {split && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 700,
-                      padding: "2px 8px", borderRadius: 999,
-                      background: colors.accentSoft,
-                      color: colors.accent,
-                      border: `1px solid ${colors.accentBorder}`,
-                      marginLeft: 4,
-                    }}>In: {split.name}</span>
-                  )}
                   {cadLabel && (
                     <span style={{
                       fontSize: 10, fontWeight: 700,
@@ -102,7 +91,7 @@ export function WorkoutsList({
                       background: colors.subtleBg,
                       color: colors.textSecondary,
                       border: `1px solid ${colors.border}`,
-                      marginLeft: split ? 0 : 4,
+                      marginLeft: 4,
                     }}>{cadLabel}</span>
                   )}
                 </div>

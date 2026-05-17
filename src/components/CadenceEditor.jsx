@@ -111,13 +111,12 @@ export function CadenceEditor({ cadence, onChange, colors, styles }) {
     <div style={styles.fieldCol}>
       <label style={styles.label}>Schedule</label>
 
-      {/* Mode picker */}
+      {/* Mode picker — workouts schedule via Whenever or Specific days only.
+          Weekly / Continuous cadence is set automatically when a workout is
+          added to a Split. */}
       <div style={{ display: "flex", gap: 6 }}>
         <ModeButton active={mode === CADENCE_MODES.WHENEVER} onClick={() => setMode(CADENCE_MODES.WHENEVER)} colors={colors}>
           Whenever
-        </ModeButton>
-        <ModeButton active={mode === CADENCE_MODES.WEEKLY} onClick={() => setMode(CADENCE_MODES.WEEKLY)} colors={colors}>
-          Weekly
         </ModeButton>
         <ModeButton active={mode === CADENCE_MODES.ANCHOR} onClick={() => setMode(CADENCE_MODES.ANCHOR)} colors={colors}>
           Specific days
@@ -132,59 +131,8 @@ export function CadenceEditor({ cadence, onChange, colors, styles }) {
       )}
 
       {mode === CADENCE_MODES.WEEKLY && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 6 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Times per week</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {[1, 2, 3, 4, 5, 6, 7].map((n) => {
-                const active = perWeek === n;
-                return (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setPerWeek(n)}
-                    aria-pressed={active}
-                    style={{
-                      width: 36, height: 36, borderRadius: 999,
-                      border: `1px solid ${active ? colors.accent : colors.border}`,
-                      background: active ? colors.accent : "transparent",
-                      color: active ? "#fff" : colors.text,
-                      fontSize: 13, fontWeight: 600,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    {n}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-              Preferred days <span style={{ opacity: 0.5, fontWeight: 400 }}>(optional)</span>
-            </div>
-            <DayChips
-              selected={preferredDays}
-              onToggle={toggleDay("preferredDays")}
-              colors={colors}
-              ariaLabel="Preferred days of the week"
-            />
-            <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6, lineHeight: 1.5 }}>
-              Soft hint — you can still log this workout on any day.
-            </div>
-          </div>
-
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={c.skipIfMissed !== false}
-              onChange={(e) => setSkipIfMissed(e.target.checked)}
-              style={{ cursor: "pointer" }}
-            />
-            <span>Skip if missed (no make-up days)</span>
-          </label>
+        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6, lineHeight: 1.5 }}>
+          Weekly schedules now live on Splits. Pick Whenever or Specific days, or add this workout to a Split.
         </div>
       )}
 
