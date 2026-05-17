@@ -5,7 +5,7 @@ import { EXERCISE_CATALOG } from "../lib/exerciseCatalog";
 import { catalogSearch } from "../lib/exerciseCatalogUtils";
 
 export function EditExerciseModal({
-  open, modalState, onUpdate, onClose, onSave, styles, colors, catalog,
+  open, modalState, onUpdate, onClose, onSave, onDelete, styles, colors, catalog,
 }) {
   const [focused, setFocused] = useState(false);
   const inputRef = useRef(null);
@@ -275,6 +275,38 @@ export function EditExerciseModal({
               }}>
                 Changing the unit may affect how existing logs display. Consider creating a new exercise instead.
               </div>
+            )}
+
+            {/* Delete exercise */}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                style={{
+                  marginTop: 16,
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: 12,
+                  border: `1px solid ${colors.border}`,
+                  background: "transparent",
+                  color: colors.dangerText,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                </svg>
+                Delete exercise
+              </button>
             )}
           </>
         )}

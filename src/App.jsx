@@ -111,6 +111,8 @@ function ensureAnimations() {
 @keyframes fabGlow { 0%,100% { box-shadow: 0 4px 16px rgba(0,0,0,0.15); } 50% { box-shadow: 0 0 28px 8px var(--fab-glow, rgba(217,119,6,0.6)), 0 4px 16px rgba(0,0,0,0.15); } }
 @keyframes fabTipIn { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes fabTipOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes workoutSheetSlideInRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes workoutSheetSlideInLeft  { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
 .btn-press { transition: transform 0.15s ease, opacity 0.15s ease; }
 .btn-press:active { transform: scale(0.97); opacity: 0.85; }
 @media (hover: hover) {
@@ -7112,6 +7114,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           setTimeout(() => dispatchModal({ type: "CLOSE_WORKOUT_DETAIL" }), 0);
           return null;
         }
+        // Swipe nav: cycle through the global `workouts` array. No wrap at ends.
+        const currentIdx = workouts.findIndex((x) => x.id === w.id);
+        const prevWorkout = currentIdx > 0 ? workouts[currentIdx - 1] : null;
+        const nextWorkout = currentIdx >= 0 && currentIdx < workouts.length - 1 ? workouts[currentIdx + 1] : null;
         return (
           <WorkoutDetailSheet
             open
@@ -7124,11 +7130,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             onOpenEditWorkout={openEditWorkout}
             onOpenEditExercise={openEditExercise}
             onAddExercise={addExercise}
-            onBrowseCatalog={(wid) => dispatchModal({ type: "OPEN_CATALOG_BROWSE", payload: { workoutId: wid } })}
             onMoveExercise={moveExercise}
             onShareWorkout={(wid, wname) => dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { workoutId: wid, workoutName: wname } })}
             onDuplicateWorkout={duplicateWorkout}
             onDeleteWorkout={deleteWorkout}
+            hasPrev={!!prevWorkout}
+            hasNext={!!nextWorkout}
+            onPrevWorkout={prevWorkout ? () => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: prevWorkout.id } }) : undefined}
+            onNextWorkout={nextWorkout ? () => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: nextWorkout.id } }) : undefined}
             styles={styles}
             colors={colors}
           />
@@ -7194,6 +7203,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           onUpdate={(payload) => dispatchModal({ type: "UPDATE_EDIT_EXERCISE", payload })}
           onClose={() => dispatchModal({ type: "CLOSE_EDIT_EXERCISE" })}
           onSave={saveEditExercise}
+          onDelete={modals.editExercise.exerciseId
+            ? () => {
+                const { workoutId, exerciseId } = modals.editExercise;
+                dispatchModal({ type: "CLOSE_EDIT_EXERCISE" });
+                deleteExercise(workoutId, exerciseId);
+              }
+            : null}
           styles={styles}
           colors={colors}
           catalog={fullCatalog}

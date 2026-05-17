@@ -3,6 +3,7 @@ import { Modal } from "./Modal";
 import { getUnit } from "../lib/constants";
 import { CADENCE_MODES } from "../lib/cadence";
 import { DISPLAY_DAYS } from "./CadenceEditor";
+import { useSwipe } from "../hooks/useSwipe";
 
 function cadenceLine(cadence) {
   const c = cadence || { mode: CADENCE_MODES.WHENEVER };
@@ -93,22 +94,44 @@ export function WorkoutDetailSheet({
   onOpenEditWorkout,
   onOpenEditExercise,
   onAddExercise,
-  onBrowseCatalog,
   onMoveExercise,
   onShareWorkout,
   onDuplicateWorkout,
   onDeleteWorkout,
   reorderExercises,
   onToggleReorderExercises,
+  onPrevWorkout,
+  onNextWorkout,
+  hasPrev,
+  hasNext,
   styles,
   colors,
 }) {
   const [nameDraft, setNameDraft] = useState("");
+  // Direction of the last nav swipe — drives slide-in animation on the body content.
+  const [navDir, setNavDir] = useState(null); // "left" (next) | "right" (prev) | null
   const nameInputRef = useRef(null);
 
   useEffect(() => {
     if (workout) setNameDraft(workout.name || "");
   }, [workout?.id, workout?.name]);
+
+  // Swipe left = next, swipe right = prev. Mirrors the log-modal card-swipe.
+  const goPrev = () => {
+    if (!hasPrev) return;
+    setNavDir("right");
+    onPrevWorkout?.();
+  };
+  const goNext = () => {
+    if (!hasNext) return;
+    setNavDir("left");
+    onNextWorkout?.();
+  };
+  const swipe = useSwipe({
+    onSwipeLeft: goNext,
+    onSwipeRight: goPrev,
+    thresholdPx: 60,
+  });
 
   if (!open || !workout) return null;
 
@@ -126,43 +149,8 @@ export function WorkoutDetailSheet({
     onRenameWorkout(workout.id, trimmed);
   };
 
-  // Custom header: Close left, Done right (both dismiss; Done commits inline name)
-  const headerContent = (
-    <div style={{ display: "flex", alignItems: "center", width: "100%", gap: 10 }}>
-      <button
-        type="button"
-        onClick={onClose}
-        style={{
-          background: "transparent",
-          border: "none",
-          color: colors.textSecondary,
-          fontFamily: "inherit",
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-          padding: "6px 4px",
-          minHeight: 44,
-        }}
-      >Close</button>
-      <div style={{ flex: 1 }} />
-      <button
-        type="button"
-        onClick={() => { commitName(); onClose(); }}
-        style={{
-          padding: "8px 16px",
-          borderRadius: 999,
-          border: "none",
-          background: colors.accent,
-          color: colors.appBg,
-          fontFamily: "inherit",
-          fontSize: 13,
-          fontWeight: 700,
-          cursor: "pointer",
-          minHeight: 36,
-        }}
-      >Done</button>
-    </div>
-  );
+  // Wrap onClose so the inline name edit commits before dismiss.
+  const closeAndCommit = () => { commitName(); onClose?.(); };
 
   // Lower overlay z-index so sub-modals (CatalogBrowse, EditExercise) layer on top.
   const sheetStyles = useMemo(() => ({
@@ -193,13 +181,29 @@ export function WorkoutDetailSheet({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      title="Edit Workout"
+      onClose={closeAndCommit}
       styles={sheetStyles}
-      headerContent={headerContent}
-      hideClose
       footer={footer}
       compactHeight
     >
+      {/* Swipe wrapper — keyed by workout.id so the slide animation replays on nav.
+          Sits as a single flex child of modalBody and re-establishes the flex
+          column layout for the frozen header + scrollable exercises area. */}
+      <div
+        key={workout.id}
+        onTouchStart={swipe.onTouchStart}
+        onTouchEnd={swipe.onTouchEnd}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          animation: navDir
+            ? `${navDir === "left" ? "workoutSheetSlideInRight" : "workoutSheetSlideInLeft"} 0.22s cubic-bezier(.2,.8,.3,1)`
+            : undefined,
+        }}
+      >
       {/* FROZEN HEADER BLOCK — workout name + meta chips */}
       <div style={{ flexShrink: 0 }}>
         <input
@@ -430,31 +434,8 @@ export function WorkoutDetailSheet({
             </button>
           )}
 
-          {/* Browse catalog (secondary link below dashed button) */}
-          {!reorderExercises && (
-            <button
-              type="button"
-              onClick={() => onBrowseCatalog(workout.id)}
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                background: "transparent",
-                color: colors.textSecondary,
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                fontSize: 12,
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 4,
-              }}
-            >
-              Browse exercise catalog →
-            </button>
-          )}
         </div>
+      </div>
       </div>
     </Modal>
   );
