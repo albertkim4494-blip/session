@@ -7441,7 +7441,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               />
             </div>
             <div style={styles.fieldCol}>
-              <label style={styles.label}>Category</label>
+              <label style={styles.label}>Workout category</label>
               <CategoryAutocomplete
                 value={modals.editWorkout.category}
                 onChange={(val) =>
