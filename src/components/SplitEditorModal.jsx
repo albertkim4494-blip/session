@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Modal } from "./Modal";
 import { DayChips, DISPLAY_DAYS } from "./CadenceEditor";
 import { SPLIT_MODES } from "../lib/cadence";
@@ -49,6 +49,9 @@ export function SplitEditorModal({
 
   const { splitId, name, mode, members, restPattern } = modalState;
   const isNew = !splitId;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // Reset picker when the modal opens fresh.
+  useEffect(() => { if (open) setPickerOpen(false); }, [open, splitId]);
 
   // Map: workoutId → split name (any *other* split it belongs to). Used to show
   // a small "Already in: X" tag in the picker, but the workout can still be
@@ -271,57 +274,83 @@ export function SplitEditorModal({
             </div>
           )}
 
-          {/* Add member picker */}
-          {availableToAdd.length > 0 && (
-            <details style={{ marginTop: 10 }}>
-              <summary style={{
-                cursor: "pointer", fontSize: 13, fontWeight: 600,
-                color: colors.accent, padding: "6px 0",
-                listStyle: "none", userSelect: "none",
-              }}>
-                + Add a workout
-              </summary>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
-                {availableToAdd.map((w) => {
-                  const otherSplitName = otherSplitNameByWorkout.get(w.id);
-                  return (
-                    <button
-                      key={w.id}
-                      type="button"
-                      onClick={() => addMember(w.id)}
-                      style={{
-                        textAlign: "left", padding: "8px 10px", borderRadius: 8,
-                        border: `1px solid ${colors.border}`, background: "transparent",
-                        color: colors.text, fontSize: 13, cursor: "pointer",
-                        fontFamily: "inherit",
-                        display: "flex", alignItems: "center", gap: 8,
-                      }}
-                    >
-                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {w.name}
-                      </span>
+          {/* Add member picker — dashed button (same style as +Add exercise),
+              tap to expand an inline list of workouts to add. */}
+          {availableToAdd.length > 0 ? (
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setPickerOpen((v) => !v)}
+                aria-expanded={pickerOpen}
+                style={{
+                  width: "100%",
+                  padding: "13px 14px",
+                  borderRadius: 14,
+                  background: pickerOpen ? colors.accentSoft : "transparent",
+                  color: colors.accent,
+                  border: `1.5px dashed ${colors.accentBorder}`,
+                  cursor: "pointer", fontFamily: "inherit",
+                  fontSize: 13, fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  minHeight: 48,
+                }}
+              >
+                {pickerOpen ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    Done adding
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    Add a workout
+                  </>
+                )}
+              </button>
+
+              {pickerOpen && availableToAdd.map((w) => {
+                const otherSplitName = otherSplitNameByWorkout.get(w.id);
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => addMember(w.id)}
+                    style={{
+                      width: "100%", minHeight: 56,
+                      padding: "12px 14px",
+                      borderRadius: 14,
+                      background: colors.cardAltBg,
+                      border: `1px solid ${colors.border}`,
+                      color: colors.text,
+                      cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                      display: "flex", alignItems: "center", gap: 12,
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 14, fontWeight: 700, color: colors.text,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>{w.name}</div>
                       {otherSplitName && (
-                        <span style={{
-                          fontSize: 10, fontWeight: 700,
-                          padding: "2px 7px", borderRadius: 999,
-                          background: colors.subtleBg, color: colors.textSecondary,
-                          border: `1px solid ${colors.border}`,
-                          flexShrink: 0,
+                        <div style={{
+                          fontSize: 11, color: colors.textSecondary, marginTop: 2,
                         }}>
                           Already in: {otherSplitName}
-                        </span>
+                        </div>
                       )}
-                    </button>
-                  );
-                })}
-              </div>
-            </details>
-          )}
-
-          {availableToAdd.length === 0 && members.length === 0 && (
-            <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6, lineHeight: 1.5 }}>
-              No workouts to add. Create one first.
+                    </div>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  </button>
+                );
+              })}
             </div>
+          ) : (
+            members.length === 0 && (
+              <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6, lineHeight: 1.5 }}>
+                No workouts to add. Create one first.
+              </div>
+            )
           )}
         </div>
 

@@ -15,7 +15,7 @@ export const DISPLAY_DAYS = [
 export function DayChips({ selected, onToggle, colors, ariaLabel }) {
   const sel = Array.isArray(selected) ? selected : [];
   return (
-    <div role="group" aria-label={ariaLabel} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+    <div role="group" aria-label={ariaLabel} style={{ display: "flex", gap: 4, width: "100%" }}>
       {DISPLAY_DAYS.map((d, i) => {
         const isSelected = sel.includes(d.value);
         return (
@@ -26,7 +26,10 @@ export function DayChips({ selected, onToggle, colors, ariaLabel }) {
             aria-label={d.full}
             onClick={() => onToggle(d.value)}
             style={{
-              minWidth: 46, height: 36, padding: "0 10px",
+              flex: 1,
+              minWidth: 0,
+              height: 36,
+              padding: "0 2px",
               borderRadius: 999,
               border: `1px solid ${isSelected ? colors.accent : colors.border}`,
               background: isSelected ? colors.accent : "transparent",
