@@ -32,7 +32,7 @@ function ModeButton({ active, onClick, children, colors }) {
  * Mirrors the EditWorkout modal pattern.
  */
 export function SplitEditorModal({
-  open, modalState, onUpdate, onClose, onSave, onDelete, styles, colors,
+  open, modalState, onUpdate, onClose, onSave, styles, colors,
 }) {
   if (!open) return null;
 
@@ -52,15 +52,6 @@ export function SplitEditorModal({
 
   const footer = (
     <div style={styles.modalFooter}>
-      {!isNew && onDelete && (
-        <button
-          className="btn-press"
-          style={{ ...styles.secondaryBtn, color: colors.dangerText, borderColor: colors.dangerBorder }}
-          onClick={onDelete}
-        >
-          Delete
-        </button>
-      )}
       <button className="btn-press" style={styles.secondaryBtn} onClick={onClose}>
         Cancel
       </button>
@@ -77,7 +68,7 @@ export function SplitEditorModal({
   return (
     <Modal
       open={open}
-      title={isNew ? "New split" : "Edit split"}
+      title={isNew ? "New Split" : "Edit Split"}
       onClose={onClose}
       styles={styles}
       footer={footer}

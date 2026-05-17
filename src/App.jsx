@@ -7357,7 +7357,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         />
       )}
 
-      {/* Edit Split (meta) Modal — name/mode/rest only */}
+      {/* Edit Split (meta) Modal — name/mode/rest only; Delete lives in the
+          SplitDetailSheet footer, not duplicated here. */}
       {modals.editSplit && (
         <SplitEditorModal
           open={modals.editSplit.isOpen}
@@ -7365,7 +7366,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           onUpdate={(payload) => dispatchModal({ type: "UPDATE_EDIT_SPLIT", payload })}
           onClose={() => dispatchModal({ type: "CLOSE_EDIT_SPLIT" })}
           onSave={saveEditSplit}
-          onDelete={modals.editSplit.splitId ? () => deleteSplit(modals.editSplit.splitId) : null}
           styles={styles}
           colors={colors}
         />
