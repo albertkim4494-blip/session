@@ -106,8 +106,6 @@ export function WorkoutDetailSheet({
   onNextWorkout,
   hasPrev,
   hasNext,
-  onSave,
-  isDirty,
   styles,
   colors,
 }) {
@@ -175,46 +173,18 @@ export function WorkoutDetailSheet({
       styles={sheetStyles}
       footer={footer}
       headerActions={
-        <>
-          <button
-            type="button"
-            onClick={() => onOpenEditWorkout(workout.id)}
-            aria-label="Edit workout name, category and schedule"
-            title="Edit workout"
-            style={sheetStyles.iconBtn}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-              <path d="m15 5 4 4" />
-            </svg>
-          </button>
-          {onSave && (
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={!isDirty}
-              aria-label="Save changes and close"
-              title={isDirty ? "Save changes" : "No changes to save"}
-              style={{
-                padding: "0 14px",
-                height: 36,
-                minWidth: 36,
-                borderRadius: 10,
-                border: `1px solid ${isDirty ? colors.accent : colors.border}`,
-                background: isDirty ? colors.accent : colors.cardAltBg,
-                color: isDirty ? colors.appBg : colors.textSecondary,
-                fontFamily: "inherit",
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: isDirty ? "pointer" : "default",
-                opacity: isDirty ? 1 : 0.55,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >
-              Save
-            </button>
-          )}
-        </>
+        <button
+          type="button"
+          onClick={() => onOpenEditWorkout(workout.id)}
+          aria-label="Edit workout name, category and schedule"
+          title="Edit workout"
+          style={sheetStyles.iconBtn}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            <path d="m15 5 4 4" />
+          </svg>
+        </button>
       }
     >
       {/* Swipe wrapper — keyed by workout.id so the slide animation replays on nav.
