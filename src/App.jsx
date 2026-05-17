@@ -229,6 +229,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const theme = state.preferences?.theme || "dark";
   const equipment = state.preferences?.equipment || ["full_gym"];
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
+  const [reorderSplits, setReorderSplits] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
   const [trainSearch, setTrainSearch] = useState("");
   const [trainSearchOpen, setTrainSearchOpen] = useState(false);
@@ -3012,6 +3013,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }
 
+  function moveSplit(splitId, direction) {
+    updateState((st) => {
+      const arr = st.program.splits || [];
+      const idx = arr.findIndex((s) => s.id === splitId);
+      if (idx < 0) return st;
+      const targetIdx = idx + direction;
+      if (targetIdx < 0 || targetIdx >= arr.length) return st;
+      [arr[idx], arr[targetIdx]] = [arr[targetIdx], arr[idx]];
+      return st;
+    });
+  }
+
   const exportJson = useCallback(() => {
     try {
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -4994,20 +5007,41 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     <div
                       onClick={() => toggleCollapse(setCollapsedManage, "workouts")}
                       style={{
-                        display: "flex", alignItems: "center",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
                         padding: "14px 16px",
                         cursor: "pointer", userSelect: "none", gap: 8,
                       }}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                      <div style={{
-                        fontSize: 11, fontWeight: 600, opacity: 0.4,
-                        textTransform: "uppercase", letterSpacing: 1,
-                      }}>
-                        Workouts
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                        <div style={{
+                          fontSize: 11, fontWeight: 600, opacity: 0.4,
+                          textTransform: "uppercase", letterSpacing: 1,
+                        }}>
+                          Workouts
+                        </div>
                       </div>
+                      {!isCollapsed && workouts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setReorderWorkouts((v) => !v); }}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 999,
+                            background: reorderWorkouts ? colors.accentSoft : "transparent",
+                            border: `1px solid ${reorderWorkouts ? colors.accentBorder : colors.border}`,
+                            color: reorderWorkouts ? colors.accent : colors.textSecondary,
+                            fontFamily: "inherit",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: 0.3,
+                            cursor: "pointer",
+                            minHeight: 32,
+                          }}
+                        >{reorderWorkouts ? "Done" : "Reorder"}</button>
+                      )}
                     </div>
 
                     {/* Body — workout rows styled like exercise rows in WorkoutDetailSheet,
@@ -5017,7 +5051,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         padding: 12, paddingTop: 0,
                         display: "flex", flexDirection: "column", gap: 8,
                       }}>
-                        {workouts.map((w) => {
+                        {workouts.map((w, wi) => {
                           const exCount = (w.exercises || []).length;
                           const split = workoutToSplit.get(w.id) || null;
                           const cadLabel = (() => {
@@ -5031,18 +5065,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             }
                             return null;
                           })();
+                          const isFirst = wi === 0;
+                          const isLast = wi === workouts.length - 1;
                           return (
                             <button
                               key={w.id}
                               type="button"
-                              onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
+                              onClick={reorderWorkouts ? undefined : () => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
                               style={{
                                 width: "100%", minHeight: 60,
                                 padding: "12px 14px",
                                 borderRadius: 14,
                                 background: colors.cardAltBg,
                                 border: `1px solid ${colors.border}`,
-                                cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                                cursor: reorderWorkouts ? "default" : "pointer",
+                                textAlign: "left", fontFamily: "inherit",
                                 color: colors.text,
                                 display: "flex", alignItems: "center", gap: 12,
                               }}
@@ -5085,33 +5122,72 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                   )}
                                 </div>
                               </div>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                <polyline points="9 18 15 12 9 6" />
-                              </svg>
+                              {reorderWorkouts ? (
+                                <div style={{ display: "flex", flexDirection: "row", flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    disabled={isFirst}
+                                    onClick={(e) => { e.stopPropagation(); moveWorkout(w.id, -1); }}
+                                    style={{
+                                      background: "transparent", border: "none",
+                                      color: colors.text,
+                                      opacity: isFirst ? 0.15 : 0.6,
+                                      padding: "4px 6px",
+                                      cursor: isFirst ? "default" : "pointer",
+                                      display: "flex", alignItems: "center",
+                                    }}
+                                    title="Move up"
+                                  >
+                                    <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isLast}
+                                    onClick={(e) => { e.stopPropagation(); moveWorkout(w.id, 1); }}
+                                    style={{
+                                      background: "transparent", border: "none",
+                                      color: colors.text,
+                                      opacity: isLast ? 0.15 : 0.6,
+                                      padding: "4px 6px",
+                                      cursor: isLast ? "default" : "pointer",
+                                      display: "flex", alignItems: "center",
+                                    }}
+                                    title="Move down"
+                                  >
+                                    <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
+                                  </button>
+                                </div>
+                              ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                  <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                              )}
                             </button>
                           );
                         })}
 
                         {/* Add workout — dashed button matching the +Add exercise pattern */}
-                        <button
-                          type="button"
-                          onClick={addWorkout}
-                          style={{
-                            width: "100%",
-                            padding: "13px 14px",
-                            borderRadius: 14,
-                            background: "transparent",
-                            color: colors.accent,
-                            border: `1.5px dashed ${colors.accentBorder}`,
-                            cursor: "pointer", fontFamily: "inherit",
-                            fontSize: 13, fontWeight: 700,
-                            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                            minHeight: 48,
-                          }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                          Add workout
-                        </button>
+                        {!reorderWorkouts && (
+                          <button
+                            type="button"
+                            onClick={addWorkout}
+                            style={{
+                              width: "100%",
+                              padding: "13px 14px",
+                              borderRadius: 14,
+                              background: "transparent",
+                              color: colors.accent,
+                              border: `1.5px dashed ${colors.accentBorder}`,
+                              cursor: "pointer", fontFamily: "inherit",
+                              fontSize: 13, fontWeight: 700,
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                              minHeight: 48,
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                            Add workout
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -5133,20 +5209,41 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     <div
                       onClick={() => toggleCollapse(setCollapsedManage, "splits")}
                       style={{
-                        display: "flex", alignItems: "center",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
                         padding: "14px 16px",
                         cursor: "pointer", userSelect: "none", gap: 8,
                       }}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                      <div style={{
-                        fontSize: 11, fontWeight: 600, opacity: 0.4,
-                        textTransform: "uppercase", letterSpacing: 1,
-                      }}>
-                        Splits
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                        <div style={{
+                          fontSize: 11, fontWeight: 600, opacity: 0.4,
+                          textTransform: "uppercase", letterSpacing: 1,
+                        }}>
+                          Splits
+                        </div>
                       </div>
+                      {!isCollapsed && splits.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setReorderSplits((v) => !v); }}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 999,
+                            background: reorderSplits ? colors.accentSoft : "transparent",
+                            border: `1px solid ${reorderSplits ? colors.accentBorder : colors.border}`,
+                            color: reorderSplits ? colors.accent : colors.textSecondary,
+                            fontFamily: "inherit",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: 0.3,
+                            cursor: "pointer",
+                            minHeight: 32,
+                          }}
+                        >{reorderSplits ? "Done" : "Reorder"}</button>
+                      )}
                     </div>
 
                     {/* Body — splits as labeled blocks with + Add split at the bottom */}
@@ -5167,12 +5264,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                 {/* Split header */}
                                 <button
                                   type="button"
-                                  onClick={() => openEditSplit(s.id)}
+                                  onClick={reorderSplits ? undefined : () => openEditSplit(s.id)}
                                   style={{
                                     width: "100%", background: "transparent",
                                     border: "none",
-                                    borderBottom: memberCount > 0 ? `1px solid ${colors.border}` : "none",
-                                    textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+                                    borderBottom: memberCount > 0 && !reorderSplits ? `1px solid ${colors.border}` : "none",
+                                    textAlign: "left",
+                                    cursor: reorderSplits ? "default" : "pointer",
+                                    fontFamily: "inherit",
                                     color: colors.text,
                                     padding: "14px 16px 12px",
                                     display: "flex", alignItems: "center", gap: 12,
@@ -5203,13 +5302,50 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                       </span>
                                     </div>
                                   </div>
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                    <polyline points="9 18 15 12 9 6" />
-                                  </svg>
+                                  {reorderSplits ? (
+                                    <div style={{ display: "flex", flexDirection: "row", flexShrink: 0 }}>
+                                      <button
+                                        type="button"
+                                        disabled={si === 0}
+                                        onClick={(e) => { e.stopPropagation(); moveSplit(s.id, -1); }}
+                                        style={{
+                                          background: "transparent", border: "none",
+                                          color: colors.text,
+                                          opacity: si === 0 ? 0.15 : 0.6,
+                                          padding: "4px 6px",
+                                          cursor: si === 0 ? "default" : "pointer",
+                                          display: "flex", alignItems: "center",
+                                        }}
+                                        title="Move up"
+                                      >
+                                        <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isLastSplit}
+                                        onClick={(e) => { e.stopPropagation(); moveSplit(s.id, 1); }}
+                                        style={{
+                                          background: "transparent", border: "none",
+                                          color: colors.text,
+                                          opacity: isLastSplit ? 0.15 : 0.6,
+                                          padding: "4px 6px",
+                                          cursor: isLastSplit ? "default" : "pointer",
+                                          display: "flex", alignItems: "center",
+                                        }}
+                                        title="Move down"
+                                      >
+                                        <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                      <polyline points="9 18 15 12 9 6" />
+                                    </svg>
+                                  )}
                                 </button>
 
                                 {/* Member rows */}
-                                {memberCount > 0 && (
+                                {memberCount > 0 && !reorderSplits && (
                                   <div style={{ background: colors.cardAltBg }}>
                                     {(s.members || []).map((m, mi) => {
                                       const w = workoutById.get(m.workoutId);
@@ -5277,27 +5413,29 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       )}
 
                       {/* Add split — dashed button matching the +Add workout / +Add exercise pattern */}
-                      <div style={{ padding: 12, paddingTop: splits.length > 0 ? 12 : 0 }}>
-                        <button
-                          type="button"
-                          onClick={openCreateSplit}
-                          style={{
-                            width: "100%",
-                            padding: "13px 14px",
-                            borderRadius: 14,
-                            background: "transparent",
-                            color: colors.accent,
-                            border: `1.5px dashed ${colors.accentBorder}`,
-                            cursor: "pointer", fontFamily: "inherit",
-                            fontSize: 13, fontWeight: 700,
-                            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                            minHeight: 48,
-                          }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                          Add split
-                        </button>
-                      </div>
+                      {!reorderSplits && (
+                        <div style={{ padding: 12, paddingTop: splits.length > 0 ? 12 : 0 }}>
+                          <button
+                            type="button"
+                            onClick={openCreateSplit}
+                            style={{
+                              width: "100%",
+                              padding: "13px 14px",
+                              borderRadius: 14,
+                              background: "transparent",
+                              color: colors.accent,
+                              border: `1.5px dashed ${colors.accentBorder}`,
+                              cursor: "pointer", fontFamily: "inherit",
+                              fontSize: 13, fontWeight: 700,
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                              minHeight: 48,
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                            Add split
+                          </button>
+                        </div>
+                      )}
                     </>)}
                   </div>
                 );
