@@ -26,16 +26,21 @@ export function DayChips({ selected, onToggle, colors, ariaLabel }) {
             aria-label={d.full}
             onClick={() => onToggle(d.value)}
             style={{
-              width: 36, height: 36, borderRadius: 999,
+              minWidth: 46, height: 36, padding: "0 10px",
+              borderRadius: 999,
               border: `1px solid ${isSelected ? colors.accent : colors.border}`,
               background: isSelected ? colors.accent : "transparent",
               color: isSelected ? "#fff" : colors.text,
-              fontSize: 13, fontWeight: 600,
+              fontSize: 12, fontWeight: 600,
+              fontFamily: "inherit",
               cursor: "pointer",
               transition: "background 0.15s ease, border-color 0.15s ease",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxSizing: "border-box",
+              lineHeight: 1,
             }}
           >
-            {d.label}
+            {d.full.slice(0, 3)}
           </button>
         );
       })}
