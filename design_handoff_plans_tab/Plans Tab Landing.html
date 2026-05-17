@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sessions — Plans tab redesign</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="android-frame.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="themes.jsx"></script>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="plans-shared.jsx"></script>
+<script type="text/babel" src="plans-redesign.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const PLANS_TWEAKS = /*EDITMODE-BEGIN*/{
+  "theme": "light"
+}/*EDITMODE-END*/;
+
+function FrameWrap({ children, frame, themeName }) {
+  const isDark = themeName === 'dark';
+  if (frame === 'ios') {
+    return (
+      <IOSDevice dark={isDark} width={372} height={760}>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column',
+                      paddingTop: 54 }}>
+          {children}
+        </div>
+      </IOSDevice>
+    );
+  }
+  return (
+    <AndroidDevice dark={isDark} width={372} height={760}>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {children}
+      </div>
+    </AndroidDevice>
+  );
+}
+
+function App() {
+  const [t, setTweak] = useTweaks(PLANS_TWEAKS);
+
+  return (
+    <>
+      <DesignCanvas title="Plans tab — clean redesign"
+                    subtitle="Splits → Workouts → Exercises. Splits + Workouts unified into one library. Inline icon clusters replaced with tap-to-open detail sheets.">
+
+        <DCSection id="flow"
+          title="Full flow"
+          subtitle="(1) Library — splits as group cards, workouts as rows · (2) Tap any workout → detail sheet (the editor) · (3) Tap any exercise → exercise edit sheet.">
+          <DCArtboard id="library" label="1 · Library" width={372} height={760}>
+            <FrameWrap frame="ios" themeName={t.theme}>
+              <PlansLibraryFrame themeName={t.theme} state="full"/>
+            </FrameWrap>
+          </DCArtboard>
+          <DCArtboard id="workout-sheet" label="2 · Workout detail" width={372} height={760}>
+            <FrameWrap frame="ios" themeName={t.theme}>
+              <WorkoutDetailFrame themeName={t.theme}/>
+            </FrameWrap>
+          </DCArtboard>
+          <DCArtboard id="exercise-sheet" label="3 · Exercise edit" width={372} height={760}>
+            <FrameWrap frame="ios" themeName={t.theme}>
+              <ExerciseEditFrame themeName={t.theme}/>
+            </FrameWrap>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="states"
+          title="Library states"
+          subtitle="Empty (creation is the only thing on screen) · sparse · full.">
+          <DCArtboard id="s-empty"  label="Empty"  width={372} height={760}>
+            <FrameWrap frame="ios" themeName={t.theme}>
+              <PlansLibraryFrame themeName={t.theme} state="empty"/>
+            </FrameWrap>
+          </DCArtboard>
+          <DCArtboard id="s-sparse" label="Sparse" width={372} height={760}>
+            <FrameWrap frame="ios" themeName={t.theme}>
+              <PlansLibraryFrame themeName={t.theme} state="sparse"/>
+            </FrameWrap>
+          </DCArtboard>
+          <DCArtboard id="s-full"   label="Full"   width={372} height={760}>
+            <FrameWrap frame="ios" themeName={t.theme}>
+              <PlansLibraryFrame themeName={t.theme} state="full"/>
+            </FrameWrap>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="themes"
+          title="Across the three real themes"
+          subtitle="Night, Day, Nature — tokens from src/styles/theme.js.">
+          <DCArtboard id="t-dark"    label="Night"  width={372} height={760}>
+            <FrameWrap frame="ios" themeName="dark">
+              <PlansLibraryFrame themeName="dark" state="full"/>
+            </FrameWrap>
+          </DCArtboard>
+          <DCArtboard id="t-light"   label="Day"    width={372} height={760}>
+            <FrameWrap frame="ios" themeName="light">
+              <PlansLibraryFrame themeName="light" state="full"/>
+            </FrameWrap>
+          </DCArtboard>
+          <DCArtboard id="t-japandi" label="Nature" width={372} height={760}>
+            <FrameWrap frame="ios" themeName="japandi">
+              <PlansLibraryFrame themeName="japandi" state="full"/>
+            </FrameWrap>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="android"
+          title="Android"
+          subtitle="Same layout on Android frame.">
+          <DCArtboard id="a-lib"     label="Library"        width={372} height={760}>
+            <FrameWrap frame="android" themeName={t.theme}>
+              <PlansLibraryFrame themeName={t.theme} state="full"/>
+            </FrameWrap>
+          </DCArtboard>
+          <DCArtboard id="a-sheet"   label="Workout sheet"  width={372} height={760}>
+            <FrameWrap frame="android" themeName={t.theme}>
+              <WorkoutDetailFrame themeName={t.theme}/>
+            </FrameWrap>
+          </DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Surface">
+          <TweakSelect label="Theme" value={t.theme}
+            options={[
+              { value: 'dark',    label: 'Night' },
+              { value: 'light',   label: 'Day' },
+              { value: 'japandi', label: 'Nature' },
+            ]}
+            onChange={v => setTweak('theme', v)}/>
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
