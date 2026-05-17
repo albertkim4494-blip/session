@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState } from "react";
 import { Modal } from "./Modal";
 import { getUnit } from "../lib/constants";
 import { CADENCE_MODES } from "../lib/cadence";
@@ -107,14 +107,8 @@ export function WorkoutDetailSheet({
   styles,
   colors,
 }) {
-  const [nameDraft, setNameDraft] = useState("");
   // Direction of the last nav swipe — drives slide-in animation on the body content.
   const [navDir, setNavDir] = useState(null); // "left" (next) | "right" (prev) | null
-  const nameInputRef = useRef(null);
-
-  useEffect(() => {
-    if (workout) setNameDraft(workout.name || "");
-  }, [workout?.id, workout?.name]);
 
   // Swipe left = next, swipe right = prev. Mirrors the log-modal card-swipe.
   const goPrev = () => {
@@ -139,18 +133,6 @@ export function WorkoutDetailSheet({
   const cadenceValue = splitForWorkout ? "Continuous" : cadenceLine(workout.cadence);
   const scheduleValue = splitForWorkout ? `In split: ${splitForWorkout.name}` : "Standalone";
   const categoryValue = (workout.category || "Workout").trim();
-
-  const commitName = () => {
-    const trimmed = (nameDraft || "").trim();
-    if (!trimmed || trimmed === workout.name) {
-      setNameDraft(workout.name || "");
-      return;
-    }
-    onRenameWorkout(workout.id, trimmed);
-  };
-
-  // Wrap onClose so the inline name edit commits before dismiss.
-  const closeAndCommit = () => { commitName(); onClose?.(); };
 
   // Lower overlay z-index so sub-modals (CatalogBrowse, EditExercise) layer on top.
   const sheetStyles = useMemo(() => ({
@@ -181,11 +163,24 @@ export function WorkoutDetailSheet({
   return (
     <Modal
       open={open}
-      title="Edit Workout"
-      onClose={closeAndCommit}
+      title={workout.name}
+      onClose={onClose}
       styles={sheetStyles}
       footer={footer}
-      compactHeight
+      headerActions={
+        <button
+          type="button"
+          onClick={() => onOpenEditWorkout(workout.id)}
+          aria-label="Edit workout name, category and schedule"
+          title="Edit workout"
+          style={sheetStyles.iconBtn}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            <path d="m15 5 4 4" />
+          </svg>
+        </button>
+      }
     >
       {/* Swipe wrapper — keyed by workout.id so the slide animation replays on nav.
           Sits as a single flex child of modalBody and re-establishes the flex
@@ -204,38 +199,12 @@ export function WorkoutDetailSheet({
             : undefined,
         }}
       >
-      {/* FROZEN HEADER BLOCK — workout name + meta chips */}
+      {/* FROZEN HEADER BLOCK — meta chips (name lives in the modal title bar) */}
       <div style={{ flexShrink: 0 }}>
-        <input
-          ref={nameInputRef}
-          value={nameDraft}
-          onChange={(e) => setNameDraft(e.target.value)}
-          onBlur={commitName}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); commitName(); e.currentTarget.blur(); }
-          }}
-          style={{
-            width: "100%",
-            border: "none",
-            background: "transparent",
-            color: colors.text,
-            fontFamily: "inherit",
-            fontSize: 26,
-            fontWeight: 700,
-            letterSpacing: -0.5,
-            padding: "4px 0",
-            outline: "none",
-            boxSizing: "border-box",
-          }}
-        />
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
-          <MetaChip label="Category" value={categoryValue} colors={colors}
-            onClick={() => onOpenEditWorkout(workout.id)} />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <MetaChip label="Category" value={categoryValue} colors={colors} disabled />
           <MetaChip label="Schedule" value={scheduleValue} colors={colors} disabled />
-          <MetaChip label="Cadence" value={cadenceValue} colors={colors}
-            onClick={splitForWorkout ? undefined : () => onOpenEditWorkout(workout.id)}
-            disabled={!!splitForWorkout} />
+          <MetaChip label="Cadence" value={cadenceValue} colors={colors} disabled />
         </div>
       </div>
 
