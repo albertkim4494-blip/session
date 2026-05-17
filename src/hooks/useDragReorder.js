@@ -18,7 +18,7 @@ import { useRef, useState, useCallback } from "react";
  * pointerup — the underlying array doesn't churn mid-drag, which keeps React
  * reconciliation simple and preserves pointer capture on the same DOM node.
  */
-export function useDragReorder({ itemCount, onCommit, rowHeight = 68 }) {
+export function useDragReorder({ itemCount, onCommit, rowHeight = 68, itemRadius = 14 }) {
   const [drag, setDrag] = useState(null); // { fromIdx, currentIdx, offsetY }
   const stateRef = useRef(null);
   const itemRefs = useRef([]);
@@ -82,13 +82,15 @@ export function useDragReorder({ itemCount, onCommit, rowHeight = 68 }) {
     const { fromIdx, currentIdx, offsetY } = drag;
     if (idx === fromIdx) {
       // Dragged row: follows finger. Includes the slot shift PLUS the
-      // residual offset for sub-row precision.
+      // residual offset for sub-row precision. borderRadius matches the
+      // inner card so the lifted box-shadow has the same rounded corners.
       const totalY = (currentIdx - fromIdx) * rowHeight + offsetY;
       return {
         transform: `translateY(${totalY}px)`,
         zIndex: 10,
         transition: "none",
         boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+        borderRadius: itemRadius,
         opacity: 0.95,
         pointerEvents: "none",
       };
