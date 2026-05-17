@@ -1,22 +1,32 @@
 import React from "react";
 import { CADENCE_MODES } from "../lib/cadence";
+import { orderedDayValues, DAY_LABELS_FULL } from "../lib/dateUtils";
 
-// Display order: Mon → Sun. Values match JS Date#getDay (0=Sun, 1=Mon, ..., 6=Sat).
-export const DISPLAY_DAYS = [
-  { label: "M", value: 1, full: "Monday" },
-  { label: "T", value: 2, full: "Tuesday" },
-  { label: "W", value: 3, full: "Wednesday" },
-  { label: "T", value: 4, full: "Thursday" },
-  { label: "F", value: 5, full: "Friday" },
-  { label: "S", value: 6, full: "Saturday" },
-  { label: "S", value: 0, full: "Sunday" },
-];
+// Values match JS Date#getDay (0=Sun, 1=Mon, ..., 6=Sat).
+// Display order is derived from the user's chosen first day of week.
+const DAY_META = {
+  0: { label: "S", full: "Sunday" },
+  1: { label: "M", full: "Monday" },
+  2: { label: "T", full: "Tuesday" },
+  3: { label: "W", full: "Wednesday" },
+  4: { label: "T", full: "Thursday" },
+  5: { label: "F", full: "Friday" },
+  6: { label: "S", full: "Saturday" },
+};
 
-export function DayChips({ selected, onToggle, colors, ariaLabel }) {
+export function getDisplayDays(weekStartsOn = 1) {
+  return orderedDayValues(weekStartsOn).map((v) => ({ value: v, ...DAY_META[v] }));
+}
+
+// Kept for backwards compatibility (Mon-first order).
+export const DISPLAY_DAYS = getDisplayDays(1);
+
+export function DayChips({ selected, onToggle, colors, ariaLabel, weekStartsOn = 1 }) {
   const sel = Array.isArray(selected) ? selected : [];
+  const days = getDisplayDays(weekStartsOn);
   return (
     <div role="group" aria-label={ariaLabel} style={{ display: "flex", gap: 4, width: "100%" }}>
-      {DISPLAY_DAYS.map((d, i) => {
+      {days.map((d, i) => {
         const isSelected = sel.includes(d.value);
         return (
           <button
@@ -80,7 +90,7 @@ function ModeButton({ active, onClick, children, colors }) {
  * Renders three modes: Whenever (default), Weekly cadence, Specific days (anchor).
  * Continuous is intentionally absent here — that mode is only set via split membership.
  */
-export function CadenceEditor({ cadence, onChange, colors, styles }) {
+export function CadenceEditor({ cadence, onChange, colors, styles, weekStartsOn = 1 }) {
   const c = cadence || { mode: CADENCE_MODES.WHENEVER };
   const mode = c.mode || CADENCE_MODES.WHENEVER;
 
@@ -152,6 +162,7 @@ export function CadenceEditor({ cadence, onChange, colors, styles }) {
             onToggle={toggleDay("days")}
             colors={colors}
             ariaLabel="Anchor days"
+            weekStartsOn={weekStartsOn}
           />
           {anchorDays.length === 0 && (
             <div style={{ fontSize: 11, opacity: 0.55, lineHeight: 1.5 }}>

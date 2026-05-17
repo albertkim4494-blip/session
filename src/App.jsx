@@ -9,9 +9,11 @@ import { avatarInitial } from "./lib/userIdentity";
 import { REP_UNITS, getUnit, getWeightLabel } from "./lib/constants";
 import {
   yyyyMmDd, addDays, formatDateLabel, monthKeyFromDate, daysInMonth,
-  weekdaySunday0, weekdayMonday0, shiftMonth, formatMonthLabel,
-  startOfWeekMonday, startOfWeekSunday, startOfMonth, startOfYear,
-  endOfWeekSunday, endOfMonth, endOfYear,
+  weekdayIndex, shiftMonth, formatMonthLabel,
+  startOfWeek, endOfWeek,
+  startOfMonth, startOfYear,
+  endOfMonth, endOfYear,
+  orderedDayValues, DAY_LABELS_SHORT,
   inRangeInclusive, isValidDateKey,
 } from "./lib/dateUtils";
 import { uid, loadState, normalizeState, persistState, makeDefaultState, safeParse, findExerciseById, forEachExercise } from "./lib/stateUtils";
@@ -37,6 +39,7 @@ import { SplitEditorModal } from "./components/SplitEditorModal";
 import { SplitDetailSheet } from "./components/SplitDetailSheet";
 import { WorkoutDetailSheet } from "./components/WorkoutDetailSheet";
 import { WorkoutsList } from "./components/WorkoutsList";
+import { SplitsList } from "./components/SplitsList";
 import { DISPLAY_DAYS } from "./components/CadenceEditor";
 import { CadenceDriftPrompt } from "./components/CadenceDriftPrompt";
 import { SunArc } from "./components/SunArc";
@@ -231,6 +234,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   });
   const theme = state.preferences?.theme || "dark";
   const equipment = state.preferences?.equipment || ["full_gym"];
+  const weekStartsOn = Number.isInteger(state.preferences?.weekStartsOn) ? state.preferences.weekStartsOn : 0;
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
   const [reorderSplits, setReorderSplits] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
@@ -708,19 +712,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // Weekly summary for the Coach Carousel "Your Week" card
   const weeklySummary = useMemo(() => {
-    const weekStart = startOfWeekSunday(dateKey);
-    const weekEnd = addDays(weekStart, 6); // Saturday
+    const weekStart = startOfWeek(dateKey, weekStartsOn);
+    const weekEnd = addDays(weekStart, 6);
 
     const sessionsSet = new Set();
     let totalSets = 0;
 
-    // Build day-of-week row data (Sun=0 .. Sat=6)
-    const dayLabels = ["Su", "M", "Tu", "W", "Th", "F", "Sa"];
-    const days = dayLabels.map((label, i) => {
+    // Build day-of-week row data, ordered from the user's chosen first day.
+    const shortByDow = { 0: "Su", 1: "M", 2: "Tu", 3: "W", 4: "Th", 5: "F", 6: "Sa" };
+    const days = orderedDayValues(weekStartsOn).map((dow, i) => {
       const d = addDays(weekStart, i);
       const logs = (state.logsByDate || {})[d];
       const hasSession = logs ? dayHasCompletedSets(logs) : false;
-      return { label, dateKey: d, hasSession, isToday: d === dateKey };
+      return { label: shortByDow[dow], dateKey: d, hasSession, isToday: d === dateKey };
     });
 
     // Count sessions + sets
@@ -739,11 +743,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     // Progress bar: sessions vs goal
     const daysPerWeek = state.program?.daysPerWeek || state.preferences?.daysPerWeek || 4;
 
-    // Week streak (reuse existing helper, needs weekMap with Sunday-start keys)
+    // Week streak (week buckets keyed by the user's chosen week-start day)
     const weekMap = {};
     for (const [ds, dl] of Object.entries(state.logsByDate || {})) {
       if (!dl || !dayHasCompletedSets(dl)) continue;
-      const ws = startOfWeekSunday(ds);
+      const ws = startOfWeek(ds, weekStartsOn);
       weekMap[ws] = (weekMap[ws] || 0) + 1;
     }
     const weekStreak = calculateWeekStreak(weekMap);
@@ -760,7 +764,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       sessions: sessionsSet.size, totalSets, days,
       daysPerWeek, weekStreak, upNext,
     };
-  }, [state.logsByDate, state.program?.workouts, state.program?.daysPerWeek, state.preferences?.daysPerWeek, state.dailyWorkouts, dateKey]);
+  }, [state.logsByDate, state.program?.workouts, state.program?.daysPerWeek, state.preferences?.daysPerWeek, state.dailyWorkouts, dateKey, weekStartsOn]);
 
   const heroMotivationLine = useMemo(
     () => selectMotivationLine(state.logsByDate, dateKey),
@@ -876,8 +880,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
 
     if (summaryMode === "week") {
-      const start = startOfWeekSunday(anchor);
-      const end = summaryOffset === 0 ? dateKey : endOfWeekSunday(anchor);
+      const start = startOfWeek(anchor, weekStartsOn);
+      const end = summaryOffset === 0 ? dateKey : endOfWeek(anchor, weekStartsOn);
       return { start, end, label: "This week" };
     }
     if (summaryMode === "month") {
@@ -894,7 +898,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     const allDates = Object.keys(state.logsByDate).filter(isValidDateKey).sort();
     const start = allDates.length > 0 ? allDates[0] : dateKey;
     return { start, end: dateKey, label: "All Time" };
-  }, [dateKey, summaryMode, summaryOffset, state.logsByDate]);
+  }, [dateKey, summaryMode, summaryOffset, state.logsByDate, weekStartsOn]);
 
   const progressWorkouts = useMemo(() => {
     const dailyExercises = [];
@@ -967,7 +971,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       if (!dayHasCompletedSets(dayLogs)) return;
       const keys = Object.keys(dayLogs);
       logged++;
-      const weekStart = startOfWeekSunday(d);
+      const weekStart = startOfWeek(d, weekStartsOn);
       weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
       for (const exId of keys) {
         const exLog = dayLogs[exId];
@@ -1029,7 +1033,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       bestVolume: bestOf(exVol),
       bestLift: bestOf(exLift),
     };
-  }, [state.logsByDate, summaryRange, progressWorkouts]);
+  }, [state.logsByDate, summaryRange, progressWorkouts, weekStartsOn]);
 
   // All-time stats for profile modal (not tied to summary range)
   const profileStats = useMemo(() => {
@@ -1051,7 +1055,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     for (const [d, dayLogs] of Object.entries(state.logsByDate)) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !dayHasCompletedSets(dayLogs)) continue;
       logged++;
-      const weekStart = startOfWeekSunday(d);
+      const weekStart = startOfWeek(d, weekStartsOn);
       weekMap[weekStart] = (weekMap[weekStart] || 0) + 1;
       for (const exId of Object.keys(dayLogs)) {
         const exLog = dayLogs[exId];
@@ -1089,7 +1093,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       bestVolume: bestOf(exVol),
       bestLift: bestOf(exLift),
     };
-  }, [state.logsByDate, progressWorkouts]);
+  }, [state.logsByDate, progressWorkouts, weekStartsOn]);
 
   // Flat exercise list for progress tab — grouped by name so swapped/re-added
   // exercises with different IDs but the same name merge their stats.
@@ -3250,6 +3254,17 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }
 
+  function reorderSplitsByIndex(fromIdx, toIdx) {
+    updateState((st) => {
+      const arr = st.program.splits || [];
+      if (fromIdx < 0 || fromIdx >= arr.length) return st;
+      if (toIdx < 0 || toIdx >= arr.length) return st;
+      const [moved] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx, 0, moved);
+      return st;
+    });
+  }
+
   const exportJson = useCallback(() => {
     try {
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -5279,6 +5294,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         onCommitReorder={reorderWorkoutsByIndex}
                         onAddWorkout={addWorkout}
                         colors={colors}
+                        weekStartsOn={weekStartsOn}
                       />
                     )}
                   </div>
@@ -5337,10 +5353,20 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       )}
                     </div>
 
-                    {/* Body — splits as compact rows (mirrors the Workouts section).
-                        Members are no longer inlined; tapping a row opens the
-                        split editor (which lists them). */}
+                    {/* Body — splits as compact rows; drag-grip reorder mirrors
+                        the Workouts section. Tap opens the detail sheet. */}
                     {!isCollapsed && (
+                      <SplitsList
+                        splits={splits}
+                        reorderSplits={reorderSplits}
+                        onOpenDetail={openSplitDetail}
+                        onCommitReorder={reorderSplitsByIndex}
+                        onAddSplit={openCreateSplit}
+                        colors={colors}
+                      />
+                    )}
+                    {/* OLD-INLINE-SPLITS-START */}
+                    {false && !isCollapsed && (
                       <div style={{
                         padding: 12, paddingTop: 0,
                         display: "flex", flexDirection: "column", gap: 8,
@@ -6656,8 +6682,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           const monthIndex0 = mm - 1;
 
           const firstDayKey = `${modals.datePicker.monthCursor}-01`;
-          const padLeft = weekdaySunday0(firstDayKey);
+          const padLeft = weekdayIndex(firstDayKey, weekStartsOn);
           const dim = daysInMonth(year, monthIndex0);
+          const dowHeader = orderedDayValues(weekStartsOn).map((v) => DAY_LABELS_SHORT[v]);
 
           const cells = [];
           for (let i = 0; i < padLeft; i++) cells.push(null);
@@ -6700,7 +6727,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
               <div {...swipe} style={styles.calendarSwipeArea}>
                 <div style={styles.calendarGrid}>
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((w) => (
+                  {dowHeader.map((w) => (
                     <div key={w} style={styles.calendarDow}>
                       {w}
                     </div>
@@ -6865,6 +6892,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             onChange={(c) => dispatchModal({ type: "UPDATE_ADD_WORKOUT", payload: { cadence: c } })}
             colors={colors}
             styles={styles}
+            weekStartsOn={weekStartsOn}
           />
 
           {/* Exercises */}
@@ -7404,6 +7432,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             onNextWorkout={nextWorkout ? () => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: nextWorkout.id } }) : undefined}
             styles={styles}
             colors={colors}
+            weekStartsOn={weekStartsOn}
           />
         );
       })()}
@@ -7457,6 +7486,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               onChange={(c) => dispatchModal({ type: "UPDATE_EDIT_WORKOUT", payload: { cadence: c } })}
               colors={colors}
               styles={styles}
+              weekStartsOn={weekStartsOn}
             />
           </div>
         </Modal>
@@ -7496,6 +7526,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           splits={splits}
           styles={styles}
           colors={colors}
+          weekStartsOn={weekStartsOn}
         />
       )}
 
@@ -7523,6 +7554,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             onShare={() => showToast("Split sharing coming soon")}
             styles={styles}
             colors={colors}
+            weekStartsOn={weekStartsOn}
           />
         );
       })()}
@@ -7629,6 +7661,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         styles={styles}
         colors={colors}
         measurementSystem={state.preferences?.measurementSystem}
+        weekStartsOn={weekStartsOn}
       />
 
       {/* Generate Today Modal */}

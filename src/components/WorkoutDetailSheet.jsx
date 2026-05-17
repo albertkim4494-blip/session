@@ -2,18 +2,18 @@ import React, { useMemo, useState } from "react";
 import { Modal } from "./Modal";
 import { getUnit } from "../lib/constants";
 import { CADENCE_MODES } from "../lib/cadence";
-import { DISPLAY_DAYS } from "./CadenceEditor";
+import { getDisplayDays } from "./CadenceEditor";
 import { useSwipe } from "../hooks/useSwipe";
 import { useDragReorder } from "../hooks/useDragReorder";
 import { DragGrip } from "./WorkoutsList";
 
-function cadenceLine(cadence) {
+function cadenceLine(cadence, weekStartsOn = 1) {
   const c = cadence || { mode: CADENCE_MODES.WHENEVER };
   if (c.mode === CADENCE_MODES.CONTINUOUS) return "Continuous";
   if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
   if (c.mode === CADENCE_MODES.ANCHOR) {
     if (!Array.isArray(c.days) || c.days.length === 0) return "Anchor (no days)";
-    return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
+    return getDisplayDays(weekStartsOn).filter((d) => c.days.includes(d.value))
       .map((d) => d.full.slice(0, 3))
       .join(" · ");
   }
@@ -108,6 +108,7 @@ export function WorkoutDetailSheet({
   hasNext,
   styles,
   colors,
+  weekStartsOn = 1,
 }) {
   // Direction of the last nav swipe — drives slide-in animation on the body content.
   const [navDir, setNavDir] = useState(null); // "left" (next) | "right" (prev) | null
@@ -139,7 +140,7 @@ export function WorkoutDetailSheet({
   });
 
   if (!open || !workout) return null;
-  const cadenceValue = splitForWorkout ? "Continuous" : cadenceLine(workout.cadence);
+  const cadenceValue = splitForWorkout ? "Continuous" : cadenceLine(workout.cadence, weekStartsOn);
   const categoryValue = (workout.category || "Workout").trim();
 
   // Lower overlay z-index so sub-modals (CatalogBrowse, EditExercise) layer on top.

@@ -96,6 +96,48 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
         </div>
 
         <div>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>Week Starts On</span>
+          <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2 }}>
+            Used by the calendar, weekly summary, schedule chips, and streak.
+          </span>
+          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+            {[
+              { key: 0, label: "Sun" },
+              { key: 1, label: "Mon" },
+              { key: 2, label: "Tue" },
+              { key: 3, label: "Wed" },
+              { key: 4, label: "Thu" },
+              { key: 5, label: "Fri" },
+              { key: 6, label: "Sat" },
+            ].map((d) => {
+              const isActive = (preferences?.weekStartsOn ?? 0) === d.key;
+              return (
+                <button
+                  key={d.key}
+                  type="button"
+                  onClick={() => onUpdatePreference?.("weekStartsOn", d.key)}
+                  style={{
+                    padding: "5px 10px",
+                    fontSize: 12,
+                    fontWeight: isActive ? 700 : 500,
+                    borderRadius: 999,
+                    border: `1.5px solid ${isActive ? (colors?.accent || "#7dd3fc") : (colors?.border || "rgba(255,255,255,0.10)")}`,
+                    background: isActive ? (colors?.accent || "#7dd3fc") + "22" : "transparent",
+                    color: isActive ? (colors?.accent || "#7dd3fc") : (colors?.text || "#e8eef7"),
+                    cursor: "pointer",
+                    WebkitTapHighlightColor: "transparent",
+                    fontFamily: "inherit",
+                    minWidth: 40,
+                  }}
+                >
+                  {d.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
           <span style={{ fontSize: 14, fontWeight: 700 }}>Theme</span>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
             {THEME_LIST.map((t) => {

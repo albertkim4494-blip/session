@@ -155,6 +155,7 @@ export function makeDefaultState() {
       measurementSystem: "imperial",
       equipment: ["full_gym"],
       theme: "dark",
+      weekStartsOn: 0,
       exerciseRestTimes: {},
     },
     meta: {
@@ -219,6 +220,10 @@ export function normalizeState(st) {
   if (!["dark", "light", "japandi"].includes(next.preferences.theme)) {
     next.preferences.theme = "dark";
   }
+
+  // Coerce weekStartsOn to a valid JS day-of-week (0=Sun .. 6=Sat).
+  const ws = Number(next.preferences.weekStartsOn);
+  next.preferences.weekStartsOn = Number.isInteger(ws) && ws >= 0 && ws <= 6 ? ws : 0;
 
   // Clean up legacy standalone localStorage keys (migration complete)
   try {

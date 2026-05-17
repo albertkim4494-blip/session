@@ -33,7 +33,7 @@ function ModeButton({ active, onClick, children, colors }) {
  * Cancel/Save flow of the EditWorkout modal.
  */
 export function SplitEditorModal({
-  open, modalState, onUpdate, onClose, onSave, workouts, splits, styles, colors,
+  open, modalState, onUpdate, onClose, onSave, workouts, splits, styles, colors, weekStartsOn = 1,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -269,6 +269,7 @@ export function SplitEditorModal({
                         onToggle={(day) => toggleMemberDay(m.workoutId, day)}
                         colors={colors}
                         ariaLabel={`Days for ${workoutName}`}
+                        weekStartsOn={weekStartsOn}
                       />
                     </div>
                   )}

@@ -5,8 +5,9 @@ import {
 } from "../lib/workoutGenerator";
 import { generateProgramAI } from "../lib/workoutGeneratorApi";
 import { EXERCISE_CATALOG, EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
+import { orderedDayValues } from "../lib/dateUtils";
 
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_NAME_BY_DOW = { 0: "Sun", 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat" };
 
 const DURATION_OPTIONS = [
   { value: 10, label: "10 min" },
@@ -30,7 +31,9 @@ export function GenerateWizardModal({
   styles,
   colors,
   measurementSystem,
+  weekStartsOn = 1,
 }) {
+  const DAY_LABELS = orderedDayValues(weekStartsOn).map((dow) => DAY_NAME_BY_DOW[dow]);
   const {
     step,
     daysPerWeek,

@@ -1,7 +1,7 @@
 import React from "react";
 import { useDragReorder } from "../hooks/useDragReorder";
 import { CADENCE_MODES } from "../lib/cadence";
-import { DISPLAY_DAYS } from "./CadenceEditor";
+import { getDisplayDays } from "./CadenceEditor";
 
 /**
  * WorkoutsList — the body of the Workouts section on the Plans tab.
@@ -15,7 +15,9 @@ export function WorkoutsList({
   onCommitReorder,
   onAddWorkout,
   colors,
+  weekStartsOn = 1,
 }) {
+  const displayDays = getDisplayDays(weekStartsOn);
   const drag = useDragReorder({
     itemCount: workouts.length,
     onCommit: onCommitReorder,
@@ -34,7 +36,7 @@ export function WorkoutsList({
           if (c.mode === CADENCE_MODES.CONTINUOUS) return "Continuous";
           if (c.mode === CADENCE_MODES.ANCHOR) {
             if (!Array.isArray(c.days) || c.days.length === 0) return null;
-            return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
+            return displayDays.filter((d) => c.days.includes(d.value))
               .map((d) => d.full.slice(0, 3)).join(" · ");
           }
           // Legacy weekly — kept rendering until the user edits the schedule.

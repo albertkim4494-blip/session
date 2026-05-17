@@ -1,14 +1,13 @@
 import React, { useMemo } from "react";
 import { SPLIT_MODES } from "../lib/cadence";
-import { DISPLAY_DAYS } from "./CadenceEditor";
+import { getDisplayDays } from "./CadenceEditor";
 
-// Render anchor days like "Mon, Wed" using the same display order as the editor.
-function formatDays(days) {
+// Render anchor days like "Mon, Wed" using the user's preferred week start order.
+function formatDays(days, weekStartsOn = 1) {
   if (!Array.isArray(days) || days.length === 0) return "";
-  const labels = DISPLAY_DAYS.filter((d) => days.includes(d.value)).map((d) => {
-    const long = d.full.slice(0, 3); // "Mon", "Tue", ...
-    return long;
-  });
+  const labels = getDisplayDays(weekStartsOn)
+    .filter((d) => days.includes(d.value))
+    .map((d) => d.full.slice(0, 3));
   return labels.join(" · ");
 }
 
@@ -26,6 +25,7 @@ export function SplitsSection({
   onEditWorkout,
   styles,
   colors,
+  weekStartsOn = 1,
 }) {
   const workoutById = useMemo(() => {
     const m = new Map();
@@ -110,7 +110,7 @@ export function SplitsSection({
                       const w = workoutById.get(m.workoutId);
                       const subtitle = isContinuous
                         ? `Day ${i + 1}`
-                        : (Array.isArray(m.days) && m.days.length > 0 ? formatDays(m.days) : "Any day");
+                        : (Array.isArray(m.days) && m.days.length > 0 ? formatDays(m.days, weekStartsOn) : "Any day");
                       return (
                         <button
                           key={m.workoutId}

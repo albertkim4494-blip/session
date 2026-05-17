@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Modal } from "./Modal";
 import { SPLIT_MODES } from "../lib/cadence";
-import { DayChips, DISPLAY_DAYS } from "./CadenceEditor";
+import { DayChips } from "./CadenceEditor";
 
 function MetaChip({ label, value, colors }) {
   return (
@@ -70,6 +70,7 @@ export function SplitDetailSheet({
   onShare,
   styles,
   colors,
+  weekStartsOn = 1,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   useEffect(() => { if (open) setPickerOpen(false); }, [open, split?.id]);
@@ -284,6 +285,7 @@ export function SplitDetailSheet({
                         }}
                         colors={colors}
                         ariaLabel={`Days for ${w.name}`}
+                        weekStartsOn={weekStartsOn}
                       />
                     </div>
                   )}

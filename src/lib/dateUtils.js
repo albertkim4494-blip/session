@@ -38,6 +38,13 @@ export function weekdaySunday0(dateKey) {
   return new Date(dateKey + "T00:00:00").getDay();
 }
 
+// 0..6 offset from the user's chosen first day of week.
+// weekStartsOn: 0=Sun, 1=Mon, ..., 6=Sat (matches JS Date#getDay)
+export function weekdayIndex(dateKey, weekStartsOn = 0) {
+  const dow = new Date(dateKey + "T00:00:00").getDay();
+  return (dow - weekStartsOn + 7) % 7;
+}
+
 export function shiftMonth(monthKey, deltaMonths) {
   const [yy, mm] = monthKey.split("-").map(Number);
   const d = new Date(yy, mm - 1, 1);
@@ -63,6 +70,18 @@ export function startOfWeekSunday(dateKey) {
   const d = new Date(dateKey + "T00:00:00");
   d.setDate(d.getDate() - d.getDay());
   return yyyyMmDd(d);
+}
+
+// Generalized — week begins on weekStartsOn (0=Sun, 1=Mon, ..., 6=Sat).
+export function startOfWeek(dateKey, weekStartsOn = 0) {
+  const d = new Date(dateKey + "T00:00:00");
+  const offset = (d.getDay() - weekStartsOn + 7) % 7;
+  d.setDate(d.getDate() - offset);
+  return yyyyMmDd(d);
+}
+
+export function endOfWeek(dateKey, weekStartsOn = 0) {
+  return addDays(startOfWeek(dateKey, weekStartsOn), 6);
 }
 
 export function startOfMonth(dateKey) {
@@ -98,4 +117,14 @@ export function endOfYear(dateKey) {
 // String comparison works for YYYY-MM-DD format (lexicographic === chronological)
 export function inRangeInclusive(dateKey, startKey, endKey) {
   return dateKey >= startKey && dateKey <= endKey;
+}
+
+// Day labels indexed by JS Date#getDay (0=Sun .. 6=Sat).
+export const DAY_LABELS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const DAY_LABELS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// Returns JS day-of-week values in display order starting from weekStartsOn.
+// e.g. weekStartsOn=1 → [1,2,3,4,5,6,0]
+export function orderedDayValues(weekStartsOn = 0) {
+  return [0, 1, 2, 3, 4, 5, 6].map((i) => (weekStartsOn + i) % 7);
 }
