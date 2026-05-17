@@ -84,6 +84,7 @@ export const initialModalState = {
     splitId: null,           // null for new split
     name: "",
     mode: "weekly",          // "weekly" | "continuous"
+    members: [],             // [{ workoutId, days[] }] — staged here, persisted on Save
     restPattern: null,       // { type: "afterCycle", days: 1 } | null
   },
   splitDetail: {
@@ -425,7 +426,7 @@ export function modalReducer(state, action) {
         workoutDetail: initialModalState.workoutDetail,
       };
 
-    // ===== EDIT SPLIT (meta) MODAL — name, mode, rest pattern =====
+    // ===== EDIT SPLIT MODAL — name, mode, rest pattern, members (staged) =====
     case "OPEN_EDIT_SPLIT":
       return {
         ...state,
@@ -434,6 +435,7 @@ export function modalReducer(state, action) {
           splitId: action.payload?.splitId ?? null,
           name: action.payload?.name ?? "",
           mode: action.payload?.mode ?? "weekly",
+          members: Array.isArray(action.payload?.members) ? action.payload.members : [],
           restPattern: action.payload?.restPattern ?? null,
         },
       };

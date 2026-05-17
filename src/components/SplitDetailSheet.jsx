@@ -1,7 +1,7 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import { Modal } from "./Modal";
 import { SPLIT_MODES } from "../lib/cadence";
-import { DayChips, DISPLAY_DAYS } from "./CadenceEditor";
+import { DayChips } from "./CadenceEditor";
 
 function MetaChip({ label, value, colors }) {
   return (
@@ -58,10 +58,8 @@ export function SplitDetailSheet({
   open,
   split,
   workouts,
-  splits,
   onClose,
   onOpenEditMeta,
-  onAddMember,
   onRemoveMember,
   onReorderMembers,        // (fromIdx, toIdx) => void
   onSetMemberDays,         // (workoutId, days[]) => void
@@ -71,23 +69,11 @@ export function SplitDetailSheet({
   styles,
   colors,
 }) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  useEffect(() => { if (open) setPickerOpen(false); }, [open, split?.id]);
-
   const workoutById = useMemo(() => {
     const m = new Map();
     for (const w of workouts || []) m.set(w.id, w);
     return m;
   }, [workouts]);
-
-  const otherSplitNameByWorkout = useMemo(() => {
-    const m = new Map();
-    for (const s of splits || []) {
-      if (!split || s.id === split.id) continue;
-      for (const mem of s.members || []) m.set(mem.workoutId, s.name);
-    }
-    return m;
-  }, [splits, split]);
 
   const sheetStyles = useMemo(() => ({
     ...styles,
@@ -98,8 +84,6 @@ export function SplitDetailSheet({
 
   const isContinuous = split.mode === SPLIT_MODES.CONTINUOUS;
   const members = split.members || [];
-  const memberWorkoutIds = new Set(members.map((m) => m.workoutId));
-  const availableToAdd = (workouts || []).filter((w) => !memberWorkoutIds.has(w.id));
 
   const footer = (
     <div style={{
@@ -291,77 +275,9 @@ export function SplitDetailSheet({
               );
             })}
 
-            {/* Add a workout — dashed accent button + inline picker */}
-            {availableToAdd.length > 0 ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen((v) => !v)}
-                  aria-expanded={pickerOpen}
-                  style={{
-                    width: "100%",
-                    padding: "13px 14px",
-                    borderRadius: 14,
-                    background: pickerOpen ? colors.accentSoft : "transparent",
-                    color: colors.accent,
-                    border: `1.5px dashed ${colors.accentBorder}`,
-                    cursor: "pointer", fontFamily: "inherit",
-                    fontSize: 13, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    minHeight: 48,
-                  }}
-                >
-                  {pickerOpen ? (
-                    <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                      Done adding
-                    </>
-                  ) : (
-                    <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                      Add a workout
-                    </>
-                  )}
-                </button>
-
-                {pickerOpen && availableToAdd.map((w) => {
-                  const otherSplitName = otherSplitNameByWorkout.get(w.id);
-                  return (
-                    <button
-                      key={w.id}
-                      type="button"
-                      onClick={() => onAddMember(w.id)}
-                      style={{
-                        width: "100%", minHeight: 56,
-                        padding: "12px 14px",
-                        borderRadius: 14,
-                        background: colors.cardAltBg,
-                        border: `1px solid ${colors.border}`,
-                        color: colors.text,
-                        cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                        display: "flex", alignItems: "center", gap: 12,
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: 14, fontWeight: 700, color: colors.text,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>{w.name}</div>
-                        {otherSplitName && (
-                          <div style={{
-                            fontSize: 11, color: colors.textSecondary, marginTop: 2,
-                          }}>
-                            Already in: {otherSplitName}
-                          </div>
-                        )}
-                      </div>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                    </button>
-                  );
-                })}
-              </>
-            ) : members.length === 0 ? (
+            {/* No add picker here — adding a workout happens in the editor
+                (tap the pencil to add). Hint when empty. */}
+            {members.length === 0 && (
               <div style={{
                 padding: "20px 14px",
                 borderRadius: 14,
@@ -370,10 +286,11 @@ export function SplitDetailSheet({
                 textAlign: "center",
                 color: colors.textSecondary,
                 fontSize: 13,
+                lineHeight: 1.5,
               }}>
-                No workouts to add. Create one first.
+                No workouts yet. Tap the pencil to add some.
               </div>
-            ) : null}
+            )}
           </div>
         </div>
       </div>
