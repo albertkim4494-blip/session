@@ -6786,46 +6786,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         styles={styles}
       />
 
-      {/* Add Workout Modal */}
+      {/* New Workout Modal — mirrors the New Split layout (95dvh height,
+          staged exercises section with dashed +Add exercise picker). */}
       <Modal
         open={modals.addWorkout.isOpen}
-        title="Add Workout"
+        title="New Workout"
         onClose={() => dispatchModal({ type: "CLOSE_ADD_WORKOUT" })}
         styles={styles}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={styles.fieldCol}>
-            <label style={styles.label}>Workout name</label>
-            <input
-              value={modals.addWorkout.name}
-              onChange={(e) =>
-                dispatchModal({
-                  type: "UPDATE_ADD_WORKOUT",
-                  payload: { name: e.target.value },
-                })
-              }
-              style={styles.textInput}
-              placeholder="e.g. Workout C"
-              autoFocus
-            />
-          </div>
-
-          <div style={styles.fieldCol}>
-            <label style={styles.label}>Workout category</label>
-            <CategoryAutocomplete
-              value={modals.addWorkout.category}
-              onChange={(val) =>
-                dispatchModal({
-                  type: "UPDATE_ADD_WORKOUT",
-                  payload: { category: val },
-                })
-              }
-              suggestions={categoryOptions}
-              placeholder="e.g. Push / Pull / Legs / Stretch"
-              styles={styles}
-            />
-          </div>
-
+        footer={
           <div style={styles.modalFooter}>
             <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_ADD_WORKOUT" })}>
               Cancel
@@ -6839,29 +6807,138 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   showToast(validation.error);
                   return;
                 }
-
                 const name = modals.addWorkout.name.trim();
                 const category = (modals.addWorkout.category || "Workout").trim() || "Workout";
+                const cadence = normalizeCadence(modals.addWorkout.cadence);
+                const stagedExercises = modals.addWorkout.exercises || [];
                 const newId = uid("w");
-
                 updateState((st) => {
                   st.program.workouts.push({
                     id: newId,
                     name,
                     category,
-                    exercises: [],
-                    cadence: { mode: CADENCE_MODES.WHENEVER },
+                    cadence,
+                    exercises: stagedExercises.map((ex) => ({ ...ex })),
                   });
                   return st;
                 });
-
                 dispatchModal({ type: "CLOSE_ADD_WORKOUT" });
-                setManageWorkoutId(newId);
-                setTab("program");
               }}
             >
               Save
             </button>
+          </div>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1, minHeight: 0 }}>
+          {/* Workout name */}
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Workout name</label>
+            <input
+              value={modals.addWorkout.name}
+              onChange={(e) =>
+                dispatchModal({ type: "UPDATE_ADD_WORKOUT", payload: { name: e.target.value } })
+              }
+              style={styles.textInput}
+              placeholder="e.g. Push Day"
+              autoFocus
+            />
+          </div>
+
+          {/* Workout category */}
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Workout category</label>
+            <CategoryAutocomplete
+              value={modals.addWorkout.category}
+              onChange={(val) =>
+                dispatchModal({ type: "UPDATE_ADD_WORKOUT", payload: { category: val } })
+              }
+              suggestions={categoryOptions}
+              placeholder="e.g. Push / Pull / Legs / Stretch"
+              styles={styles}
+            />
+          </div>
+
+          {/* Schedule (cadence) */}
+          <CadenceEditor
+            cadence={modals.addWorkout.cadence}
+            onChange={(c) => dispatchModal({ type: "UPDATE_ADD_WORKOUT", payload: { cadence: c } })}
+            colors={colors}
+            styles={styles}
+          />
+
+          {/* Exercises */}
+          <div style={styles.fieldCol}>
+            <label style={styles.label}>Exercises</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {(modals.addWorkout.exercises || []).map((ex) => {
+                const unitInfo = getUnit(ex.unit, ex);
+                return (
+                  <div
+                    key={ex.id}
+                    style={{
+                      background: colors.cardAltBg,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: 14,
+                      padding: "12px 14px",
+                      display: "flex", alignItems: "center", gap: 12,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 14, fontWeight: 700, color: colors.text,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>{ex.name}</div>
+                      <div style={{
+                        fontSize: 11.5, color: colors.textSecondary, marginTop: 2,
+                      }}>{unitInfo.label} ({unitInfo.abbr})</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => dispatchModal({
+                        type: "UPDATE_ADD_WORKOUT",
+                        payload: {
+                          exercises: (modals.addWorkout.exercises || []).filter((e) => e.id !== ex.id),
+                        },
+                      })}
+                      title="Remove"
+                      style={{
+                        background: "transparent", border: "none",
+                        padding: 4, cursor: "pointer", opacity: 0.45, color: colors.text,
+                        display: "flex", alignItems: "center",
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => dispatchModal({
+                  type: "OPEN_CATALOG_BROWSE",
+                  payload: { workoutId: null, stageInAddWorkout: true },
+                })}
+                style={{
+                  width: "100%",
+                  padding: "13px 14px",
+                  borderRadius: 14,
+                  background: "transparent",
+                  color: colors.accent,
+                  border: `1.5px dashed ${colors.accentBorder}`,
+                  cursor: "pointer", fontFamily: "inherit",
+                  fontSize: 13, fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  minHeight: 48,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                Add exercise
+              </button>
+            </div>
           </div>
         </div>
       </Modal>
@@ -6954,6 +7031,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           });
         }}
         onAddExercise={(entry, workoutIdOrIds, userEx) => {
+          // --- Stage-in-AddWorkout mode: push into addWorkout modal state ---
+          if (modals.catalogBrowse.stageInAddWorkout) {
+            let newEx;
+            if (userEx) {
+              newEx = { id: uid("ex"), name: userEx.name, unit: userEx.unit || "reps" };
+              if (userEx.catalogId) newEx.catalogId = userEx.catalogId;
+              if (userEx.customUnitAbbr) newEx.customUnitAbbr = userEx.customUnitAbbr;
+              if (userEx.customUnitAllowDecimal) newEx.customUnitAllowDecimal = userEx.customUnitAllowDecimal;
+            } else {
+              newEx = { id: uid("ex"), name: entry.name, unit: entry.defaultUnit, catalogId: entry.id };
+              if (isBodyweightOnly(entry)) newEx.bodyweight = true;
+            }
+            dispatchModal({
+              type: "UPDATE_ADD_WORKOUT",
+              payload: {
+                exercises: [...(modals.addWorkout.exercises || []), newEx],
+              },
+            });
+            dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
+            return;
+          }
+
           // --- Swap mode: replace exercise for today ---
           if (modals.catalogBrowse.swapMode) {
             const { swapExerciseId, swapExerciseName, swapIsDaily } = modals.catalogBrowse;

@@ -30,6 +30,8 @@ export const initialModalState = {
     isOpen: false,
     name: "",
     category: "Workout",
+    cadence: { mode: "whenever" },
+    exercises: [],  // staged before Save; each: { id, name, unit, catalogId?, customUnitAbbr?, customUnitAllowDecimal?, bodyweight? }
   },
   addSuggestion: {
     isOpen: false,
@@ -122,6 +124,7 @@ export const initialModalState = {
     swapIsDaily: false,
     sessionAddMode: false,
     sessionAddIsDaily: false,
+    stageInAddWorkout: false,  // when true, selections stage into addWorkout.exercises instead of mutating state
   },
   billing: {
     isOpen: false,
@@ -363,6 +366,7 @@ export function modalReducer(state, action) {
           swapIsDaily: action.payload.swapIsDaily || false,
           sessionAddMode: action.payload.sessionAddMode || false,
           sessionAddIsDaily: action.payload.sessionAddIsDaily || false,
+          stageInAddWorkout: action.payload.stageInAddWorkout || false,
         },
       };
 
