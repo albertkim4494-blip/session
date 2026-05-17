@@ -115,14 +115,39 @@ export function SplitEditorModal({
 
   const canSave = name.trim().length > 0;
 
+  const footer = (
+    <div style={styles.modalFooter}>
+      {!isNew && onDelete && (
+        <button
+          className="btn-press"
+          style={{ ...styles.secondaryBtn, color: colors.dangerText, borderColor: colors.dangerBorder }}
+          onClick={onDelete}
+        >
+          Delete
+        </button>
+      )}
+      <button className="btn-press" style={styles.secondaryBtn} onClick={onClose}>
+        Cancel
+      </button>
+      <button
+        className="btn-press"
+        style={{ ...styles.primaryBtn, opacity: canSave ? 1 : 0.5, pointerEvents: canSave ? "auto" : "none" }}
+        onClick={onSave}
+      >
+        Save
+      </button>
+    </div>
+  );
+
   return (
     <Modal
       open={open}
       title={isNew ? "New split" : "Edit split"}
       onClose={onClose}
       styles={styles}
+      footer={footer}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1, minHeight: 0 }}>
         {/* Name */}
         <div style={styles.fieldCol}>
           <label style={styles.label}>Split name</label>
@@ -312,29 +337,6 @@ export function SplitEditorModal({
             <span>Take a rest day after each full cycle</span>
           </label>
         )}
-
-        {/* Footer */}
-        <div style={styles.modalFooter}>
-          {!isNew && onDelete && (
-            <button
-              className="btn-press"
-              style={{ ...styles.secondaryBtn, color: colors.dangerText, borderColor: colors.dangerBorder }}
-              onClick={onDelete}
-            >
-              Delete
-            </button>
-          )}
-          <button className="btn-press" style={styles.secondaryBtn} onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="btn-press"
-            style={{ ...styles.primaryBtn, opacity: canSave ? 1 : 0.5, pointerEvents: canSave ? "auto" : "none" }}
-            onClick={onSave}
-          >
-            Save
-          </button>
-        </div>
       </div>
     </Modal>
   );

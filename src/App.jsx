@@ -1431,8 +1431,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     modals.datePicker.isOpen || modals.addWorkout.isOpen ||
     modals.addSuggestion.isOpen || modals.profile.isOpen || modals.changeUsername.isOpen ||
     modals.changePassword.isOpen || modals.welcomeChoice.isOpen || modals.editWorkout?.isOpen ||
-    modals.editExercise?.isOpen || modals.catalogBrowse.isOpen || modals.generateWizard.isOpen ||
-    modals.generateToday.isOpen || modals.customExercise?.isOpen || modals.billing?.isOpen ||
+    modals.editExercise?.isOpen || modals.editSplit?.isOpen || modals.catalogBrowse.isOpen ||
+    modals.generateWizard.isOpen || modals.generateToday.isOpen ||
+    modals.customExercise?.isOpen || modals.billing?.isOpen ||
     modals.friendSearch?.isOpen ||
     modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen ||
     modals.workoutDetail?.isOpen;
@@ -1464,14 +1465,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       cancelReorderExercises();
       return;
     }
-    // Edit Exercise / Edit Workout sub-modals: back closes just the sub-modal
-    // so the user returns to the workout sheet behind it, not the train tab.
+    // Edit Exercise / Edit Workout / Edit Split sub-modals: back closes just
+    // the sub-modal so the user returns to where they were (workout sheet or
+    // plans tab) instead of dropping to the train tab.
     if (modals.editExercise?.isOpen) {
       dispatchModal({ type: "CLOSE_EDIT_EXERCISE" });
       return;
     }
     if (modals.editWorkout?.isOpen) {
       dispatchModal({ type: "CLOSE_EDIT_WORKOUT" });
+      return;
+    }
+    if (modals.editSplit?.isOpen) {
+      dispatchModal({ type: "CLOSE_EDIT_SPLIT" });
       return;
     }
     if (anyModalOpenRef.current) {
