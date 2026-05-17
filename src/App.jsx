@@ -1464,6 +1464,16 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       cancelReorderExercises();
       return;
     }
+    // Edit Exercise / Edit Workout sub-modals: back closes just the sub-modal
+    // so the user returns to the workout sheet behind it, not the train tab.
+    if (modals.editExercise?.isOpen) {
+      dispatchModal({ type: "CLOSE_EDIT_EXERCISE" });
+      return;
+    }
+    if (modals.editWorkout?.isOpen) {
+      dispatchModal({ type: "CLOSE_EDIT_WORKOUT" });
+      return;
+    }
     if (anyModalOpenRef.current) {
       if (backOverrideRef.current) {
         try {
@@ -7271,15 +7281,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         );
       })()}
 
-      {/* Edit Workout Modal */}
+      {/* Edit Workout Modal — same chrome as EditExerciseModal: title, full
+          height (footer prop), Cancel/Save footer. */}
       {modals.editWorkout && (
         <Modal
           open={modals.editWorkout.isOpen}
           title="Edit Workout"
           onClose={() => dispatchModal({ type: "CLOSE_EDIT_WORKOUT" })}
           styles={styles}
+          footer={
+            <div style={styles.modalFooter}>
+              <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_WORKOUT" })}>
+                Cancel
+              </button>
+              <button className="btn-press" style={styles.primaryBtn} onClick={saveEditWorkout}>
+                Save
+              </button>
+            </div>
+          }
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minHeight: 0 }}>
             <div style={styles.fieldCol}>
               <label style={styles.label}>Workout name</label>
               <input
@@ -7310,14 +7331,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               colors={colors}
               styles={styles}
             />
-            <div style={styles.modalFooter}>
-              <button className="btn-press" style={styles.secondaryBtn} onClick={() => dispatchModal({ type: "CLOSE_EDIT_WORKOUT" })}>
-                Cancel
-              </button>
-              <button className="btn-press" style={styles.primaryBtn} onClick={saveEditWorkout}>
-                Save
-              </button>
-            </div>
           </div>
         </Modal>
       )}
