@@ -4980,25 +4980,32 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               />
 
               {/* ===== WORKOUTS SECTION ===== */}
-              {(workouts.length > 0 || splits.length > 0) && (<>
-                {(() => {
-                  const isCollapsed = collapsedManage.has("workouts");
-                  return (
+              {(workouts.length > 0 || splits.length > 0) && (() => {
+                const isCollapsed = collapsedManage.has("workouts");
+                return (
+                  <div style={{
+                    background: colors.cardBg,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 16,
+                    boxShadow: colors.shadow,
+                    overflow: "hidden",
+                  }}>
+                    {/* Section header — tap to collapse/expand */}
                     <div
                       onClick={() => toggleCollapse(setCollapsedManage, "workouts")}
                       style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                        marginTop: 12, marginBottom: isCollapsed ? 0 : -4, paddingLeft: 4,
+                        padding: "14px 16px",
                         cursor: "pointer", userSelect: "none",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
                           <polyline points="6 9 12 15 18 9" />
                         </svg>
                         <div style={{
-                          fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
-                          textTransform: "uppercase", color: colors.textTertiary,
+                          fontSize: 11, fontWeight: 600, opacity: 0.4,
+                          textTransform: "uppercase", letterSpacing: 1,
                         }}>
                           Workouts
                         </div>
@@ -5020,112 +5027,129 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                       </button>
                     </div>
-                  );
-                })()}
-                {!collapsedManage.has("workouts") && (<>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {workouts.map((w) => {
-                    const exCount = (w.exercises || []).length;
-                    const split = workoutToSplit.get(w.id) || null;
-                    const cadLabel = (() => {
-                      if (split) return split.mode === SPLIT_MODES.CONTINUOUS ? "Continuous" : "Weekly";
-                      const c = w.cadence || { mode: CADENCE_MODES.WHENEVER };
-                      if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
-                      if (c.mode === CADENCE_MODES.ANCHOR) {
-                        if (!Array.isArray(c.days) || c.days.length === 0) return null;
-                        return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
-                          .map((d) => d.full.slice(0, 3)).join(" · ");
-                      }
-                      return null;
-                    })();
-                    return (
-                      <div key={w.id} style={{
-                        background: colors.cardBg, borderRadius: 14,
-                        border: `1px solid ${colors.border}`, boxShadow: colors.shadow,
-                        overflow: "hidden",
-                      }}>
-                        <button
-                          type="button"
-                          onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
-                          style={{
-                            width: "100%", minHeight: 60,
-                            padding: "12px 14px",
-                            background: "transparent",
-                            border: "none",
-                            cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                            color: colors.text,
-                            display: "flex", alignItems: "center", gap: 12,
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{
-                              fontSize: 14.5, fontWeight: 700,
-                              color: colors.text, letterSpacing: -0.1,
-                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            }}>{w.name}</div>
-                            <div style={{
-                              display: "flex", alignItems: "center", gap: 6,
-                              marginTop: 3,
-                              fontSize: 11.5, color: colors.textSecondary,
-                              flexWrap: "wrap",
-                            }}>
-                              <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
-                              {w.category && (
-                                <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
-                              )}
-                              {split && (
-                                <span style={{
-                                  fontSize: 10, fontWeight: 700,
-                                  padding: "2px 8px", borderRadius: 999,
-                                  background: colors.accentSoft,
-                                  color: colors.accent,
-                                  border: `1px solid ${colors.accentBorder}`,
-                                  marginLeft: 4,
-                                }}>In: {split.name}</span>
-                              )}
-                              {cadLabel && (
-                                <span style={{
-                                  fontSize: 10, fontWeight: 700,
-                                  padding: "2px 8px", borderRadius: 999,
-                                  background: colors.subtleBg,
-                                  color: colors.textSecondary,
-                                  border: `1px solid ${colors.border}`,
-                                  marginLeft: split ? 0 : 4,
-                                }}>{cadLabel}</span>
-                              )}
-                            </div>
-                          </div>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                            <polyline points="9 18 15 12 9 6" />
-                          </svg>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-                </>)}
-              </>)}
+
+                    {/* Body — flat rows separated by dividers */}
+                    {!isCollapsed && (
+                      workouts.length === 0 ? (
+                        <div style={{
+                          padding: "16px",
+                          borderTop: `1px solid ${colors.border}`,
+                          fontSize: 12.5, color: colors.textSecondary,
+                          textAlign: "center",
+                        }}>
+                          No workouts yet. Tap + to add one.
+                        </div>
+                      ) : (
+                        <div style={{ borderTop: `1px solid ${colors.border}` }}>
+                          {workouts.map((w, wi) => {
+                            const exCount = (w.exercises || []).length;
+                            const split = workoutToSplit.get(w.id) || null;
+                            const cadLabel = (() => {
+                              if (split) return split.mode === SPLIT_MODES.CONTINUOUS ? "Continuous" : "Weekly";
+                              const c = w.cadence || { mode: CADENCE_MODES.WHENEVER };
+                              if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
+                              if (c.mode === CADENCE_MODES.ANCHOR) {
+                                if (!Array.isArray(c.days) || c.days.length === 0) return null;
+                                return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
+                                  .map((d) => d.full.slice(0, 3)).join(" · ");
+                              }
+                              return null;
+                            })();
+                            const isLast = wi === workouts.length - 1;
+                            return (
+                              <button
+                                key={w.id}
+                                type="button"
+                                onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
+                                style={{
+                                  width: "100%", minHeight: 60,
+                                  padding: "12px 16px",
+                                  background: "transparent",
+                                  border: "none",
+                                  borderBottom: !isLast ? `1px solid ${colors.border}` : "none",
+                                  cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                                  color: colors.text,
+                                  display: "flex", alignItems: "center", gap: 12,
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{
+                                    fontSize: 14.5, fontWeight: 700,
+                                    color: colors.text, letterSpacing: -0.1,
+                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                  }}>{w.name}</div>
+                                  <div style={{
+                                    display: "flex", alignItems: "center", gap: 6,
+                                    marginTop: 3,
+                                    fontSize: 11.5, color: colors.textSecondary,
+                                    flexWrap: "wrap",
+                                  }}>
+                                    <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
+                                    {w.category && (
+                                      <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
+                                    )}
+                                    {split && (
+                                      <span style={{
+                                        fontSize: 10, fontWeight: 700,
+                                        padding: "2px 8px", borderRadius: 999,
+                                        background: colors.accentSoft,
+                                        color: colors.accent,
+                                        border: `1px solid ${colors.accentBorder}`,
+                                        marginLeft: 4,
+                                      }}>In: {split.name}</span>
+                                    )}
+                                    {cadLabel && (
+                                      <span style={{
+                                        fontSize: 10, fontWeight: 700,
+                                        padding: "2px 8px", borderRadius: 999,
+                                        background: colors.subtleBg,
+                                        color: colors.textSecondary,
+                                        border: `1px solid ${colors.border}`,
+                                        marginLeft: split ? 0 : 4,
+                                      }}>{cadLabel}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                  <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ===== SPLITS SECTION ===== */}
-              {(workouts.length > 0 || splits.length > 0) && (<>
-                {(() => {
-                  const isCollapsed = collapsedManage.has("splits");
-                  return (
+              {(workouts.length > 0 || splits.length > 0) && (() => {
+                const isCollapsed = collapsedManage.has("splits");
+                return (
+                  <div style={{
+                    background: colors.cardBg,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 16,
+                    boxShadow: colors.shadow,
+                    overflow: "hidden",
+                  }}>
+                    {/* Section header — tap to collapse/expand */}
                     <div
                       onClick={() => toggleCollapse(setCollapsedManage, "splits")}
                       style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                        marginTop: 12, marginBottom: isCollapsed ? 0 : -4, paddingLeft: 4,
+                        padding: "14px 16px",
                         cursor: "pointer", userSelect: "none",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s" }}>
                           <polyline points="6 9 12 15 18 9" />
                         </svg>
                         <div style={{
-                          fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
-                          textTransform: "uppercase", color: colors.textTertiary,
+                          fontSize: 11, fontWeight: 600, opacity: 0.4,
+                          textTransform: "uppercase", letterSpacing: 1,
                         }}>
                           Splits
                         </div>
@@ -5147,131 +5171,146 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                       </button>
                     </div>
-                  );
-                })()}
-                {!collapsedManage.has("splits") && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {splits.map((s) => {
-                    const isContinuous = s.mode === SPLIT_MODES.CONTINUOUS;
-                    const memberCount = (s.members || []).length;
-                    return (
-                      <div key={s.id} style={{
-                        background: colors.cardBg, borderRadius: 16,
-                        border: `1px solid ${colors.border}`, boxShadow: colors.shadow,
-                        overflow: "hidden",
-                      }}>
-                        {/* Split header */}
-                        <button
-                          type="button"
-                          onClick={() => openEditSplit(s.id)}
-                          style={{
-                            width: "100%", background: "transparent",
-                            border: "none",
-                            borderBottom: memberCount > 0 ? `1px solid ${colors.border}` : "none",
-                            textAlign: "left", cursor: "pointer", fontFamily: "inherit",
-                            color: colors.text,
-                            padding: "14px 14px 12px",
-                            display: "flex", alignItems: "center", gap: 12,
-                            minHeight: 60,
-                          }}
-                        >
-                          <div style={{
-                            width: 4, alignSelf: "stretch", borderRadius: 999,
-                            background: colors.accent,
-                          }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.2, color: colors.text }}>
-                              {s.name}
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
-                              <span style={{
-                                fontSize: 10, fontWeight: 700,
-                                padding: "2px 8px", borderRadius: 999,
-                                background: colors.accentSoft,
-                                color: colors.accent,
-                                border: `1px solid ${colors.accentBorder}`,
-                                letterSpacing: 0.2,
-                              }}>
-                                {isContinuous ? "Continuous" : "Weekly"}
-                              </span>
-                              <span style={{ fontSize: 11.5, color: colors.textSecondary }}>
-                                {memberCount} {memberCount === 1 ? "workout" : "workouts"}
-                              </span>
-                            </div>
-                          </div>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                            <polyline points="9 18 15 12 9 6" />
-                          </svg>
-                        </button>
 
-                        {/* Member rows */}
-                        {memberCount > 0 && (
-                          <div style={{ background: colors.cardAltBg }}>
-                            {(s.members || []).map((m, mi) => {
-                              const w = workoutById.get(m.workoutId);
-                              if (!w) return null;
-                              const isLastMember = mi === memberCount - 1;
-                              const positionLabel = isContinuous
-                                ? `Day ${mi + 1}`
-                                : (Array.isArray(m.days) && m.days.length > 0
-                                  ? DISPLAY_DAYS.filter((d) => m.days.includes(d.value)).map((d) => d.full.slice(0, 3)).join(" · ")
-                                  : "Any day");
-                              const exCount = (w.exercises || []).length;
-                              return (
+                    {/* Body — splits as labeled blocks separated by dividers */}
+                    {!isCollapsed && (
+                      splits.length === 0 ? (
+                        <div style={{
+                          padding: "16px",
+                          borderTop: `1px solid ${colors.border}`,
+                          fontSize: 12.5, color: colors.textSecondary,
+                          textAlign: "center",
+                        }}>
+                          No splits yet. Tap + to group workouts.
+                        </div>
+                      ) : (
+                        <div style={{ borderTop: `1px solid ${colors.border}` }}>
+                          {splits.map((s, si) => {
+                            const isContinuous = s.mode === SPLIT_MODES.CONTINUOUS;
+                            const memberCount = (s.members || []).length;
+                            const isLastSplit = si === splits.length - 1;
+                            return (
+                              <div
+                                key={s.id}
+                                style={{
+                                  borderBottom: !isLastSplit ? `2px solid ${colors.border}` : "none",
+                                }}
+                              >
+                                {/* Split header */}
                                 <button
-                                  key={m.workoutId}
                                   type="button"
-                                  onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
+                                  onClick={() => openEditSplit(s.id)}
                                   style={{
-                                    width: "100%", minHeight: 60,
-                                    padding: "12px 14px",
-                                    background: "transparent",
+                                    width: "100%", background: "transparent",
                                     border: "none",
-                                    borderBottom: !isLastMember ? `1px solid ${colors.border}` : "none",
-                                    cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                                    borderBottom: memberCount > 0 ? `1px solid ${colors.border}` : "none",
+                                    textAlign: "left", cursor: "pointer", fontFamily: "inherit",
                                     color: colors.text,
+                                    padding: "14px 16px 12px",
                                     display: "flex", alignItems: "center", gap: 12,
+                                    minHeight: 60,
                                   }}
                                 >
+                                  <div style={{
+                                    width: 4, alignSelf: "stretch", borderRadius: 999,
+                                    background: colors.accent,
+                                  }} />
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                      <span style={{
-                                        fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
-                                        textTransform: "uppercase",
-                                        color: colors.textTertiary,
-                                        minWidth: 44,
-                                      }}>{positionLabel}</span>
-                                      <span style={{
-                                        fontSize: 14.5, fontWeight: 700,
-                                        color: colors.text, letterSpacing: -0.1,
-                                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                      }}>{w.name}</span>
+                                    <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.2, color: colors.text }}>
+                                      {s.name}
                                     </div>
-                                    <div style={{
-                                      display: "flex", alignItems: "center", gap: 6,
-                                      marginTop: 3, paddingLeft: 52,
-                                      fontSize: 11.5, color: colors.textSecondary,
-                                    }}>
-                                      <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
-                                      {w.category && (
-                                        <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
-                                      )}
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                                      <span style={{
+                                        fontSize: 10, fontWeight: 700,
+                                        padding: "2px 8px", borderRadius: 999,
+                                        background: colors.accentSoft,
+                                        color: colors.accent,
+                                        border: `1px solid ${colors.accentBorder}`,
+                                        letterSpacing: 0.2,
+                                      }}>
+                                        {isContinuous ? "Continuous" : "Weekly"}
+                                      </span>
+                                      <span style={{ fontSize: 11.5, color: colors.textSecondary }}>
+                                        {memberCount} {memberCount === 1 ? "workout" : "workouts"}
+                                      </span>
                                     </div>
                                   </div>
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                                     <polyline points="9 18 15 12 9 6" />
                                   </svg>
                                 </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                )}
-              </>)}
+
+                                {/* Member rows */}
+                                {memberCount > 0 && (
+                                  <div style={{ background: colors.cardAltBg }}>
+                                    {(s.members || []).map((m, mi) => {
+                                      const w = workoutById.get(m.workoutId);
+                                      if (!w) return null;
+                                      const isLastMember = mi === memberCount - 1;
+                                      const positionLabel = isContinuous
+                                        ? `Day ${mi + 1}`
+                                        : (Array.isArray(m.days) && m.days.length > 0
+                                          ? DISPLAY_DAYS.filter((d) => m.days.includes(d.value)).map((d) => d.full.slice(0, 3)).join(" · ")
+                                          : "Any day");
+                                      const exCount = (w.exercises || []).length;
+                                      return (
+                                        <button
+                                          key={m.workoutId}
+                                          type="button"
+                                          onClick={() => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
+                                          style={{
+                                            width: "100%", minHeight: 60,
+                                            padding: "12px 16px",
+                                            background: "transparent",
+                                            border: "none",
+                                            borderBottom: !isLastMember ? `1px solid ${colors.border}` : "none",
+                                            cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                                            color: colors.text,
+                                            display: "flex", alignItems: "center", gap: 12,
+                                          }}
+                                        >
+                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                              <span style={{
+                                                fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
+                                                textTransform: "uppercase",
+                                                color: colors.textTertiary,
+                                                minWidth: 44,
+                                              }}>{positionLabel}</span>
+                                              <span style={{
+                                                fontSize: 14.5, fontWeight: 700,
+                                                color: colors.text, letterSpacing: -0.1,
+                                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                              }}>{w.name}</span>
+                                            </div>
+                                            <div style={{
+                                              display: "flex", alignItems: "center", gap: 6,
+                                              marginTop: 3, paddingLeft: 52,
+                                              fontSize: 11.5, color: colors.textSecondary,
+                                            }}>
+                                              <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
+                                              {w.category && (
+                                                <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                            <polyline points="9 18 15 12 9 6" />
+                                          </svg>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )
+                    )}
+                  </div>
+                );
+              })()}
 
             </div>
           ) : null}
