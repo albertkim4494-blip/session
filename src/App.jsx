@@ -34,6 +34,7 @@ import { PillTabs } from "./components/PillTabs";
 import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { CadenceEditor } from "./components/CadenceEditor";
 import { SplitEditorModal } from "./components/SplitEditorModal";
+import { SplitDetailSheet } from "./components/SplitDetailSheet";
 import { WorkoutDetailSheet } from "./components/WorkoutDetailSheet";
 import { WorkoutsList } from "./components/WorkoutsList";
 import { DISPLAY_DAYS } from "./components/CadenceEditor";
@@ -1436,7 +1437,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     modals.customExercise?.isOpen || modals.billing?.isOpen ||
     modals.friendSearch?.isOpen ||
     modals.shareWorkout?.isOpen || modals.workoutPreview?.isOpen ||
-    modals.workoutDetail?.isOpen;
+    modals.workoutDetail?.isOpen || modals.splitDetail?.isOpen;
 
   const backOverrideRef = useRef(null);
   const anyModalOpenRef = useRef(false);
@@ -1478,6 +1479,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
     if (modals.editSplit?.isOpen) {
       dispatchModal({ type: "CLOSE_EDIT_SPLIT" });
+      return;
+    }
+    if (modals.splitDetail?.isOpen) {
+      dispatchModal({ type: "CLOSE_SPLIT_DETAIL" });
       return;
     }
     if (anyModalOpenRef.current) {
@@ -2512,10 +2517,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const openCreateSplit = useCallback(() => {
     dispatchModal({
       type: "OPEN_EDIT_SPLIT",
-      payload: { splitId: null, name: "", mode: SPLIT_MODES.WEEKLY, members: [], restPattern: null },
+      payload: { splitId: null, name: "", mode: SPLIT_MODES.WEEKLY, restPattern: null },
     });
   }, []);
 
+  // Pencil from SplitDetailSheet — edit name/mode/rest only.
   const openEditSplit = useCallback(
     (splitId) => {
       const s = splits.find((x) => x.id === splitId);
@@ -2526,93 +2532,151 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           splitId: s.id,
           name: s.name,
           mode: s.mode,
-          members: (s.members || []).map((m) => ({ ...m, days: Array.isArray(m.days) ? [...m.days] : [] })),
           restPattern: s.restPattern || null,
-          queuePosition: s.queuePosition || 0,
         },
       });
     },
     [splits]
   );
 
+  // Tap a split row in the Plans tab — opens the detail sheet (members live there).
+  const openSplitDetail = useCallback(
+    (splitId) => {
+      dispatchModal({ type: "OPEN_SPLIT_DETAIL", payload: { splitId } });
+    },
+    []
+  );
+
+  // Saves only name / mode / restPattern. New splits are created here with an
+  // empty members list, then we transition into the detail sheet so the user
+  // can add members. Existing splits' members are untouched.
   const saveEditSplit = useCallback(() => {
     if (!modals.editSplit) return;
-    const { splitId, name, mode, members, restPattern, queuePosition } = modals.editSplit;
+    const { splitId, name, mode, restPattern } = modals.editSplit;
     const trimmedName = (name || "").trim();
     if (!trimmedName) {
       showToast("Give your split a name.");
       return;
     }
 
-    const memberWorkoutIds = new Set(members.map((m) => m.workoutId));
+    const isNew = !splitId;
+    const id = splitId || uid("split");
 
     updateState((st) => {
-      const isNew = !splitId;
-      const id = splitId || uid("split");
-
-      // Helper: collect every other split's member ids so we don't accidentally
-      // wipe a workout's cadence when it still lives in another split.
-      const otherSplitMemberIds = new Set();
-      for (const s of (st.program.splits || [])) {
-        if (s.id === splitId) continue;
-        for (const m of (s.members || [])) otherSplitMemberIds.add(m.workoutId);
-      }
-
-      // Workouts that were members before this save but are no longer → revert to
-      // whenever, unless they're still a member of another split.
-      const prevSplit = (st.program.splits || []).find((s) => s.id === splitId);
-      const prevMemberIds = new Set((prevSplit?.members || []).map((m) => m.workoutId));
-      const removedIds = [...prevMemberIds].filter((wid) => !memberWorkoutIds.has(wid));
-      for (const wid of removedIds) {
-        if (otherSplitMemberIds.has(wid)) continue; // Still in another split
-        const w = st.program.workouts.find((x) => x.id === wid);
-        if (w) w.cadence = { mode: CADENCE_MODES.WHENEVER };
-      }
-
-      // Apply cadence to current members based on split mode. If the workout is
-      // ALSO a member of another split, the most-recently-saved split's cadence
-      // wins (last-save-wins). The user can resolve any conflict by editing.
-      for (const m of members) {
-        const w = st.program.workouts.find((x) => x.id === m.workoutId);
-        if (!w) continue;
-        if (mode === SPLIT_MODES.CONTINUOUS) {
-          w.cadence = { mode: CADENCE_MODES.CONTINUOUS };
-        } else {
-          // Weekly: mirror member days onto the workout's anchor cadence.
-          const days = Array.isArray(m.days) ? m.days : [];
-          w.cadence = days.length > 0
-            ? { mode: CADENCE_MODES.ANCHOR, days }
-            : { mode: CADENCE_MODES.WHENEVER };
-        }
-      }
-
-      // Persist the split itself (normalized).
-      const splitData = normalizeSplit({
-        id,
-        name: trimmedName,
-        mode,
-        members: members.map((m, i) => ({
-          workoutId: m.workoutId,
-          order: i,
-          days: Array.isArray(m.days) ? m.days : [],
-        })),
-        restPattern,
-        queuePosition: queuePosition || 0,
-      });
-
       if (!st.program.splits) st.program.splits = [];
-      if (isNew) {
-        st.program.splits.push(splitData);
+      const prev = st.program.splits.find((s) => s.id === id);
+      if (prev) {
+        // Existing: update meta; if mode changes, re-apply cadence to current members.
+        const modeChanged = prev.mode !== mode;
+        prev.name = trimmedName;
+        prev.mode = mode;
+        prev.restPattern = mode === SPLIT_MODES.CONTINUOUS ? restPattern : null;
+        if (modeChanged) {
+          for (const m of (prev.members || [])) {
+            const w = st.program.workouts.find((x) => x.id === m.workoutId);
+            if (!w) continue;
+            if (mode === SPLIT_MODES.CONTINUOUS) {
+              w.cadence = { mode: CADENCE_MODES.CONTINUOUS };
+            } else {
+              const days = Array.isArray(m.days) ? m.days : [];
+              w.cadence = days.length > 0
+                ? { mode: CADENCE_MODES.ANCHOR, days }
+                : { mode: CADENCE_MODES.WHENEVER };
+            }
+          }
+        }
       } else {
-        const idx = st.program.splits.findIndex((s) => s.id === splitId);
-        if (idx >= 0) st.program.splits[idx] = splitData;
-        else st.program.splits.push(splitData);
+        // New split — start empty; user adds members in the detail sheet.
+        st.program.splits.push(normalizeSplit({
+          id,
+          name: trimmedName,
+          mode,
+          members: [],
+          restPattern: mode === SPLIT_MODES.CONTINUOUS ? restPattern : null,
+          queuePosition: 0,
+        }));
       }
       return st;
     });
 
     dispatchModal({ type: "CLOSE_EDIT_SPLIT" });
+    if (isNew) {
+      // Hand off to the detail sheet so the user can add member workouts.
+      setTimeout(() => dispatchModal({ type: "OPEN_SPLIT_DETAIL", payload: { splitId: id } }), 0);
+    }
   }, [modals.editSplit]);
+
+  // --- Immediate member handlers used by SplitDetailSheet ---
+  // Cadence applied/reverted in step with each change.
+  const applyMemberCadence = (w, splitMode, days) => {
+    if (splitMode === SPLIT_MODES.CONTINUOUS) {
+      w.cadence = { mode: CADENCE_MODES.CONTINUOUS };
+    } else {
+      w.cadence = (days || []).length > 0
+        ? { mode: CADENCE_MODES.ANCHOR, days: [...days] }
+        : { mode: CADENCE_MODES.WHENEVER };
+    }
+  };
+
+  const addSplitMember = useCallback((splitId, workoutId) => {
+    updateState((st) => {
+      const s = (st.program.splits || []).find((x) => x.id === splitId);
+      if (!s) return st;
+      if ((s.members || []).some((m) => m.workoutId === workoutId)) return st;
+      const order = (s.members || []).length;
+      s.members = [...(s.members || []), { workoutId, order, days: [] }];
+      const w = st.program.workouts.find((x) => x.id === workoutId);
+      if (w) applyMemberCadence(w, s.mode, []);
+      return st;
+    });
+  }, []);
+
+  const removeSplitMember = useCallback((splitId, workoutId) => {
+    updateState((st) => {
+      const s = (st.program.splits || []).find((x) => x.id === splitId);
+      if (!s) return st;
+      s.members = (s.members || [])
+        .filter((m) => m.workoutId !== workoutId)
+        .map((m, i) => ({ ...m, order: i }));
+      // Revert cadence unless the workout is still in another split.
+      const otherSplitMemberIds = new Set();
+      for (const other of (st.program.splits || [])) {
+        if (other.id === splitId) continue;
+        for (const m of (other.members || [])) otherSplitMemberIds.add(m.workoutId);
+      }
+      if (!otherSplitMemberIds.has(workoutId)) {
+        const w = st.program.workouts.find((x) => x.id === workoutId);
+        if (w) w.cadence = { mode: CADENCE_MODES.WHENEVER };
+      }
+      return st;
+    });
+  }, []);
+
+  const reorderSplitMembers = useCallback((splitId, fromIdx, toIdx) => {
+    updateState((st) => {
+      const s = (st.program.splits || []).find((x) => x.id === splitId);
+      if (!s) return st;
+      const arr = s.members || [];
+      if (fromIdx < 0 || fromIdx >= arr.length) return st;
+      if (toIdx < 0 || toIdx >= arr.length) return st;
+      const [moved] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx, 0, moved);
+      arr.forEach((m, i) => { m.order = i; });
+      return st;
+    });
+  }, []);
+
+  const setSplitMemberDays = useCallback((splitId, workoutId, days) => {
+    updateState((st) => {
+      const s = (st.program.splits || []).find((x) => x.id === splitId);
+      if (!s) return st;
+      const m = (s.members || []).find((mm) => mm.workoutId === workoutId);
+      if (m) m.days = [...days];
+      const w = st.program.workouts.find((x) => x.id === workoutId);
+      if (w && s.mode === SPLIT_MODES.WEEKLY) applyMemberCadence(w, SPLIT_MODES.WEEKLY, days);
+      return st;
+    });
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Cadence drift detection — surface "your schedule shifted" prompts
@@ -5263,7 +5327,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                             <button
                               key={s.id}
                               type="button"
-                              onClick={reorderSplits ? undefined : () => openEditSplit(s.id)}
+                              onClick={reorderSplits ? undefined : () => openSplitDetail(s.id)}
                               style={{
                                 width: "100%", minHeight: 60,
                                 padding: "12px 14px",
@@ -7293,7 +7357,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         />
       )}
 
-      {/* Edit Split Modal */}
+      {/* Edit Split (meta) Modal — name/mode/rest only */}
       {modals.editSplit && (
         <SplitEditorModal
           open={modals.editSplit.isOpen}
@@ -7302,12 +7366,38 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           onClose={() => dispatchModal({ type: "CLOSE_EDIT_SPLIT" })}
           onSave={saveEditSplit}
           onDelete={modals.editSplit.splitId ? () => deleteSplit(modals.editSplit.splitId) : null}
-          workouts={workouts}
-          splits={splits}
           styles={styles}
           colors={colors}
         />
       )}
+
+      {/* Split Detail Sheet — Plans tab tap-to-open viewer (members + add/edit) */}
+      {modals.splitDetail?.isOpen && (() => {
+        const s = splits.find((x) => x.id === modals.splitDetail.splitId);
+        if (!s) {
+          setTimeout(() => dispatchModal({ type: "CLOSE_SPLIT_DETAIL" }), 0);
+          return null;
+        }
+        return (
+          <SplitDetailSheet
+            open
+            split={s}
+            workouts={workouts}
+            splits={splits}
+            onClose={() => dispatchModal({ type: "CLOSE_SPLIT_DETAIL" })}
+            onOpenEditMeta={() => openEditSplit(s.id)}
+            onAddMember={(workoutId) => addSplitMember(s.id, workoutId)}
+            onRemoveMember={(workoutId) => removeSplitMember(s.id, workoutId)}
+            onReorderMembers={(fromIdx, toIdx) => reorderSplitMembers(s.id, fromIdx, toIdx)}
+            onSetMemberDays={(workoutId, days) => setSplitMemberDays(s.id, workoutId, days)}
+            onOpenWorkoutDetail={(wid) => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: wid } })}
+            onDelete={() => deleteSplit(s.id)}
+            onShare={() => showToast("Split sharing coming soon")}
+            styles={styles}
+            colors={colors}
+          />
+        );
+      })()}
 
       {/* Continuous-split conflict modal */}
       {modals.continuousConflict?.isOpen && (

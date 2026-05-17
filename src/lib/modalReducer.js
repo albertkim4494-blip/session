@@ -84,9 +84,11 @@ export const initialModalState = {
     splitId: null,           // null for new split
     name: "",
     mode: "weekly",          // "weekly" | "continuous"
-    members: [],             // [{ workoutId, order, days }]
     restPattern: null,       // { type: "afterCycle", days: 1 } | null
-    queuePosition: 0,
+  },
+  splitDetail: {
+    isOpen: false,
+    splitId: null,
   },
   continuousConflict: {
     isOpen: false,
@@ -423,7 +425,7 @@ export function modalReducer(state, action) {
         workoutDetail: initialModalState.workoutDetail,
       };
 
-    // ===== EDIT SPLIT MODAL =====
+    // ===== EDIT SPLIT (meta) MODAL — name, mode, rest pattern =====
     case "OPEN_EDIT_SPLIT":
       return {
         ...state,
@@ -432,9 +434,7 @@ export function modalReducer(state, action) {
           splitId: action.payload?.splitId ?? null,
           name: action.payload?.name ?? "",
           mode: action.payload?.mode ?? "weekly",
-          members: Array.isArray(action.payload?.members) ? action.payload.members : [],
           restPattern: action.payload?.restPattern ?? null,
-          queuePosition: action.payload?.queuePosition ?? 0,
         },
       };
 
@@ -448,6 +448,19 @@ export function modalReducer(state, action) {
       return {
         ...state,
         editSplit: initialModalState.editSplit,
+      };
+
+    // ===== SPLIT DETAIL SHEET =====
+    case "OPEN_SPLIT_DETAIL":
+      return {
+        ...state,
+        splitDetail: { isOpen: true, splitId: action.payload.splitId },
+      };
+
+    case "CLOSE_SPLIT_DETAIL":
+      return {
+        ...state,
+        splitDetail: initialModalState.splitDetail,
       };
 
     // ===== CONTINUOUS CONFLICT MODAL =====

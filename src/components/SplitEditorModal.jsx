@@ -1,6 +1,5 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React from "react";
 import { Modal } from "./Modal";
-import { DayChips, DISPLAY_DAYS } from "./CadenceEditor";
 import { SPLIT_MODES } from "../lib/cadence";
 
 function ModeButton({ active, onClick, children, colors }) {
@@ -18,6 +17,7 @@ function ModeButton({ active, onClick, children, colors }) {
         color: active ? colors.accent : colors.text,
         fontSize: 13, fontWeight: 600,
         cursor: "pointer",
+        transition: "background 0.15s ease",
         fontFamily: "inherit",
       }}
     >
@@ -27,96 +27,28 @@ function ModeButton({ active, onClick, children, colors }) {
 }
 
 /**
- * SplitEditorModal — create or edit a workout split.
- *
- * Workouts live in at most one split at a time. When the split's mode is "weekly",
- * each member can be assigned specific days. When it's "continuous", members are
- * ordered and rotate through completion (rest pattern handled in Phase 5+).
+ * SplitEditorModal — meta editor for a split: name, mode, rest pattern.
+ * Members editing lives in SplitDetailSheet (immediate add/remove/reorder).
+ * Mirrors the EditWorkout modal pattern.
  */
 export function SplitEditorModal({
-  open,
-  modalState,
-  onUpdate,
-  onClose,
-  onSave,
-  onDelete,
-  workouts,
-  splits,
-  styles,
-  colors,
+  open, modalState, onUpdate, onClose, onSave, onDelete, styles, colors,
 }) {
   if (!open) return null;
 
-  const { splitId, name, mode, members, restPattern } = modalState;
+  const { splitId, name, mode, restPattern } = modalState;
   const isNew = !splitId;
-  const [pickerOpen, setPickerOpen] = useState(false);
-  // Reset picker when the modal opens fresh.
-  useEffect(() => { if (open) setPickerOpen(false); }, [open, splitId]);
-
-  // Map: workoutId → split name (any *other* split it belongs to). Used to show
-  // a small "Already in: X" tag in the picker, but the workout can still be
-  // added to this split too — a workout can belong to multiple splits.
-  const otherSplitNameByWorkout = useMemo(() => {
-    const map = new Map();
-    for (const s of splits || []) {
-      if (s.id === splitId) continue;
-      for (const m of s.members || []) map.set(m.workoutId, s.name);
-    }
-    return map;
-  }, [splits, splitId]);
-
-  const memberWorkoutIds = useMemo(() => new Set(members.map((m) => m.workoutId)), [members]);
-
-  const availableToAdd = useMemo(
-    () => (workouts || []).filter((w) => !memberWorkoutIds.has(w.id)),
-    [workouts, memberWorkoutIds]
-  );
-
-  const workoutNameById = useMemo(() => {
-    const m = new Map();
-    for (const w of workouts || []) m.set(w.id, w.name);
-    return m;
-  }, [workouts]);
 
   const setMode = (next) => {
     if (next === mode) return;
     onUpdate({ mode: next });
   };
 
-  const addMember = (workoutId) => {
-    const order = members.length;
-    onUpdate({ members: [...members, { workoutId, order, days: [] }] });
-  };
-
-  const removeMember = (workoutId) => {
-    const next = members.filter((m) => m.workoutId !== workoutId).map((m, i) => ({ ...m, order: i }));
-    onUpdate({ members: next });
-  };
-
-  const moveMember = (workoutId, delta) => {
-    const idx = members.findIndex((m) => m.workoutId === workoutId);
-    if (idx < 0) return;
-    const targetIdx = idx + delta;
-    if (targetIdx < 0 || targetIdx >= members.length) return;
-    const next = [...members];
-    [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
-    onUpdate({ members: next.map((m, i) => ({ ...m, order: i })) });
-  };
-
-  const toggleMemberDay = (workoutId, day) => {
-    const next = members.map((m) => {
-      if (m.workoutId !== workoutId) return m;
-      const days = Array.isArray(m.days) ? m.days : [];
-      return { ...m, days: days.includes(day) ? days.filter((d) => d !== day) : [...days, day] };
-    });
-    onUpdate({ members: next });
-  };
-
   const setRestAfterCycle = (enabled) => {
     onUpdate({ restPattern: enabled ? { type: "afterCycle", days: 1 } : null });
   };
 
-  const canSave = name.trim().length > 0;
+  const canSave = (name || "").trim().length > 0;
 
   const footer = (
     <div style={styles.modalFooter}>
@@ -179,179 +111,6 @@ export function SplitEditorModal({
               ? "Each workout has target day(s) of the week."
               : "Workouts rotate in order. Calendar days don't matter — when one finishes, the next is up."}
           </div>
-        </div>
-
-        {/* Members */}
-        <div style={styles.fieldCol}>
-          <label style={styles.label}>Workouts in this split</label>
-
-          {members.length === 0 ? (
-            <div style={{ fontSize: 12, opacity: 0.5, padding: "10px 0" }}>
-              No workouts yet. Add some below.
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {members.map((m, i) => {
-                const isFirst = i === 0;
-                const isLast = i === members.length - 1;
-                return (
-                  <div
-                    key={m.workoutId}
-                    style={{
-                      border: `1px solid ${colors.border}`,
-                      borderRadius: 10,
-                      padding: 10,
-                      background: colors.cardAltBg,
-                      display: "flex", flexDirection: "column", gap: 8,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {mode === SPLIT_MODES.CONTINUOUS && (
-                        <div style={{ fontSize: 11, opacity: 0.5, fontWeight: 600, minWidth: 28 }}>
-                          {i + 1}.
-                        </div>
-                      )}
-                      <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>
-                        {workoutNameById.get(m.workoutId) || "(deleted workout)"}
-                      </div>
-                      {mode === SPLIT_MODES.CONTINUOUS && (
-                        <div style={{ display: "flex", gap: 2 }}>
-                          <button
-                            type="button"
-                            disabled={isFirst}
-                            onClick={() => moveMember(m.workoutId, -1)}
-                            title="Move up"
-                            style={{
-                              background: "transparent", border: "none", padding: 4,
-                              cursor: isFirst ? "default" : "pointer",
-                              opacity: isFirst ? 0.2 : 0.55, color: colors.text,
-                            }}
-                          >
-                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isLast}
-                            onClick={() => moveMember(m.workoutId, 1)}
-                            title="Move down"
-                            style={{
-                              background: "transparent", border: "none", padding: 4,
-                              cursor: isLast ? "default" : "pointer",
-                              opacity: isLast ? 0.2 : 0.55, color: colors.text,
-                            }}
-                          >
-                            <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
-                          </button>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => removeMember(m.workoutId)}
-                        title="Remove from split"
-                        style={{
-                          background: "transparent", border: "none", padding: 4,
-                          cursor: "pointer", opacity: 0.45, color: colors.text,
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    {mode === SPLIT_MODES.WEEKLY && (
-                      <DayChips
-                        selected={Array.isArray(m.days) ? m.days : []}
-                        onToggle={(day) => toggleMemberDay(m.workoutId, day)}
-                        colors={colors}
-                        ariaLabel={`Days for ${workoutNameById.get(m.workoutId) || "member"}`}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Add member picker — dashed button (same style as +Add exercise),
-              tap to expand an inline list of workouts to add. */}
-          {availableToAdd.length > 0 ? (
-            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setPickerOpen((v) => !v)}
-                aria-expanded={pickerOpen}
-                style={{
-                  width: "100%",
-                  padding: "13px 14px",
-                  borderRadius: 14,
-                  background: pickerOpen ? colors.accentSoft : "transparent",
-                  color: colors.accent,
-                  border: `1.5px dashed ${colors.accentBorder}`,
-                  cursor: "pointer", fontFamily: "inherit",
-                  fontSize: 13, fontWeight: 700,
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  minHeight: 48,
-                }}
-              >
-                {pickerOpen ? (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                    Done adding
-                  </>
-                ) : (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                    Add a workout
-                  </>
-                )}
-              </button>
-
-              {pickerOpen && availableToAdd.map((w) => {
-                const otherSplitName = otherSplitNameByWorkout.get(w.id);
-                return (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => addMember(w.id)}
-                    style={{
-                      width: "100%", minHeight: 56,
-                      padding: "12px 14px",
-                      borderRadius: 14,
-                      background: colors.cardAltBg,
-                      border: `1px solid ${colors.border}`,
-                      color: colors.text,
-                      cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                      display: "flex", alignItems: "center", gap: 12,
-                      boxSizing: "border-box",
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: 14, fontWeight: 700, color: colors.text,
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>{w.name}</div>
-                      {otherSplitName && (
-                        <div style={{
-                          fontSize: 11, color: colors.textSecondary, marginTop: 2,
-                        }}>
-                          Already in: {otherSplitName}
-                        </div>
-                      )}
-                    </div>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            members.length === 0 && (
-              <div style={{ fontSize: 11, opacity: 0.5, marginTop: 6, lineHeight: 1.5 }}>
-                No workouts to add. Create one first.
-              </div>
-            )
-          )}
         </div>
 
         {/* Rest pattern (continuous only) */}
