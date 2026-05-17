@@ -4,6 +4,8 @@ import { getUnit } from "../lib/constants";
 import { CADENCE_MODES } from "../lib/cadence";
 import { DISPLAY_DAYS } from "./CadenceEditor";
 import { useSwipe } from "../hooks/useSwipe";
+import { useDragReorder } from "../hooks/useDragReorder";
+import { DragGrip } from "./WorkoutsList";
 
 function cadenceLine(cadence) {
   const c = cadence || { mode: CADENCE_MODES.WHENEVER };
@@ -95,6 +97,7 @@ export function WorkoutDetailSheet({
   onOpenEditExercise,
   onAddExercise,
   onMoveExercise,
+  onReorderExercisesByIndex,
   onShareWorkout,
   onDeleteWorkout,
   reorderExercises,
@@ -126,9 +129,16 @@ export function WorkoutDetailSheet({
     thresholdPx: 60,
   });
 
-  if (!open || !workout) return null;
+  // Drag-to-reorder for exercises. Must be called before any early return.
+  const exercises = workout?.exercises || [];
+  const workoutId = workout?.id;
+  const exerciseDrag = useDragReorder({
+    itemCount: exercises.length,
+    onCommit: (from, to) => workoutId && onReorderExercisesByIndex?.(workoutId, from, to),
+    rowHeight: 64,
+  });
 
-  const exercises = workout.exercises || [];
+  if (!open || !workout) return null;
   const cadenceValue = splitForWorkout ? "Continuous" : cadenceLine(workout.cadence);
   const scheduleValue = splitForWorkout ? `In split: ${splitForWorkout.name}` : "Standalone";
   const categoryValue = (workout.category || "Workout").trim();
@@ -270,103 +280,72 @@ export function WorkoutDetailSheet({
             </div>
           )}
           {exercises.map((ex, i) => {
-            const isFirst = i === 0;
-            const isLast = i === exercises.length - 1;
             const unitInfo = getUnit(ex.unit, ex);
             return (
-              <button
+              <div
                 key={ex.id}
-                type="button"
-                onClick={reorderExercises ? undefined : () => onOpenEditExercise(workout.id, ex.id)}
+                ref={reorderExercises ? exerciseDrag.setItemRef(i) : undefined}
                 style={{
                   width: "100%",
-                  minHeight: 56,
-                  padding: "12px 14px",
-                  borderRadius: 14,
-                  background: colors.cardAltBg,
-                  border: `1px solid ${colors.border}`,
-                  color: colors.text,
-                  cursor: reorderExercises ? "default" : "pointer",
-                  textAlign: "left",
-                  fontFamily: "inherit",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
+                  ...(reorderExercises ? exerciseDrag.itemStyle(i) : {}),
                 }}
               >
-                <div style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 7,
-                  background: colors.subtleBg,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  color: colors.textSecondary,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}>{i + 1}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 14,
-                    fontWeight: 700,
+                <div
+                  onClick={reorderExercises ? undefined : () => onOpenEditExercise(workout.id, ex.id)}
+                  style={{
+                    width: "100%",
+                    minHeight: 56,
+                    padding: "12px 14px",
+                    borderRadius: 14,
+                    background: colors.cardAltBg,
+                    border: `1px solid ${colors.border}`,
                     color: colors.text,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}>{ex.name}</div>
+                    cursor: reorderExercises ? "default" : "pointer",
+                    textAlign: "left",
+                    fontFamily: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    boxSizing: "border-box",
+                  }}
+                >
                   <div style={{
-                    fontSize: 11.5,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 7,
+                    background: colors.subtleBg,
+                    fontSize: 11,
+                    fontWeight: 800,
                     color: colors.textSecondary,
-                    marginTop: 2,
-                  }}>{unitInfo.label} ({unitInfo.abbr})</div>
-                </div>
-                {reorderExercises ? (
-                  <div style={{ display: "flex", flexDirection: "row", flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      disabled={isFirst}
-                      onClick={(e) => { e.stopPropagation(); onMoveExercise(workout.id, ex.id, -1); }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: colors.text,
-                        opacity: isFirst ? 0.15 : 0.6,
-                        padding: "4px 6px",
-                        cursor: isFirst ? "default" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                      title="Move up"
-                    >
-                      <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isLast}
-                      onClick={(e) => { e.stopPropagation(); onMoveExercise(workout.id, ex.id, 1); }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: colors.text,
-                        opacity: isLast ? 0.15 : 0.6,
-                        padding: "4px 6px",
-                        cursor: isLast ? "default" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                      title="Move down"
-                    >
-                      <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
-                    </button>
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}>{i + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: colors.text,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>{ex.name}</div>
+                    <div style={{
+                      fontSize: 11.5,
+                      color: colors.textSecondary,
+                      marginTop: 2,
+                    }}>{unitInfo.label} ({unitInfo.abbr})</div>
                   </div>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35, flexShrink: 0 }}>
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                )}
-              </button>
+                  {reorderExercises ? (
+                    <DragGrip {...exerciseDrag.handleProps(i)} colors={colors} />
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35, flexShrink: 0 }}>
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  )}
+                </div>
+              </div>
             );
           })}
 

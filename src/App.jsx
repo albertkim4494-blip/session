@@ -25,6 +25,7 @@ import { initialModalState, modalReducer } from "./lib/modalReducer";
 
 // Extracted hooks
 import { useSwipe } from "./hooks/useSwipe";
+import { useDragReorder } from "./hooks/useDragReorder";
 import { useClickOutside } from "./hooks/useClickOutside";
 
 // Extracted components
@@ -34,6 +35,7 @@ import { CategoryAutocomplete } from "./components/CategoryAutocomplete";
 import { CadenceEditor } from "./components/CadenceEditor";
 import { SplitEditorModal } from "./components/SplitEditorModal";
 import { WorkoutDetailSheet } from "./components/WorkoutDetailSheet";
+import { WorkoutsList } from "./components/WorkoutsList";
 import { DISPLAY_DAYS } from "./components/CadenceEditor";
 import { CadenceDriftPrompt } from "./components/CadenceDriftPrompt";
 import { SunArc } from "./components/SunArc";
@@ -3013,6 +3015,32 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }
 
+  // Reorder a workout from one index to another (used by drag-to-reorder).
+  function reorderWorkoutsByIndex(fromIdx, toIdx) {
+    updateState((st) => {
+      const arr = st.program.workouts;
+      if (fromIdx < 0 || fromIdx >= arr.length) return st;
+      if (toIdx < 0 || toIdx >= arr.length) return st;
+      const [moved] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx, 0, moved);
+      return st;
+    });
+  }
+
+  // Reorder an exercise within a workout by index (drag-to-reorder).
+  function reorderExercisesByIndex(workoutId, fromIdx, toIdx) {
+    updateState((st) => {
+      const w = st.program.workouts.find((x) => x.id === workoutId);
+      if (!w) return st;
+      const arr = w.exercises;
+      if (fromIdx < 0 || fromIdx >= arr.length) return st;
+      if (toIdx < 0 || toIdx >= arr.length) return st;
+      const [moved] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx, 0, moved);
+      return st;
+    });
+  }
+
   function moveSplit(splitId, direction) {
     updateState((st) => {
       const arr = st.program.splits || [];
@@ -5047,148 +5075,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     {/* Body — workout rows styled like exercise rows in WorkoutDetailSheet,
                         with a dashed "+ Add workout" button at the bottom. */}
                     {!isCollapsed && (
-                      <div style={{
-                        padding: 12, paddingTop: 0,
-                        display: "flex", flexDirection: "column", gap: 8,
-                      }}>
-                        {workouts.map((w, wi) => {
-                          const exCount = (w.exercises || []).length;
-                          const split = workoutToSplit.get(w.id) || null;
-                          const cadLabel = (() => {
-                            if (split) return split.mode === SPLIT_MODES.CONTINUOUS ? "Continuous" : "Weekly";
-                            const c = w.cadence || { mode: CADENCE_MODES.WHENEVER };
-                            if (c.mode === CADENCE_MODES.WEEKLY) return `${c.perWeek || 1}×/wk`;
-                            if (c.mode === CADENCE_MODES.ANCHOR) {
-                              if (!Array.isArray(c.days) || c.days.length === 0) return null;
-                              return DISPLAY_DAYS.filter((d) => c.days.includes(d.value))
-                                .map((d) => d.full.slice(0, 3)).join(" · ");
-                            }
-                            return null;
-                          })();
-                          const isFirst = wi === 0;
-                          const isLast = wi === workouts.length - 1;
-                          return (
-                            <button
-                              key={w.id}
-                              type="button"
-                              onClick={reorderWorkouts ? undefined : () => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: w.id } })}
-                              style={{
-                                width: "100%", minHeight: 60,
-                                padding: "12px 14px",
-                                borderRadius: 14,
-                                background: colors.cardAltBg,
-                                border: `1px solid ${colors.border}`,
-                                cursor: reorderWorkouts ? "default" : "pointer",
-                                textAlign: "left", fontFamily: "inherit",
-                                color: colors.text,
-                                display: "flex", alignItems: "center", gap: 12,
-                              }}
-                            >
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{
-                                  fontSize: 14.5, fontWeight: 700,
-                                  color: colors.text, letterSpacing: -0.1,
-                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                }}>{w.name}</div>
-                                <div style={{
-                                  display: "flex", alignItems: "center", gap: 6,
-                                  marginTop: 3,
-                                  fontSize: 11.5, color: colors.textSecondary,
-                                  flexWrap: "wrap",
-                                }}>
-                                  <span>{exCount} {exCount === 1 ? "exercise" : "exercises"}</span>
-                                  {w.category && (
-                                    <span style={{ color: colors.textTertiary }}>· {(w.category || "").trim()}</span>
-                                  )}
-                                  {split && (
-                                    <span style={{
-                                      fontSize: 10, fontWeight: 700,
-                                      padding: "2px 8px", borderRadius: 999,
-                                      background: colors.accentSoft,
-                                      color: colors.accent,
-                                      border: `1px solid ${colors.accentBorder}`,
-                                      marginLeft: 4,
-                                    }}>In: {split.name}</span>
-                                  )}
-                                  {cadLabel && (
-                                    <span style={{
-                                      fontSize: 10, fontWeight: 700,
-                                      padding: "2px 8px", borderRadius: 999,
-                                      background: colors.subtleBg,
-                                      color: colors.textSecondary,
-                                      border: `1px solid ${colors.border}`,
-                                      marginLeft: split ? 0 : 4,
-                                    }}>{cadLabel}</span>
-                                  )}
-                                </div>
-                              </div>
-                              {reorderWorkouts ? (
-                                <div style={{ display: "flex", flexDirection: "row", flexShrink: 0 }}>
-                                  <button
-                                    type="button"
-                                    disabled={isFirst}
-                                    onClick={(e) => { e.stopPropagation(); moveWorkout(w.id, -1); }}
-                                    style={{
-                                      background: "transparent", border: "none",
-                                      color: colors.text,
-                                      opacity: isFirst ? 0.15 : 0.6,
-                                      padding: "4px 6px",
-                                      cursor: isFirst ? "default" : "pointer",
-                                      display: "flex", alignItems: "center",
-                                    }}
-                                    title="Move up"
-                                  >
-                                    <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 13 12 5 6 13" /></svg>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={isLast}
-                                    onClick={(e) => { e.stopPropagation(); moveWorkout(w.id, 1); }}
-                                    style={{
-                                      background: "transparent", border: "none",
-                                      color: colors.text,
-                                      opacity: isLast ? 0.15 : 0.6,
-                                      padding: "4px 6px",
-                                      cursor: isLast ? "default" : "pointer",
-                                      display: "flex", alignItems: "center",
-                                    }}
-                                    title="Move down"
-                                  >
-                                    <svg width="16" height="12" viewBox="0 0 24 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 3 12 11 18 3" /></svg>
-                                  </button>
-                                </div>
-                              ) : (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textTertiary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                  <polyline points="9 18 15 12 9 6" />
-                                </svg>
-                              )}
-                            </button>
-                          );
-                        })}
-
-                        {/* Add workout — dashed button matching the +Add exercise pattern */}
-                        {!reorderWorkouts && (
-                          <button
-                            type="button"
-                            onClick={addWorkout}
-                            style={{
-                              width: "100%",
-                              padding: "13px 14px",
-                              borderRadius: 14,
-                              background: "transparent",
-                              color: colors.accent,
-                              border: `1.5px dashed ${colors.accentBorder}`,
-                              cursor: "pointer", fontFamily: "inherit",
-                              fontSize: 13, fontWeight: 700,
-                              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                              minHeight: 48,
-                            }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                            Add workout
-                          </button>
-                        )}
-                      </div>
+                      <WorkoutsList
+                        workouts={workouts}
+                        workoutToSplit={workoutToSplit}
+                        reorderWorkouts={reorderWorkouts}
+                        onOpenDetail={(wid) => dispatchModal({ type: "OPEN_WORKOUT_DETAIL", payload: { workoutId: wid } })}
+                        onCommitReorder={reorderWorkoutsByIndex}
+                        onAddWorkout={addWorkout}
+                        colors={colors}
+                      />
                     )}
                   </div>
                 );
@@ -7274,6 +7169,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             onOpenEditExercise={openEditExercise}
             onAddExercise={addExercise}
             onMoveExercise={moveExercise}
+            onReorderExercisesByIndex={reorderExercisesByIndex}
             onShareWorkout={(wid, wname) => dispatchModal({ type: "OPEN_SHARE_WORKOUT", payload: { workoutId: wid, workoutName: wname } })}
             onDeleteWorkout={deleteWorkout}
             hasPrev={!!prevWorkout}
