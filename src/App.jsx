@@ -217,6 +217,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   ensureAnimations();
   const [state, setState] = useState(() => loadState());
   const [dataReady, setDataReady] = useState(false);
+  // localReady gates only the splash screen — true as soon as localStorage has
+  // user data, so returning users see the app instantly. dataReady still waits
+  // for cloud reconciliation to gate save-back, coach fetch, etc.
+  const [localReady, setLocalReady] = useState(false);
   const cloudSaver = useRef(null);
   const [tab, setTab] = useState(() => sessionStorage.getItem("wt_tab") || "train");
   const tabRef = useRef("train");
@@ -484,6 +488,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     let cancelled = false;
 
+    // Reveal the app immediately if localStorage already has user data. Cloud
+    // reconciliation runs in the background. Only fresh-device / empty-LS
+    // sign-ins block on the network fetch.
+    const initialLocal = loadState();
+    const initialLocalIsEmpty =
+      Object.keys(initialLocal.logsByDate || {}).length === 0 &&
+      Object.keys(initialLocal.dailyWorkouts || {}).length === 0 &&
+      (initialLocal.customExercises || []).length === 0 &&
+      Object.keys(initialLocal.todaySessions || {}).length === 0 &&
+      Object.keys(initialLocal.sessionAdditions || {}).length === 0 &&
+      Object.keys(initialLocal.sessionOverrides || {}).length === 0;
+    if (!initialLocalIsEmpty) {
+      setLocalReady(true);
+    }
+
     async function init() {
       try {
         const cloudState = await fetchCloudState(session.user.id);
@@ -534,7 +553,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         console.error("Cloud sync init failed, using localStorage:", err);
       }
 
-      if (!cancelled) setDataReady(true);
+      if (!cancelled) {
+        setLocalReady(true);
+        setDataReady(true);
+      }
     }
 
     init();
@@ -4074,7 +4096,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // RENDER
   // ---------------------------------------------------------------------------
 
-  if (!dataReady) {
+  if (!localReady) {
     return (
       <div style={{
         fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
