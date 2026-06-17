@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Modal } from "./Modal";
 import { EXERCISE_CATALOG } from "../lib/exerciseCatalog";
-import { catalogSearch, normalizeQuery, filterCatalog } from "../lib/exerciseCatalogUtils";
+import { catalogSearch, normalizeQuery, filterCatalog, buildCatalogMap } from "../lib/exerciseCatalogUtils";
+import { buildAllowedEquipment } from "../lib/exerciseCatalog";
+import { findSubstitutes } from "../lib/exerciseSubstitution";
 import { ExerciseDetailModal } from "./ExerciseDetailModal";
 import { getSportIconUrl } from "../lib/sportIcons";
 import { BodyDiagram, SLUG_TO_MUSCLES } from "./BodyDiagram";
@@ -83,6 +85,7 @@ export function ExerciseCatalogModal({
   open, onClose, onAddExercise, onCustomExercise, onDeleteCustomExercise, onUpdateCustomExercise, onSaveAsNew,
   styles, colors, workouts, logsByDate,
   targetWorkoutId, catalog, backOverrideRef, session,
+  swapSource, equipment,
 }) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState("home"); // "home" | "list"
@@ -197,6 +200,29 @@ export function ExerciseCatalogModal({
     const catalog = results.filter((r) => !r.custom);
     return [...custom, ...catalog];
   }, [src, query, view]);
+
+  // Smart-swap suggestions: equipment-aware, same-stimulus alternatives for the
+  // exercise being swapped. Only computed in swap mode.
+  const swapSuggestions = useMemo(() => {
+    if (!swapSource) return [];
+    const catalogMap = buildCatalogMap(src);
+    // Full gym (null) or unset prefs → rank across all equipment; constrained → filter to available.
+    let allowedEquipment = Array.isArray(equipment) && equipment.length > 0
+      ? buildAllowedEquipment(equipment)
+      : null;
+    if (!allowedEquipment) {
+      allowedEquipment = new Set();
+      for (const e of src) for (const q of e.equipment || []) allowedEquipment.add(q);
+    }
+    // Exclude the source and anything already in the target workout.
+    const exclude = new Set();
+    if (swapSource.catalogId) exclude.add(swapSource.catalogId);
+    const targetWorkout = (workouts || []).find((w) => w.id === targetWorkoutId);
+    for (const ex of targetWorkout?.exercises || []) {
+      if (ex.catalogId) exclude.add(ex.catalogId);
+    }
+    return findSubstitutes(swapSource, { catalog: src, catalogMap, allowedEquipment, exclude, limit: 6 });
+  }, [swapSource, equipment, src, workouts, targetWorkoutId]);
 
   const catalogNameSet = useMemo(
     () => new Set(catalogResults.map((r) => r.name.toLowerCase())),
@@ -687,6 +713,19 @@ export function ExerciseCatalogModal({
         enterKeyHint="search"
         aria-label="Search exercises"
       />
+
+      {!homeHasQuery && swapSuggestions.length > 0 && (
+        /* Smart-swap suggestions — equipment-aware, same-stimulus alternatives */
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.55, padding: "2px 2px 0", display: "flex", alignItems: "center", gap: 5 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none"><path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" /></svg>
+            Smart swaps
+            {swapSuggestions[0]?.loose && <span style={{ opacity: 0.6, fontWeight: 600 }}>· closest matches</span>}
+          </div>
+          {swapSuggestions.map((s) => renderExerciseBtn(s.entry))}
+          <div style={{ height: 1, background: colors.border, opacity: 0.5, margin: "4px 0" }} />
+        </div>
+      )}
 
       {homeHasQuery ? (
         /* Inline search results */

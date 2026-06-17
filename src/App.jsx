@@ -3985,6 +3985,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         swapMode: true,
         swapExerciseId: exerciseId,
         swapExerciseName: ex?.name || "",
+        swapSource: ex ? { catalogId: ex.catalogId || null, name: ex.name || "", unit: ex.unit || "reps" } : null,
         swapIsDaily: isDaily,
       },
     });
@@ -6882,6 +6883,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         workouts={workouts}
         logsByDate={state.logsByDate}
         targetWorkoutId={modals.catalogBrowse.workoutId}
+        swapSource={modals.catalogBrowse.swapMode ? modals.catalogBrowse.swapSource : null}
+        equipment={state.preferences?.equipment}
         backOverrideRef={backOverrideRef}
         onUpdateCustomExercise={(updatedEntry) => {
           updateState((st) => {

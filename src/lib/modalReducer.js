@@ -121,6 +121,7 @@ export const initialModalState = {
     swapMode: false,
     swapExerciseId: null,
     swapExerciseName: null,
+    swapSource: null,         // { catalogId, name, unit } of the exercise being swapped — powers smart-swap suggestions
     swapIsDaily: false,
     sessionAddMode: false,
     sessionAddIsDaily: false,
@@ -363,6 +364,7 @@ export function modalReducer(state, action) {
           swapMode: action.payload.swapMode || false,
           swapExerciseId: action.payload.swapExerciseId || null,
           swapExerciseName: action.payload.swapExerciseName || null,
+          swapSource: action.payload.swapSource || null,
           swapIsDaily: action.payload.swapIsDaily || false,
           sessionAddMode: action.payload.sessionAddMode || false,
           sessionAddIsDaily: action.payload.sessionAddIsDaily || false,
