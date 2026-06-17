@@ -4551,7 +4551,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                     {focused.name}
                                   </div>
                                   <div style={{ fontSize: 13, color: secondary, marginTop: 2 }}>
-                                    {exerciseCount} {exerciseCount === 1 ? "lift" : "lifts"}
+                                    {exerciseCount} {exerciseCount === 1 ? "exercise" : "exercises"}
                                   </div>
                                 </div>
                                 {/* Middle scroll area — lifts only */}
@@ -4653,7 +4653,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                                             {w.name}
                                           </div>
                                           <div style={{ fontSize: 12, color: secondary }}>
-                                            {liftCount} {liftCount === 1 ? "lift" : "lifts"}
+                                            {liftCount} {liftCount === 1 ? "exercise" : "exercises"}
                                           </div>
                                         </div>
                                         <svg
