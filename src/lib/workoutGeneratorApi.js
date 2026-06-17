@@ -4,8 +4,9 @@
  */
 
 import { supabase } from "./supabase";
-import { exerciseFitsEquipment } from "./exerciseCatalog";
+import { exerciseFitsEquipment, buildAllowedEquipment } from "./exerciseCatalog";
 import { buildCatalogMap } from "./exerciseCatalogUtils";
+import { transformExercises } from "./workoutTransform";
 import { analyzeMuscleRecency, exerciseCountFromDuration } from "./workoutGenerator";
 import { isSetCompleted, dayHasCompletedSets } from "./setHelpers";
 import { recordAiEvent } from "./aiMetrics";
@@ -215,62 +216,6 @@ function buildMuscleRecency(state, catalog, todayKey) {
 }
 
 /**
- * Transform AI response exercises into app workout structure.
- * Uses catalog names (not AI names) to prevent typos.
- * Returns { exercises, diagnostics } with drop reasons for observability.
- */
-function transformExercises(aiExercises, catalogMap) {
-  const diagnostics = { dropped: 0, reasons: [] };
-  if (!Array.isArray(aiExercises)) return { exercises: [], diagnostics };
-
-  // Build name→entry lookup for fallback matching
-  const nameMap = new Map();
-  for (const [, entry] of catalogMap) {
-    nameMap.set(entry.name.toLowerCase(), entry);
-  }
-
-  const exercises = [];
-  const usedIds = new Set();
-  for (const e of aiExercises) {
-    let entry = null;
-
-    // Try catalogId first
-    if (e.catalogId && catalogMap.has(e.catalogId)) {
-      entry = catalogMap.get(e.catalogId);
-    }
-
-    // Fallback: match by name if catalogId missing or invalid
-    if (!entry && e.name) {
-      const byName = nameMap.get(e.name.toLowerCase());
-      if (byName) {
-        diagnostics.reasons.push(`Recovered ${e.name}: bad catalogId "${e.catalogId}", matched by name`);
-        entry = byName;
-      }
-    }
-
-    if (!entry) {
-      diagnostics.dropped++;
-      diagnostics.reasons.push(`Dropped ${e.name || e.catalogId || "unknown"}: not found in catalog`);
-      continue;
-    }
-
-    // Skip duplicates
-    if (usedIds.has(entry.id)) continue;
-    usedIds.add(entry.id);
-
-    exercises.push({
-      id: uid("ex"),
-      name: entry.name,
-      unit: entry.defaultUnit,
-      catalogId: entry.id,
-      scheme: e.scheme || null,
-    });
-  }
-
-  return { exercises, diagnostics };
-}
-
-/**
  * Build fatigue signals from recent logs: mood trend, RPE averages, today's trained muscles.
  */
 function buildFatigueSignals(state, catalog, todayKey) {
@@ -406,11 +351,12 @@ export async function generateProgramAI({
     if (data?.error) throw new Error(data.reason ? `${data.error}: ${data.reason}` : data.error);
     if (!Array.isArray(data?.workouts)) throw new Error("Invalid AI response");
 
+    const allowedEquipment = buildAllowedEquipment(equipment);
     let hasSparseWorkout = false;
     const workouts = data.workouts.map((w) => {
-      const { exercises, diagnostics } = transformExercises(w.exercises, catalogMap);
-      if (diagnostics.dropped > 0) {
-        console.warn(`[AI program] ${w.name}: dropped ${diagnostics.dropped} exercises`, diagnostics.reasons);
+      const { exercises, diagnostics } = transformExercises(w.exercises, catalogMap, { catalog, allowedEquipment });
+      if (diagnostics.dropped > 0 || diagnostics.substituted > 0) {
+        console.warn(`[AI program] ${w.name}: ${diagnostics.substituted} substituted, ${diagnostics.dropped} dropped`, diagnostics.reasons);
       }
       if (exercises.length < 2) hasSparseWorkout = true;
       return {
@@ -490,9 +436,10 @@ export async function generateTodayAI({
     if (data?.error) throw new Error(data.reason ? `${data.error}: ${data.reason}` : data.error);
     if (!Array.isArray(data?.exercises)) throw new Error("Invalid AI response");
 
-    const { exercises, diagnostics } = transformExercises(data.exercises, catalogMap);
-    if (diagnostics.dropped > 0) {
-      console.warn(`[AI today] dropped ${diagnostics.dropped} exercises`, diagnostics.reasons);
+    const allowedEquipment = buildAllowedEquipment(equipment);
+    const { exercises, diagnostics } = transformExercises(data.exercises, catalogMap, { catalog, allowedEquipment });
+    if (diagnostics.dropped > 0 || diagnostics.substituted > 0) {
+      console.warn(`[AI today] ${diagnostics.substituted} substituted, ${diagnostics.dropped} dropped`, diagnostics.reasons);
     }
 
     const minRequired = (duration || 60) <= 15 ? 1 : 2;
