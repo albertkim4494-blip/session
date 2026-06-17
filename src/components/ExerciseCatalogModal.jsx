@@ -714,19 +714,6 @@ export function ExerciseCatalogModal({
         aria-label="Search exercises"
       />
 
-      {!homeHasQuery && swapSuggestions.length > 0 && (
-        /* Smart-swap suggestions — equipment-aware, same-stimulus alternatives */
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.55, padding: "2px 2px 0", display: "flex", alignItems: "center", gap: 5 }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none"><path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" /></svg>
-            Smart swaps
-            {swapSuggestions[0]?.loose && <span style={{ opacity: 0.6, fontWeight: 600 }}>· closest matches</span>}
-          </div>
-          {swapSuggestions.map((s) => renderExerciseBtn(s.entry))}
-          <div style={{ height: 1, background: colors.border, opacity: 0.5, margin: "4px 0" }} />
-        </div>
-      )}
-
       {homeHasQuery ? (
         /* Inline search results */
         <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, overflowY: "auto", minHeight: 0 }}>
@@ -757,6 +744,19 @@ export function ExerciseCatalogModal({
         /* Browse by muscle group */
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Smart-swap suggestions — equipment-aware, same-stimulus alternatives */}
+            {swapSuggestions.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.55, padding: "2px 2px 0", display: "flex", alignItems: "center", gap: 5 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#f0b429" stroke="none"><path d="M12 0l2.5 8.5L23 12l-8.5 2.5L12 23l-2.5-8.5L1 12l8.5-2.5z" /></svg>
+                  Smart swaps
+                  {swapSuggestions[0]?.loose && <span style={{ opacity: 0.6, fontWeight: 600 }}>· closest matches</span>}
+                </div>
+                {swapSuggestions.map((s) => renderExerciseBtn(s.entry))}
+                <div style={{ height: 1, background: colors.border, opacity: 0.5, margin: "2px 0" }} />
+              </div>
+            )}
+
             {/* Body diagram — tap a muscle to toggle its group */}
             <BodyDiagram
               highlightedMuscles={[...hoveredMuscles]}
