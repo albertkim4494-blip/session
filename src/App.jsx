@@ -505,6 +505,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, [showGenerateWizard]);
 
+  // TEMP (pre-launch dev tooling — remove before shipping): visiting the app with
+  // ?dev=1 enables hidden dev tools (e.g. the Pro entitlement toggle in Settings)
+  // on production builds too; ?dev=0 disables them. The flag persists in
+  // localStorage so it survives into the installed PWA (same origin). See
+  // APP_STORE_ROADMAP.md — remove alongside the DEV Pro toggle at launch.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("dev")) {
+        const v = params.get("dev");
+        if (v === "0" || v === "false") localStorage.removeItem("wt_dev");
+        else localStorage.setItem("wt_dev", "1");
+      }
+    } catch {
+      // window/localStorage may be unavailable — ignore.
+    }
+  }, []);
+
   // ---------------------------------------------------------------------------
   // CLOUD SYNC
   // ---------------------------------------------------------------------------

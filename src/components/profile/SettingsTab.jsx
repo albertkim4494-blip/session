@@ -402,10 +402,11 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </div>
           </div>
 
-          {/* DEV-only: manual Pro entitlement toggle. Gated by import.meta.env.DEV
-              so it never ships in a production build. Lets us test Pro-gated
-              features before RevenueCat exists (Phase 3). See entitlements.js. */}
-          {import.meta.env.DEV && (
+          {/* DEV-only: manual Pro entitlement toggle. Shown in dev builds, or on
+              production when the ?dev=1 flag has been set (localStorage "wt_dev").
+              Lets us test Pro-gated features before RevenueCat exists (Phase 3).
+              TEMP — remove this + the wt_dev flag before launch. See entitlements.js. */}
+          {(import.meta.env.DEV || (typeof localStorage !== "undefined" && localStorage.getItem("wt_dev") === "1")) && (
             <div style={styles.fieldCol}>
               <label style={styles.label}>Pro entitlement (dev only)</label>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
