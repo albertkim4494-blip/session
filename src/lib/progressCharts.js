@@ -20,6 +20,23 @@ function toNum(v) {
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** ISO date key of the week-start containing `dk`, given weekStartsOn (0=Sun..6=Sat). */
+export function weekStartOf(dk, weekStartsOn = 0) {
+  const [y, m, d] = dk.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const diff = (dt.getUTCDay() - weekStartsOn + 7) % 7;
+  dt.setUTCDate(dt.getUTCDate() - diff);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Add `days` to an ISO date key (UTC-safe). */
+function addDaysKey(dk, days) {
+  const [y, m, d] = dk.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
 /**
  * Build a per-session strength time series for one exercise.
  *
@@ -126,5 +143,61 @@ export function buildRepsSeries(logsByDate, ids, startKey = null, endKey = null)
     }
   }
 
+  return out;
+}
+
+/**
+ * Build a week-over-week total-volume series across ALL exercises (weighted
+ * sets only; volume = weight × reps). Weeks with no volume between the first
+ * and last active week are included as zeros so the trend reads honestly.
+ *
+ * @returns {Array<{weekStart:string, volume:number, sets:number}>} ascending.
+ */
+export function buildWeeklyVolumeSeries(logsByDate, startKey = null, endKey = null, weekStartsOn = 0) {
+  if (!logsByDate) return [];
+  const buckets = new Map(); // weekStart → { volume, sets }
+
+  for (const dk of Object.keys(logsByDate)) {
+    if (!DATE_KEY_RE.test(dk)) continue;
+    if (startKey && dk < startKey) continue;
+    if (endKey && dk > endKey) continue;
+
+    const day = logsByDate[dk];
+    if (!day || typeof day !== "object") continue;
+
+    let dayVol = 0;
+    let daySets = 0;
+    for (const exId of Object.keys(day)) {
+      const exLog = day[exId];
+      if (!exLog || !Array.isArray(exLog.sets)) continue;
+      for (const s of exLog.sets) {
+        if (!isSetCompleted(s)) continue;
+        const w = toNum(s.weight);
+        const reps = toNum(s.reps) ?? 0;
+        if (w == null || !(reps > 0)) continue;
+        dayVol += w * reps;
+        daySets++;
+      }
+    }
+
+    if (daySets > 0) {
+      const wk = weekStartOf(dk, weekStartsOn);
+      const b = buckets.get(wk) || { volume: 0, sets: 0 };
+      b.volume += dayVol;
+      b.sets += daySets;
+      buckets.set(wk, b);
+    }
+  }
+
+  if (buckets.size === 0) return [];
+
+  const weeks = [...buckets.keys()].sort();
+  const first = weeks[0];
+  const last = weeks[weeks.length - 1];
+  const out = [];
+  for (let wk = first; wk <= last; wk = addDaysKey(wk, 7)) {
+    const b = buckets.get(wk);
+    out.push({ weekStart: wk, volume: b ? Math.round(b.volume) : 0, sets: b ? b.sets : 0 });
+  }
   return out;
 }

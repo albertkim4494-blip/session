@@ -82,7 +82,8 @@ import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } 
 import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { isPro as selectIsPro } from "./lib/entitlements";
-import { buildStrengthSeries, buildRepsSeries } from "./lib/progressCharts";
+import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries } from "./lib/progressCharts";
+import { LineChart } from "./components/charts/LineChart";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 import { CoachCard } from "./components/CoachCard";
@@ -1205,6 +1206,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
     return result;
   }, [progressWorkouts, summaryRange, state.logsByDate]);
+
+  // Week-over-week total training volume for the Progress volume-trend chart.
+  const weeklyVolume = useMemo(
+    () => buildWeeklyVolumeSeries(state.logsByDate, summaryRange.start, summaryRange.end, weekStartsOn),
+    [state.logsByDate, summaryRange, weekStartsOn]
+  );
 
   const loggedDaysInMonth = useMemo(() => {
     const set = new Set();
@@ -5214,6 +5221,40 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                 );
               })()}
               </div>
+
+              {/* Volume trend — week-over-week total training volume (Pro-gated) */}
+              {summaryStats.logged > 0 && (
+                <div style={{ ...styles.card, padding: 16 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.4, display: "block", marginBottom: 10 }}>
+                    Volume trend ({getWeightLabel(state.preferences?.measurementSystem)}/week)
+                  </span>
+                  {!isPro ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: colors.subtleBg, border: `1px solid ${colors.border}` }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6, flexShrink: 0 }}>
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                      </svg>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Volume trend is a Pro feature</div>
+                        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>See your weekly training volume rise and fall over time.</div>
+                      </div>
+                    </div>
+                  ) : weeklyVolume.length < 2 ? (
+                    <div style={{ fontSize: 12, opacity: 0.55, padding: "6px 2px", lineHeight: 1.5 }}>
+                      Log weighted sets across at least 2 weeks to see your volume trend.
+                    </div>
+                  ) : (
+                    <LineChart
+                      data={weeklyVolume}
+                      xKey="weekStart"
+                      colors={colors}
+                      lines={[{ key: "volume", label: "Volume", color: colors.accent }]}
+                      formatValue={(v) => (v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1).replace(/\.0$/, "") + "k" : String(Math.round(v)))}
+                      formatX={(dk) => { const p = String(dk).split("-"); return `${Number(p[1])}/${Number(p[2])}`; }}
+                      formatXLong={(dk) => { const M = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; const p = String(dk).split("-"); return `Week of ${M[Number(p[1]) - 1]} ${Number(p[2])}`; }}
+                    />
+                  )}
+                </div>
+              )}
 
               {summaryStats.logged === 0 ? (
                 <div style={{

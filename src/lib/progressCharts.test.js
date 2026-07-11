@@ -1,6 +1,6 @@
 // Tests for progressCharts.js — plain Node.js test script
 
-const { epley1RM, buildStrengthSeries, buildRepsSeries } = await import("./progressCharts.js");
+const { epley1RM, buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, weekStartOf } = await import("./progressCharts.js");
 
 let passed = 0;
 let failed = 0;
@@ -91,6 +91,29 @@ assert(bw2r.length === 1 && bw2r[0].maxReps === 12 && bw2r[0].sets === 1, "reps:
 
 assert(buildRepsSeries(null, ["x"]).length === 0, "reps: null logs → []");
 assert(buildRepsSeries(bwLogs, []).length === 0, "reps: empty ids → []");
+
+// --- weekStartOf ---
+// 2026-01-15 is a Thursday. Sunday-start week → 2026-01-11; Monday-start → 2026-01-12.
+assert(weekStartOf("2026-01-15", 0) === "2026-01-11", `weekStartOf Sun (got ${weekStartOf("2026-01-15", 0)})`);
+assert(weekStartOf("2026-01-15", 1) === "2026-01-12", `weekStartOf Mon (got ${weekStartOf("2026-01-15", 1)})`);
+
+// --- buildWeeklyVolumeSeries ---
+const volLogs = {
+  // week of 2026-01-11 (Sun-start): bench 100x5 + squat 200x5
+  "2026-01-12": { bench: { sets: [done(100, 5)] } },
+  "2026-01-14": { squat: { sets: [done(200, 5)] } },
+  // (skip a week — should appear as a zero bar)
+  // week of 2026-01-25: deadlift 300x3
+  "2026-01-26": { deadlift: { sets: [done(300, 3)] } },
+};
+const vol = buildWeeklyVolumeSeries(volLogs, null, null, 0);
+assert(vol.length === 3, `weekly volume fills gap weeks (got ${vol.length})`);
+assert(vol[0].weekStart === "2026-01-11" && vol[0].volume === 500 + 1000, `week 1 volume (got ${vol[0].volume})`);
+assert(vol[1].volume === 0 && vol[1].weekStart === "2026-01-18", "gap week is a zero bar");
+assert(vol[2].volume === 900 && vol[2].weekStart === "2026-01-25", `week 3 volume (got ${vol[2].volume})`);
+// BW-only sets contribute no volume
+assert(buildWeeklyVolumeSeries({ "2026-02-01": { pushup: { sets: [done("BW", 20)] } } }).length === 0, "BW-only → no volume weeks");
+assert(buildWeeklyVolumeSeries(null).length === 0, "weekly volume: null → []");
 
 // --- Done ---
 console.log(`${passed} passed, ${failed} failed`);
