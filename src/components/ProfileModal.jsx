@@ -25,7 +25,7 @@ function isDirty(modalState, pendingPrefs) {
   return DIRTY_FIELDS.some((k) => (modalState[k] ?? "") !== (init[k] ?? ""));
 }
 
-export function ProfileModal({ open, modalState, dispatch, profile, session, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference, onExportJson, onExportCSV, onImportFile, onResetAll }) {
+export function ProfileModal({ open, modalState, dispatch, profile, profileStale, session, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference, onExportJson, onExportCSV, onImportFile, onResetAll }) {
   const [activeTab, setActiveTab] = useState("profile");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [pendingPrefs, setPendingPrefs] = useState({});
@@ -229,6 +229,22 @@ export function ProfileModal({ open, modalState, dispatch, profile, session, onL
       footer={unifiedFooter}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }} {...swipeHandlers}>
+        {profileStale && (
+          <div style={{
+            fontSize: 12,
+            color: previewColors?.text || "#e8eef7",
+            background: previewColors?.cardAltBg || "rgba(255,255,255,0.06)",
+            border: `1px solid ${previewColors?.border || "rgba(255,255,255,0.10)"}`,
+            borderRadius: 8,
+            padding: "8px 10px",
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+          }}>
+            <span style={{ fontSize: 14 }}>⚠️</span>
+            <span style={{ opacity: 0.8 }}>Couldn't reach the server — showing your saved profile. Changes may not save until you're back online.</span>
+          </div>
+        )}
         {activeTab === "profile" ? (
           <ProfileTab
             modalState={modalState}

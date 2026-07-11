@@ -306,7 +306,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
   // AI Coach state
-  const [profile, setProfile] = useState(null);
+  // Profile is fetched from Supabase on every open. Seed from a per-user
+  // localStorage cache so username/avatar survive backend downtime (e.g. a
+  // paused project) instead of silently rendering blank.
+  const profileCacheKey = `wt_profile_cache_${session.user.id}`;
+  const [profile, setProfile] = useState(() => {
+    try {
+      const cached = localStorage.getItem(profileCacheKey);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [profileStale, setProfileStale] = useState(false);
+  // Merge updates into profile state AND the localStorage cache in one step.
+  const mergeProfile = useCallback((updates) => {
+    setProfile((prev) => {
+      const next = { ...prev, ...updates };
+      try { localStorage.setItem(profileCacheKey, JSON.stringify(next)); } catch { /* quota / private mode */ }
+      return next;
+    });
+  }, [profileCacheKey]);
   const [coachInsights, setCoachInsights] = useState([]);
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachError, setCoachError] = useState(null);
@@ -577,16 +597,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           .select("username, display_name, username_last_changed_at, username_change_count, birthdate, gender, age, weight_lbs, height_inches, goal, about, sports, avatar_url")
           .eq("id", session.user.id)
           .single();
-        if (!cancelled && data && !error) {
+        if (cancelled) return;
+        if (data && !error) {
           setProfile(data);
+          setProfileStale(false);
+          try { localStorage.setItem(profileCacheKey, JSON.stringify(data)); } catch { /* quota / private mode */ }
+        } else if (error) {
+          // Backend reachable but query failed — keep any cached profile, flag as stale.
+          console.error("Failed to load profile:", error);
+          setProfileStale(true);
         }
       } catch (err) {
+        // Network/backend unreachable (e.g. paused project). Keep the cached
+        // profile seeded at init rather than blanking the UI.
+        if (!cancelled) setProfileStale(true);
         console.error("Failed to load profile:", err);
       }
     }
     loadProfile();
     return () => { cancelled = true; };
-  }, [session.user.id]);
+  }, [session.user.id, profileCacheKey]);
 
   // Social badge polling
   useEffect(() => {
@@ -4062,12 +4092,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         return;
       }
 
-      setProfile((prev) => ({ ...prev, ...updates }));
+      mergeProfile(updates);
       dispatchModal({ type: "CLOSE_PROFILE_MODAL" });
     } catch (err) {
       dispatchModal({ type: "UPDATE_PROFILE_MODAL", payload: { saving: false, error: "Failed to save. Try again." } });
     }
-  }, [session.user.id]);
+  }, [session.user.id, mergeProfile]);
 
   // Swipe hook for calendar
   const swipe = useSwipe({
@@ -7188,6 +7218,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         modalState={modals.profile}
         dispatch={dispatchModal}
         profile={profile}
+        profileStale={profileStale}
         session={session}
         onLogout={onLogout}
         onSave={saveProfile}
@@ -7229,7 +7260,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         dispatch={dispatchModal}
         profile={profile}
         session={session}
-        onProfileUpdate={(updates) => setProfile((prev) => ({ ...prev, ...updates }))}
+        onProfileUpdate={mergeProfile}
         styles={styles}
       />
 
