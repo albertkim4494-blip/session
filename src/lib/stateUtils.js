@@ -157,6 +157,7 @@ export function makeDefaultState() {
       theme: "dark",
       weekStartsOn: 0,
       exerciseRestTimes: {},
+      isPro: false,
     },
     meta: {
       createdAt: Date.now(),
@@ -224,6 +225,10 @@ export function normalizeState(st) {
   // Coerce weekStartsOn to a valid JS day-of-week (0=Sun .. 6=Sat).
   const ws = Number(next.preferences.weekStartsOn);
   next.preferences.weekStartsOn = Number.isInteger(ws) && ws >= 0 && ws <= 6 ? ws : 0;
+
+  // Pro entitlement flag — coerce to a strict boolean. Source of truth is a
+  // DEV-only toggle today; RevenueCat drives it in Phase 3 (see entitlements.js).
+  next.preferences.isPro = next.preferences.isPro === true;
 
   // Clean up legacy standalone localStorage keys (migration complete)
   try {

@@ -81,6 +81,7 @@ import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } from "./lib/greetings";
 import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
+import { isPro as selectIsPro } from "./lib/entitlements";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 import { CoachCard } from "./components/CoachCard";
@@ -239,6 +240,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const theme = state.preferences?.theme || "dark";
   const equipment = state.preferences?.equipment || ["full_gym"];
   const weekStartsOn = Number.isInteger(state.preferences?.weekStartsOn) ? state.preferences.weekStartsOn : 0;
+  // Pro entitlement. Manual DEV toggle today; RevenueCat in Phase 3. Gate Pro
+  // features on this (never read preferences.isPro directly). See entitlements.js.
+  const isPro = selectIsPro(state);
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
   const [reorderSplits, setReorderSplits] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
@@ -7307,7 +7311,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             background: colors.accentBg, border: `1px solid ${colors.accentBorder}`,
           }}>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>Free Plan</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{isPro ? "Pro Plan" : "Free Plan"}</div>
               <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>Your current plan</div>
             </div>
             <div style={{
@@ -7317,7 +7321,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           </div>
 
           <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
-            Pro plans coming soon with unlimited AI coaching, advanced analytics, and more.
+            {isPro
+              ? "Pro unlocks advanced analytics, unlimited AI coaching, and more."
+              : "Pro plans coming soon with unlimited AI coaching, advanced analytics, and more."}
           </div>
         </div>
       </Modal>

@@ -402,6 +402,31 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </div>
           </div>
 
+          {/* DEV-only: manual Pro entitlement toggle. Gated by import.meta.env.DEV
+              so it never ships in a production build. Lets us test Pro-gated
+              features before RevenueCat exists (Phase 3). See entitlements.js. */}
+          {import.meta.env.DEV && (
+            <div style={styles.fieldCol}>
+              <label style={styles.label}>Pro entitlement (dev only)</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
+                  {preferences?.isPro ? "Pro ON" : "Pro OFF"}
+                </span>
+                <button
+                  type="button"
+                  className="btn-press"
+                  onClick={() => onUpdatePreference?.("isPro", !preferences?.isPro)}
+                  style={{ ...styles.secondaryBtn, padding: "4px 10px", fontSize: 12 }}
+                >
+                  Toggle
+                </button>
+              </div>
+              <span style={{ fontSize: 11, opacity: 0.5, marginTop: 4, display: "block" }}>
+                Simulates a Pro subscription for testing gated features. Not shown in production.
+              </span>
+            </div>
+          )}
+
           <div style={styles.fieldCol}>
             <label style={styles.label}>Backups</label>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
