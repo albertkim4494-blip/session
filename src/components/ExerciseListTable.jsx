@@ -1,5 +1,14 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { classifyUnit } from "../lib/constants";
+import { LineChart } from "./charts/LineChart";
+
+// "2026-01-15" → "1/15" for compact x-axis labels.
+function shortDate(dk) {
+  if (typeof dk !== "string") return "";
+  const parts = dk.split("-");
+  if (parts.length !== 3) return dk;
+  return `${Number(parts[1])}/${Number(parts[2])}`;
+}
 
 const SESSIONS_WIDTH = 44;
 const RIGHT_TOTAL_WIDTH = 140; // total px for columns right of Sessions — split evenly
@@ -42,6 +51,15 @@ function SessionsIcon({ color, size = 13 }) {
   );
 }
 
+function LockIcon({ size = 14, color }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0110 0v4" />
+    </svg>
+  );
+}
+
 function CollapseChevron({ collapsed }) {
   return collapsed ? (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
@@ -54,7 +72,9 @@ function GroupTable({
   groupKey, groupLabel, exercises, colors, styles, sortKey, sortAsc, onSort,
   showVolume, onToggleVolume,
   collapsed, onToggleCollapse,
+  isPro, getSeries, weightUnit,
 }) {
+  const [expandedId, setExpandedId] = useState(null);
   const sorted = [...exercises].sort((a, b) => {
     const cmp = compareValues(a, b, sortKey);
     return sortAsc ? cmp : -cmp;
@@ -111,6 +131,48 @@ function GroupTable({
       <span style={{ position: "absolute", marginLeft: 1, fontSize: 8 }}>
         {sortAsc ? "\u25B2" : "\u25BC"}
       </span>
+    );
+  };
+
+  // Expanded per-exercise strength chart (Pro-gated). Strength group only.
+  const renderExpanded = (ex) => {
+    if (!isPro) {
+      return (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "12px 14px", borderRadius: 10,
+          background: colors.subtleBg, border: `1px solid ${colors.border}`,
+        }}>
+          <span style={{ opacity: 0.6, flexShrink: 0 }}><LockIcon color={colors.text} /></span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Strength charts are a Pro feature</div>
+            <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
+              See your top set and estimated 1RM trend over time.
+            </div>
+          </div>
+        </div>
+      );
+    }
+    const series = getSeries ? getSeries(ex) : [];
+    if (!series || series.length < 2) {
+      return (
+        <div style={{ fontSize: 12, opacity: 0.55, padding: "10px 4px", lineHeight: 1.5 }}>
+          Log this exercise with weight on at least 2 days to see your weight &amp; estimated-1RM trend.
+        </div>
+      );
+    }
+    return (
+      <LineChart
+        data={series}
+        xKey="date"
+        colors={colors}
+        lines={[
+          { key: "topWeight", label: "Top set", color: colors.accent },
+          { key: "e1rm", label: "Est. 1RM", color: colors.text },
+        ]}
+        formatValue={(v) => `${Math.round(v)}${weightUnit || ""}`}
+        formatX={shortDate}
+      />
     );
   };
 
@@ -237,30 +299,54 @@ function GroupTable({
               const bestIsEmpty = isStrength
                 ? ex.maxWeight === "\u2014"
                 : (!bestValue && bestValue !== 0);
+              const expandable = isStrength;
+              const isExpanded = expandable && expandedId === ex.id;
               return (
-                <tr key={ex.id}>
-                  <td style={{ ...cb, paddingLeft: 16, fontWeight: 600, textOverflow: "ellipsis", maxWidth: 0 }}>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>{ex.name}</span>
-                  </td>
-                  <td style={{ ...cb, textAlign: "center", opacity: 0.7 }}>
-                    {ex.sessions}
-                  </td>
-                  <td style={{ ...cb, textAlign: "center", opacity: 0.7 }}>
-                    {metricValue}
-                    {!(isStrength && showVolume) && !commonUnit && ex.unitAbbr !== "reps" && (
-                      <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 2 }}>{ex.unitAbbr}</span>
-                    )}
-                  </td>
-                  <td style={{ ...cb, textAlign: "center", paddingRight: 16, opacity: 0.7 }}>
-                    {bestIsEmpty ? (
-                      <span style={{ opacity: 0.35 }}>{"\u2014"}</span>
-                    ) : isStrength ? (
-                      ex.maxWeight
-                    ) : (
-                      <>{bestValue}<span style={{ fontSize: 10, opacity: 0.5, marginLeft: 2 }}>{ex.unitAbbr}</span></>
-                    )}
-                  </td>
-                </tr>
+                <React.Fragment key={ex.id}>
+                  <tr
+                    onClick={expandable ? () => setExpandedId(isExpanded ? null : ex.id) : undefined}
+                    style={{
+                      cursor: expandable ? "pointer" : "default",
+                      background: isExpanded ? `${colors.accent}14` : "transparent",
+                    }}
+                  >
+                    <td style={{ ...cb, paddingLeft: 16, fontWeight: 600, textOverflow: "ellipsis", maxWidth: 0, borderBottom: isExpanded ? "none" : cb.borderBottom }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
+                        {expandable && (
+                          <span style={{ opacity: 0.4, flexShrink: 0, transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-flex" }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                          </span>
+                        )}
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{ex.name}</span>
+                      </span>
+                    </td>
+                    <td style={{ ...cb, textAlign: "center", opacity: 0.7, borderBottom: isExpanded ? "none" : cb.borderBottom }}>
+                      {ex.sessions}
+                    </td>
+                    <td style={{ ...cb, textAlign: "center", opacity: 0.7, borderBottom: isExpanded ? "none" : cb.borderBottom }}>
+                      {metricValue}
+                      {!(isStrength && showVolume) && !commonUnit && ex.unitAbbr !== "reps" && (
+                        <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 2 }}>{ex.unitAbbr}</span>
+                      )}
+                    </td>
+                    <td style={{ ...cb, textAlign: "center", paddingRight: 16, opacity: 0.7, borderBottom: isExpanded ? "none" : cb.borderBottom }}>
+                      {bestIsEmpty ? (
+                        <span style={{ opacity: 0.35 }}>{"\u2014"}</span>
+                      ) : isStrength ? (
+                        ex.maxWeight
+                      ) : (
+                        <>{bestValue}<span style={{ fontSize: 10, opacity: 0.5, marginLeft: 2 }}>{ex.unitAbbr}</span></>
+                      )}
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr style={{ background: `${colors.accent}14` }}>
+                      <td colSpan={4} style={{ padding: "4px 16px 16px", borderBottom: isLastRow ? "none" : `1px solid ${colors.border}22` }}>
+                        {renderExpanded(ex)}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>
@@ -270,7 +356,7 @@ function GroupTable({
   );
 }
 
-export function ExerciseListTable({ exercises, colors, styles }) {
+export function ExerciseListTable({ exercises, colors, styles, isPro, getSeries, weightUnit }) {
   const [sortKey, setSortKey] = useState("sessions");
   const [sortAsc, setSortAsc] = useState(false);
   const [showVolume, setShowVolume] = useState(false);
@@ -331,6 +417,9 @@ export function ExerciseListTable({ exercises, colors, styles }) {
           onToggleVolume={setShowVolume}
           collapsed={collapsedSet.has(g.key)}
           onToggleCollapse={toggleCollapse}
+          isPro={isPro}
+          getSeries={getSeries}
+          weightUnit={weightUnit}
         />
       ))}
     </div>

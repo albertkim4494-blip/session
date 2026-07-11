@@ -82,6 +82,7 @@ import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } 
 import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { isPro as selectIsPro } from "./lib/entitlements";
+import { buildStrengthSeries } from "./lib/progressCharts";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 import { CoachCard } from "./components/CoachCard";
@@ -1172,6 +1173,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       const s = computeExerciseSummary(allIds, summaryRange.start, summaryRange.end, exUnit);
       result.push({
         id: exercise.id,
+        ids: allIds,
         name: exercise.name,
         sessions: s.sessions,
         totalSets: s.totalSets,
@@ -5218,6 +5220,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   exercises={flatExerciseList}
                   colors={colors}
                   styles={styles}
+                  isPro={isPro}
+                  weightUnit={getWeightLabel(state.preferences?.measurementSystem)}
+                  getSeries={(ex) => buildStrengthSeries(state.logsByDate, ex.ids || [ex.id], summaryRange.start, summaryRange.end)}
                 />
               )}
             </div>
