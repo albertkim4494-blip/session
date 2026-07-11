@@ -83,3 +83,48 @@ export function buildStrengthSeries(logsByDate, ids, startKey = null, endKey = n
 
   return out;
 }
+
+/**
+ * Build a per-session reps time series for a bodyweight exercise (pushups,
+ * pullups, etc.), where progress means more reps rather than more load.
+ * Counts every completed set with a finite rep count, regardless of weight.
+ *
+ * @returns {Array<{date:string, maxReps:number, totalReps:number, sets:number}>}
+ *   ascending by date; one entry per day with ≥1 completed rep-based set.
+ */
+export function buildRepsSeries(logsByDate, ids, startKey = null, endKey = null) {
+  if (!logsByDate || !ids) return [];
+  const idList = Array.isArray(ids) ? ids : [ids];
+  if (idList.length === 0) return [];
+
+  const dates = Object.keys(logsByDate).filter((dk) => DATE_KEY_RE.test(dk)).sort();
+  const out = [];
+
+  for (const dk of dates) {
+    if (startKey && dk < startKey) continue;
+    if (endKey && dk > endKey) continue;
+
+    let maxReps = 0;
+    let totalReps = 0;
+    let setCount = 0;
+
+    for (const id of idList) {
+      const exLog = logsByDate[dk]?.[id];
+      if (!exLog || !Array.isArray(exLog.sets)) continue;
+      for (const s of exLog.sets) {
+        if (!isSetCompleted(s)) continue;
+        const reps = toNum(s.reps);
+        if (reps == null) continue;
+        setCount++;
+        totalReps += reps;
+        if (reps > maxReps) maxReps = reps;
+      }
+    }
+
+    if (setCount > 0) {
+      out.push({ date: dk, maxReps, totalReps, sets: setCount });
+    }
+  }
+
+  return out;
+}

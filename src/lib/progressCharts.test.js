@@ -1,6 +1,6 @@
 // Tests for progressCharts.js — plain Node.js test script
 
-const { epley1RM, buildStrengthSeries } = await import("./progressCharts.js");
+const { epley1RM, buildStrengthSeries, buildRepsSeries } = await import("./progressCharts.js");
 
 let passed = 0;
 let failed = 0;
@@ -66,6 +66,31 @@ assert(buildStrengthSeries(null, ["x"]).length === 0, "null logs → []");
 assert(buildStrengthSeries(logs, []).length === 0, "empty ids → []");
 assert(buildStrengthSeries(logs, "bench").length === 3, "accepts single id string");
 assert(buildStrengthSeries({ "not-a-date": { bench: { sets: [done(100, 5)] } } }, ["bench"]).length === 0, "ignores non-date keys");
+
+// --- buildRepsSeries ---
+const bwLogs = {
+  "2026-05-01": { pushup: { sets: [done("BW", 20), done("BW", 18), done("BW", 15)] } },
+  "2026-05-08": { pushup: { sets: [done("BW", 22), done("BW", 20)] } },
+};
+const bw = buildRepsSeries(bwLogs, ["pushup"]);
+assert(bw.length === 2, `reps series has 2 sessions (got ${bw.length})`);
+assert(bw[0].maxReps === 20, `session 1 maxReps = 20 (got ${bw[0].maxReps})`);
+assert(bw[0].totalReps === 53, `session 1 totalReps = 53 (got ${bw[0].totalReps})`);
+assert(bw[0].sets === 3, "session 1 counts 3 sets");
+assert(bw[1].maxReps === 22, "session 2 maxReps = 22");
+
+// counts reps regardless of weight (weighted pullups still have a rep count)
+const mixed = { "2026-05-01": { pullup: { sets: [done(25, 5), done("BW", 10)] } } };
+const mixedReps = buildRepsSeries(mixed, ["pullup"]);
+assert(mixedReps[0].maxReps === 10 && mixedReps[0].totalReps === 15, "reps counted across weighted + BW sets");
+
+// incomplete sets ignored; sets without a rep number ignored
+const bw2 = { "2026-05-01": { pushup: { sets: [notDone("BW", 30), done("BW", "x"), done("BW", 12)] } } };
+const bw2r = buildRepsSeries(bw2, ["pushup"]);
+assert(bw2r.length === 1 && bw2r[0].maxReps === 12 && bw2r[0].sets === 1, "reps: skips incomplete + non-numeric reps");
+
+assert(buildRepsSeries(null, ["x"]).length === 0, "reps: null logs → []");
+assert(buildRepsSeries(bwLogs, []).length === 0, "reps: empty ids → []");
 
 // --- Done ---
 console.log(`${passed} passed, ${failed} failed`);

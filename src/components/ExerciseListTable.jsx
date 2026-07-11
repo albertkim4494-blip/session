@@ -153,26 +153,29 @@ function GroupTable({
         </div>
       );
     }
-    const series = getSeries ? getSeries(ex) : [];
-    if (!series || series.length < 2) {
+    const result = getSeries ? getSeries(ex) : { mode: "weight", data: [] };
+    const { mode, data } = result || {};
+    if (!data || data.length < 2) {
       return (
         <div style={{ fontSize: 12, opacity: 0.55, padding: "10px 4px", lineHeight: 1.5 }}>
-          Log this exercise with weight on at least 2 days to see your weight &amp; estimated-1RM trend.
+          Log this exercise on at least 2 days to see your progress trend.
         </div>
       );
     }
-    return (
-      <LineChart
-        data={series}
-        xKey="date"
-        colors={colors}
-        lines={[
+    const lines = mode === "reps"
+      ? [
+          { key: "maxReps", label: "Max reps", color: colors.accent },
+          { key: "totalReps", label: "Total reps", color: colors.text },
+        ]
+      : [
           { key: "topWeight", label: "Top set", color: colors.accent },
           { key: "e1rm", label: "Est. 1RM", color: colors.text },
-        ]}
-        formatValue={(v) => `${Math.round(v)}${weightUnit || ""}`}
-        formatX={shortDate}
-      />
+        ];
+    const fmt = mode === "reps"
+      ? (v) => String(Math.round(v))
+      : (v) => `${Math.round(v)}${weightUnit || ""}`;
+    return (
+      <LineChart data={data} xKey="date" colors={colors} lines={lines} formatValue={fmt} formatX={shortDate} />
     );
   };
 

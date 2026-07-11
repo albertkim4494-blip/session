@@ -82,7 +82,7 @@ import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } 
 import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { isPro as selectIsPro } from "./lib/entitlements";
-import { buildStrengthSeries } from "./lib/progressCharts";
+import { buildStrengthSeries, buildRepsSeries } from "./lib/progressCharts";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 import { CoachCard } from "./components/CoachCard";
@@ -5240,7 +5240,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   styles={styles}
                   isPro={isPro}
                   weightUnit={getWeightLabel(state.preferences?.measurementSystem)}
-                  getSeries={(ex) => buildStrengthSeries(state.logsByDate, ex.ids || [ex.id], summaryRange.start, summaryRange.end)}
+                  getSeries={(ex) => {
+                    const ids = ex.ids || [ex.id];
+                    // Prefer the weighted chart when there's enough weighted data;
+                    // otherwise fall back to a reps chart for bodyweight movements.
+                    const weight = buildStrengthSeries(state.logsByDate, ids, summaryRange.start, summaryRange.end);
+                    if (weight.length >= 2) return { mode: "weight", data: weight };
+                    const reps = buildRepsSeries(state.logsByDate, ids, summaryRange.start, summaryRange.end);
+                    if (reps.length >= 2) return { mode: "reps", data: reps };
+                    // Not enough for a trend — return whichever has any points so the
+                    // empty-state copy can still be shown.
+                    if (weight.length) return { mode: "weight", data: weight };
+                    return { mode: "reps", data: reps };
+                  }}
                 />
               )}
             </div>
