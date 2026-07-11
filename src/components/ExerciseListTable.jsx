@@ -10,6 +10,16 @@ function shortDate(dk) {
   return `${Number(parts[1])}/${Number(parts[2])}`;
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// "2026-01-15" → "Jan 15, 2026" for the scrub tooltip.
+function longDate(dk) {
+  if (typeof dk !== "string") return "";
+  const parts = dk.split("-");
+  if (parts.length !== 3) return dk;
+  const m = MONTHS[Number(parts[1]) - 1] || parts[1];
+  return `${m} ${Number(parts[2])}, ${parts[0]}`;
+}
+
 const SESSIONS_WIDTH = 44;
 const RIGHT_TOTAL_WIDTH = 140; // total px for columns right of Sessions — split evenly
 
@@ -175,7 +185,7 @@ function GroupTable({
       ? (v) => String(Math.round(v))
       : (v) => `${Math.round(v)}${weightUnit || ""}`;
     return (
-      <LineChart data={data} xKey="date" colors={colors} lines={lines} formatValue={fmt} formatX={shortDate} />
+      <LineChart data={data} xKey="date" colors={colors} lines={lines} formatValue={fmt} formatX={shortDate} formatXLong={longDate} />
     );
   };
 
