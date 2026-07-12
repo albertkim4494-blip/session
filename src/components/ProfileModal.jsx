@@ -3,6 +3,7 @@ import { Modal } from "./Modal";
 import { useSwipe } from "../hooks/useSwipe";
 import { isValidBirthdateString, computeAge } from "../lib/validation";
 import { validateDisplayName } from "../lib/userIdentity";
+import { toLbs } from "../lib/units";
 import { getColors, getStyles } from "../styles/theme";
 import { ProfileTab } from "./profile/ProfileTab";
 import { SettingsTab } from "./profile/SettingsTab";
@@ -119,7 +120,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, profileStale
       display_name: displayName.trim() || null,
       birthdate: modalState.birthdate || null,
       gender: modalState.gender || null,
-      weight_lbs: weightLbs ? wNum : null,
+      weight_lbs: weightLbs ? toLbs(wNum, isMetric ? "metric" : "imperial") : null,
       height_inches: heightInches ? (isMetric ? Math.round(hNum / 2.54) : hNum) : null,
       goal: modalState.goal?.trim() || null,
       sports: modalState.sports?.trim() || null,

@@ -215,8 +215,11 @@ export function computePRs(logsByDate, ids, excludeKey = null) {
   const res = { topWeight: null, e1rm: null, maxReps: null };
   if (!logsByDate || idList.length === 0) return res;
 
-  for (const dk of Object.keys(logsByDate)) {
-    if (!DATE_KEY_RE.test(dk)) continue;
+  // Sort chronologically — object key order is insertion order, not date order
+  // (editing an old day inserts its key late), and we want the EARLIEST date a
+  // record was reached (strict-greater comparison keeps the first occurrence).
+  const dates = Object.keys(logsByDate).filter((dk) => DATE_KEY_RE.test(dk)).sort();
+  for (const dk of dates) {
     if (excludeKey && dk === excludeKey) continue;
     for (const id of idList) {
       const exLog = logsByDate[dk]?.[id];

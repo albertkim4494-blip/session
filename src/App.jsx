@@ -84,6 +84,7 @@ import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekSt
 import { isPro as selectIsPro } from "./lib/entitlements";
 import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, computePRs } from "./lib/progressCharts";
 import { buildMuscleBalance } from "./lib/muscleBalance";
+import { fromLbs } from "./lib/units";
 import { buildDayActivity, buildCalendarWeeks } from "./lib/activityCalendar";
 import { LineChart } from "./components/charts/LineChart";
 import { BarChart } from "./components/charts/BarChart";
@@ -4340,7 +4341,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       displayName: profile?.display_name || "",
                       birthdate: profile?.birthdate || "",
                       gender: profile?.gender || "",
-                      weightLbs: profile?.weight_lbs || "",
+                      weightLbs: profile?.weight_lbs != null && profile?.weight_lbs !== ""
+                        ? (fromLbs(profile.weight_lbs, state.preferences?.measurementSystem) ?? "")
+                        : "",
                       goal: profile?.goal || "",
                       sports: profile?.sports || "",
                       about: profile?.about || "",
@@ -5271,8 +5274,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
               {summaryStats.logged > 0 && (
                 <div style={{ ...styles.card, padding: 16 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.4, display: "block", marginBottom: 10 }}>
-                    Volume trend ({getWeightLabel(state.preferences?.measurementSystem)}/week)
+                    Weekly volume · {getWeightLabel(state.preferences?.measurementSystem)}
                   </span>
+                  {isPro && weeklyVolume.length >= 2 && (
+                    <div style={{ fontSize: 11, opacity: 0.45, marginTop: -4, marginBottom: 8, lineHeight: 1.4 }}>
+                      Weight × reps from completed weighted sets. Bodyweight sets aren&apos;t included. Volume reflects exercise choice and frequency — up isn&apos;t always better.
+                    </div>
+                  )}
                   {!isPro ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: colors.subtleBg, border: `1px solid ${colors.border}` }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6, flexShrink: 0 }}>
@@ -5316,7 +5324,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       </svg>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 700 }}>Muscle balance is a Pro feature</div>
-                        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>Spot under- and over-trained muscle groups at a glance.</div>
+                        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>See how your logged strength sets distribute across muscle groups.</div>
                       </div>
                     </div>
                   ) : (

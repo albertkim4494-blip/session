@@ -80,7 +80,7 @@ export function ActivityHeatmap({ weeks, colors }) {
       {/* caption: selected day, else summary + legend */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 8, minHeight: 16 }}>
         <span style={{ fontSize: 11.5, opacity: 0.7, fontWeight: sel ? 700 : 400 }}>
-          {sel ? `${longDate(sel.date)} · ${sel.sets} set${sel.sets === 1 ? "" : "s"}` : `${activeDays} active day${activeDays === 1 ? "" : "s"} in range`}
+          {sel ? `${longDate(sel.date)} · ${sel.sets} set${sel.sets === 1 ? "" : "s"}` : `${activeDays} active day${activeDays === 1 ? "" : "s"} · shade by completed sets`}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
           <span style={{ fontSize: 9, opacity: 0.45 }}>Less</span>

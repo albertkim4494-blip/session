@@ -141,6 +141,14 @@ assert(tiePR.topWeight.date === "2026-06-01", "PR keeps earliest date on tie");
 
 assert(computePRs(null, ["x"]).topWeight === null, "computePRs: null → nulls");
 
+// keys inserted OUT of chronological order — PR date must still be the earliest
+// occurrence, not whichever key was inserted first.
+const outOfOrder = {};
+outOfOrder["2026-07-10"] = { x: { sets: [done(100, 5)] } }; // later date inserted first
+outOfOrder["2026-07-01"] = { x: { sets: [done(100, 5)] } }; // earlier date inserted second
+const oo = computePRs(outOfOrder, ["x"]);
+assert(oo.topWeight.date === "2026-07-01", `PR date is earliest despite insertion order (got ${oo.topWeight.date})`);
+
 // --- Done ---
 console.log(`${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -40,7 +40,7 @@ export function MuscleBalance({ data, colors }) {
           </div>
         );
       })}
-      <div style={{ fontSize: 10.5, opacity: 0.4, marginTop: 2 }}>Sets per muscle group · secondary muscles count as ½</div>
+      <div style={{ fontSize: 10.5, opacity: 0.4, marginTop: 2 }}>Estimated effective sets · secondary muscles count as ½</div>
     </div>
   );
 }

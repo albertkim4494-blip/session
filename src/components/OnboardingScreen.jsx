@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { validateUsernameStrict, sanitizeUsername, validateDisplayName } from "../lib/userIdentity";
 import { isValidBirthdateString, computeAge } from "../lib/validation";
+import { toLbs } from "../lib/units";
 
 const EQUIPMENT_OPTIONS = [
   { key: "no_equipment", label: "No Equipment", desc: "Bodyweight only" },
@@ -89,7 +90,7 @@ export default function OnboardingScreen({ session, onComplete, onUpdatePreferen
           display_name: displayName.trim() || null,
           birthdate,
           age: ageNum,
-          weight_lbs: weightNum,
+          weight_lbs: toLbs(weightNum, measurementSystem),
           height_inches: measurementSystem === "metric"
             ? (heightCm ? Math.round(Number(heightCm) / 2.54) : null)
             : (heightFt || heightIn ? (Number(heightFt) || 0) * 12 + (Number(heightIn) || 0) : null),
