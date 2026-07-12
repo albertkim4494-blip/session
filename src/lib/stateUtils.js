@@ -158,6 +158,7 @@ export function makeDefaultState() {
       weekStartsOn: 0,
       exerciseRestTimes: {},
       isPro: false,
+      aiEnabled: true,
     },
     meta: {
       createdAt: Date.now(),
@@ -229,6 +230,10 @@ export function normalizeState(st) {
   // Pro entitlement flag — coerce to a strict boolean. Source of truth is a
   // DEV-only toggle today; RevenueCat drives it in Phase 3 (see entitlements.js).
   next.preferences.isPro = next.preferences.isPro === true;
+
+  // AI features on/off — controls whether training data is sent to the AI
+  // provider (including the automatic coach fetch). Default on; coerce boolean.
+  next.preferences.aiEnabled = next.preferences.aiEnabled !== false;
 
   // Clean up legacy standalone localStorage keys (migration complete)
   try {

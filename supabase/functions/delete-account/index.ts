@@ -46,13 +46,16 @@ Deno.serve(async (req) => {
   // 2. Service-role client bypasses RLS for the actual teardown.
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
-  const warnings: string[] = [];
+  // All-or-nothing: collect failures and only delete the auth user if every
+  // data + storage deletion succeeded. Each step is idempotent (delete-by-id /
+  // remove-missing are no-ops), so a failed call can be safely retried.
+  const failures: string[] = [];
   const del = async (label: string, run: () => Promise<{ error: unknown }>) => {
     try {
       const { error } = await run();
-      if (error) warnings.push(`${label}: ${(error as { message?: string }).message ?? error}`);
+      if (error) failures.push(`${label}: ${(error as { message?: string }).message ?? error}`);
     } catch (e) {
-      warnings.push(`${label}: ${(e as Error).message ?? e}`);
+      failures.push(`${label}: ${(e as Error).message ?? e}`);
     }
   };
 
@@ -66,25 +69,42 @@ Deno.serve(async (req) => {
   await del("user_state", () => admin.from("user_state").delete().eq("user_id", uid));
   await del("profiles", () => admin.from("profiles").delete().eq("id", uid));
 
-  // 4. Delete the user's storage objects (paths are prefixed with the user id).
+  // 4. Delete the user's storage objects (paths prefixed with the user id),
+  //    paginating in case there are many.
   for (const bucket of ["avatars", "exercise-images"]) {
     try {
-      const { data: files } = await admin.storage.from(bucket).list(uid, { limit: 1000 });
-      if (files && files.length) {
+      const pageSize = 100;
+      let offset = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data: files, error: listErr } = await admin.storage
+          .from(bucket)
+          .list(uid, { limit: pageSize, offset });
+        if (listErr) { failures.push(`storage ${bucket} list: ${listErr.message}`); break; }
+        if (!files || files.length === 0) break;
         const paths = files.map((f) => `${uid}/${f.name}`);
-        const { error } = await admin.storage.from(bucket).remove(paths);
-        if (error) warnings.push(`storage ${bucket}: ${error.message}`);
+        const { error: rmErr } = await admin.storage.from(bucket).remove(paths);
+        if (rmErr) { failures.push(`storage ${bucket} remove: ${rmErr.message}`); break; }
+        if (files.length < pageSize) break;
+        offset += pageSize;
       }
     } catch (e) {
-      warnings.push(`storage ${bucket}: ${(e as Error).message ?? e}`);
+      failures.push(`storage ${bucket}: ${(e as Error).message ?? e}`);
     }
   }
 
-  // 5. Delete the auth user last (cascades anything still FK'd to auth.users).
-  const { error: delErr } = await admin.auth.admin.deleteUser(uid);
-  if (delErr) {
-    return json({ error: `Failed to delete account: ${delErr.message}`, warnings }, 500);
+  // 5. If any data/storage deletion failed, do NOT delete the auth user — the
+  //    account stays usable and the client can retry. Returning success here
+  //    would strand orphaned personal data behind a deleted login.
+  if (failures.length > 0) {
+    return json({ success: false, error: "Some data could not be deleted. Please try again.", failures }, 500);
   }
 
-  return json({ success: true, warnings });
+  // 6. Everything cleared — delete the auth user last.
+  const { error: delErr } = await admin.auth.admin.deleteUser(uid);
+  if (delErr) {
+    return json({ success: false, error: `Failed to delete account: ${delErr.message}` }, 500);
+  }
+
+  return json({ success: true });
 });

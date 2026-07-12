@@ -249,9 +249,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const theme = state.preferences?.theme || "dark";
   const equipment = state.preferences?.equipment || ["full_gym"];
   const weekStartsOn = Number.isInteger(state.preferences?.weekStartsOn) ? state.preferences.weekStartsOn : 0;
-  // Pro entitlement. Manual DEV toggle today; RevenueCat in Phase 3. Gate Pro
-  // features on this (never read preferences.isPro directly). See entitlements.js.
-  const isPro = selectIsPro(state);
+  // Pro entitlement. Manual DEV toggle today; RevenueCat in Phase 3. In a release
+  // build (no dev tools) there is no way to pay yet, so ignore any legacy
+  // cloud-synced isPro flag — RevenueCat becomes the authority in Phase 3.
+  const isPro = DEV_TOOLS_ENABLED ? selectIsPro(state) : false;
+  // AI features (incl. the automatic coach fetch that sends data to OpenAI).
+  // Users can turn this off in Settings; default on.
+  const aiEnabled = state.preferences?.aiEnabled !== false;
   const [reorderWorkouts, setReorderWorkouts] = useState(false);
   const [reorderSplits, setReorderSplits] = useState(false);
   const [reorderExercises, setReorderExercises] = useState(false);
@@ -1294,6 +1298,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   useEffect(() => {
     if (!dataReady || !profile || !session?.user?.id) return;
     if (coachFetchingRef.current) return;
+    // Respect the AI setting — no automatic transmission to the AI provider
+    // unless AI features are enabled (see Privacy Policy / Settings → AI).
+    if (!aiEnabled) return;
 
     const userId = session.user.id;
     const cacheKey = getCoachCacheKey(userId, coachTodayKey);
@@ -1396,6 +1403,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     session?.user?.id,
     state,
     todayCheckin,
+    aiEnabled,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -3541,6 +3549,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   // Shared coach fetch logic used by both refresh and check-in submit
   const doCoachFetch = useCallback(({ checkinData, checkinOverride, showLimitToast, forceNoCheckin = false, bypassLimit = false } = {}) => {
     if (coachFetchingRef.current) return;
+    if (!aiEnabled) {
+      if (showLimitToast) showToast("AI features are turned off — enable them in Settings");
+      return;
+    }
     if (!bypassLimit && getDailyRefreshCount() >= MAX_DAILY_REFRESHES) {
       if (showLimitToast) showToast("Daily refresh limit reached \u2014 insights update automatically each day");
       return;
@@ -3610,7 +3622,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           setCoachStreaming(false);
         }
       });
-  }, [coachDateRange, coachSignature, coachTodayKey, fullCatalog, equipment, profile, showToast, state, session?.user?.id, catalogMap]);
+  }, [coachDateRange, coachSignature, coachTodayKey, fullCatalog, equipment, profile, showToast, state, session?.user?.id, catalogMap, aiEnabled]);
 
   const handleCoachRefresh = useCallback((checkinOverride) => {
     doCoachFetch({ checkinOverride, showLimitToast: true });

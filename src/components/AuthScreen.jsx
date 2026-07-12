@@ -52,10 +52,17 @@ export default function AuthScreen() {
     if (mode === "reset") {
       setLoading(true);
       try {
-        await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
-        setNotice("If an account exists for that email, a password reset link is on its way. Check your inbox.");
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+        // Don't reveal whether the email exists. Only surface operational
+        // failures (network / config / rate limit) as a generic error.
+        if (resetError) {
+          console.error("Password reset error:", resetError.message);
+          setError("We couldn't send the email right now. Please try again in a moment.");
+        } else {
+          setNotice("If an account exists for that email, a password reset link is on its way. Check your inbox.");
+        }
       } catch {
-        setError("Something went wrong. Please try again.");
+        setError("We couldn't send the email right now. Please try again in a moment.");
       } finally {
         setLoading(false);
       }

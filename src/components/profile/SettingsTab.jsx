@@ -452,6 +452,44 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
         </div>
       </div>
 
+      {/* AI */}
+      <div style={{ borderTop: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`, paddingTop: 14 }}>
+        <div style={{ ...sectionHeaderStyle, marginBottom: 10 }}>
+          AI Features
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" /></svg>
+        </div>
+        <div>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>AI Coach &amp; workout generation</span>
+          <span style={{ fontSize: 11, opacity: 0.5, display: "block", marginTop: 2, lineHeight: 1.45 }}>
+            When on, your training data and check-ins are sent to our AI provider (OpenAI) to generate coaching insights and workouts — including automatically each day. Turn off to stop all AI data sharing.
+          </span>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {[
+              { key: true, label: "On" },
+              { key: false, label: "Off" },
+            ].map((opt) => {
+              const isActive = (preferences?.aiEnabled !== false) === opt.key;
+              return (
+                <button
+                  key={String(opt.key)}
+                  type="button"
+                  onClick={() => onUpdatePreference?.("aiEnabled", opt.key)}
+                  style={{
+                    padding: "5px 12px", fontSize: 12, fontWeight: isActive ? 700 : 500, borderRadius: 999,
+                    border: `1.5px solid ${isActive ? (colors?.accent || "#7dd3fc") : (colors?.border || "rgba(255,255,255,0.10)")}`,
+                    background: isActive ? (colors?.accent || "#7dd3fc") + "22" : "transparent",
+                    color: isActive ? (colors?.accent || "#7dd3fc") : (colors?.text || "#e8eef7"),
+                    cursor: "pointer", WebkitTapHighlightColor: "transparent", fontFamily: "inherit",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Privacy */}
       <div style={{ borderTop: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`, paddingTop: 14 }}>
         <div style={{ ...sectionHeaderStyle, marginBottom: 10 }}>
