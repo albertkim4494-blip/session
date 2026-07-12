@@ -37,6 +37,20 @@ Details for the Android items live in `ANDROID_SETUP_GUIDE.md`.
   env vars, then visit with `?dev=1`. **Never** set that env var for the Play Store
   release build.
 
+## 📄 Legal pages — fill in before store submission
+
+Draft pages live at `public/privacy.html`, `public/terms.html`,
+`public/delete-account.html` (served at `/privacy.html` etc. once deployed).
+They are drafts — **have them reviewed** and replace every `[BRACKET]` placeholder:
+
+- [ ] Set a **support email** (`[SUPPORT_EMAIL]`) — ideally a dedicated address,
+      not your personal Gmail. Appears in all three pages.
+- [ ] Fill **legal entity / name, city/country, hosting provider, governing law**
+      placeholders in privacy.html + terms.html.
+- [ ] Have a professional review both documents (this is not legal advice).
+- [ ] Add the hosted **Privacy Policy URL** to Google Play Console + App Store
+      Connect, and the **account-deletion URL** to Play Console's Data Safety form.
+
 ## 🟡 Testing & data — quick, do soon
 
 - [ ] **Test account deletion** with a THROWAWAY account (⚠️ not your real one):

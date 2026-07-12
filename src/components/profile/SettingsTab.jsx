@@ -500,6 +500,25 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             <span style={{ fontSize: 14, fontWeight: 700 }}>Notifications</span>
             <span style={{ fontSize: 12, fontWeight: 600 }}>Coming soon</span>
           </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 2 }}>
+            {[
+              { label: "Privacy Policy", href: "/privacy.html" },
+              { label: "Terms of Service", href: "/terms.html" },
+              { label: "Delete Account & Data", href: "/delete-account.html" },
+            ].map((l) => (
+              <a
+                key={l.href}
+                href={l.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", fontSize: 14, fontWeight: 600, color: colors?.text || "#e8eef7", textDecoration: "none" }}
+              >
+                <span>{l.label}</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+              </a>
+            ))}
+          </div>
         </div>
       </div>
 
