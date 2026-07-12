@@ -164,11 +164,32 @@ function GroupTable({
       );
     }
     const result = getSeries ? getSeries(ex) : { mode: "weight", data: [] };
-    const { mode, data } = result || {};
+    const { mode, data, prs } = result || {};
+
+    // All-time PR badge (shown whenever we have a record, even with <2 chart points).
+    const prBadge = (() => {
+      if (!prs) return null;
+      const pr = mode === "reps" ? prs.maxReps : (prs.topWeight || prs.maxReps);
+      if (!pr) return null;
+      const label = mode === "reps" || !prs.topWeight
+        ? `${pr.value} reps`
+        : `${pr.value}${weightUnit || ""}${prs.e1rm ? ` · est. 1RM ${prs.e1rm.value}${weightUnit || ""}` : ""}`;
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, fontSize: 12 }}>
+          <span style={{ flexShrink: 0 }} aria-hidden>🏆</span>
+          <span style={{ fontWeight: 700 }}>PR {label}</span>
+          <span style={{ opacity: 0.5 }}>· {longDate(pr.date)}</span>
+        </div>
+      );
+    })();
+
     if (!data || data.length < 2) {
       return (
-        <div style={{ fontSize: 12, opacity: 0.55, padding: "10px 4px", lineHeight: 1.5 }}>
-          Log this exercise on at least 2 days to see your progress trend.
+        <div>
+          {prBadge}
+          <div style={{ fontSize: 12, opacity: 0.55, padding: "2px", lineHeight: 1.5 }}>
+            Log this exercise on at least 2 days to see your progress trend.
+          </div>
         </div>
       );
     }
@@ -185,7 +206,10 @@ function GroupTable({
       ? (v) => String(Math.round(v))
       : (v) => `${Math.round(v)}${weightUnit || ""}`;
     return (
-      <LineChart data={data} xKey="date" colors={colors} lines={lines} formatValue={fmt} formatX={shortDate} formatXLong={longDate} />
+      <div>
+        {prBadge}
+        <LineChart data={data} xKey="date" colors={colors} lines={lines} formatValue={fmt} formatX={shortDate} formatXLong={longDate} />
+      </div>
     );
   };
 

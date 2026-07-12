@@ -201,3 +201,40 @@ export function buildWeeklyVolumeSeries(logsByDate, startKey = null, endKey = nu
   }
   return out;
 }
+
+/**
+ * All-time personal records for an exercise (across the given ids). Each record
+ * is the earliest date the best value was reached, or null if never.
+ *
+ * @param {string} [excludeKey] - a date key to skip (used to compute the prior
+ *   best when detecting whether *today's* log is a new PR).
+ * @returns {{topWeight:{value,date}|null, e1rm:{value,date}|null, maxReps:{value,date}|null}}
+ */
+export function computePRs(logsByDate, ids, excludeKey = null) {
+  const idList = Array.isArray(ids) ? ids : [ids];
+  const res = { topWeight: null, e1rm: null, maxReps: null };
+  if (!logsByDate || idList.length === 0) return res;
+
+  for (const dk of Object.keys(logsByDate)) {
+    if (!DATE_KEY_RE.test(dk)) continue;
+    if (excludeKey && dk === excludeKey) continue;
+    for (const id of idList) {
+      const exLog = logsByDate[dk]?.[id];
+      if (!exLog || !Array.isArray(exLog.sets)) continue;
+      for (const s of exLog.sets) {
+        if (!isSetCompleted(s)) continue;
+        const reps = toNum(s.reps);
+        if (reps != null && reps > 0 && (!res.maxReps || reps > res.maxReps.value)) {
+          res.maxReps = { value: reps, date: dk };
+        }
+        const w = toNum(s.weight);
+        if (w != null) {
+          if (!res.topWeight || w > res.topWeight.value) res.topWeight = { value: w, date: dk };
+          const e = Math.round(epley1RM(w, reps ?? 0));
+          if (e > 0 && (!res.e1rm || e > res.e1rm.value)) res.e1rm = { value: e, date: dk };
+        }
+      }
+    }
+  }
+  return res;
+}

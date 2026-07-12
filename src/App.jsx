@@ -82,7 +82,7 @@ import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } 
 import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { isPro as selectIsPro } from "./lib/entitlements";
-import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries } from "./lib/progressCharts";
+import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, computePRs } from "./lib/progressCharts";
 import { LineChart } from "./components/charts/LineChart";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
@@ -2060,14 +2060,42 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const saveLog = useCallback(() => {
     if (!modals.log.context) return;
 
-    const existing = state.logsByDate[dateKey]?.[modals.log.context.exerciseId];
+    const exId = modals.log.context.exerciseId;
+    const existing = state.logsByDate[dateKey]?.[exId];
     saveLogData();
+
+    // New-PR detection: compare today's best completed sets against the all-time
+    // best from every OTHER day (pre-save state). Only celebrate when a prior
+    // record existed, so the very first log of an exercise isn't a "PR".
+    let prMsg = null;
+    {
+      const prior = computePRs(state.logsByDate, [exId], dateKey);
+      let tW = 0;
+      let tReps = 0;
+      for (const s of modals.log.sets || []) {
+        if (!s.completed) continue;
+        const r = Number(s.reps) || 0;
+        if (r > tReps) tReps = r;
+        const wRaw = String(s.weight ?? "").trim();
+        if (wRaw.toUpperCase() !== "BW") {
+          const w = parseFloat(wRaw.replace(/[^\d.]/g, ""));
+          if (Number.isFinite(w)) tW = Math.max(tW, w);
+        }
+      }
+      const unit = getWeightLabel(state.preferences?.measurementSystem);
+      if (tW > 0 && prior.topWeight && tW > prior.topWeight.value) prMsg = `🏆 New PR! ${tW}${unit}`;
+      else if (tW === 0 && tReps > 0 && prior.maxReps && tReps > prior.maxReps.value) prMsg = `🏆 New PR! ${tReps} reps`;
+    }
 
     // Toast only for meaningful changes (not template-only saves)
     const notesChanged = (modals.log.notes ?? "") !== (existing?.notes ?? "");
     const moodChanged = modals.log.mood !== (existing?.mood ?? null);
 
-    if (notesChanged || moodChanged) {
+    if (prMsg) {
+      setToast(prMsg);
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+    } else if (notesChanged || moodChanged) {
       const ack = selectAcknowledgment(modals.log.mood, dateKey, state.logsByDate);
       setToast(ack);
       clearTimeout(toastTimerRef.current);
@@ -5283,16 +5311,18 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                   weightUnit={getWeightLabel(state.preferences?.measurementSystem)}
                   getSeries={(ex) => {
                     const ids = ex.ids || [ex.id];
+                    // All-time PRs (not range-limited) shown above the chart.
+                    const prs = computePRs(state.logsByDate, ids);
                     // Prefer the weighted chart when there's enough weighted data;
                     // otherwise fall back to a reps chart for bodyweight movements.
                     const weight = buildStrengthSeries(state.logsByDate, ids, summaryRange.start, summaryRange.end);
-                    if (weight.length >= 2) return { mode: "weight", data: weight };
+                    if (weight.length >= 2) return { mode: "weight", data: weight, prs };
                     const reps = buildRepsSeries(state.logsByDate, ids, summaryRange.start, summaryRange.end);
-                    if (reps.length >= 2) return { mode: "reps", data: reps };
+                    if (reps.length >= 2) return { mode: "reps", data: reps, prs };
                     // Not enough for a trend — return whichever has any points so the
                     // empty-state copy can still be shown.
-                    if (weight.length) return { mode: "weight", data: weight };
-                    return { mode: "reps", data: reps };
+                    if (weight.length) return { mode: "weight", data: weight, prs };
+                    return { mode: "reps", data: reps, prs };
                   }}
                 />
               )}

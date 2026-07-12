@@ -1,6 +1,6 @@
 // Tests for progressCharts.js — plain Node.js test script
 
-const { epley1RM, buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, weekStartOf } = await import("./progressCharts.js");
+const { epley1RM, buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, weekStartOf, computePRs } = await import("./progressCharts.js");
 
 let passed = 0;
 let failed = 0;
@@ -114,6 +114,32 @@ assert(vol[2].volume === 900 && vol[2].weekStart === "2026-01-25", `week 3 volum
 // BW-only sets contribute no volume
 assert(buildWeeklyVolumeSeries({ "2026-02-01": { pushup: { sets: [done("BW", 20)] } } }).length === 0, "BW-only → no volume weeks");
 assert(buildWeeklyVolumeSeries(null).length === 0, "weekly volume: null → []");
+
+// --- computePRs ---
+const prLogs = {
+  "2026-01-01": { bench: { sets: [done(100, 5)] } },
+  "2026-01-08": { bench: { sets: [done(120, 3), done(110, 8)] } }, // heaviest 120; best e1rm from 110x8
+  "2026-01-15": { bench: { sets: [done(115, 5)] } },
+};
+const prs = computePRs(prLogs, ["bench"]);
+assert(prs.topWeight.value === 120 && prs.topWeight.date === "2026-01-08", `PR topWeight 120 on 01-08 (got ${prs.topWeight.value}/${prs.topWeight.date})`);
+// e1rm: 120x3=132, 110x8=139.3→139, 115x5=134.2→134 ⇒ best 139 on 01-08
+assert(prs.e1rm.value === 139 && prs.e1rm.date === "2026-01-08", `PR e1rm 139 on 01-08 (got ${prs.e1rm.value}/${prs.e1rm.date})`);
+assert(prs.maxReps.value === 8 && prs.maxReps.date === "2026-01-08", `PR maxReps 8 (got ${prs.maxReps.value})`);
+
+// excludeKey → prior best ignores that day (used for new-PR detection)
+const priorPR = computePRs(prLogs, ["bench"], "2026-01-08");
+assert(priorPR.topWeight.value === 115, `prior topWeight excl 01-08 = 115 (got ${priorPR.topWeight.value})`);
+
+// bodyweight: only reps PR, no weight PR
+const bwPR = computePRs({ "2026-05-01": { pushup: { sets: [done("BW", 25)] } } }, ["pushup"]);
+assert(bwPR.maxReps.value === 25 && bwPR.topWeight === null, "BW: reps PR only, no weight PR");
+
+// earliest date kept on ties
+const tiePR = computePRs({ "2026-06-01": { x: { sets: [done(100, 5)] } }, "2026-06-08": { x: { sets: [done(100, 5)] } } }, ["x"]);
+assert(tiePR.topWeight.date === "2026-06-01", "PR keeps earliest date on tie");
+
+assert(computePRs(null, ["x"]).topWeight === null, "computePRs: null → nulls");
 
 // --- Done ---
 console.log(`${passed} passed, ${failed} failed`);
