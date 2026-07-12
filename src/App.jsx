@@ -86,6 +86,7 @@ import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, computeP
 import { buildMuscleBalance } from "./lib/muscleBalance";
 import { buildDayActivity, buildCalendarWeeks } from "./lib/activityCalendar";
 import { LineChart } from "./components/charts/LineChart";
+import { BarChart } from "./components/charts/BarChart";
 import { MuscleBalance } from "./components/charts/MuscleBalance";
 import { ActivityHeatmap } from "./components/charts/ActivityHeatmap";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
@@ -5287,11 +5288,13 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       Log weighted sets across at least 2 weeks to see your volume trend.
                     </div>
                   ) : (
-                    <LineChart
+                    <BarChart
                       data={weeklyVolume}
                       xKey="weekStart"
+                      valueKey="volume"
+                      label="Volume"
+                      color={colors.accent}
                       colors={colors}
-                      lines={[{ key: "volume", label: "Volume", color: colors.accent }]}
                       formatValue={(v) => (v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1).replace(/\.0$/, "") + "k" : String(Math.round(v)))}
                       formatX={(dk) => { const p = String(dk).split("-"); return `${Number(p[1])}/${Number(p[2])}`; }}
                       formatXLong={(dk) => { const M = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; const p = String(dk).split("-"); return `Week of ${M[Number(p[1]) - 1]} ${Number(p[2])}`; }}
