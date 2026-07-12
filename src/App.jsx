@@ -75,7 +75,7 @@ import {
 
 // Exercise catalog
 import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
-import { buildCatalogMap, isBodyweightOnly } from "./lib/exerciseCatalogUtils";
+import { buildCatalogMap, isBodyweightOnly, classifyLoadType } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } from "./lib/greetings";
@@ -1199,6 +1199,8 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       result.push({
         id: exercise.id,
         ids: allIds,
+        catalogId: exercise.catalogId,
+        equipment: exercise.equipment,
         name: exercise.name,
         sessions: s.sessions,
         totalSets: s.totalSets,
@@ -2084,9 +2086,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     // New-PR detection: compare today's best completed sets against the all-time
     // best from every OTHER day (pre-save state). Only celebrate when a prior
-    // record existed, so the very first log of an exercise isn't a "PR".
+    // record existed (so a first-ever log isn't a "PR") and only when logging for
+    // TODAY — editing/backfilling a past date shouldn't trigger a live PR toast.
     let prMsg = null;
-    {
+    if (dateKey === todayKey) {
       const prior = computePRs(state.logsByDate, [exId], dateKey);
       let tW = 0;
       let tReps = 0;
@@ -5384,16 +5387,19 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     const ids = ex.ids || [ex.id];
                     // All-time PRs (not range-limited) shown above the chart.
                     const prs = computePRs(state.logsByDate, ids);
-                    // Prefer the weighted chart when there's enough weighted data;
-                    // otherwise fall back to a reps chart for bodyweight movements.
                     const weight = buildStrengthSeries(state.logsByDate, ids, summaryRange.start, summaryRange.end);
-                    if (weight.length >= 2) return { mode: "weight", data: weight, prs };
                     const reps = buildRepsSeries(state.logsByDate, ids, summaryRange.start, summaryRange.end);
-                    if (reps.length >= 2) return { mode: "reps", data: reps, prs };
-                    // Not enough for a trend — return whichever has any points so the
-                    // empty-state copy can still be shown.
-                    if (weight.length) return { mode: "weight", data: weight, prs };
-                    return { mode: "reps", data: reps, prs };
+                    // Pick the chart by exercise metadata first (equipment), so a
+                    // weighted lift logged only a couple times isn't misread as
+                    // bodyweight. Bodyweight-only → reps. Otherwise show weight when
+                    // any weighted data exists, else fall back to reps.
+                    const loadType = classifyLoadType(ex, catalogMap);
+                    const mode = loadType === "bodyweight"
+                      ? "reps"
+                      : weight.length > 0
+                        ? "weight"
+                        : "reps";
+                    return { mode, data: mode === "weight" ? weight : reps, prs };
                   }}
                 />
               )}

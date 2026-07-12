@@ -13,6 +13,7 @@ import {
   getFrequentExercises,
   resolveExerciseDisplay,
   getMuscleGroups,
+  classifyLoadType,
 } from "./exerciseCatalogUtils.js";
 
 let passed = 0;
@@ -203,6 +204,15 @@ assert(musclesFromFallback.includes("QUADS"), "fallback identifies QUADS for squ
 // Without catalogId and no fallback
 const musclesNoFallback = getMuscleGroups(squatEx, catalogMap, null);
 assert(musclesNoFallback.includes("UNCLASSIFIED"), "no fallback returns UNCLASSIFIED");
+
+// --- classifyLoadType ---
+console.log("\nclassifyLoadType:");
+assertEqual(classifyLoadType({ catalogId: "edb-EIeI8Vf" }, catalogMap), "weighted", "barbell bench → weighted (from catalog)");
+assertEqual(classifyLoadType({ equipment: ["bodyweight"] }, null), "bodyweight", "bodyweight-only equipment → bodyweight");
+assertEqual(classifyLoadType({ equipment: ["bodyweight", "dumbbell"] }, null), "weighted", "bodyweight + dumbbell → weighted");
+assertEqual(classifyLoadType({ equipment: ["dumbbell"] }, null), "weighted", "dumbbell → weighted");
+assertEqual(classifyLoadType({ name: "Mystery" }, catalogMap), null, "no equipment info → null (unknown)");
+assertEqual(classifyLoadType({ equipment: [] }, null), null, "empty equipment → null");
 
 // --- filterCatalog ---
 console.log("\nfilterCatalog:");

@@ -371,6 +371,24 @@ export function filterCatalog(catalog, { uiMuscleGroup, uiMuscleGroups, muscles,
  * Get muscle groups for an exercise using catalog data first, falling back
  * to the keyword-based classifyExerciseMuscles from coachNormalize.
  */
+/**
+ * Classify an exercise's load type from equipment metadata, so Progress charts
+ * can pick weight- vs rep-progression regardless of how sparsely it's logged.
+ * Resolves equipment from the catalog (by catalogId) then the exercise itself.
+ * @returns {"bodyweight"|"weighted"|null} null when equipment is unknown.
+ */
+export function classifyLoadType(exercise, catalogMap) {
+  let equip = null;
+  if (exercise?.catalogId && catalogMap) {
+    const entry = catalogMap.get(exercise.catalogId);
+    if (entry?.equipment) equip = entry.equipment;
+  }
+  if (!equip && Array.isArray(exercise?.equipment)) equip = exercise.equipment;
+  if (!Array.isArray(equip) || equip.length === 0) return null;
+  const hasExternalLoad = equip.some((e) => e !== "bodyweight");
+  return hasExternalLoad ? "weighted" : "bodyweight";
+}
+
 export function getMuscleGroups(exercise, catalogMap, keywordFallback) {
   if (exercise?.catalogId && catalogMap) {
     const entry = catalogMap.get(exercise.catalogId);
