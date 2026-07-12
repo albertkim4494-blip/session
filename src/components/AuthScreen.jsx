@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { supabase } from "../lib/supabase";
 
+// Bump when the Terms/Privacy content materially changes, so recorded consent
+// is versioned (stored in auth user metadata at sign-up).
+const TOS_VERSION = "2026-07-11";
+
 const EyeIcon = ({ open }) => open ? (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -25,6 +29,7 @@ export default function AuthScreen() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   // Auto-clear mismatch error when passwords match
   const confirmMismatch = mode === "signup" && confirmPassword.length > 0 && password !== confirmPassword;
@@ -35,6 +40,7 @@ export default function AuthScreen() {
     setNotice("");
     setConfirmPassword("");
     setShowConfirm(false);
+    setAgreed(false);
   };
 
   const handleSubmit = async (e) => {
@@ -61,6 +67,11 @@ export default function AuthScreen() {
       return;
     }
 
+    if (mode === "signup" && !agreed) {
+      setError("Please accept the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -68,7 +79,12 @@ export default function AuthScreen() {
         const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
         if (authError) setError(authError.message);
       } else {
-        const { data, error: authError } = await supabase.auth.signUp({ email, password });
+        // Record consent (timestamp + policy version) in the user's auth metadata.
+        const { data, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { tos_accepted_at: new Date().toISOString(), tos_version: TOS_VERSION } },
+        });
         if (authError) {
           setError(authError.message);
         } else if (!data?.session) {
@@ -186,6 +202,22 @@ export default function AuthScreen() {
             <button type="button" style={styles.forgotLink} onClick={() => switchMode("reset")}>
               Forgot password?
             </button>
+          )}
+
+          {mode === "signup" && (
+            <label style={styles.consent}>
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => { setAgreed(e.target.checked); setError(""); }}
+                style={styles.checkbox}
+              />
+              <span>
+                I agree to the{" "}
+                <a href="/terms.html" target="_blank" rel="noopener noreferrer" style={styles.inlineLink}>Terms of Service</a>{" "}and{" "}
+                <a href="/privacy.html" target="_blank" rel="noopener noreferrer" style={styles.inlineLink}>Privacy Policy</a>.
+              </span>
+            </label>
           )}
 
           {notice && <div style={styles.notice}>{notice}</div>}
@@ -339,6 +371,27 @@ const styles = {
     padding: 0,
     marginTop: -4,
     alignSelf: "flex-end",
+  },
+  consent: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 9,
+    fontSize: 12.5,
+    lineHeight: 1.45,
+    color: "#94a3b8",
+    cursor: "pointer",
+  },
+  checkbox: {
+    marginTop: 2,
+    width: 16,
+    height: 16,
+    flexShrink: 0,
+    accentColor: "#2dd4bf",
+    cursor: "pointer",
+  },
+  inlineLink: {
+    color: "#2dd4bf",
+    textDecoration: "underline",
   },
   submit: {
     padding: "12px 0",
