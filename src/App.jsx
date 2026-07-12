@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } 
 import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
 import { supabase } from "./lib/supabase";
 import { fetchCoachInsights } from "./lib/coachApi";
-import { buildNormalizedAnalysis, detectImbalancesNormalized } from "./lib/coachNormalize";
+import { buildNormalizedAnalysis, detectImbalancesNormalized, classifyExerciseMuscles } from "./lib/coachNormalize";
 import { avatarInitial } from "./lib/userIdentity";
 
 // Extracted lib modules
@@ -83,7 +83,9 @@ import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getSchedu
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { isPro as selectIsPro } from "./lib/entitlements";
 import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, computePRs } from "./lib/progressCharts";
+import { buildMuscleBalance } from "./lib/muscleBalance";
 import { LineChart } from "./components/charts/LineChart";
+import { MuscleBalance } from "./components/charts/MuscleBalance";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 import { CoachCard } from "./components/CoachCard";
@@ -1211,6 +1213,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const weeklyVolume = useMemo(
     () => buildWeeklyVolumeSeries(state.logsByDate, summaryRange.start, summaryRange.end, weekStartsOn),
     [state.logsByDate, summaryRange, weekStartsOn]
+  );
+
+  // Sets-per-muscle-group over the range for the Progress balance view.
+  const muscleBalance = useMemo(
+    () => buildMuscleBalance(state.logsByDate, progressWorkouts, summaryRange.start, summaryRange.end, catalogMap, classifyExerciseMuscles),
+    [state.logsByDate, progressWorkouts, summaryRange, catalogMap]
   );
 
   const loggedDaysInMonth = useMemo(() => {
@@ -5280,6 +5288,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       formatX={(dk) => { const p = String(dk).split("-"); return `${Number(p[1])}/${Number(p[2])}`; }}
                       formatXLong={(dk) => { const M = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; const p = String(dk).split("-"); return `Week of ${M[Number(p[1]) - 1]} ${Number(p[2])}`; }}
                     />
+                  )}
+                </div>
+              )}
+
+              {/* Muscle balance — sets per muscle group over the range (Pro-gated) */}
+              {summaryStats.logged > 0 && (
+                <div style={{ ...styles.card, padding: 16 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.4, display: "block", marginBottom: 12 }}>
+                    Muscle balance
+                  </span>
+                  {!isPro ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: colors.subtleBg, border: `1px solid ${colors.border}` }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6, flexShrink: 0 }}>
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                      </svg>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Muscle balance is a Pro feature</div>
+                        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>Spot under- and over-trained muscle groups at a glance.</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <MuscleBalance data={muscleBalance} colors={colors} />
                   )}
                 </div>
               )}
