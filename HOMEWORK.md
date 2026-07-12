@@ -38,6 +38,11 @@ Details for the Android items live in `ANDROID_SETUP_GUIDE.md`.
 - [ ] **Re-enter your weight** in Settings *if your profile is set to metric* —
       the weight bug fix changed storage to canonical pounds, and old metric rows
       held the kg number mislabeled as lbs. (Skip if you use imperial/lbs.)
+- [ ] **Configure Supabase Auth** (dashboard → Authentication) for the new
+      password-reset + email-verification flows: add your app origin(s) to the
+      **Redirect URLs** allowlist and set the **Site URL**; confirm email
+      confirmation + the reset/confirm email templates are enabled. Then test
+      "Forgot password?" end-to-end with a throwaway account.
 
 ---
 
