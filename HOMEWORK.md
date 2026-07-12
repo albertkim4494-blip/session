@@ -29,6 +29,14 @@ Details for the Android items live in `ANDROID_SETUP_GUIDE.md`.
       Software info → tap Build number 7×), enable **USB debugging**, plug in,
       and confirm `adb devices` lists it.
 
+## ⚙️ Dev workflow note (FYI, not a task)
+
+- The Pro entitlement toggle is now **compile-time gated** so it can't ship in a
+  release build. It still appears automatically in `npm run dev`. To use it on an
+  **installed/deployed PWA**, set `VITE_ENABLE_DEV_TOOLS=true` in that deployment's
+  env vars, then visit with `?dev=1`. **Never** set that env var for the Play Store
+  release build.
+
 ## 🟡 Testing & data — quick, do soon
 
 - [ ] **Test account deletion** with a THROWAWAY account (⚠️ not your real one):

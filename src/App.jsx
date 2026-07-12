@@ -82,6 +82,7 @@ import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } 
 import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { isPro as selectIsPro } from "./lib/entitlements";
+import { DEV_TOOLS_ENABLED } from "./lib/devFlags";
 import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, computePRs } from "./lib/progressCharts";
 import { buildMuscleBalance } from "./lib/muscleBalance";
 import { fromLbs } from "./lib/units";
@@ -512,12 +513,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     }
   }, [showGenerateWizard]);
 
-  // TEMP (pre-launch dev tooling — remove before shipping): visiting the app with
-  // ?dev=1 enables hidden dev tools (e.g. the Pro entitlement toggle in Settings)
-  // on production builds too; ?dev=0 disables them. The flag persists in
-  // localStorage so it survives into the installed PWA (same origin). See
-  // APP_STORE_ROADMAP.md — remove alongside the DEV Pro toggle at launch.
+  // TEMP dev tooling (removed at Phase 3 / launch): visiting with ?dev=1 reveals
+  // the hidden Pro entitlement toggle; ?dev=0 hides it. Gated by DEV_TOOLS_ENABLED
+  // so this is a no-op in a production release build — the bypass cannot ship.
   useEffect(() => {
+    if (!DEV_TOOLS_ENABLED) return;
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.has("dev")) {

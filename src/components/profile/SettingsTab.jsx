@@ -3,6 +3,7 @@ import { THEME_LIST, getColors } from "../../styles/theme";
 import { usernameChangeCooldownMs } from "../../lib/userIdentity";
 import { SOUND_LIST, playTimerSound } from "../../lib/timerSounds";
 import { EQUIPMENT_LABELS } from "../../lib/exerciseCatalog";
+import { DEV_TOOLS_ENABLED } from "../../lib/devFlags";
 import { updateSearchable } from "../../lib/socialApi";
 import { TimeInput } from "../TimeInput";
 
@@ -402,11 +403,11 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             </div>
           </div>
 
-          {/* DEV-only: manual Pro entitlement toggle. Shown in dev builds, or on
-              production when the ?dev=1 flag has been set (localStorage "wt_dev").
-              Lets us test Pro-gated features before RevenueCat exists (Phase 3).
-              TEMP — remove this + the wt_dev flag before launch. See entitlements.js. */}
-          {(import.meta.env.DEV || (typeof localStorage !== "undefined" && localStorage.getItem("wt_dev") === "1")) && (
+          {/* DEV-only: manual Pro entitlement toggle. Requires a dev-tools build
+              (DEV_TOOLS_ENABLED) AND, on a deployed dev build, the ?dev=1 flag.
+              Compile-time gating means this is absent from release bundles — no
+              user path to self-grant Pro. Remove with RevenueCat (Phase 3). */}
+          {DEV_TOOLS_ENABLED && (import.meta.env.DEV || (typeof localStorage !== "undefined" && localStorage.getItem("wt_dev") === "1")) && (
             <div style={styles.fieldCol}>
               <label style={styles.label}>Pro entitlement (dev only)</label>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
