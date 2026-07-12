@@ -84,8 +84,10 @@ import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekSt
 import { isPro as selectIsPro } from "./lib/entitlements";
 import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, computePRs } from "./lib/progressCharts";
 import { buildMuscleBalance } from "./lib/muscleBalance";
+import { buildDayActivity, buildCalendarWeeks } from "./lib/activityCalendar";
 import { LineChart } from "./components/charts/LineChart";
 import { MuscleBalance } from "./components/charts/MuscleBalance";
+import { ActivityHeatmap } from "./components/charts/ActivityHeatmap";
 import { getUpNextSuggestion } from "./lib/weeklyPatterns";
 import { isTimerEligible, updateRestAverage } from "./lib/timerUtils";
 import { CoachCard } from "./components/CoachCard";
@@ -1220,6 +1222,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     () => buildMuscleBalance(state.logsByDate, progressWorkouts, summaryRange.start, summaryRange.end, catalogMap, classifyExerciseMuscles),
     [state.logsByDate, progressWorkouts, summaryRange, catalogMap]
   );
+
+  // Day-by-day activity laid out as week columns for the consistency heatmap.
+  const calendarWeeks = useMemo(() => {
+    const activity = buildDayActivity(state.logsByDate, summaryRange.start, summaryRange.end);
+    return buildCalendarWeeks(activity, summaryRange.start, summaryRange.end, weekStartsOn);
+  }, [state.logsByDate, summaryRange, weekStartsOn]);
 
   const loggedDaysInMonth = useMemo(() => {
     const set = new Set();
@@ -5310,6 +5318,28 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     </div>
                   ) : (
                     <MuscleBalance data={muscleBalance} colors={colors} />
+                  )}
+                </div>
+              )}
+
+              {/* Consistency heatmap — training days by intensity (Pro-gated) */}
+              {summaryStats.logged > 0 && (
+                <div style={{ ...styles.card, padding: 16 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.4, display: "block", marginBottom: 12 }}>
+                    Consistency
+                  </span>
+                  {!isPro ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: colors.subtleBg, border: `1px solid ${colors.border}` }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6, flexShrink: 0 }}>
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
+                      </svg>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Consistency heatmap is a Pro feature</div>
+                        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>See your training frequency day by day.</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <ActivityHeatmap weeks={calendarWeeks} colors={colors} />
                   )}
                 </div>
               )}

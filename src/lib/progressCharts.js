@@ -30,7 +30,7 @@ export function weekStartOf(dk, weekStartsOn = 0) {
 }
 
 /** Add `days` to an ISO date key (UTC-safe). */
-function addDaysKey(dk, days) {
+export function addDaysKey(dk, days) {
   const [y, m, d] = dk.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + days);
