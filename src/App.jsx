@@ -7438,6 +7438,27 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
             },
           });
         }}
+        onDeleteAccount={() => {
+          dispatchModal({
+            type: "OPEN_CONFIRM",
+            payload: {
+              title: "Delete Account",
+              message: "This permanently deletes your account and all data — workouts, logs, profile, friends, and backups. This cannot be undone. A local backup will be exported first.",
+              confirmText: "Delete forever",
+              onConfirm: async () => {
+                try { exportJson(); } catch { /* best-effort backup */ }
+                const { data, error } = await supabase.functions.invoke("delete-account", { method: "POST" });
+                if (error || !data?.success) {
+                  showToast("Couldn't delete account — please try again");
+                  return;
+                }
+                dispatchModal({ type: "CLOSE_CONFIRM" });
+                // Tear down the local session; AuthGate returns to the sign-in screen.
+                if (onLogout) await onLogout();
+              },
+            },
+          });
+        }}
       />
 
       {/* Change Username Modal */}

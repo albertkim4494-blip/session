@@ -18,7 +18,7 @@ const sectionHeaderStyle = {
   gap: 6,
 };
 
-export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference, styles, colors, onExportJson, onExportCSV, onImportFile, onResetAll }) {
+export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference, styles, colors, onExportJson, onExportCSV, onImportFile, onResetAll, onDeleteAccount }) {
   const [isSearchable, setIsSearchable] = useState(profile?.is_searchable !== false);
 
   function openChangeUsername() {
@@ -503,7 +503,7 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
       </div>
 
       {/* Data */}
-      {(onExportJson || onExportCSV || onImportFile || onResetAll) && (
+      {(onExportJson || onExportCSV || onImportFile || onResetAll || onDeleteAccount) && (
         <div style={{ borderTop: `1px solid ${colors?.border || "rgba(255,255,255,0.10)"}`, paddingTop: 14 }}>
           <div style={{ ...sectionHeaderStyle, marginBottom: 10 }}>
             Data
@@ -578,6 +578,22 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>Reset All</div>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>Delete all workouts and logs</div>
+                </div>
+              </button>
+            )}
+
+            {onDeleteAccount && (
+              <button
+                type="button"
+                onClick={onDeleteAccount}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${colors?.dangerBorder}`, background: colors?.dangerBg, color: colors?.dangerText, cursor: "pointer", textAlign: "left", width: "100%", marginTop: 4, fontFamily: "inherit" }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M3 6h18" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Delete Account</div>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>Permanently erase your account and all data</div>
                 </div>
               </button>
             )}

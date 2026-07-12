@@ -26,7 +26,7 @@ function isDirty(modalState, pendingPrefs) {
   return DIRTY_FIELDS.some((k) => (modalState[k] ?? "") !== (init[k] ?? ""));
 }
 
-export function ProfileModal({ open, modalState, dispatch, profile, profileStale, session, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference, onExportJson, onExportCSV, onImportFile, onResetAll }) {
+export function ProfileModal({ open, modalState, dispatch, profile, profileStale, session, onLogout, onSave, styles, summaryStats, colors, preferences, onUpdatePreference, onExportJson, onExportCSV, onImportFile, onResetAll, onDeleteAccount }) {
   const [activeTab, setActiveTab] = useState("profile");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [pendingPrefs, setPendingPrefs] = useState({});
@@ -270,6 +270,7 @@ export function ProfileModal({ open, modalState, dispatch, profile, profileStale
             onExportCSV={onExportCSV}
             onImportFile={onImportFile}
             onResetAll={onResetAll}
+            onDeleteAccount={onDeleteAccount}
           />
         )}
       </div>
