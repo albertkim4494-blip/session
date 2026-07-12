@@ -4,6 +4,7 @@ import { LS_KEY, LS_BACKUP_KEY } from "../lib/constants";
 import { loadState, persistState } from "../lib/stateUtils";
 import AuthScreen from "./AuthScreen";
 import OnboardingScreen from "./OnboardingScreen";
+import UpdatePasswordScreen from "./UpdatePasswordScreen";
 import App from "../App";
 
 // Read Supabase's cached session from localStorage for instant offline startup.
@@ -31,6 +32,7 @@ export default function AuthGate() {
   });
   const [profileReady, setProfileReady] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const sessionRef = useRef(session || null);
   const profileCheckedForRef = useRef(null);
 
@@ -49,6 +51,11 @@ export default function AuthGate() {
         const prevUserId = sessionRef.current?.user?.id || null;
         const newUserId = session?.user?.id || null;
         sessionRef.current = session;
+
+        // Arrived via a password-reset email link — show the update-password screen.
+        if (event === "PASSWORD_RECOVERY") {
+          setRecoveryMode(true);
+        }
 
         if (event === "TOKEN_REFRESHED" && newUserId === prevUserId) {
           return; // same user token refresh — no re-render
@@ -143,6 +150,11 @@ export default function AuthGate() {
   // 2. Not logged in
   if (!session) {
     return <AuthScreen />;
+  }
+
+  // 2b. Password recovery — user opened a reset link (has a recovery session).
+  if (recoveryMode) {
+    return <UpdatePasswordScreen onDone={() => setRecoveryMode(false)} />;
   }
 
   // 3. Profile not yet checked

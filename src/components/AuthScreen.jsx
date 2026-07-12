@@ -16,21 +16,45 @@ const EyeIcon = ({ open }) => open ? (
 );
 
 export default function AuthScreen() {
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "reset"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Auto-clear mismatch error when passwords match
   const confirmMismatch = mode === "signup" && confirmPassword.length > 0 && password !== confirmPassword;
 
+  const switchMode = (next) => {
+    setMode(next);
+    setError("");
+    setNotice("");
+    setConfirmPassword("");
+    setShowConfirm(false);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setNotice("");
+
+    // Password reset request — send an email, don't reveal whether it exists.
+    if (mode === "reset") {
+      setLoading(true);
+      try {
+        await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+        setNotice("If an account exists for that email, a password reset link is on its way. Check your inbox.");
+      } catch {
+        setError("Something went wrong. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     if (mode === "signup" && password !== confirmPassword) {
       setError("Passwords do not match");
@@ -40,12 +64,19 @@ export default function AuthScreen() {
     setLoading(true);
 
     try {
-      const { error: authError } =
-        mode === "login"
-          ? await supabase.auth.signInWithPassword({ email, password })
-          : await supabase.auth.signUp({ email, password });
-
-      if (authError) setError(authError.message);
+      if (mode === "login") {
+        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (authError) setError(authError.message);
+      } else {
+        const { data, error: authError } = await supabase.auth.signUp({ email, password });
+        if (authError) {
+          setError(authError.message);
+        } else if (!data?.session) {
+          // Email confirmation required — no session yet.
+          switchMode("login");
+          setNotice("Account created. Check your email to confirm your account, then log in.");
+        }
+      }
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -54,6 +85,7 @@ export default function AuthScreen() {
   };
 
   const isLogin = mode === "login";
+  const isReset = mode === "reset";
 
   return (
     <div style={styles.wrapper}>
@@ -66,27 +98,27 @@ export default function AuthScreen() {
           />
         </div>
 
-        {/* Mode toggle pills */}
-        <div style={styles.pillRow}>
-          <button
-            style={{
-              ...styles.pill,
-              ...(isLogin ? styles.pillActive : styles.pillInactive),
-            }}
-            onClick={() => { setMode("login"); setError(""); setConfirmPassword(""); setShowConfirm(false); }}
-          >
-            Log In
-          </button>
-          <button
-            style={{
-              ...styles.pill,
-              ...(!isLogin ? styles.pillActive : styles.pillInactive),
-            }}
-            onClick={() => { setMode("signup"); setError(""); setConfirmPassword(""); setShowConfirm(false); }}
-          >
-            Sign Up
-          </button>
-        </div>
+        {/* Mode toggle pills (hidden during password reset) */}
+        {!isReset && (
+          <div style={styles.pillRow}>
+            <button
+              style={{ ...styles.pill, ...(isLogin ? styles.pillActive : styles.pillInactive) }}
+              onClick={() => switchMode("login")}
+            >
+              Log In
+            </button>
+            <button
+              style={{ ...styles.pill, ...(!isLogin ? styles.pillActive : styles.pillInactive) }}
+              onClick={() => switchMode("signup")}
+            >
+              Sign Up
+            </button>
+          </div>
+        )}
+
+        {isReset && (
+          <p style={styles.resetIntro}>Enter your email and we'll send you a link to reset your password.</p>
+        )}
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <input
@@ -98,6 +130,7 @@ export default function AuthScreen() {
             autoComplete="email"
             style={styles.input}
           />
+          {!isReset && (<>
           <div style={styles.passwordWrapper}>
             <input
               type={showPassword ? "text" : "password"}
@@ -147,26 +180,36 @@ export default function AuthScreen() {
               )}
             </>
           )}
+          </>)}
 
+          {isLogin && (
+            <button type="button" style={styles.forgotLink} onClick={() => switchMode("reset")}>
+              Forgot password?
+            </button>
+          )}
+
+          {notice && <div style={styles.notice}>{notice}</div>}
           {error && <div style={styles.error}>{error}</div>}
 
           <button type="submit" disabled={loading} style={styles.submit}>
-            {loading
-              ? "Please wait..."
-              : isLogin
-              ? "Log In"
-              : "Create Account"}
+            {loading ? "Please wait..." : isReset ? "Send reset link" : isLogin ? "Log In" : "Create Account"}
           </button>
         </form>
 
         <p style={styles.footer}>
-          {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-          <button
-            style={styles.link}
-            onClick={() => { setMode(isLogin ? "signup" : "login"); setError(""); }}
-          >
-            {isLogin ? "Sign up" : "Log in"}
-          </button>
+          {isReset ? (
+            <button style={styles.link} onClick={() => switchMode("login")}>Back to log in</button>
+          ) : (
+            <>
+              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+              <button
+                style={styles.link}
+                onClick={() => switchMode(isLogin ? "signup" : "login")}
+              >
+                {isLogin ? "Sign up" : "Log in"}
+              </button>
+            </>
+          )}
         </p>
       </div>
     </div>
@@ -273,6 +316,29 @@ const styles = {
     color: "#f87171",
     fontSize: 13,
     textAlign: "center",
+  },
+  notice: {
+    color: "#2dd4bf",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 1.5,
+  },
+  resetIntro: {
+    color: "#94a3b8",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 1.5,
+    margin: "0 0 16px",
+  },
+  forgotLink: {
+    background: "none",
+    border: "none",
+    color: "#64748b",
+    cursor: "pointer",
+    fontSize: 12,
+    padding: 0,
+    marginTop: -4,
+    alignSelf: "flex-end",
   },
   submit: {
     padding: "12px 0",
