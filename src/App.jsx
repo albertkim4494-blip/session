@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState, useRef, useReducer, useCallback } from "react";
 import { fetchCloudState, saveCloudState, createDebouncedSaver } from "./lib/supabaseSync";
 import { supabase } from "./lib/supabase";
 import { fetchCoachInsights } from "./lib/coachApi";
@@ -381,6 +381,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const touchRef = useRef({ startX: 0, startY: 0, swiping: false, locked: false });
   const bodyRef = useRef(null);
   const TAB_ORDER = ["train", "progress", "program", "social"];
+
+  // Per-tab scroll memory. All four tabs share one scroll container (styles.body),
+  // so without this the scrollTop bleeds between tabs and gets clamped to the
+  // shorter tab's height — returning to a tab lands at the wrong spot. We record
+  // each tab's scrollTop live and restore it on tab change (before paint).
+  const tabScrollRef = useRef({});
+  const rememberScroll = useCallback((e) => {
+    tabScrollRef.current[tabRef.current] = e.currentTarget.scrollTop;
+  }, []);
+  // Restore the incoming tab's saved scroll position before the browser paints
+  // (so the tab slides in already at the right spot, no flicker).
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (el) el.scrollTop = tabScrollRef.current[tab] ?? 0;
+  }, [tab]);
 
   const handleTouchStart = useCallback((e) => {
     // If the touch lands inside an element that owns horizontal gestures
@@ -4582,7 +4597,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         </div>
 
         {/* Main body */}
-        <div ref={bodyRef} style={styles.body} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+        <div ref={bodyRef} style={styles.body} onScroll={rememberScroll} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
           {/* Set Username banner */}
           {profile && !profile.username && (
             <div style={{
