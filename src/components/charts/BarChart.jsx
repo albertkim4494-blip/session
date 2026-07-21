@@ -82,6 +82,7 @@ export function BarChart({ data, valueKey, label, color, xKey = "date", colors, 
 
       <div
         ref={containerRef}
+        data-owns-horizontal-gesture
         style={{ width: "100%", position: "relative", touchAction: "pan-y", cursor: "crosshair" }}
         onPointerDown={onDown}
         onPointerMove={onMove}

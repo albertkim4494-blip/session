@@ -22,6 +22,11 @@ const sectionHeaderStyle = {
 export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference, styles, colors, onExportJson, onExportCSV, onImportFile, onResetAll, onDeleteAccount }) {
   const [isSearchable, setIsSearchable] = useState(profile?.is_searchable !== false);
 
+  // Mirror App's entitlement rule: Pro is only real when dev tools are compiled
+  // in (Phase 0) — RevenueCat becomes the authority in Phase 3. Keeps this row in
+  // sync with the Billing modal (which reads the same effective isPro).
+  const isProActive = DEV_TOOLS_ENABLED && preferences?.isPro === true;
+
   function openChangeUsername() {
     const cooldownMs = usernameChangeCooldownMs(profile?.username_last_changed_at);
     dispatch({
@@ -390,7 +395,7 @@ export function SettingsTab({ dispatch, profile, preferences, onUpdatePreference
             <label style={styles.label}>Billing</label>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 600, opacity: 0.85 }}>
-                Free plan
+                {isProActive ? "Pro plan" : "Free plan"}
               </span>
               <button
                 type="button"

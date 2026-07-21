@@ -101,6 +101,7 @@ export function LineChart({ data, lines, xKey = "date", colors, formatValue, for
           touchAction pan-y lets vertical page scroll through while we own horizontal drags. */}
       <div
         ref={containerRef}
+        data-owns-horizontal-gesture
         style={{ width: "100%", position: "relative", touchAction: "pan-y", cursor: "crosshair" }}
         onPointerDown={onDown}
         onPointerMove={onMove}
