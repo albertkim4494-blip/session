@@ -83,6 +83,7 @@ import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getSchedu
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
 import { isPro as selectIsPro } from "./lib/entitlements";
 import { DEV_TOOLS_ENABLED } from "./lib/devFlags";
+import { Capacitor } from "@capacitor/core";
 import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, computePRs } from "./lib/progressCharts";
 import { buildMuscleBalance } from "./lib/muscleBalance";
 import { fromLbs } from "./lib/units";
@@ -1558,6 +1559,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const anyModalOpenRef = useRef(false);
   anyModalOpenRef.current = anyModalOpen;
 
+  // In the Capacitor native shell the OS captures the hardware back press and
+  // it never reaches the WebView's CloseWatcher — so we route it through the
+  // @capacitor/app backButton event instead (see effect below). This flag lets
+  // the web-only CloseWatcher/history path opt out so the two don't compete.
+  const isNativeShell = Capacitor.isNativePlatform();
+
   // ---------------------------------------------------------------------------
   // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
   // Primary: CloseWatcher API (Chrome 126+) — directly intercepts back button.
@@ -1579,6 +1586,42 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     // Reorder mode (workout detail sheet exercises): cancel without saving.
     if (modals.workoutDetail.isOpen && modals.workoutDetail.reorderExercises) {
       cancelReorderExercises();
+      return;
+    }
+    // Overlay / nested modals: a back press dismisses just the topmost one so
+    // the user returns to the modal underneath (e.g. Change Username → Profile),
+    // instead of collapsing the whole stack via CLOSE_ALL. Ordered topmost-first
+    // and MUST run before the primary sub-modal + CLOSE_ALL branches below.
+    if (modals.confirm.isOpen) {
+      dispatchModal({ type: "CLOSE_CONFIRM" });
+      return;
+    }
+    if (modals.input.isOpen) {
+      dispatchModal({ type: "CLOSE_INPUT" });
+      return;
+    }
+    if (modals.customExercise?.isOpen) {
+      dispatchModal({ type: "CLOSE_CUSTOM_EXERCISE" });
+      return;
+    }
+    if (modals.catalogBrowse.isOpen) {
+      dispatchModal({ type: "CLOSE_CATALOG_BROWSE" });
+      return;
+    }
+    if (modals.datePicker.isOpen) {
+      dispatchModal({ type: "CLOSE_DATE_PICKER" });
+      return;
+    }
+    if (modals.changeUsername.isOpen) {
+      dispatchModal({ type: "CLOSE_CHANGE_USERNAME" });
+      return;
+    }
+    if (modals.changePassword.isOpen) {
+      dispatchModal({ type: "CLOSE_CHANGE_PASSWORD" });
+      return;
+    }
+    if (modals.billing?.isOpen) {
+      dispatchModal({ type: "CLOSE_BILLING" });
       return;
     }
     // Edit Exercise / Edit Workout / Edit Split sub-modals: back closes just
@@ -1626,6 +1669,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   };
 
   useEffect(() => {
+    // Native shell handles back via @capacitor/app (see the effect below);
+    // the CloseWatcher/history machinery here is browser/PWA only.
+    if (isNativeShell) return;
+
     const hasCW = typeof CloseWatcher !== "undefined";
 
     // --- PRIMARY: CloseWatcher API (Chrome 126+, Samsung Internet 28+) ---
@@ -1741,6 +1788,40 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       window.removeEventListener("hashchange", onBack);
     };
   }, []);
+
+  // --- NATIVE (Capacitor) hardware back button ---
+  // Routes the OS back press into the same handleBackRef close-priority logic.
+  // Reuses the "prepare_exit" contract: first back at the train tab with no
+  // modal arms exit (toast shown by handleBackRef); a second back within the
+  // window actually exits the app. Any handled modal/tab disarms it.
+  useEffect(() => {
+    if (!isNativeShell) return;
+    let sub = null;
+    let cancelled = false;
+    let armed = false;
+    let armTimer = null;
+    (async () => {
+      const { App } = await import("@capacitor/app");
+      if (cancelled) return;
+      sub = await App.addListener("backButton", () => {
+        const result = handleBackRef.current?.();
+        if (result === "prepare_exit") {
+          if (armed) { App.exitApp(); return; }
+          armed = true;
+          clearTimeout(armTimer);
+          armTimer = setTimeout(() => { armed = false; }, 2500);
+        } else {
+          armed = false;
+          clearTimeout(armTimer);
+        }
+      });
+    })();
+    return () => {
+      cancelled = true;
+      clearTimeout(armTimer);
+      sub?.remove?.();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Back button override for log modal (flipped state → flip back; normal → close log)
   const logBackHandlerRef = useRef(null);
