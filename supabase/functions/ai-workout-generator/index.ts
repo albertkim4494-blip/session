@@ -707,8 +707,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Invalid mode. Use 'program' or 'today'." }, 400);
     }
 
-    // Use gpt-4o for full program generation (higher quality), gpt-4o-mini for today (speed)
-    const model = mode === "program" ? "gpt-4o" : "gpt-4o-mini";
+    // Program always uses gpt-4o. For "today", honor the client's data-driven
+    // modelHint (gpt-4o when the user has rich history/trends/coaching signal,
+    // gpt-4o-mini otherwise), validated against an allow-list.
+    const ALLOWED_MODELS = new Set(["gpt-4o", "gpt-4o-mini"]);
+    const todayModel = ALLOWED_MODELS.has(body.modelHint) ? body.modelHint : "gpt-4o-mini";
+    const model = mode === "program" ? "gpt-4o" : todayModel;
 
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

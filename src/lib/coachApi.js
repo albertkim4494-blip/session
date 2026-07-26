@@ -15,6 +15,7 @@ import {
   computeVolumeLoadTrends,
   computeEstimated1RMTrends,
   buildMuscleVolumeDetail,
+  computeComplexityScore,
 } from "./trainingSignals";
 
 const CACHE_KEY = "wt_coach_cache";
@@ -550,39 +551,6 @@ function buildFatigueTrend(logsByDate) {
   lines.push(`Fatigue signals: ${signals.length > 0 ? "ELEVATED (" + signals.join(", ") + ")" : "NORMAL"}`);
 
   return lines.join("\n");
-}
-
-/**
- * Compute a complexity score (0-7) to decide model routing.
- * Score >= 4 → gpt-4o (complex analysis), else → gpt-4o-mini (cheaper).
- *
- * Scoring factors:
- *   +1 if logged days in range >= 5
- *   +1 if unique exercises >= 8
- *   +1 if progression trends >= 4
- *   +1 if muscle groups >= 5
- *   +1 if user has sports
- *   +1 if tiered history present (recentHistory or olderHistory)
- *   +1 if previous insights >= 5 (anti-repetition harder → needs smarter model)
- */
-export function computeComplexityScore({
-  loggedDays = 0,
-  exerciseCount = 0,
-  trendCount = 0,
-  muscleGroupCount = 0,
-  hasSports = false,
-  hasHistory = false,
-  previousInsightCount = 0,
-}) {
-  let score = 0;
-  if (loggedDays >= 5) score++;
-  if (exerciseCount >= 8) score++;
-  if (trendCount >= 4) score++;
-  if (muscleGroupCount >= 5) score++;
-  if (hasSports) score++;
-  if (hasHistory) score++;
-  if (previousInsightCount >= 5) score++;
-  return score;
 }
 
 /**

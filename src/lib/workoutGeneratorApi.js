@@ -18,6 +18,7 @@ import {
   loadInsightHistory,
   buildFollowUpContext,
   buildCoachingHistoryPayload,
+  computeComplexityScore,
 } from "./trainingSignals";
 
 // Human-readable labels for the 8 movement-pattern traits inferred from a sport.
@@ -371,7 +372,7 @@ function buildFatigueSignals(state, catalog, todayKey) {
  * exact builders the AI Coach uses (lib/trainingSignals.js). Pure; returns
  * compact, prompt-ready shapes. Window: last ~42 days ending today.
  */
-function buildTrainingSignals(appState, weightLabel, todayKey) {
+function buildTrainingSignals(appState, weightLabel, todayKey, hasSports = false) {
   const logsByDate = appState.logsByDate || {};
   const end = todayKey;
   const startDate = new Date(`${todayKey}T00:00:00`);
@@ -401,7 +402,25 @@ function buildTrainingSignals(appState, weightLabel, todayKey) {
   const followUp = buildFollowUpContext(insightHistory, { progressionTrends, activeExerciseNames });
   const coachingHistory = buildCoachingHistoryPayload(insightHistory, followUp);
 
-  return { estimated1RMTrends, volumeLoadTrends, coachingHistory };
+  // Model routing: route rich generations (lots of history/trends/coaching
+  // signal) to gpt-4o, thin ones to gpt-4o-mini. Same scorer the Coach uses.
+  const exerciseIds = new Set();
+  for (const day of Object.values(recentLogs)) {
+    if (day && typeof day === "object") for (const id of Object.keys(day)) exerciseIds.add(id);
+  }
+  const previousInsightCount = coachingHistory?.entries?.length || 0;
+  const complexityScore = computeComplexityScore({
+    loggedDays: Object.keys(recentLogs).length,
+    exerciseCount: exerciseIds.size,
+    trendCount: (estimated1RMTrends?.length || 0) + (volumeLoadTrends?.length || 0),
+    muscleGroupCount: 0,
+    hasSports,
+    hasHistory: previousInsightCount > 0,
+    previousInsightCount,
+  });
+  const modelHint = complexityScore >= 4 ? "gpt-4o" : "gpt-4o-mini";
+
+  return { estimated1RMTrends, volumeLoadTrends, coachingHistory, modelHint };
 }
 
 // ---------------------------------------------------------------------------
@@ -518,8 +537,8 @@ export async function generateTodayAI({
     const currentPlan = buildCurrentPlanSummary(appState);
     const trainingPattern = buildTrainingPatternSummary(appState, todayKey);
     const catalogMap = buildCatalogMap(catalog);
-    // Coach-grade signals: strength progress + coaching memory (reused builders).
-    const signals = buildTrainingSignals(appState, wLabel, todayKey);
+    // Coach-grade signals: strength progress + coaching memory + model routing.
+    const signals = buildTrainingSignals(appState, wLabel, todayKey, !!profile?.sports);
 
     const { data, error } = await supabase.functions.invoke(
       "ai-workout-generator",
@@ -540,6 +559,7 @@ export async function generateTodayAI({
           estimated1RMTrends: signals.estimated1RMTrends,
           volumeLoadTrends: signals.volumeLoadTrends,
           coachingHistory: signals.coachingHistory,
+          modelHint: signals.modelHint,
         },
       }
     );
