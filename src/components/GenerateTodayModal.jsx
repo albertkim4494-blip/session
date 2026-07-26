@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Modal } from "./Modal";
 import { EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
 import { CoachCheckin } from "./CoachCheckin";
@@ -41,13 +41,25 @@ export function GenerateTodayModal({
 }) {
   const { step, duration, equipment, preview, loading, error } = todayState || {};
 
+  // Live streaming state — the coaching "why" line and exercises as they arrive.
+  const [streamNote, setStreamNote] = useState(null);
+  const [streamExercises, setStreamExercises] = useState([]);
+
   const update = (payload) =>
     dispatch({ type: "UPDATE_GENERATE_TODAY", payload });
 
   // Auto-generate when entering step 4 (preview)
   useEffect(() => {
     if (!open || step !== 4 || preview || loading) return;
-    onGenerate({ equipment, duration, checkinData: todayCheckin });
+    setStreamNote(null);
+    setStreamExercises([]);
+    onGenerate({
+      equipment,
+      duration,
+      checkinData: todayCheckin,
+      onPreamble: (text) => setStreamNote(text),
+      onExercise: (ex) => setStreamExercises((prev) => [...prev, ex]),
+    });
     // onGenerate handles setting loading/preview state
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, step, preview, loading, equipment, duration, todayCheckin]);
@@ -183,19 +195,54 @@ export function GenerateTodayModal({
           </div>
         )}
 
-        {/* Step 4: Preview — loading */}
+        {/* Step 4: Preview — loading. If streaming has started, build the
+            workout live (preamble + exercises appearing); else a spinner. */}
         {step === 4 && loading && !preview && (
-          <div style={{ textAlign: "center", padding: 32, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-            <div style={{
-              width: 32, height: 32, border: `3px solid ${colors.border}`,
-              borderTopColor: colors.primaryBg, borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-            }} />
-            <div style={{ fontSize: 14, opacity: 0.7 }}>
-              Designing your workout...
+          (streamNote || streamExercises.length > 0) ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {streamNote && (
+                <div style={{ fontSize: 12, opacity: 0.7 }}>{streamNote}</div>
+              )}
+              <div style={{
+                padding: "10px 12px", borderRadius: 12,
+                border: `1px solid ${colors.border}`, background: colors.cardAltBg,
+              }}>
+                {streamExercises.map((ex, i) => (
+                  <div key={i} style={{
+                    fontSize: 13, padding: "3px 0", display: "flex",
+                    justifyContent: "space-between", alignItems: "center",
+                    animation: "genFadeIn 0.25s ease",
+                  }}>
+                    <span>✓ {ex.name}</span>
+                    {ex.scheme && (
+                      <span style={{ fontSize: 11, opacity: 0.6, fontWeight: 600, marginLeft: 8, whiteSpace: "nowrap" }}>
+                        {ex.scheme}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                <div style={{ fontSize: 13, padding: "3px 0", opacity: 0.5 }}>Designing…</div>
+              </div>
+              <style>{`@keyframes genFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }`}</style>
             </div>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 12, opacity: 0.6 }}>Reading your recent training &amp; recovery…</div>
+              <div style={{
+                padding: "16px 12px", borderRadius: 12,
+                border: `1px solid ${colors.border}`, background: colors.cardAltBg,
+                display: "flex", alignItems: "center", gap: 10,
+              }}>
+                <div style={{
+                  width: 18, height: 18, border: `2px solid ${colors.border}`,
+                  borderTopColor: colors.primaryBg, borderRadius: "50%",
+                  animation: "spin 0.8s linear infinite", flexShrink: 0,
+                }} />
+                <span style={{ fontSize: 13, opacity: 0.7 }}>Designing your workout…</span>
+              </div>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )
         )}
 
         {/* Step 4: Preview — content */}

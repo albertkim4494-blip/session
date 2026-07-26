@@ -514,7 +514,78 @@ export async function generateProgramAI({
 }
 
 /**
+ * Stream today's generation over SSE. Dispatches a preamble (the "note") and
+ * each exercise as they arrive, and resolves with the final validated workout
+ * JSON (the "done" payload). Throws on stream error/timeout so the caller can
+ * fall back to the blocking path. Returns the raw workout JSON (caller finalizes).
+ */
+async function streamTodayAI(requestBody, { onPreamble, onExercise }) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const { data: { session } } = await supabase.auth.getSession();
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/ai-workout-generator`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session?.access_token || supabaseKey}`,
+      apikey: supabaseKey,
+    },
+    body: JSON.stringify({ ...requestBody, stream: true }),
+  });
+
+  if (!res.ok) throw new Error(`Edge HTTP ${res.status}`);
+
+  // If the function answered with plain JSON (not SSE), hand it back directly.
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const data = await res.json();
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let sseBuffer = "";
+  let doneData = null;
+  const STREAM_TIMEOUT = 45000; // abort if no data for 45s
+
+  while (true) {
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("Stream timeout")), STREAM_TIMEOUT);
+    });
+    const { done, value } = await Promise.race([reader.read(), timeoutPromise]).finally(() => clearTimeout(timeoutId));
+    if (done) break;
+    sseBuffer += decoder.decode(value, { stream: true });
+
+    const lines = sseBuffer.split("\n");
+    sseBuffer = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const payload = line.slice(6).trim();
+      if (!payload) continue;
+      let event;
+      try { event = JSON.parse(payload); } catch { continue; }
+      if (event.type === "preamble") onPreamble?.(event.text);
+      else if (event.type === "exercise") onExercise?.(event.data);
+      else if (event.type === "done") doneData = event.data;
+      else if (event.type === "error") throw new Error(event.message || "stream error");
+    }
+  }
+
+  if (!doneData) throw new Error("stream ended without done");
+  return doneData;
+}
+
+/**
  * Generate a single workout for today using AI.
+ *
+ * When an `onExercise` callback is provided, streams the generation over SSE:
+ * `onPreamble(text)` fires with the coaching rationale, `onExercise(raw)` fires
+ * per exercise as it's produced, and the final validated workout is returned.
+ * Without callbacks (or on any streaming failure) it uses the blocking call.
+ *
  * @returns {{ success: true, data: workout } | { success: false, error: string }}
  */
 export async function generateTodayAI({
@@ -526,6 +597,8 @@ export async function generateTodayAI({
   todayKey,
   measurementSystem,
   checkinContext,
+  onPreamble,
+  onExercise,
 }) {
   try {
     const appState = state || {};
@@ -537,64 +610,73 @@ export async function generateTodayAI({
     const currentPlan = buildCurrentPlanSummary(appState);
     const trainingPattern = buildTrainingPatternSummary(appState, todayKey);
     const catalogMap = buildCatalogMap(catalog);
+    const allowedEquipment = buildAllowedEquipment(equipment);
     // Coach-grade signals: strength progress + coaching memory + model routing.
     const signals = buildTrainingSignals(appState, wLabel, todayKey, !!profile?.sports);
 
-    const { data, error } = await supabase.functions.invoke(
-      "ai-workout-generator",
-      {
-        body: {
-          mode: "today",
-          profile: buildProfilePayload(profile, measurementSystem),
-          equipment,
-          duration: duration || 60,
-          exerciseCount: exerciseCountFromDuration(duration),
-          catalog: catalogPayload,
-          history,
-          currentPlan,
-          trainingPattern,
-          checkinContext: checkinContext || null,
-          muscleRecency,
-          fatigue,
-          estimated1RMTrends: signals.estimated1RMTrends,
-          volumeLoadTrends: signals.volumeLoadTrends,
-          coachingHistory: signals.coachingHistory,
-          modelHint: signals.modelHint,
-        },
-      }
-    );
-
-    if (error) throw new Error(error.message || "Edge function error");
-    if (data?.error) throw new Error(data.reason ? `${data.error}: ${data.reason}` : data.error);
-    if (!Array.isArray(data?.exercises)) throw new Error("Invalid AI response");
-
-    const allowedEquipment = buildAllowedEquipment(equipment);
-    const { exercises, diagnostics } = transformExercises(data.exercises, catalogMap, { catalog, allowedEquipment });
-    if (diagnostics.dropped > 0 || diagnostics.substituted > 0) {
-      console.warn(`[AI today] ${diagnostics.substituted} substituted, ${diagnostics.dropped} dropped`, diagnostics.reasons);
-    }
-
-    const minRequired = (duration || 60) <= 15 ? 1 : 2;
-    if (exercises.length < minRequired) {
-      recordAiEvent("ai_empty_workout", "today");
-      return { success: false, error: "AI output too sparse after catalog validation" };
-    }
-
-    recordAiEvent("ai_success", "today");
-
-    const workout = {
-      id: uid("w"),
-      name: data.name || "Today's Workout",
-      category: "Workout",
-      scheme: data.scheme || "3x10",
-      targetMuscles: Array.isArray(data.targetMuscles)
-        ? data.targetMuscles
-        : [],
-      note: data.note || null,
-      exercises,
+    const requestBody = {
+      mode: "today",
+      profile: buildProfilePayload(profile, measurementSystem),
+      equipment,
+      duration: duration || 60,
+      exerciseCount: exerciseCountFromDuration(duration),
+      catalog: catalogPayload,
+      history,
+      currentPlan,
+      trainingPattern,
+      checkinContext: checkinContext || null,
+      muscleRecency,
+      fatigue,
+      estimated1RMTrends: signals.estimated1RMTrends,
+      volumeLoadTrends: signals.volumeLoadTrends,
+      coachingHistory: signals.coachingHistory,
+      modelHint: signals.modelHint,
     };
 
-    return { success: true, data: workout };
+    // Transform + validate a raw workout JSON into the final workout object (or
+    // a sparse-failure). Shared by the streaming + blocking paths.
+    const finalize = (data) => {
+      if (!Array.isArray(data?.exercises)) return { success: false, error: "Invalid AI response" };
+      const { exercises, diagnostics } = transformExercises(data.exercises, catalogMap, { catalog, allowedEquipment });
+      if (diagnostics.dropped > 0 || diagnostics.substituted > 0) {
+        console.warn(`[AI today] ${diagnostics.substituted} substituted, ${diagnostics.dropped} dropped`, diagnostics.reasons);
+      }
+      const minRequired = (duration || 60) <= 15 ? 1 : 2;
+      if (exercises.length < minRequired) {
+        recordAiEvent("ai_empty_workout", "today");
+        return { success: false, error: "AI output too sparse after catalog validation" };
+      }
+      recordAiEvent("ai_success", "today");
+      return {
+        success: true,
+        data: {
+          id: uid("w"),
+          name: data.name || "Today's Workout",
+          category: "Workout",
+          scheme: data.scheme || "3x10",
+          targetMuscles: Array.isArray(data.targetMuscles) ? data.targetMuscles : [],
+          note: data.note || null,
+          exercises,
+        },
+      };
+    };
+
+    // STREAMING PATH — when a callback is provided, stream so the UI can render
+    // the preamble + exercises as they arrive. Falls through to blocking on error.
+    if (typeof onExercise === "function") {
+      try {
+        const streamed = await streamTodayAI(requestBody, { onPreamble, onExercise });
+        return finalize(streamed);
+      } catch (streamErr) {
+        console.warn("[AI today] streaming failed, falling back to blocking:", streamErr?.message);
+      }
+    }
+
+    // BLOCKING PATH (default + streaming fallback).
+    const { data, error } = await supabase.functions.invoke("ai-workout-generator", { body: requestBody });
+    if (error) throw new Error(error.message || "Edge function error");
+    if (data?.error) throw new Error(data.reason ? `${data.error}: ${data.reason}` : data.error);
+    return finalize(data);
   } catch (err) {
     console.error("AI today generation failed:", err);
     recordAiEvent("ai_fallback_used", "today", { error: err.message });

@@ -3955,6 +3955,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       todayKey: dateKey,
       measurementSystem: state.preferences?.measurementSystem,
       checkinContext,
+      // Stream the build so the modal can render the preamble + exercises live.
+      onPreamble: opts?.onPreamble,
+      onExercise: opts?.onExercise,
     });
 
     if (result.success) {

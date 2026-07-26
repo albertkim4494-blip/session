@@ -714,6 +714,9 @@ Deno.serve(async (req) => {
     const todayModel = ALLOWED_MODELS.has(body.modelHint) ? body.modelHint : "gpt-4o-mini";
     const model = mode === "program" ? "gpt-4o" : todayModel;
 
+    // Only "today" streams (the hero surface). Program stays a blocking JSON call.
+    const wantsStream = body.stream === true && mode === "today";
+
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -729,6 +732,7 @@ Deno.serve(async (req) => {
         temperature: 0.8,
         max_tokens: 2000,
         response_format: { type: "json_object" },
+        ...(wantsStream ? { stream: true } : {}),
       }),
     });
 
@@ -739,6 +743,139 @@ Deno.serve(async (req) => {
         { error: "AI service error", detail: openaiRes.status },
         502
       );
+    }
+
+    // -----------------------------------------------------------------------
+    // STREAMING PATH (today only): emit a one-line preamble (the "note") as soon
+    // as it's complete, then each exercise object as it finishes, then a final
+    // "done" with the validated workout. Mirrors the ai-coach SSE emitter.
+    // -----------------------------------------------------------------------
+    if (wantsStream && openaiRes.body) {
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+      const reader = openaiRes.body.getReader();
+
+      const sseStream = new ReadableStream({
+        async start(controller) {
+          let fullText = "";
+          let exercisesSent = 0;
+          let preambleSent = false;
+          const send = (obj: unknown) =>
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+
+          try {
+            let sseBuffer = "";
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              sseBuffer += decoder.decode(value, { stream: true });
+              const lines = sseBuffer.split("\n");
+              sseBuffer = lines.pop() || "";
+
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                const payload = line.slice(6).trim();
+                if (payload === "[DONE]") continue;
+                try {
+                  const chunk = JSON.parse(payload);
+                  const delta = chunk.choices?.[0]?.delta?.content;
+                  if (delta) fullText += delta;
+                } catch {
+                  // skip malformed chunk
+                }
+              }
+
+              // Preamble: emit the "note" field once its closing quote arrives.
+              if (!preambleSent) {
+                const noteMatch = fullText.match(/"note"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                if (noteMatch) {
+                  let note = noteMatch[1];
+                  try { note = JSON.parse(`"${note}"`); } catch { /* keep raw */ }
+                  if (note) send({ type: "preamble", text: note });
+                  preambleSent = true;
+                }
+              }
+
+              // Exercises: brace-walk the "exercises":[ … ] array, emit each new
+              // complete object (skipping string contents so braces in strings
+              // don't miscount).
+              const exMatch = fullText.match(/"exercises"\s*:\s*\[/);
+              if (exMatch) {
+                const arrayStart = fullText.indexOf("[", exMatch.index);
+                let depth = 0;
+                let objStart = -1;
+                let objectIndex = 0;
+                for (let i = arrayStart + 1; i < fullText.length; i++) {
+                  const ch = fullText[i];
+                  if (ch === '"') {
+                    i++;
+                    while (i < fullText.length && fullText[i] !== '"') {
+                      if (fullText[i] === '\\') i++;
+                      i++;
+                    }
+                    continue;
+                  }
+                  if (ch === '{') {
+                    if (depth === 0) objStart = i;
+                    depth++;
+                  } else if (ch === '}') {
+                    depth--;
+                    if (depth === 0 && objStart >= 0) {
+                      if (objectIndex >= exercisesSent) {
+                        try {
+                          const ex = JSON.parse(fullText.slice(objStart, i + 1));
+                          send({ type: "exercise", data: ex });
+                        } catch {
+                          // malformed object — skip permanently
+                        }
+                        exercisesSent = objectIndex + 1;
+                      }
+                      objectIndex++;
+                      objStart = -1;
+                    }
+                  }
+                }
+              }
+            }
+
+            // Stream finished — parse + validate the full workout.
+            const cleaned = fullText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+            let parsed;
+            try {
+              parsed = JSON.parse(cleaned);
+            } catch {
+              console.log(JSON.stringify({ event: "ai_parse_fail", feature: "today", contentPreview: fullText.slice(0, 200) }));
+              send({ type: "error", message: "parse_fail" });
+              controller.close();
+              return;
+            }
+            const valErr = validateWorkoutOutput(parsed, "today");
+            if (valErr) {
+              console.log(JSON.stringify({ event: "ai_schema_fail", feature: "today", code: valErr.code, field: valErr.field }));
+              send({ type: "error", message: "schema_fail" });
+              controller.close();
+              return;
+            }
+            console.log(JSON.stringify({ event: "ai_success", feature: "today", model, streamed: true }));
+            send({ type: "done", data: parsed });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error("Generator stream error:", msg);
+            send({ type: "error", message: msg });
+          } finally {
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(sseStream, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
     }
 
     const openaiData = await openaiRes.json();
