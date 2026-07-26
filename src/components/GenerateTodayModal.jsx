@@ -12,6 +12,16 @@ const DURATION_OPTIONS = [
   { value: 90, label: "90+ min" },
 ];
 
+// Status captions shown while waiting for the first streamed token. These mirror
+// the data the generator actually sends (recency, fatigue, trait vector, trends),
+// so the wait reads as real work rather than a dead spinner.
+const BUILD_STAGES = [
+  "Reading your recent training…",
+  "Checking recovery & fatigue…",
+  "Balancing muscle groups…",
+  "Writing your workout…",
+];
+
 const MUSCLE_LABELS = {
   CHEST: "Chest",
   BACK: "Back",
@@ -50,6 +60,16 @@ export function GenerateTodayModal({
   const [streamExercises, setStreamExercises] = useState([]);
   // 👍/👎 on the generated workout (WS5). Reset per generation.
   const [feedback, setFeedback] = useState(null);
+  // Cycling status caption during the pre-token wait.
+  const [stageIdx, setStageIdx] = useState(0);
+
+  // Advance the build-stage caption while waiting for the first streamed content.
+  const buildingWait = open && step === 4 && loading && !preview && !streamNote && streamExercises.length === 0;
+  useEffect(() => {
+    if (!buildingWait) return;
+    const id = setInterval(() => setStageIdx((i) => Math.min(i + 1, BUILD_STAGES.length - 1)), 1800);
+    return () => clearInterval(id);
+  }, [buildingWait]);
 
   const update = (payload) =>
     dispatch({ type: "UPDATE_GENERATE_TODAY", payload });
@@ -60,6 +80,7 @@ export function GenerateTodayModal({
     setStreamNote(null);
     setStreamExercises([]);
     setFeedback(null);
+    setStageIdx(0);
     onGenerate({
       equipment,
       duration,
@@ -242,21 +263,31 @@ export function GenerateTodayModal({
               <style>{`@keyframes genFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }`}</style>
             </div>
           ) : (
+            // Pre-token wait: cycling status caption + shimmering skeleton rows,
+            // in the same card that will fill with real exercises — so the
+            // stream reads as one continuous "building" motion, not a spinner.
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontSize: 12, opacity: 0.6 }}>Reading your recent training &amp; recovery…</div>
-              <div style={{
-                padding: "16px 12px", borderRadius: 12,
-                border: `1px solid ${colors.border}`, background: colors.cardAltBg,
-                display: "flex", alignItems: "center", gap: 10,
-              }}>
-                <div style={{
-                  width: 18, height: 18, border: `2px solid ${colors.border}`,
-                  borderTopColor: colors.primaryBg, borderRadius: "50%",
-                  animation: "spin 0.8s linear infinite", flexShrink: 0,
-                }} />
-                <span style={{ fontSize: 13, opacity: 0.7 }}>Designing your workout…</span>
+              <div style={{ fontSize: 12, opacity: 0.65, transition: "opacity 0.3s" }}>
+                {BUILD_STAGES[stageIdx]}
               </div>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              <div style={{
+                padding: "10px 12px", borderRadius: 12,
+                border: `1px solid ${colors.border}`, background: colors.cardAltBg,
+              }}>
+                {[72, 56, 80, 50].map((w, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0" }}>
+                    <div style={{
+                      height: 10, width: `${w}%`, borderRadius: 6, background: colors.border,
+                      animation: `genPulse 1.2s ease-in-out ${i * 0.15}s infinite`,
+                    }} />
+                    <div style={{
+                      height: 10, width: 30, borderRadius: 6, background: colors.border,
+                      animation: `genPulse 1.2s ease-in-out ${i * 0.15}s infinite`,
+                    }} />
+                  </div>
+                ))}
+              </div>
+              <style>{`@keyframes genPulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.6; } }`}</style>
             </div>
           )
         )}
