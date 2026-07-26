@@ -8093,7 +8093,6 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         isPro={isPro}
         genUsage={{ used: getMonthlyGenCount(), limit: FREE_AI_MONTHLY_LIMIT }}
         onRegenerate={() => recordAiEvent("ai_regenerated", "today")}
-        onFeedback={(rating) => recordAiEvent(rating === "up" ? "ai_thumbs_up" : "ai_thumbs_down", "today")}
         styles={styles}
         colors={colors}
       />

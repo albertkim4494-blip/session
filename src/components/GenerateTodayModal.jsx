@@ -49,7 +49,6 @@ export function GenerateTodayModal({
   isPro,
   genUsage,
   onRegenerate,
-  onFeedback,
   styles,
   colors,
 }) {
@@ -58,8 +57,6 @@ export function GenerateTodayModal({
   // Live streaming state — the coaching "why" line and exercises as they arrive.
   const [streamNote, setStreamNote] = useState(null);
   const [streamExercises, setStreamExercises] = useState([]);
-  // 👍/👎 on the generated workout (WS5). Reset per generation.
-  const [feedback, setFeedback] = useState(null);
   // Cycling status caption during the pre-token wait.
   const [stageIdx, setStageIdx] = useState(0);
 
@@ -79,7 +76,6 @@ export function GenerateTodayModal({
     if (!open || step !== 4 || preview || loading) return;
     setStreamNote(null);
     setStreamExercises([]);
-    setFeedback(null);
     setStageIdx(0);
     onGenerate({
       equipment,
@@ -111,11 +107,6 @@ export function GenerateTodayModal({
     onRegenerate?.();
     update({ preview: null, loading: false, error: null });
     // useEffect will re-trigger generation
-  };
-
-  const chooseFeedback = (rating) => {
-    setFeedback(rating);
-    onFeedback?.(rating);
   };
 
   // Free-tier allowance display (soft — never blocks). Pro = unlimited.
@@ -321,11 +312,9 @@ export function GenerateTodayModal({
                 <div style={{ fontWeight: 700, fontSize: 14 }}>
                   {preview.name}
                 </div>
-                {preview.scheme && (
-                  <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600 }}>
-                    {preview.scheme}
-                  </span>
-                )}
+                {/* No workout-level scheme here — each exercise carries its own
+                    tailored sets×reps below, so a single title-level "3×10"
+                    would contradict them. */}
               </div>
 
               {preview.targetMuscles && preview.targetMuscles.length > 0 && (
@@ -350,33 +339,16 @@ export function GenerateTodayModal({
               ))}
             </div>
 
-            {/* Feedback (👍/👎) + free-tier usage line */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, opacity: 0.55 }}>Good workout?</span>
-              {["up", "down"].map((r) => (
-                <button
-                  key={r}
-                  className="btn-press"
-                  onClick={() => chooseFeedback(r)}
-                  aria-label={r === "up" ? "Thumbs up" : "Thumbs down"}
-                  style={{
-                    border: `1px solid ${feedback === r ? colors.primaryBg : colors.border}`,
-                    background: feedback === r ? colors.primaryBg : "transparent",
-                    borderRadius: 8, padding: "4px 8px", cursor: "pointer", fontSize: 14, lineHeight: 1,
-                  }}
-                >
-                  {r === "up" ? "👍" : "👎"}
-                </button>
-              ))}
-              <div style={{ flex: 1 }} />
-              {!isPro && genRemaining != null && (
-                <span style={{ fontSize: 11, opacity: 0.5, textAlign: "right" }}>
-                  {genRemaining > 0
-                    ? `${genRemaining} of ${genUsage.limit} free AI workouts left`
-                    : "Free limit reached — free during beta"}
-                </span>
-              )}
-            </div>
+            {/* Free-tier usage line (non-Pro only; soft, never blocks).
+                Post-workout "how was that session?" feedback — the signal that
+                should feed future generations — is a planned separate feature. */}
+            {!isPro && genRemaining != null && (
+              <div style={{ fontSize: 11, opacity: 0.5, textAlign: "right" }}>
+                {genRemaining > 0
+                  ? `${genRemaining} of ${genUsage.limit} free AI workouts left`
+                  : "Free limit reached — free during beta"}
+              </div>
+            )}
           </>
         )}
 
