@@ -11,6 +11,14 @@ import { analyzeMuscleRecency, exerciseCountFromDuration } from "./workoutGenera
 import { isSetCompleted, dayHasCompletedSets } from "./setHelpers";
 import { recordAiEvent } from "./aiMetrics";
 import { inferSportTraits } from "./coachNormalize";
+import {
+  computeEstimated1RMTrends,
+  computeVolumeLoadTrends,
+  computeProgressionTrends,
+  loadInsightHistory,
+  buildFollowUpContext,
+  buildCoachingHistoryPayload,
+} from "./trainingSignals";
 
 // Human-readable labels for the 8 movement-pattern traits inferred from a sport.
 // Used to turn the trait vector into a data-driven "sport demand" summary that
@@ -356,6 +364,46 @@ function buildFatigueSignals(state, catalog, todayKey) {
   };
 }
 
+/**
+ * Collect the Coach's higher-order training signals for the generator prompt:
+ * strength progress (est-1RM + volume-load trends) and coaching-insight memory
+ * (so today's workout stays consistent with recent coach advice). Reuses the
+ * exact builders the AI Coach uses (lib/trainingSignals.js). Pure; returns
+ * compact, prompt-ready shapes. Window: last ~42 days ending today.
+ */
+function buildTrainingSignals(appState, weightLabel, todayKey) {
+  const logsByDate = appState.logsByDate || {};
+  const end = todayKey;
+  const startDate = new Date(`${todayKey}T00:00:00`);
+  startDate.setDate(startDate.getDate() - 42);
+  const start = startDate.toISOString().slice(0, 10);
+  const recentLogs = {};
+  for (const [d, day] of Object.entries(logsByDate)) {
+    if (d >= start && d <= end) recentLogs[d] = day;
+  }
+  // All workouts that could contain the logged exercise ids (program + daily).
+  const allWorkouts = [
+    ...(appState.program?.workouts || []),
+    ...Object.values(appState.dailyWorkouts || {}).flat(),
+  ];
+
+  const estimated1RMTrends = computeEstimated1RMTrends(recentLogs, allWorkouts, weightLabel);
+  const volumeLoadTrends = computeVolumeLoadTrends(recentLogs, allWorkouts, weightLabel);
+  const progressionTrends = computeProgressionTrends(recentLogs, allWorkouts, weightLabel);
+
+  // Coaching-insight memory → follow-up-aware payload, so "today" reflects what
+  // the Coach recently advised and whether the user acted on it.
+  const activeExerciseNames = [];
+  for (const w of allWorkouts) {
+    for (const ex of w.exercises || []) activeExerciseNames.push(ex.name);
+  }
+  const insightHistory = loadInsightHistory();
+  const followUp = buildFollowUpContext(insightHistory, { progressionTrends, activeExerciseNames });
+  const coachingHistory = buildCoachingHistoryPayload(insightHistory, followUp);
+
+  return { estimated1RMTrends, volumeLoadTrends, coachingHistory };
+}
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -470,6 +518,8 @@ export async function generateTodayAI({
     const currentPlan = buildCurrentPlanSummary(appState);
     const trainingPattern = buildTrainingPatternSummary(appState, todayKey);
     const catalogMap = buildCatalogMap(catalog);
+    // Coach-grade signals: strength progress + coaching memory (reused builders).
+    const signals = buildTrainingSignals(appState, wLabel, todayKey);
 
     const { data, error } = await supabase.functions.invoke(
       "ai-workout-generator",
@@ -487,6 +537,9 @@ export async function generateTodayAI({
           checkinContext: checkinContext || null,
           muscleRecency,
           fatigue,
+          estimated1RMTrends: signals.estimated1RMTrends,
+          volumeLoadTrends: signals.volumeLoadTrends,
+          coachingHistory: signals.coachingHistory,
         },
       }
     );

@@ -254,8 +254,14 @@ function buildTodayPrompt(payload: {
     todayMusclesAlreadyTrained?: string[];
     todayExercisesAlreadyDone?: string[];
   };
+  estimated1RMTrends?: string[] | null;
+  volumeLoadTrends?: string[] | null;
+  coachingHistory?: {
+    entries?: Array<{ title?: string; message?: string; severity?: string; suggestions?: Array<{ exercise?: string }> }>;
+    followUps?: Array<{ title?: string; followUp?: string[] }>;
+  } | null;
 }) {
-  const { profile, equipment, duration, catalog, history, currentPlan, trainingPattern, checkinContext, muscleRecency, fatigue } = payload;
+  const { profile, equipment, duration, catalog, history, currentPlan, trainingPattern, checkinContext, muscleRecency, fatigue, estimated1RMTrends, volumeLoadTrends, coachingHistory } = payload;
 
   const profileLines: string[] = [];
   if (profile.age) profileLines.push(`Age: ${profile.age}`);
@@ -305,6 +311,33 @@ function buildTodayPrompt(payload: {
   const exerciseCount = payload.exerciseCount || (dur <= 15 ? 2 : dur <= 30 ? Math.min(4, Math.max(3, Math.round(dur / 8))) : Math.max(4, Math.min(10, Math.round(dur / 7))));
   const checkinSection = formatCheckinSection(checkinContext);
 
+  // Strength progress (reused Coach math): est-1RM + volume-load trends.
+  const strengthLines: string[] = [];
+  if (Array.isArray(estimated1RMTrends) && estimated1RMTrends.length > 0) {
+    strengthLines.push("Estimated 1RM trend (first → latest):");
+    for (const t of estimated1RMTrends.slice(0, 8)) strengthLines.push(`- ${t}`);
+  }
+  if (Array.isArray(volumeLoadTrends) && volumeLoadTrends.length > 0) {
+    strengthLines.push("Volume-load trend (first → latest):");
+    for (const t of volumeLoadTrends.slice(0, 8)) strengthLines.push(`- ${t}`);
+  }
+  const strengthSection = strengthLines.length > 0
+    ? `\nSTRENGTH PROGRESS:\n${strengthLines.join("\n")}\nProgress lifts that are climbing; address ones stalling or regressing.\n`
+    : "";
+
+  // Recent coaching memory — keep today's workout consistent with prior advice.
+  let coachingSection = "";
+  if (coachingHistory?.entries && coachingHistory.entries.length > 0) {
+    const noteLines = coachingHistory.entries.slice(0, 4).map((e) => {
+      const sug = (e.suggestions || []).map((s) => s.exercise).filter(Boolean).join(", ");
+      return `- ${e.title}${e.message ? `: ${e.message}` : ""}${sug ? ` (suggested: ${sug})` : ""}`;
+    });
+    const followLines = (coachingHistory.followUps || [])
+      .slice(0, 3)
+      .flatMap((f) => (f.followUp || []).map((x) => `- ${x}`));
+    coachingSection = `\nRECENT COACHING NOTES (from the AI Coach — stay consistent with this):\n${noteLines.join("\n")}${followLines.length > 0 ? `\nFollow-up:\n${followLines.join("\n")}` : ""}\n`;
+  }
+
   // Sport demand instruction (when profile.sports exists). Prefer the client's
   // data-driven trait-vector summary (profile.sportDemand); fall back to a
   // generic instruction when the sport isn't recognized (no hardcoded blurb).
@@ -346,7 +379,7 @@ ${recencyLines}
 TRAINING HISTORY (last 14 days):
 ${history || "No recent training data."}
 Lines prefixed with [SPORT] are sport activities — do NOT include them as exercises. Use them only for understanding training load and muscle fatigue.
-
+${strengthSection}${coachingSection}
 EXERCISE CATALOG (pick ONLY from these by catalogId):
 id | name | muscles | tags | unit
 ${catalogText}
