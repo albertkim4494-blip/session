@@ -96,8 +96,12 @@ function buildProgramPrompt(payload: {
 
   const profileLines: string[] = [];
   if (profile.age) profileLines.push(`Age: ${profile.age}`);
-  if (profile.weight_lbs) profileLines.push(`Weight: ${profile.weight_lbs} lbs`);
-  if (profile.height_inches) profileLines.push(`Height: ${profile.height_inches} inches`);
+  // weightStr/heightStr are unit-correct display strings from the client
+  // (kg/cm for metric users). Fall back to the raw lbs/inches for older payloads.
+  const weightStr = (profile.weightStr as string) || (profile.weight_lbs ? `${profile.weight_lbs} lbs` : "");
+  const heightStr = (profile.heightStr as string) || (profile.height_inches ? `${profile.height_inches} inches` : "");
+  if (weightStr) profileLines.push(`Weight: ${weightStr}`);
+  if (heightStr) profileLines.push(`Height: ${heightStr}`);
   if (profile.gender) profileLines.push(`Gender: ${profile.gender}`);
   if (profile.goal) profileLines.push(`Goal: ${profile.goal}`);
   if (profile.sports) profileLines.push(`Sports: ${profile.sports}`);
@@ -249,8 +253,12 @@ function buildTodayPrompt(payload: {
 
   const profileLines: string[] = [];
   if (profile.age) profileLines.push(`Age: ${profile.age}`);
-  if (profile.weight_lbs) profileLines.push(`Weight: ${profile.weight_lbs} lbs`);
-  if (profile.height_inches) profileLines.push(`Height: ${profile.height_inches} inches`);
+  // weightStr/heightStr are unit-correct display strings from the client
+  // (kg/cm for metric users). Fall back to the raw lbs/inches for older payloads.
+  const weightStr = (profile.weightStr as string) || (profile.weight_lbs ? `${profile.weight_lbs} lbs` : "");
+  const heightStr = (profile.heightStr as string) || (profile.height_inches ? `${profile.height_inches} inches` : "");
+  if (weightStr) profileLines.push(`Weight: ${weightStr}`);
+  if (heightStr) profileLines.push(`Height: ${heightStr}`);
   if (profile.gender) profileLines.push(`Gender: ${profile.gender}`);
   if (profile.goal) profileLines.push(`Goal: ${profile.goal}`);
   if (profile.sports) profileLines.push(`Sports: ${profile.sports}`);

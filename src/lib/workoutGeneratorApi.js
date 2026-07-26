@@ -48,14 +48,40 @@ function calculateAge(birthdate) {
   return age > 0 && age < 120 ? age : null;
 }
 
-function buildProfilePayload(profile = {}) {
+function buildProfilePayload(profile = {}, measurementSystem) {
   const age = profile.age || calculateAge(profile.birthdate);
+  const metric = measurementSystem === "metric";
+  // Weight/height are stored canonically as lbs/inches. Render display-ready,
+  // unit-correct strings here so the edge-function prompt never mislabels a
+  // metric user's numbers (was hardcoded "lbs"/"inches" server-side).
+  let weightStr = null;
+  if (profile.weight_lbs != null && profile.weight_lbs !== "") {
+    const lbs = Number(profile.weight_lbs);
+    if (!Number.isNaN(lbs)) {
+      weightStr = metric ? `${Math.round(lbs * 0.453592)} kg` : `${Math.round(lbs)} lb`;
+    }
+  }
+  let heightStr = null;
+  if (profile.height_inches != null && profile.height_inches !== "") {
+    const inches = Number(profile.height_inches);
+    if (!Number.isNaN(inches)) {
+      if (metric) {
+        heightStr = `${Math.round(inches * 2.54)} cm`;
+      } else {
+        const ft = Math.floor(inches / 12);
+        const rem = Math.round(inches % 12);
+        heightStr = `${ft}'${rem}"`;
+      }
+    }
+  }
   return {
     age,
     birthdate: profile.birthdate,
     gender: profile.gender,
     weight_lbs: profile.weight_lbs,
     height_inches: profile.height_inches,
+    weightStr,
+    heightStr,
     goal: profile.goal,
     sports: profile.sports,
     about: profile.about,
@@ -331,7 +357,7 @@ export async function generateProgramAI({
       {
         body: {
           mode: "program",
-          profile: buildProfilePayload(profile),
+          profile: buildProfilePayload(profile, measurementSystem),
           equipment,
           catalog: catalogPayload,
           history,
@@ -417,7 +443,7 @@ export async function generateTodayAI({
       {
         body: {
           mode: "today",
-          profile: buildProfilePayload(profile),
+          profile: buildProfilePayload(profile, measurementSystem),
           equipment,
           duration: duration || 60,
           exerciseCount: exerciseCountFromDuration(duration),

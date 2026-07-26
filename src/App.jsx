@@ -3926,6 +3926,26 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
     dispatchModal({ type: "UPDATE_GENERATE_TODAY", payload: { loading: true, error: null, preview: null } });
 
+    // Respect the AI privacy toggle: when AI is disabled we must NOT send training
+    // data to OpenAI. Fall back to the on-device deterministic builder so the user
+    // still gets a workout, just without the AI round-trip. Mirrors the Coach path
+    // (doCoachFetch), which also gates on aiEnabled.
+    if (!aiEnabled) {
+      const local = generateTodayWorkout({
+        state,
+        equipment: eq,
+        profile,
+        catalog: fullCatalog,
+        todayKey: dateKey,
+        duration: dur,
+      });
+      dispatchModal({
+        type: "UPDATE_GENERATE_TODAY",
+        payload: { preview: local, loading: false, error: "AI is off in Settings — used smart defaults" },
+      });
+      return;
+    }
+
     const result = await generateTodayAI({
       equipment: eq,
       duration: dur,
