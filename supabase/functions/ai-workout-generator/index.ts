@@ -146,15 +146,21 @@ The user plays ${sportName} on ${sportDayList} (${sportDayCount} days per week).
 - For sport day entries, set "scheme" to "sport" and name them like "${sportName} (${sportDayList})" or "${sportName} + Recovery".`
       : "";
 
-  // Sport biomechanics instruction (when profile.sports exists)
+  // Sport demand instruction (when profile.sports exists). Prefer the client's
+  // data-driven trait-vector summary (profile.sportDemand); fall back to a
+  // generic instruction when the sport isn't recognized (no hardcoded blurb).
   let sportBioSection = "";
   if (profile.sports) {
-    sportBioSection = `
-SPORT BIOMECHANICS:
-The user participates in: ${profile.sports}. Consider the muscular demands of this sport.
-Common sport demands — Water polo: heavy shoulders, chest, legs, cardio. Basketball: legs, shoulders, cardio. Soccer: legs, cardio, core. Swimming: shoulders, back, chest, cardio. Tennis: shoulders, forearm, core, legs. Running: legs, cardio. Cycling: quads, hamstrings, cardio. Rowing: back, legs, shoulders, cardio.
-Avoid overloading muscles already heavily taxed by the sport.
-Prioritize complementary work, antagonist muscles, and injury prevention.
+    const sportDemand = profile.sportDemand as string | undefined;
+    sportBioSection = sportDemand
+      ? `
+SPORT DEMAND PROFILE:
+The user plays: ${profile.sports}. Based on the movement patterns of that sport, it already heavily loads: ${sportDemand}.
+Avoid piling more volume onto those already-taxed patterns today. Prioritize complementary/antagonist work, structural balance, and injury prevention.
+`
+      : `
+SPORT DEMAND PROFILE:
+The user participates in: ${profile.sports}. Consider its muscular demands, avoid overloading muscles the sport already taxes heavily, and prioritize complementary/antagonist work and injury prevention.
 `;
   }
 
@@ -299,15 +305,21 @@ function buildTodayPrompt(payload: {
   const exerciseCount = payload.exerciseCount || (dur <= 15 ? 2 : dur <= 30 ? Math.min(4, Math.max(3, Math.round(dur / 8))) : Math.max(4, Math.min(10, Math.round(dur / 7))));
   const checkinSection = formatCheckinSection(checkinContext);
 
-  // Sport biomechanics instruction (when profile.sports exists)
+  // Sport demand instruction (when profile.sports exists). Prefer the client's
+  // data-driven trait-vector summary (profile.sportDemand); fall back to a
+  // generic instruction when the sport isn't recognized (no hardcoded blurb).
   let sportBioSection = "";
   if (profile.sports) {
-    sportBioSection = `
-SPORT BIOMECHANICS:
-The user participates in: ${profile.sports}. Consider the muscular demands of this sport.
-Common sport demands — Water polo: heavy shoulders, chest, legs, cardio. Basketball: legs, shoulders, cardio. Soccer: legs, cardio, core. Swimming: shoulders, back, chest, cardio. Tennis: shoulders, forearm, core, legs. Running: legs, cardio. Cycling: quads, hamstrings, cardio. Rowing: back, legs, shoulders, cardio.
-Avoid overloading muscles already heavily taxed by the sport.
-Prioritize complementary work, antagonist muscles, and injury prevention.
+    const sportDemand = profile.sportDemand as string | undefined;
+    sportBioSection = sportDemand
+      ? `
+SPORT DEMAND PROFILE:
+The user plays: ${profile.sports}. Based on the movement patterns of that sport, it already heavily loads: ${sportDemand}.
+Avoid piling more volume onto those already-taxed patterns today. Prioritize complementary/antagonist work, structural balance, and injury prevention.
+`
+      : `
+SPORT DEMAND PROFILE:
+The user participates in: ${profile.sports}. Consider its muscular demands, avoid overloading muscles the sport already taxes heavily, and prioritize complementary/antagonist work and injury prevention.
 `;
   }
 

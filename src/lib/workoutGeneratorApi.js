@@ -10,6 +10,36 @@ import { transformExercises } from "./workoutTransform";
 import { analyzeMuscleRecency, exerciseCountFromDuration } from "./workoutGenerator";
 import { isSetCompleted, dayHasCompletedSets } from "./setHelpers";
 import { recordAiEvent } from "./aiMetrics";
+import { inferSportTraits } from "./coachNormalize";
+
+// Human-readable labels for the 8 movement-pattern traits inferred from a sport.
+// Used to turn the trait vector into a data-driven "sport demand" summary that
+// replaces the old hardcoded per-sport blurb in the generator prompt.
+const TRAIT_LABELS = {
+  upperPush: "pushing (shoulders/chest/triceps)",
+  upperPull: "pulling (back/biceps)",
+  legLoad: "legs",
+  coreRotation: "rotational core",
+  gripLoad: "grip/forearms",
+  impactStress: "joint impact",
+  explosiveness: "power/explosiveness",
+  cardioLoad: "cardio/conditioning",
+};
+
+/**
+ * Turn a free-text sport list into a data-driven demand summary, e.g.
+ * "cardio/conditioning: HIGH; legs: HIGH; power/explosiveness: MODERATE".
+ * Returns null if the sport(s) aren't recognized (prompt falls back to generic).
+ */
+function buildSportDemand(profileSports) {
+  const traits = inferSportTraits(profileSports);
+  if (!traits) return null;
+  const lines = Object.entries(traits)
+    .filter(([, v]) => v >= 0.4)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${TRAIT_LABELS[k] || k}: ${v >= 0.7 ? "HIGH" : "MODERATE"}`);
+  return lines.length ? lines.join("; ") : null;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -84,6 +114,9 @@ function buildProfilePayload(profile = {}, measurementSystem) {
     heightStr,
     goal: profile.goal,
     sports: profile.sports,
+    // Data-driven movement-pattern demand from the declared sport(s); the edge
+    // prompt renders this instead of a hardcoded per-sport blurb.
+    sportDemand: buildSportDemand(profile.sports),
     about: profile.about,
   };
 }
