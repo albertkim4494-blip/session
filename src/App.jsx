@@ -22,7 +22,7 @@ import {
   toNumberOrNull, formatMaxWeight,
 } from "./lib/validation";
 import { computeCoachSignature, COACH_CACHE_TTL_MS } from "./lib/coachSignature";
-import { getDailyRefreshCount, incrementDailyRefresh } from "./lib/aiMetrics";
+import { getDailyRefreshCount, incrementDailyRefresh, recordAiEvent, getMonthlyGenCount, incrementMonthlyGenCount } from "./lib/aiMetrics";
 import { initialModalState, modalReducer } from "./lib/modalReducer";
 
 // Extracted hooks
@@ -81,7 +81,7 @@ import { generateTodayAI } from "./lib/workoutGeneratorApi";
 import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } from "./lib/greetings";
 import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
-import { isPro as selectIsPro } from "./lib/entitlements";
+import { isPro as selectIsPro, FREE_AI_MONTHLY_LIMIT } from "./lib/entitlements";
 import { DEV_TOOLS_ENABLED } from "./lib/devFlags";
 import { Capacitor } from "@capacitor/core";
 import { initBilling, getIsPro, getProOffering, purchasePro, restorePro, addProListener } from "./lib/billing";
@@ -3946,6 +3946,11 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return;
     }
 
+    // Count this AI generation against the monthly free allowance (WS6). Every
+    // AI call counts (incl. regenerates) since each hits OpenAI. Soft for now —
+    // hard enforcement lands in Phase 3 with the real entitlement.
+    incrementMonthlyGenCount();
+
     const result = await generateTodayAI({
       equipment: eq,
       duration: dur,
@@ -3980,6 +3985,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }
 
   function handleAcceptTodayWorkout(workout) {
+    recordAiEvent("ai_accepted", "today");
     updateState((st) => {
       if (!st.dailyWorkouts) st.dailyWorkouts = {};
       if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
@@ -8084,6 +8090,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         onCheckinSubmit={handleGenerateTodayCheckin}
         onAccept={handleAcceptTodayWorkout}
         onClose={() => dispatchModal({ type: "CLOSE_GENERATE_TODAY" })}
+        isPro={isPro}
+        genUsage={{ used: getMonthlyGenCount(), limit: FREE_AI_MONTHLY_LIMIT }}
+        onRegenerate={() => recordAiEvent("ai_regenerated", "today")}
+        onFeedback={(rating) => recordAiEvent(rating === "up" ? "ai_thumbs_up" : "ai_thumbs_down", "today")}
         styles={styles}
         colors={colors}
       />

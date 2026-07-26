@@ -36,6 +36,10 @@ export function GenerateTodayModal({
   onCheckinSubmit,
   onAccept,
   onClose,
+  isPro,
+  genUsage,
+  onRegenerate,
+  onFeedback,
   styles,
   colors,
 }) {
@@ -44,6 +48,8 @@ export function GenerateTodayModal({
   // Live streaming state — the coaching "why" line and exercises as they arrive.
   const [streamNote, setStreamNote] = useState(null);
   const [streamExercises, setStreamExercises] = useState([]);
+  // 👍/👎 on the generated workout (WS5). Reset per generation.
+  const [feedback, setFeedback] = useState(null);
 
   const update = (payload) =>
     dispatch({ type: "UPDATE_GENERATE_TODAY", payload });
@@ -53,6 +59,7 @@ export function GenerateTodayModal({
     if (!open || step !== 4 || preview || loading) return;
     setStreamNote(null);
     setStreamExercises([]);
+    setFeedback(null);
     onGenerate({
       equipment,
       duration,
@@ -80,9 +87,18 @@ export function GenerateTodayModal({
   };
 
   const handleRegenerate = () => {
+    onRegenerate?.();
     update({ preview: null, loading: false, error: null });
     // useEffect will re-trigger generation
   };
+
+  const chooseFeedback = (rating) => {
+    setFeedback(rating);
+    onFeedback?.(rating);
+  };
+
+  // Free-tier allowance display (soft — never blocks). Pro = unlimited.
+  const genRemaining = genUsage ? Math.max(0, (genUsage.limit || 0) - (genUsage.used || 0)) : null;
 
   const smallChipStyle = (active) => ({
     padding: "8px 16px",
@@ -301,6 +317,34 @@ export function GenerateTodayModal({
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* Feedback (👍/👎) + free-tier usage line */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, opacity: 0.55 }}>Good workout?</span>
+              {["up", "down"].map((r) => (
+                <button
+                  key={r}
+                  className="btn-press"
+                  onClick={() => chooseFeedback(r)}
+                  aria-label={r === "up" ? "Thumbs up" : "Thumbs down"}
+                  style={{
+                    border: `1px solid ${feedback === r ? colors.primaryBg : colors.border}`,
+                    background: feedback === r ? colors.primaryBg : "transparent",
+                    borderRadius: 8, padding: "4px 8px", cursor: "pointer", fontSize: 14, lineHeight: 1,
+                  }}
+                >
+                  {r === "up" ? "👍" : "👎"}
+                </button>
+              ))}
+              <div style={{ flex: 1 }} />
+              {!isPro && genRemaining != null && (
+                <span style={{ fontSize: 11, opacity: 0.5, textAlign: "right" }}>
+                  {genRemaining > 0
+                    ? `${genRemaining} of ${genUsage.limit} free AI workouts left`
+                    : "Free limit reached — free during beta"}
+                </span>
+              )}
             </div>
           </>
         )}

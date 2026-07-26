@@ -8,7 +8,7 @@ const MAX_ENTRIES = 100;
 
 /**
  * Record an AI event for observability.
- * @param {"ai_success"|"ai_parse_fail"|"ai_schema_fail"|"ai_fallback_used"|"ai_empty_workout"|"ai_repair_success"} event
+ * @param {"ai_success"|"ai_parse_fail"|"ai_schema_fail"|"ai_fallback_used"|"ai_empty_workout"|"ai_repair_success"|"ai_accepted"|"ai_regenerated"|"ai_dismissed"|"ai_thumbs_up"|"ai_thumbs_down"} event
  * @param {"coach"|"program"|"today"} feature
  * @param {Record<string, unknown>} [meta] - Optional metadata (error message, token counts, etc.)
  */
@@ -87,6 +87,51 @@ export function incrementDailyRefresh() {
     }
     count++;
     localStorage.setItem(DAILY_REFRESH_KEY, JSON.stringify({ date: today, count }));
+    return count;
+  } catch {
+    return 1;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Monthly AI generation count (free-tier allowance plumbing — WS6)
+// ---------------------------------------------------------------------------
+
+const MONTHLY_GEN_KEY = "wt_ai_monthly_gen";
+
+function currentMonth() {
+  return new Date().toISOString().slice(0, 7); // "YYYY-MM"
+}
+
+/**
+ * AI workout generations used this calendar month. Resets when the month
+ * changes. Counts every AI generation (incl. regenerates) since each is an
+ * OpenAI call; the deterministic on-device builder is NOT counted.
+ */
+export function getMonthlyGenCount() {
+  try {
+    const raw = localStorage.getItem(MONTHLY_GEN_KEY);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw);
+    if (parsed.month !== currentMonth()) return 0;
+    return parsed.count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Increment this month's AI generation counter. Returns the new count. */
+export function incrementMonthlyGenCount() {
+  try {
+    const month = currentMonth();
+    const raw = localStorage.getItem(MONTHLY_GEN_KEY);
+    let count = 0;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.month === month) count = parsed.count || 0;
+    }
+    count++;
+    localStorage.setItem(MONTHLY_GEN_KEY, JSON.stringify({ month, count }));
     return count;
   } catch {
     return 1;
