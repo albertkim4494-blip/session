@@ -33,9 +33,16 @@ async function loadPurchases() {
   return mod;
 }
 
-/** True if the given CustomerInfo has the `pro` entitlement active. */
+/**
+ * True if the CustomerInfo grants Pro. Primary check is the named `pro`
+ * entitlement; fallback is ANY active entitlement. The RevenueCat Test Store
+ * ships a single "Session Pro" entitlement (identifier isn't literally `pro`),
+ * and for this spike any active entitlement means Pro. Phase 3 (real Play
+ * products) should pin this to the exact production entitlement identifier.
+ */
 function proFromCustomerInfo(customerInfo) {
-  return !!customerInfo?.entitlements?.active?.[PRO_ENTITLEMENT];
+  const active = customerInfo?.entitlements?.active || {};
+  return !!active[PRO_ENTITLEMENT] || Object.keys(active).length > 0;
 }
 
 /**
