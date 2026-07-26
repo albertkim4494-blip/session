@@ -84,6 +84,7 @@ import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekSt
 import { isPro as selectIsPro } from "./lib/entitlements";
 import { DEV_TOOLS_ENABLED } from "./lib/devFlags";
 import { Capacitor } from "@capacitor/core";
+import { initBilling, getIsPro, getProOffering, purchasePro, restorePro, addProListener } from "./lib/billing";
 import { buildStrengthSeries, buildRepsSeries, buildWeeklyVolumeSeries, computePRs } from "./lib/progressCharts";
 import { buildMuscleBalance } from "./lib/muscleBalance";
 import { fromLbs } from "./lib/units";
@@ -250,10 +251,15 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const theme = state.preferences?.theme || "dark";
   const equipment = state.preferences?.equipment || ["full_gym"];
   const weekStartsOn = Number.isInteger(state.preferences?.weekStartsOn) ? state.preferences.weekStartsOn : 0;
-  // Pro entitlement. Manual DEV toggle today; RevenueCat in Phase 3. In a release
-  // build (no dev tools) there is no way to pay yet, so ignore any legacy
-  // cloud-synced isPro flag — RevenueCat becomes the authority in Phase 3.
-  const isPro = DEV_TOOLS_ENABLED ? selectIsPro(state) : false;
+  // Native Capacitor shell? Drives both back-button routing (see the effect far
+  // below) and whether RevenueCat entitlements are allowed to grant Pro.
+  const isNativeShell = Capacitor.isNativePlatform();
+  // Pro entitlement. On the native shell RevenueCat is the authority: the billing
+  // init effect syncs its `pro` entitlement into preferences.isPro (see billing.js),
+  // so we read the synced flag. In a dev-tools build the manual Settings toggle
+  // drives it. In a plain web release build there's no way to pay, so Pro stays off
+  // regardless of any legacy cloud-synced flag.
+  const isPro = (DEV_TOOLS_ENABLED || isNativeShell) ? selectIsPro(state) : false;
   // AI features (incl. the automatic coach fetch that sends data to OpenAI).
   // Users can turn this off in Settings; default on.
   const aiEnabled = state.preferences?.aiEnabled !== false;
@@ -1576,9 +1582,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   // In the Capacitor native shell the OS captures the hardware back press and
   // it never reaches the WebView's CloseWatcher — so we route it through the
-  // @capacitor/app backButton event instead (see effect below). This flag lets
-  // the web-only CloseWatcher/history path opt out so the two don't compete.
-  const isNativeShell = Capacitor.isNativePlatform();
+  // @capacitor/app backButton event instead (see effect below). The isNativeShell
+  // flag (declared near the top of the component) lets the web-only
+  // CloseWatcher/history path opt out so the two don't compete.
 
   // ---------------------------------------------------------------------------
   // BACK BUTTON / HISTORY MANAGEMENT (Android PWA)
@@ -2688,6 +2694,85 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       return st;
     });
   }, []);
+
+  // BILLING (RevenueCat) — native shell only. Configure once per signed-in user,
+  // then mirror RevenueCat's `pro` entitlement into preferences.isPro (which is
+  // what isPro(state) reads). A CustomerInfo listener keeps it live across
+  // renewals/expirations/restores. Off native this is entirely inert (billing.js
+  // no-ops and never imports the plugin). See billing.js + APP_STORE_ROADMAP Phase 3.
+  const userId = session?.user?.id;
+  useEffect(() => {
+    if (!isNativeShell || !userId) return;
+    let cancelled = false;
+    const syncPro = (pro) => {
+      if (cancelled) return;
+      // Only write when it actually changes, to avoid a redundant cloud upsert.
+      updateState((st) => {
+        if (!st.preferences) st.preferences = {};
+        if (st.preferences.isPro !== pro) st.preferences.isPro = pro;
+        return st;
+      });
+    };
+    (async () => {
+      const ok = await initBilling(userId);
+      if (cancelled || !ok) return;
+      syncPro(await getIsPro());
+      await addProListener(syncPro);
+    })();
+    return () => { cancelled = true; };
+  }, [isNativeShell, userId]);
+
+  // Paywall state — the current Offering's packages, loaded lazily when the
+  // Billing modal opens (native only). `billingBusy` disables the buttons during
+  // a purchase/restore round-trip.
+  const [billingOffering, setBillingOffering] = useState(null);
+  const [billingBusy, setBillingBusy] = useState(false);
+  const billingOpen = modals.billing?.isOpen;
+  useEffect(() => {
+    if (!billingOpen || !isNativeShell) return;
+    let cancelled = false;
+    (async () => {
+      const offering = await getProOffering();
+      if (!cancelled) setBillingOffering(offering);
+    })();
+    return () => { cancelled = true; };
+  }, [billingOpen, isNativeShell]);
+
+  const handleBuyPro = useCallback(async (pkg) => {
+    if (!pkg || billingBusy) return;
+    setBillingBusy(true);
+    try {
+      const res = await purchasePro(pkg);
+      if (res.isPro) {
+        updatePreference("isPro", true);
+        showToast("Welcome to Pro! 🎉");
+        dispatchModal({ type: "CLOSE_BILLING" });
+      } else if (res.cancelled) {
+        // User backed out — say nothing.
+      } else {
+        showToast("Purchase didn't complete. Please try again.");
+      }
+    } finally {
+      setBillingBusy(false);
+    }
+  }, [billingBusy, updatePreference, showToast]);
+
+  const handleRestorePro = useCallback(async () => {
+    if (billingBusy) return;
+    setBillingBusy(true);
+    try {
+      const pro = await restorePro();
+      if (pro) {
+        updatePreference("isPro", true);
+        showToast("Purchases restored — Pro is active.");
+        dispatchModal({ type: "CLOSE_BILLING" });
+      } else {
+        showToast("No previous purchases found.");
+      }
+    } finally {
+      setBillingBusy(false);
+    }
+  }, [billingBusy, updatePreference, showToast]);
 
   const findPriorForExercise = useCallback(
     (exerciseId) => findMostRecentLogBefore(exerciseId, dateKey),
@@ -7635,8 +7720,56 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
           <div style={{ fontSize: 13, opacity: 0.6, lineHeight: 1.5 }}>
             {isPro
               ? "Pro unlocks advanced analytics, unlimited AI coaching, and more."
-              : "Pro plans coming soon with unlimited AI coaching, advanced analytics, and more."}
+              : "Go Pro for advanced analytics, unlimited AI coaching, and more."}
           </div>
+
+          {/* Purchase options — native shell only (RevenueCat/Play Billing).
+              On the web there's no in-app purchase, so we show a gentle note. */}
+          {!isPro && (isNativeShell ? (() => {
+            const pkgs = billingOffering
+              ? ([billingOffering.monthly, billingOffering.annual].filter(Boolean).length
+                  ? [billingOffering.monthly, billingOffering.annual].filter(Boolean)
+                  : (billingOffering.packages || []))
+              : null;
+            if (pkgs === null) {
+              return <div style={{ fontSize: 13, opacity: 0.6 }}>Loading plans…</div>;
+            }
+            if (pkgs.length === 0) {
+              return <div style={{ fontSize: 13, opacity: 0.6 }}>Plans are not available right now.</div>;
+            }
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {pkgs.map((pkg) => (
+                  <button
+                    key={pkg.identifier}
+                    className="btn-press"
+                    disabled={billingBusy}
+                    onClick={() => handleBuyPro(pkg)}
+                    style={{
+                      ...styles.primaryBtn,
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      width: "100%", opacity: billingBusy ? 0.6 : 1,
+                    }}
+                  >
+                    <span>{pkg.product?.title || pkg.identifier}</span>
+                    <span style={{ fontWeight: 700 }}>{pkg.product?.priceString || ""}</span>
+                  </button>
+                ))}
+                <button
+                  className="btn-press"
+                  disabled={billingBusy}
+                  onClick={handleRestorePro}
+                  style={{ ...styles.secondaryBtn, width: "100%", opacity: billingBusy ? 0.6 : 1 }}
+                >
+                  Restore purchases
+                </button>
+              </div>
+            );
+          })() : (
+            <div style={{ fontSize: 12, opacity: 0.5, lineHeight: 1.5 }}>
+              Pro is available in the Android app.
+            </div>
+          ))}
         </div>
       </Modal>
 
