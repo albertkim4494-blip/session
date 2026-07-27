@@ -19,6 +19,7 @@ import {
   buildFollowUpContext,
   buildCoachingHistoryPayload,
   computeComplexityScore,
+  buildGenerationPreferences,
 } from "./trainingSignals";
 
 // Human-readable labels for the 8 movement-pattern traits inferred from a sport.
@@ -631,6 +632,8 @@ export async function generateTodayAI({
       volumeLoadTrends: signals.volumeLoadTrends,
       coachingHistory: signals.coachingHistory,
       modelHint: signals.modelHint,
+      // Difficulty bias from recent post-session feedback (may be null).
+      generationPreferences: buildGenerationPreferences(appState, todayKey),
     };
 
     // Transform + validate a raw workout JSON into the final workout object (or

@@ -260,8 +260,9 @@ function buildTodayPrompt(payload: {
     entries?: Array<{ title?: string; message?: string; severity?: string; suggestions?: Array<{ exercise?: string }> }>;
     followUps?: Array<{ title?: string; followUp?: string[] }>;
   } | null;
+  generationPreferences?: { difficultyBias?: string } | null;
 }) {
-  const { profile, equipment, duration, catalog, history, currentPlan, trainingPattern, checkinContext, muscleRecency, fatigue, estimated1RMTrends, volumeLoadTrends, coachingHistory } = payload;
+  const { profile, equipment, duration, catalog, history, currentPlan, trainingPattern, checkinContext, muscleRecency, fatigue, estimated1RMTrends, volumeLoadTrends, coachingHistory, generationPreferences } = payload;
 
   const profileLines: string[] = [];
   if (profile.age) profileLines.push(`Age: ${profile.age}`);
@@ -338,6 +339,14 @@ function buildTodayPrompt(payload: {
     coachingSection = `\nRECENT COACHING NOTES (from the AI Coach — stay consistent with this):\n${noteLines.join("\n")}${followLines.length > 0 ? `\nFollow-up:\n${followLines.join("\n")}` : ""}\n`;
   }
 
+  // Difficulty bias from the user's recent post-session feedback.
+  let prefsSection = "";
+  if (generationPreferences?.difficultyBias === "too_easy") {
+    prefsSection = `\nUSER FEEDBACK: Recent sessions felt TOO EASY. Progress the challenge today — add a set, add reps, or nudge intensity on the main lifts. Don't just repeat last time's volume.\n`;
+  } else if (generationPreferences?.difficultyBias === "too_hard") {
+    prefsSection = `\nUSER FEEDBACK: Recent sessions felt TOO HARD. Pull back today — fewer sets or lighter schemes — so it stays sustainable. Prioritize quality over volume.\n`;
+  }
+
   // Sport demand instruction (when profile.sports exists). Prefer the client's
   // data-driven trait-vector summary (profile.sportDemand); fall back to a
   // generic instruction when the sport isn't recognized (no hardcoded blurb).
@@ -379,7 +388,7 @@ ${recencyLines}
 TRAINING HISTORY (last 14 days):
 ${history || "No recent training data."}
 Lines prefixed with [SPORT] are sport activities — do NOT include them as exercises. Use them only for understanding training load and muscle fatigue.
-${strengthSection}${coachingSection}
+${strengthSection}${coachingSection}${prefsSection}
 EXERCISE CATALOG (pick ONLY from these by catalogId):
 id | name | muscles | tags | unit
 ${catalogText}

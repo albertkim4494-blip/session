@@ -597,3 +597,45 @@ export function computeComplexityScore({
   if (previousInsightCount >= 5) score++;
   return score;
 }
+
+// ---------------------------------------------------------------------------
+// Generation preferences (from post-session difficulty feedback)
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive a difficulty bias for the next generated workout from the user's recent
+ * post-session feedback (state.sessionFeedback: { [date]: { difficulty } }, where
+ * difficulty ∈ "easy" | "right" | "hard").
+ *
+ * Uses the last 3 rated sessions in a 30-day window and requires a CLEAR signal
+ * (≥2 of 3 the same direction, none opposing) so a single off day doesn't swing
+ * the plan. Returns { difficultyBias: "too_easy" | "too_hard", sampleCount } or
+ * null when there's no confident signal.
+ */
+export function buildGenerationPreferences(state, todayKey) {
+  const fb = state?.sessionFeedback;
+  if (!fb || typeof fb !== "object") return null;
+
+  const end = todayKey;
+  const startDate = new Date(`${todayKey}T00:00:00`);
+  startDate.setDate(startDate.getDate() - 30);
+  const start = startDate.toISOString().slice(0, 10);
+
+  const recent = Object.entries(fb)
+    .filter(([d, v]) => d >= start && d <= end && v && v.difficulty)
+    .sort((a, b) => a[0].localeCompare(b[0])) // oldest → newest
+    .slice(-3) // most recent 3 rated sessions
+    .map(([, v]) => v.difficulty);
+
+  if (recent.length === 0) return null;
+
+  const easy = recent.filter((d) => d === "easy").length;
+  const hard = recent.filter((d) => d === "hard").length;
+
+  let difficultyBias = null;
+  if (easy >= 2 && hard === 0) difficultyBias = "too_easy";
+  else if (hard >= 2 && easy === 0) difficultyBias = "too_hard";
+  if (!difficultyBias) return null;
+
+  return { difficultyBias, sampleCount: recent.length };
+}

@@ -3996,6 +3996,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     dispatchModal({ type: "CLOSE_GENERATE_TODAY" });
   }
 
+  // Post-session difficulty feedback (feeds the next Generate Today via
+  // trainingSignals.buildGenerationPreferences). Keyed by the viewed date.
+  const recordSessionFeedback = useCallback((dk, difficulty) => {
+    updateState((s) => {
+      if (!s.sessionFeedback) s.sessionFeedback = {};
+      s.sessionFeedback[dk] = { difficulty, ts: Date.now() };
+      return s;
+    });
+    recordAiEvent("ai_session_rated", "today", { difficulty });
+    showToast(
+      difficulty === "easy"
+        ? "Got it — I'll push you harder next time"
+        : difficulty === "hard"
+          ? "Got it — I'll ease off next time"
+          : "Thanks — noted"
+    );
+  }, [showToast]);
+
   const deleteDailyWorkout = useCallback((workoutId) => {
     const w = workoutById.get(workoutId);
     const dayLogs = state.logsByDate?.[dateKey] || {};
@@ -5350,6 +5368,37 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                       onAddExercise={() => addExerciseForToday(w.id, true)}
                     />
                   ))}
+
+                  {/* Post-session difficulty feedback — appears once the day has
+                      completed sets and hasn't been rated. Feeds the next
+                      Generate Today (buildGenerationPreferences). */}
+                  {dayHasCompletedSets(logsForDate) && !state.sessionFeedback?.[dateKey] && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+                      padding: "12px 14px", borderRadius: 12, marginTop: 4,
+                      border: `1px solid ${colors.border}`, background: colors.cardAltBg,
+                    }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, marginRight: 4 }}>How did that feel?</span>
+                      {[
+                        { key: "easy", label: "Too easy" },
+                        { key: "right", label: "Just right" },
+                        { key: "hard", label: "Too hard" },
+                      ].map((opt) => (
+                        <button
+                          key={opt.key}
+                          className="btn-press"
+                          onClick={() => recordSessionFeedback(dateKey, opt.key)}
+                          style={{
+                            border: `1px solid ${colors.border}`, background: "transparent",
+                            color: colors.text, borderRadius: 999, padding: "6px 12px",
+                            fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </div>

@@ -146,6 +146,9 @@ export function makeDefaultState() {
     sessionOverrides: {},
     sessionAdditions: {},
     logsByDate: {},
+    // Post-session difficulty feedback, keyed by date: { [YYYY-MM-DD]: { difficulty, ts } }.
+    // Drives generation preferences (see trainingSignals.buildGenerationPreferences).
+    sessionFeedback: {},
     preferences: {
       defaultRestSec: 90,
       timerSound: true,
@@ -203,6 +206,7 @@ export function normalizeState(st) {
     sessionOverrides: st.sessionOverrides && typeof st.sessionOverrides === "object" ? st.sessionOverrides : {},
     sessionAdditions: st.sessionAdditions && typeof st.sessionAdditions === "object" ? st.sessionAdditions : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
+    sessionFeedback: st.sessionFeedback && typeof st.sessionFeedback === "object" ? st.sessionFeedback : {},
     meta: {
       createdAt: st.meta?.createdAt ?? Date.now(),
       updatedAt: st.meta?.updatedAt ?? 0,

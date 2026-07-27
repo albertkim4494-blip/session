@@ -8,7 +8,7 @@ const MAX_ENTRIES = 100;
 
 /**
  * Record an AI event for observability.
- * @param {"ai_success"|"ai_parse_fail"|"ai_schema_fail"|"ai_fallback_used"|"ai_empty_workout"|"ai_repair_success"|"ai_accepted"|"ai_regenerated"|"ai_dismissed"|"ai_thumbs_up"|"ai_thumbs_down"} event
+ * @param {"ai_success"|"ai_parse_fail"|"ai_schema_fail"|"ai_fallback_used"|"ai_empty_workout"|"ai_repair_success"|"ai_accepted"|"ai_regenerated"|"ai_dismissed"|"ai_thumbs_up"|"ai_thumbs_down"|"ai_session_rated"} event
  * @param {"coach"|"program"|"today"} feature
  * @param {Record<string, unknown>} [meta] - Optional metadata (error message, token counts, etc.)
  */
