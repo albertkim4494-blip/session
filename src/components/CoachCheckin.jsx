@@ -547,13 +547,23 @@ export function CoachCheckin({
     };
 
     const handleCardMood = (v) => {
-      if (v === null) return;
+      // The picker sends null when the user taps the already-selected option
+      // (a toggle-off, meant for edit mode). In this forward-only card flow that
+      // should re-confirm and advance, not leave the user stuck. Only ignore a
+      // null when nothing is selected yet.
+      if (v === null) {
+        if (mood !== null) advanceStep(1);
+        return;
+      }
       setMood(v);
       advanceStep(1);
     };
 
     const handleCardSleep = (v) => {
-      if (v === null) return;
+      if (v === null) {
+        if (sleep !== null) advanceStep(2);
+        return;
+      }
       setSleep(v);
       advanceStep(2);
     };
