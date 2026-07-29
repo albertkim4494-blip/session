@@ -352,7 +352,7 @@ function buildTodayPrompt(payload: {
   let focusSection = "";
   if (todayFocus?.guidance) {
     const balanceLine = isFullBody
-      ? " REQUIRED for a full-body day: include at least ONE lower-body/leg movement, one upper-body PUSH, and one upper-body PULL — never skip legs on a full-body day. Prioritize balanced compound coverage over novelty, even if some of these were trained earlier this week."
+      ? " REQUIRED on a full-body day: include at least ONE lower-body/leg movement, one upper-body PUSH, and one upper-body PULL — NEVER skip legs, even in a short/express session and even if legs were trained recently. If there's only room for a few exercises, they should BE a leg movement + a push + a pull. Balanced compound coverage over novelty."
       : "";
     focusSection = `
 TODAY'S FOCUS: ${todayFocus.label || todayFocus.key}. Build the session around ${todayFocus.guidance}. This is the PRIMARY driver of which muscles to train today — honor it above the "recently trained" signal (while still respecting today's check-in and any muscles already trained earlier TODAY).${balanceLine}
@@ -400,6 +400,15 @@ SPORT DEMAND PROFILE:
 The user participates in: ${profile.sports}. Consider its muscular demands, avoid overloading muscles the sport already taxes heavily, and prioritize complementary/antagonist work and injury prevention.
 `;
   }
+
+  // Volume scaling — one authoritative guide so exercise/set counts match the
+  // time budget (10-min sessions aren't 9 exercises; an hour isn't 1 set each).
+  const isExpress = dur <= 10;
+  const setsGuide = dur <= 10
+    ? "1-2 quick sets per exercise (circuit style, short rest)"
+    : dur <= 20
+      ? "about 2 working sets per exercise"
+      : "about 3 working sets per exercise (2 for isolation/accessory moves)";
 
   const system = `You are an expert strength & conditioning coach designing a single workout for today.
 
@@ -470,24 +479,22 @@ ${(() => {
   return sections.join("\n");
 })()}
 
+SESSION VOLUME (scale everything to fit ~${dur} minutes — this governs how much work to prescribe):
+- Aim for ~${exerciseCount} exercises, ${setsGuide}.
+- The whole session (warm-up + working sets + rest) must realistically fit ~${dur} minutes. Do NOT overload a short session, and do NOT leave a long one thin — a 10-minute session is a few quick movements, an hour is a handful of exercises at a few sets each.${isExpress ? "\n- EXPRESS: big compound movements only (no isolation), minimal rest — a fast circuit." : ""}
+
 RULES:
-0. KEEP IT PROVEN AND FOCUSED. Default to well-known, effective movements — a great workout is mostly staples (compound lifts: squat, hinge/deadlift, press, row, pull, lunge) plus a few sensible accessories. It should look like a normal session a good trainer would actually program, NOT a showcase of unusual or highly-specific exercises. Reach for a less-common movement ONLY when there's a clear, concrete reason. Use the personalization signals to pick sensible emphasis and loading — do NOT over-optimize them into a scattered, exotic, or overly clever workout. When in doubt, choose the simpler, more familiar exercise.
-1. Prioritize muscles that haven't been trained recently (high days-ago or "never trained"). NEVER target muscles already trained today.
+0. KEEP IT PROVEN AND FOCUSED. Default to well-known, effective movements — a great workout is mostly staples (compound lifts: squat, hinge/deadlift, press, row, pull, lunge) plus a few sensible accessories. It should look like a normal session a good trainer would actually program, NOT a showcase of unusual or highly-specific exercises. Reach for a less-common movement ONLY when there's a clear reason. Do NOT over-optimize the personalization signals into a scattered, exotic, or overly clever workout. When in doubt, choose the simpler, more familiar exercise.
+1. Prioritize muscles that haven't been trained recently (high days-ago or "never trained"). NEVER target muscles already trained today. (Today's focus, above, overrides this — e.g. a full-body day still trains legs even if legs are recent.)
 2. Pick exercises ONLY from the catalog, using exact catalogId values. Do NOT pick exercises the user already did today.
-3. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.${dur <= 10 ? `\n   - EXPRESS OVERRIDE (~${dur} min): prescribe a SINGLE working set per exercise (e.g. "1x12", "1x15") — IGNORE the multi-set goal counts below. Speed over volume.` : ""}
-   - For isometric/hold exercises (tagged "isometric", unit "sec") like planks: prescribe a SINGLE long hold, e.g. "1x60s", "1x45s", "1x90s". Do NOT prescribe multiple sets for holds.
-   - For other exercises with unit "sec" (non-isometric): prescribe time-based schemes like "3x30s".
-   - For exercises with unit "reps": prescribe rep-based schemes like "4x8-12", "3x10", "5x5".
-   - Tailor schemes to the user's goal${dur <= 10 ? " (EXCEPT express — one set each, see override above)" : ""}:
-     * Build Muscle: 3-4 sets of 8-12 reps
-     * Get Stronger: 4-5 sets of 3-5 reps
-     * Lose Fat: 3 sets of 15-20 reps
-     * General Fitness: 3 sets of 10-12 reps
-     * Sport Performance: 3-4 sets of 6-8 reps
-   - If the user has health conditions or is a beginner, lean toward fewer sets (2-3) with moderate intensity.
+3. Each exercise MUST have its own "scheme" field (sets x reps like "3x8-12", or a hold like "1x60s"). Use the SET COUNT from SESSION VOLUME above; use rep ranges suited to the goal:
+   - Build Muscle: 8-12 reps · Get Stronger: 3-5 reps · Lose Fat: 15-20 reps · General Fitness: 10-12 reps · Sport Performance: 6-8 reps.
+   - Isometric/holds (unit "sec", e.g. planks): a SINGLE long hold like "1x60s" — never multiple sets.
+   - Timed non-isometric (unit "sec"): "3x30s".
+   - Beginners / health conditions: lean toward the lower end of sets and moderate intensity.
 4. No duplicate exercises.
 5. Order: compounds first, then isolation, then accessories.
-6. Pick ~${exerciseCount} exercises to fit within ~${dur} minutes${dur <= 10 ? `. EXPRESS session (~${dur} min): 2-3 BIG compound movements only, a SINGLE quick working set each (e.g. "1x12", NOT multiple sets), minimal rest — a fast circuit. For full-body express, pick multi-joint lifts that each cover a lot (squat, hinge, push-up, row).` : dur <= 15 ? ". Quick session — compound movements only, no isolation." : " (including warm-up and rest between sets)."}
+6. Match the exercise and set count to SESSION VOLUME above — don't exceed what ~${dur} minutes realistically holds.
 7. Give the workout a descriptive name (e.g. "Pull", "Upper Body", "Chest & Shoulders").
 8. List the primary target muscle groups (use keys like CHEST, BACK, QUADS, etc.).
 

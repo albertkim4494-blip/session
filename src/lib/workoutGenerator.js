@@ -76,10 +76,17 @@ export const SET_REP_SCHEMES = {
  */
 export function exerciseCountFromDuration(duration) {
   const mins = duration || 60;
-  if (mins <= 10) return 3;   // express — a few quick movements, ~1 set each
-  if (mins <= 15) return 3;
-  if (mins <= 30) return Math.min(4, Math.max(3, Math.round(mins / 8)));
-  return Math.max(4, Math.min(10, Math.round(mins / 7)));
+  // Recalibrated for realistic volume (paired with the prompt's SESSION VOLUME
+  // set-count guidance): express is a few quick movements; an hour is ~6-7
+  // exercises at ~3 sets, not 9.
+  if (mins <= 7) return 3;    // 5 min
+  if (mins <= 12) return 4;   // 10 min express
+  if (mins <= 20) return 4;   // 15 min
+  if (mins <= 35) return 5;   // 30 min
+  if (mins <= 50) return 6;   // 45 min
+  if (mins <= 75) return 7;   // 60 min
+  if (mins <= 105) return 8;  // 90 min
+  return 9;                   // 120 min
 }
 
 // All muscle keys used across splits
