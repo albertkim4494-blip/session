@@ -413,6 +413,7 @@ export function CoachCheckin({
   editValues,   // null = fresh check-in, { mood, sleep, pain } = editing existing
   autoExpand,   // if true, skip the collapsed "How are you feeling?" prompt
   showAll,      // if true, show all 3 questions at once instead of step-by-step
+  painOnly,     // if true (with showAll), ask ONLY "anything hurting?" (skip mood/sleep)
 }) {
   const isEdit = editValues !== null && editValues !== undefined;
   const [expanded, setExpanded] = useState(isEdit || autoExpand);
@@ -534,6 +535,33 @@ export function CoachCheckin({
     background: colors.cardBg, color: colors.text, opacity: 0.7,
     cursor: "pointer",
   };
+
+  // --- Pain-only mode: a single "anything hurting?" question + submit ---
+  if (showAll && painOnly) {
+    const submitPainOnly = () => {
+      const pain = Object.entries(painMap)
+        .filter(([, sev]) => sev)
+        .map(([area, severity]) => ({ area, severity }));
+      onSubmit({ mood: null, sleep: null, pain });
+    };
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, flex: 1 }}>
+        <PainAreaPills painMap={painMap} onChange={handlePainChange} colors={colors} />
+        <button
+          onClick={submitPainOnly}
+          style={{
+            background: "transparent", border: "none", color: colors.text,
+            cursor: "pointer", fontSize: 13, opacity: 0.5, padding: "4px 0",
+            transition: "opacity 0.15s",
+          }}
+          onPointerEnter={(e) => { e.currentTarget.style.opacity = "0.8"; }}
+          onPointerLeave={(e) => { e.currentTarget.style.opacity = "0.5"; }}
+        >
+          {Object.keys(painMap).length > 0 ? "Done" : "No pain, I’m good"}
+        </button>
+      </div>
+    );
+  }
 
   // --- Card mode: animated step-by-step with morph-to-chip transitions ---
   if (showAll) {

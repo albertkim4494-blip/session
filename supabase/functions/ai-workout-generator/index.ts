@@ -44,8 +44,13 @@ function formatCheckinSection(checkinContext?: CheckinContext | null): string {
   if (!checkinContext) return "";
   const lines: string[] = ["", "CHECK-IN CONTEXT:"];
   if (checkinContext.today) {
-    lines.push(`Today mood: ${checkinContext.today.moodLabel || "unknown"} (${checkinContext.today.mood ?? "n/a"}/2)`);
-    lines.push(`Today sleep: ${checkinContext.today.sleep || "unknown"}`);
+    // mood/sleep are optional (the daily flow may ask only about pain) — omit when absent.
+    if (checkinContext.today.mood !== null && checkinContext.today.mood !== undefined) {
+      lines.push(`Today mood: ${checkinContext.today.moodLabel || "unknown"} (${checkinContext.today.mood}/2)`);
+    }
+    if (checkinContext.today.sleep) {
+      lines.push(`Today sleep: ${checkinContext.today.sleep}`);
+    }
     lines.push(`Today pain: ${formatPain(checkinContext.today.pain)}`);
   } else {
     lines.push("Today check-in: none");
@@ -343,10 +348,14 @@ function buildTodayPrompt(payload: {
 
   // Today's chosen focus (from the weekly plan) — the primary muscle-selection
   // driver for the session.
+  const isFullBody = todayFocus?.key === "full_body";
   let focusSection = "";
   if (todayFocus?.guidance) {
+    const balanceLine = isFullBody
+      ? " REQUIRED for a full-body day: include at least ONE lower-body/leg movement, one upper-body PUSH, and one upper-body PULL — never skip legs on a full-body day. Prioritize balanced compound coverage over novelty, even if some of these were trained earlier this week."
+      : "";
     focusSection = `
-TODAY'S FOCUS: ${todayFocus.label || todayFocus.key}. Build the session around ${todayFocus.guidance}. This is the PRIMARY driver of which muscles to train today — honor it (while still respecting today's check-in, fatigue/recovery, and any muscles already trained earlier today).
+TODAY'S FOCUS: ${todayFocus.label || todayFocus.key}. Build the session around ${todayFocus.guidance}. This is the PRIMARY driver of which muscles to train today — honor it above the "recently trained" signal (while still respecting today's check-in and any muscles already trained earlier TODAY).${balanceLine}
 `;
   }
 
@@ -356,8 +365,13 @@ TODAY'S FOCUS: ${todayFocus.label || todayFocus.key}. Build the session around $
     const done = (weekContext.doneThisWeek || [])
       .map((d) => `${d.focus || "?"}${d.name ? ` (${d.name})` : ""}`)
       .join(", ");
+    // A full-body day is SUPPOSED to revisit the main patterns — don't let the
+    // "avoid repeating this week" rule starve it into an odd partial session.
+    const complementLine = isFullBody
+      ? " Today is a full-body day, so a balanced session that revisits the main movement patterns is expected — just vary the specific exercises from earlier this week where you can."
+      : " Make today COMPLEMENT the week — build on it and avoid re-hammering what was already trained hard this week unless today's focus specifically calls for it.";
     weekSection = `
-THIS WEEK'S PLAN: ${weekContext.splitLabel}${weekContext.daysPerWeek ? `, ~${weekContext.daysPerWeek} days/week` : ""}. This is day ${weekContext.dayNumber || 1} of the week.${done ? ` Already trained this week: ${done}.` : ""} Make today COMPLEMENT the week — build on it and avoid re-hammering what was already trained hard this week unless today's focus specifically calls for it.
+THIS WEEK'S PLAN: ${weekContext.splitLabel}${weekContext.daysPerWeek ? `, ~${weekContext.daysPerWeek} days/week` : ""}. This is day ${weekContext.dayNumber || 1} of the week.${done ? ` Already trained this week: ${done}.` : ""}${complementLine}
 `;
   }
 

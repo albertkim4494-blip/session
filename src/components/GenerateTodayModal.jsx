@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Modal } from "./Modal";
 import { EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
 import { CoachCheckin } from "./CoachCheckin";
-import { getSplitOptions } from "../lib/splitTemplates";
+import { getSplitOptions, FOCUS_LABELS } from "../lib/splitTemplates";
 
 const DURATION_OPTIONS = [
   { value: 10, label: "10 min" },
@@ -52,6 +52,7 @@ export function GenerateTodayModal({
   onRegenerate,
   weeklyPlan,
   suggestedFocusKey,
+  maxWeeklyDays,
   onCreateWeeklyPlan,
   styles,
   colors,
@@ -71,7 +72,7 @@ export function GenerateTodayModal({
     equipment: "Equipment?",
     split: "Pick your split",
     focus: "What are you training today?",
-    checkin: "Quick check-in",
+    checkin: "Anything hurting?",
     preview: "Generated Workout",
   };
   const stepTitle = STEP_TITLES[stepKey] || "";
@@ -137,8 +138,18 @@ export function GenerateTodayModal({
   };
   const pickFocus = (focus) => update({ todayFocus: focus, step: step + 1 });
 
-  // Daily focus options: the plan's slots (App passes the suggested next focus).
-  const focusSlots = (weeklyPlan?.slots || []);
+  // Daily focus options: DISTINCT focuses from the plan (the A/B slot instances
+  // are meaningless to a user — each day is freshly generated). App passes the
+  // suggested next focus. "Something else" is redundant for a full-body plan.
+  const uniqueFocuses = (() => {
+    const seen = new Set();
+    const out = [];
+    for (const slot of weeklyPlan?.slots || []) {
+      if (!seen.has(slot.focus)) { seen.add(slot.focus); out.push(slot.focus); }
+    }
+    return out;
+  })();
+  const showSomethingElse = !uniqueFocuses.includes("full_body");
 
   const handleRegenerate = () => {
     onRegenerate?.();
@@ -189,16 +200,34 @@ export function GenerateTodayModal({
     <Modal open={open} title={stepTitle} onClose={onClose} styles={styles}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
-        {/* Days per week (weekly-plan setup) */}
+        {/* Days per week (weekly-plan setup) — one row; days beyond what's still
+            achievable this week are grayed out. */}
         {stepKey === "days" && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", paddingTop: 12 }}>
-            {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-              <button key={n} style={smallChipStyle(weeklyDays === n)} onClick={() => update({ weeklyDays: n })}>
-                {n}
-              </button>
-            ))}
-            <div style={{ width: "100%", textAlign: "center", fontSize: 12, opacity: 0.55, marginTop: 4 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
+              {[1, 2, 3, 4, 5, 6, 7].map((n) => {
+                const disabled = maxWeeklyDays != null && n > maxWeeklyDays;
+                return (
+                  <button
+                    key={n}
+                    disabled={disabled}
+                    style={{
+                      ...smallChipStyle(weeklyDays === n),
+                      minWidth: 0,
+                      padding: "8px 0",
+                      opacity: disabled ? 0.3 : 1,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                    }}
+                    onClick={() => !disabled && update({ weeklyDays: n })}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ textAlign: "center", fontSize: 12, opacity: 0.55 }}>
               days you plan to train this week — a target, not a rule
+              {maxWeeklyDays != null && maxWeeklyDays < 7 ? ` · ${maxWeeklyDays} left this week` : ""}
             </div>
           </div>
         )}
@@ -231,26 +260,24 @@ export function GenerateTodayModal({
                 {weeklyPlan.splitLabel} — pick today
               </div>
             )}
-            {(() => {
-              let hl = false;
-              return focusSlots.map((slot) => {
-                const isSuggested = !hl && slot.focus === suggestedFocusKey;
-                if (isSuggested) hl = true;
-                return (
-                  <button
-                    key={slot.id}
-                    className="btn-press"
-                    style={chipStyle(isSuggested)}
-                    onClick={() => pickFocus(slot.focus)}
-                  >
-                    {slot.label}{isSuggested ? "  ·  suggested" : ""}
-                  </button>
-                );
-              });
-            })()}
-            <button className="btn-press" style={{ ...chipStyle(false), opacity: 0.85 }} onClick={() => pickFocus("full_body")}>
-              Something else — quick full body
-            </button>
+            {uniqueFocuses.map((focus) => {
+              const isSuggested = focus === suggestedFocusKey;
+              return (
+                <button
+                  key={focus}
+                  className="btn-press"
+                  style={chipStyle(isSuggested)}
+                  onClick={() => pickFocus(focus)}
+                >
+                  {FOCUS_LABELS[focus] || focus}{isSuggested ? "  ·  suggested" : ""}
+                </button>
+              );
+            })}
+            {showSomethingElse && (
+              <button className="btn-press" style={{ ...chipStyle(false), opacity: 0.85 }} onClick={() => pickFocus("full_body")}>
+                Something else — quick full body
+              </button>
+            )}
           </div>
         )}
 
@@ -307,11 +334,11 @@ export function GenerateTodayModal({
           </div>
         )}
 
-        {/* Required check-in */}
+        {/* Anything hurting? (pain-only — we work around injuries) */}
         {stepKey === "checkin" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 8 }}>
             <div style={{ fontSize: 13, opacity: 0.65, textAlign: "center", lineHeight: 1.5 }}>
-              Today&apos;s workout uses how you feel right now, not just your history.
+              Tap anything that&apos;s bothering you — today&apos;s workout will steer around it.
             </div>
             <CoachCheckin
               colors={colors}
@@ -321,6 +348,7 @@ export function GenerateTodayModal({
               }}
               editValues={todayCheckin || null}
               showAll
+              painOnly
             />
           </div>
         )}

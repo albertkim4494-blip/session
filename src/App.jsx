@@ -270,6 +270,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const suggestedFocusKey = activeWeeklyPlan
     ? suggestNextSlot(activeWeeklyPlan, doneFocusesThisWeek)?.focus || null
     : null;
+  // Days still achievable this week (today through week-end, inclusive) — caps the
+  // "how many days" setup so you can't pick a 7-day week on a Wednesday.
+  const daysSinceWeekStart = Math.round(
+    (new Date(dateKey + "T00:00:00") - new Date(currentWeekStart + "T00:00:00")) / 86400000
+  );
+  const maxWeeklyDays = Math.max(1, 7 - daysSinceWeekStart);
 
   // Native Capacitor shell? Drives both back-button routing (see the effect far
   // below) and whether RevenueCat entitlements are allowed to grant Pro.
@@ -3947,7 +3953,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         planningMode,
         equipment: activeWeeklyPlan?.equipment || equipment || ["full_gym"],
         duration: activeWeeklyPlan?.duration || 60,
-        weeklyDays: activeWeeklyPlan?.daysPerWeek || 4,
+        weeklyDays: Math.min(activeWeeklyPlan?.daysPerWeek || 4, maxWeeklyDays),
         todayFocus: null,
       },
     });
@@ -8208,6 +8214,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         onRegenerate={() => recordAiEvent("ai_regenerated", "today")}
         weeklyPlan={activeWeeklyPlan}
         suggestedFocusKey={suggestedFocusKey}
+        maxWeeklyDays={maxWeeklyDays}
         onCreateWeeklyPlan={createWeeklyPlan}
         styles={styles}
         colors={colors}
