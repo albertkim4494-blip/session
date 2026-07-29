@@ -542,7 +542,9 @@ export function CoachCheckin({
       const pain = Object.entries(painMap)
         .filter(([, sev]) => sev)
         .map(([area, severity]) => ({ area, severity }));
-      onSubmit({ mood: null, sleep: null, pain });
+      // Preserve any mood/sleep already set (e.g. a fuller train-tab check-in
+      // today); null when none, so the prompt just omits them.
+      onSubmit({ mood: mood ?? null, sleep: sleep ?? null, pain });
     };
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, flex: 1 }}>
