@@ -900,6 +900,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }, [modals.log.isOpen]);
 
   const logsForDate = state.logsByDate[dateKey] ?? EMPTY_OBJ;
+  // True when the viewed day has an AI-generated ("Generate Today") workout. The
+  // post-session difficulty feedback is scoped to these — it rates/tunes the AI's
+  // creation, not every manually-logged session.
+  const hasAiWorkoutForDate = (state.dailyWorkouts?.[dateKey] || []).some((w) => w?.source === "generate_today");
 
   // For non-today dates, auto-detect program workouts that have logs (backward compat)
   const logDetectedWorkouts = useMemo(() => {
@@ -2200,7 +2204,14 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     // TODAY — editing/backfilling a past date shouldn't trigger a live PR toast.
     let prMsg = null;
     if (dateKey === todayKey) {
-      const prior = computePRs(state.logsByDate, [exId], dateKey);
+      // Compare against ALL instances of this movement (grouped by name, the same
+      // way the Progress table does), not just the current exercise instance —
+      // otherwise heavier history logged under a differently-instanced but
+      // same-named exercise is invisible and we falsely celebrate a "PR".
+      const nameLower = (modals.log.context.exerciseName || "").toLowerCase();
+      const group = flatExerciseList.find((e) => e.name.toLowerCase() === nameLower);
+      const priorIds = group?.ids?.length ? group.ids : [exId];
+      const prior = computePRs(state.logsByDate, priorIds, dateKey);
       let tW = 0;
       let tReps = 0;
       for (const s of modals.log.sets || []) {
@@ -2240,7 +2251,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     setRpePopoverIdx(null);
 
     dispatchModal({ type: "CLOSE_LOG" });
-  }, [modals.log, dateKey, state.logsByDate, state.dailyWorkouts, state.preferences, saveLogData, session]);
+  }, [modals.log, dateKey, state.logsByDate, state.dailyWorkouts, state.preferences, saveLogData, session, flatExerciseList]);
 
   // Check if navigation to next/prev exercise is possible
   const canNavLogExercise = useCallback((direction) => {
@@ -5369,10 +5380,10 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
                     />
                   ))}
 
-                  {/* Post-session difficulty feedback — appears once the day has
-                      completed sets and hasn't been rated. Feeds the next
-                      Generate Today (buildGenerationPreferences). */}
-                  {dayHasCompletedSets(logsForDate) && !state.sessionFeedback?.[dateKey] && (
+                  {/* Post-session difficulty feedback — only for days with an AI
+                      "Generate Today" workout, once they have completed sets and
+                      haven't been rated. Feeds the next generation. */}
+                  {hasAiWorkoutForDate && dayHasCompletedSets(logsForDate) && !state.sessionFeedback?.[dateKey] && (
                     <div style={{
                       display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
                       padding: "12px 14px", borderRadius: 12, marginTop: 4,

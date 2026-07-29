@@ -105,6 +105,30 @@ export function ExerciseCatalogModal({
 
   const src = catalog || EXERCISE_CATALOG;
 
+  // Which movements the user has already logged (by catalogId + name). Used to
+  // badge catalog entries "Logged" so the user doesn't re-log the same movement
+  // under a near-duplicate name (e.g. "Wrist Curl" vs "Reverse Wrist Curl"),
+  // which would split their history across two exercises.
+  const loggedIdentity = useMemo(() => {
+    const names = new Set();
+    const catalogIds = new Set();
+    const idToEx = new Map();
+    for (const w of workouts || []) {
+      for (const ex of (w.exercises || [])) idToEx.set(ex.id, ex);
+    }
+    for (const day of Object.values(logsByDate || {})) {
+      if (!day || typeof day !== "object") continue;
+      for (const [exId, log] of Object.entries(day)) {
+        const hasSet = Array.isArray(log?.sets) && log.sets.some((s) => (Number(s.reps) || 0) > 0 || s.completed);
+        if (!hasSet) continue;
+        const ex = idToEx.get(exId);
+        if (ex?.name) names.add(ex.name.toLowerCase());
+        if (ex?.catalogId) catalogIds.add(ex.catalogId);
+      }
+    }
+    return { names, catalogIds };
+  }, [workouts, logsByDate]);
+
   // Reset on open
   useEffect(() => {
     if (open) {
@@ -608,6 +632,7 @@ export function ExerciseCatalogModal({
   // --- Render a single exercise result button ---
   const renderExerciseBtn = (entry) => {
     const sportIcon = !entry.gifUrl ? getSportIconUrl(entry.name, entry.sportIcon) : null;
+    const loggedBefore = loggedIdentity.catalogIds.has(entry.id) || loggedIdentity.names.has((entry.name || "").toLowerCase());
     return (
       <button
         key={entry.id}
@@ -627,6 +652,15 @@ export function ExerciseCatalogModal({
             />
           )}
           <div style={{ fontWeight: 700, fontSize: 14 }}>{entry.name}</div>
+          {loggedBefore && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999,
+              background: colors.accentBg, color: colors.accent,
+              border: `1px solid ${colors.accentBorder}`, whiteSpace: "nowrap", flexShrink: 0,
+            }}>
+              ✓ Logged
+            </span>
+          )}
         </div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {(entry.muscles?.primary || []).map((m) => (
