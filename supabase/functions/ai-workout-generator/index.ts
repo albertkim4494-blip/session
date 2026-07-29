@@ -261,8 +261,10 @@ function buildTodayPrompt(payload: {
     followUps?: Array<{ title?: string; followUp?: string[] }>;
   } | null;
   generationPreferences?: { difficultyBias?: string } | null;
+  todayFocus?: { key?: string; label?: string; guidance?: string } | null;
+  weekContext?: { splitLabel?: string; daysPerWeek?: number; dayNumber?: number; doneThisWeek?: Array<{ focus?: string; name?: string; date?: string }> } | null;
 }) {
-  const { profile, equipment, duration, catalog, history, currentPlan, trainingPattern, checkinContext, muscleRecency, fatigue, estimated1RMTrends, volumeLoadTrends, coachingHistory, generationPreferences } = payload;
+  const { profile, equipment, duration, catalog, history, currentPlan, trainingPattern, checkinContext, muscleRecency, fatigue, estimated1RMTrends, volumeLoadTrends, coachingHistory, generationPreferences, todayFocus, weekContext } = payload;
 
   const profileLines: string[] = [];
   if (profile.age) profileLines.push(`Age: ${profile.age}`);
@@ -339,6 +341,26 @@ function buildTodayPrompt(payload: {
     coachingSection = `\nRECENT COACHING NOTES (from the AI Coach — stay consistent with this):\n${noteLines.join("\n")}${followLines.length > 0 ? `\nFollow-up:\n${followLines.join("\n")}` : ""}\n`;
   }
 
+  // Today's chosen focus (from the weekly plan) — the primary muscle-selection
+  // driver for the session.
+  let focusSection = "";
+  if (todayFocus?.guidance) {
+    focusSection = `
+TODAY'S FOCUS: ${todayFocus.label || todayFocus.key}. Build the session around ${todayFocus.guidance}. This is the PRIMARY driver of which muscles to train today — honor it (while still respecting today's check-in, fatigue/recovery, and any muscles already trained earlier today).
+`;
+  }
+
+  // This week's plan — so the day reads as part of a coherent week, not an island.
+  let weekSection = "";
+  if (weekContext?.splitLabel) {
+    const done = (weekContext.doneThisWeek || [])
+      .map((d) => `${d.focus || "?"}${d.name ? ` (${d.name})` : ""}`)
+      .join(", ");
+    weekSection = `
+THIS WEEK'S PLAN: ${weekContext.splitLabel}${weekContext.daysPerWeek ? `, ~${weekContext.daysPerWeek} days/week` : ""}. This is day ${weekContext.dayNumber || 1} of the week.${done ? ` Already trained this week: ${done}.` : ""} Make today COMPLEMENT the week — build on it and avoid re-hammering what was already trained hard this week unless today's focus specifically calls for it.
+`;
+  }
+
   // Difficulty bias from the user's recent post-session feedback.
   let prefsSection = "";
   if (generationPreferences?.difficultyBias === "too_easy") {
@@ -373,7 +395,7 @@ ${profileLines.length > 0 ? profileLines.join("\n") : "No profile info."}
 Equipment: ${formatEquipmentLabelToday(equipment)}
 Goal: ${goal}
 Session duration: ~${dur} minutes
-${sportBioSection}
+${sportBioSection}${focusSection}${weekSection}
 
 CURRENT PROGRAM:
 ${currentPlan || "No current program structure available."}

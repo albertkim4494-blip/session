@@ -21,6 +21,7 @@ import {
   computeComplexityScore,
   buildGenerationPreferences,
 } from "./trainingSignals";
+import { focusGuidance, FOCUS_LABELS } from "./splitTemplates";
 
 // Human-readable labels for the 8 movement-pattern traits inferred from a sport.
 // Used to turn the trait vector into a data-driven "sport demand" summary that
@@ -598,6 +599,8 @@ export async function generateTodayAI({
   todayKey,
   measurementSystem,
   checkinContext,
+  focus,
+  weekContext,
   onPreamble,
   onExercise,
 }) {
@@ -634,6 +637,9 @@ export async function generateTodayAI({
       modelHint: signals.modelHint,
       // Difficulty bias from recent post-session feedback (may be null).
       generationPreferences: buildGenerationPreferences(appState, todayKey),
+      // Weekly-plan continuity: today's chosen focus + what's been done this week.
+      todayFocus: focus ? { key: focus, label: FOCUS_LABELS[focus] || focus, guidance: focusGuidance(focus) } : null,
+      weekContext: weekContext || null,
     };
 
     // Transform + validate a raw workout JSON into the final workout object (or

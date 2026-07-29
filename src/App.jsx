@@ -78,6 +78,8 @@ import { EXERCISE_CATALOG, exerciseFitsEquipment } from "./lib/exerciseCatalog";
 import { buildCatalogMap, isBodyweightOnly, classifyLoadType } from "./lib/exerciseCatalogUtils";
 import { generateTodayWorkout, parseScheme } from "./lib/workoutGenerator";
 import { generateTodayAI } from "./lib/workoutGeneratorApi";
+import { buildWeekContext } from "./lib/trainingSignals";
+import { suggestNextSlot } from "./lib/splitTemplates";
 import { selectAcknowledgment, selectSetCompletionToast, selectMotivationLine } from "./lib/greetings";
 import { CADENCE_MODES, SPLIT_MODES, normalizeCadence, normalizeSplit, getScheduledForDate, getContinuousNextUp, detectAnchorDrift } from "./lib/cadence";
 import { isSetCompleted, dayHasCompletedSets, calculateWeekStreak, longestWeekStreak } from "./lib/setHelpers";
@@ -251,6 +253,24 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const theme = state.preferences?.theme || "dark";
   const equipment = state.preferences?.equipment || ["full_gym"];
   const weekStartsOn = Number.isInteger(state.preferences?.weekStartsOn) ? state.preferences.weekStartsOn : 0;
+
+  // --- Weekly-plan scaffold for Generate Today (continuity) ---
+  const currentWeekStart = startOfWeek(dateKey, weekStartsOn);
+  const activeWeeklyPlan =
+    state.weeklyPlan && state.weeklyPlan.weekStart === currentWeekStart ? state.weeklyPlan : null;
+  const doneFocusesThisWeek = useMemo(() => {
+    const out = [];
+    const daily = state.dailyWorkouts || {};
+    for (const [d, ws] of Object.entries(daily)) {
+      if (d < currentWeekStart || d > dateKey) continue;
+      for (const w of Array.isArray(ws) ? ws : []) if (w?.focus) out.push(w.focus);
+    }
+    return out;
+  }, [state.dailyWorkouts, currentWeekStart, dateKey]);
+  const suggestedFocusKey = activeWeeklyPlan
+    ? suggestNextSlot(activeWeeklyPlan, doneFocusesThisWeek)?.focus || null
+    : null;
+
   // Native Capacitor shell? Drives both back-button routing (see the effect far
   // below) and whether RevenueCat entitlements are allowed to grant Pro.
   const isNativeShell = Capacitor.isNativePlatform();
@@ -3918,8 +3938,36 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   }
 
   function openGenerateToday() {
-    dispatchModal({ type: "OPEN_GENERATE_TODAY", payload: { equipment: equipment || ["full_gym"] } });
+    // Active plan for this week → jump to the daily "what are you doing today"
+    // flow; otherwise → set up the week (days + split).
+    const planningMode = activeWeeklyPlan ? "daily" : "setup";
+    dispatchModal({
+      type: "OPEN_GENERATE_TODAY",
+      payload: {
+        planningMode,
+        equipment: activeWeeklyPlan?.equipment || equipment || ["full_gym"],
+        duration: activeWeeklyPlan?.duration || 60,
+        weeklyDays: activeWeeklyPlan?.daysPerWeek || 4,
+        todayFocus: null,
+      },
+    });
   }
+
+  // Create/replace the active weekly plan when the user picks a split in setup.
+  const createWeeklyPlan = useCallback((draft) => {
+    updateState((s) => {
+      s.weeklyPlan = {
+        weekStart: startOfWeek(dateKey, weekStartsOn),
+        daysPerWeek: draft.daysPerWeek,
+        duration: draft.duration,
+        equipment: draft.equipment,
+        splitId: draft.splitId,
+        splitLabel: draft.splitLabel,
+        slots: draft.slots,
+      };
+      return s;
+    });
+  }, [dateKey, weekStartsOn]);
 
   async function handleGenerateToday(opts) {
     const eq = opts?.equipment || modals.generateToday.equipment || equipment;
@@ -3971,6 +4019,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       todayKey: dateKey,
       measurementSystem: state.preferences?.measurementSystem,
       checkinContext,
+      // Weekly-plan continuity: today's chosen focus + this week's context.
+      focus: opts?.focus || null,
+      weekContext: buildWeekContext(state, currentWeekStart, dateKey),
       // Stream the build so the modal can render the preamble + exercises live.
       onPreamble: opts?.onPreamble,
       onExercise: opts?.onExercise,
@@ -3997,10 +4048,12 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
 
   function handleAcceptTodayWorkout(workout) {
     recordAiEvent("ai_accepted", "today");
+    // Stamp the weekly-plan focus so "done this week" is derivable for continuity.
+    const focus = modals.generateToday?.todayFocus || null;
     updateState((st) => {
       if (!st.dailyWorkouts) st.dailyWorkouts = {};
       if (!st.dailyWorkouts[dateKey]) st.dailyWorkouts[dateKey] = [];
-      st.dailyWorkouts[dateKey].push({ ...workout, source: "generate_today" });
+      st.dailyWorkouts[dateKey].push({ ...workout, source: "generate_today", focus });
       return st;
     });
     setCollapsedToday((prev) => new Set(prev).add(workout.id));
@@ -8153,6 +8206,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         isPro={isPro}
         genUsage={{ used: getMonthlyGenCount(), limit: FREE_AI_MONTHLY_LIMIT }}
         onRegenerate={() => recordAiEvent("ai_regenerated", "today")}
+        weeklyPlan={activeWeeklyPlan}
+        suggestedFocusKey={suggestedFocusKey}
+        onCreateWeeklyPlan={createWeeklyPlan}
         styles={styles}
         colors={colors}
       />

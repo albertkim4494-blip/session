@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Modal } from "./Modal";
 import { EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
 import { CoachCheckin } from "./CoachCheckin";
+import { getSplitOptions } from "../lib/splitTemplates";
 
 const DURATION_OPTIONS = [
   { value: 10, label: "10 min" },
@@ -49,10 +50,31 @@ export function GenerateTodayModal({
   isPro,
   genUsage,
   onRegenerate,
+  weeklyPlan,
+  suggestedFocusKey,
+  onCreateWeeklyPlan,
   styles,
   colors,
 }) {
-  const { step, duration, equipment, preview, loading, error } = todayState || {};
+  const { step, duration, equipment, preview, loading, error, planningMode, weeklyDays, todayFocus } = todayState || {};
+
+  // Dynamic step flow: "setup" (no active weekly plan → ask days + pick a split)
+  // vs. "daily" (active plan → pick today's focus). Preview always generates.
+  const stepFlow = planningMode === "setup"
+    ? ["days", "duration", "equipment", "split", "checkin", "preview"]
+    : ["focus", "checkin", "preview"];
+  const stepKey = stepFlow[(step || 1) - 1] || "preview";
+  const TOTAL_STEPS = stepFlow.length;
+  const STEP_TITLES = {
+    days: "How many days this week?",
+    duration: "How much time do you have?",
+    equipment: "Equipment?",
+    split: "Pick your split",
+    focus: "What are you training today?",
+    checkin: "Quick check-in",
+    preview: "Generated Workout",
+  };
+  const stepTitle = STEP_TITLES[stepKey] || "";
 
   // Live streaming state — the coaching "why" line and exercises as they arrive.
   const [streamNote, setStreamNote] = useState(null);
@@ -61,7 +83,7 @@ export function GenerateTodayModal({
   const [stageIdx, setStageIdx] = useState(0);
 
   // Advance the build-stage caption while waiting for the first streamed content.
-  const buildingWait = open && step === 4 && loading && !preview && !streamNote && streamExercises.length === 0;
+  const buildingWait = open && stepKey === "preview" && loading && !preview && !streamNote && streamExercises.length === 0;
   useEffect(() => {
     if (!buildingWait) return;
     const id = setInterval(() => setStageIdx((i) => Math.min(i + 1, BUILD_STAGES.length - 1)), 1800);
@@ -71,37 +93,52 @@ export function GenerateTodayModal({
   const update = (payload) =>
     dispatch({ type: "UPDATE_GENERATE_TODAY", payload });
 
-  // Auto-generate when entering step 4 (preview)
+  // Auto-generate on entering the preview step.
   useEffect(() => {
-    if (!open || step !== 4 || preview || loading) return;
+    if (!open || stepKey !== "preview" || preview || loading) return;
     setStreamNote(null);
     setStreamExercises([]);
     setStageIdx(0);
     onGenerate({
       equipment,
       duration,
+      focus: todayFocus,
       checkinData: todayCheckin,
       onPreamble: (text) => setStreamNote(text),
       onExercise: (ex) => setStreamExercises((prev) => [...prev, ex]),
     });
     // onGenerate handles setting loading/preview state
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, step, preview, loading, equipment, duration, todayCheckin]);
+  }, [open, stepKey, preview, loading, equipment, duration, todayFocus, todayCheckin]);
 
   if (!open) return null;
-
-  const TOTAL_STEPS = 4; // 1=duration, 2=equipment, 3=check-in, 4=preview
-
-  const stepTitles = ["", "How much time do you have?", "Equipment?", "Quick check-in", "Generated Workout"];
-  const stepTitle = stepTitles[step] || "";
 
   const goNext = () => {
     if (step < TOTAL_STEPS) update({ step: step + 1 });
   };
   const goBack = () => {
-    if (step === 4) update({ step: step - 1, preview: null, loading: false, error: null });
+    if (stepKey === "preview") update({ step: step - 1, preview: null, loading: false, error: null });
     else if (step > 1) update({ step: step - 1 });
   };
+
+  // --- Weekly-plan step handlers ---
+  const splitOptions = planningMode === "setup" ? getSplitOptions(weeklyDays) : [];
+  const pickSplit = (opt) => {
+    onCreateWeeklyPlan?.({
+      daysPerWeek: weeklyDays,
+      duration,
+      equipment,
+      splitId: opt.id,
+      splitLabel: opt.label,
+      slots: opt.slots,
+    });
+    // Start the first day of the new plan on its first slot.
+    update({ todayFocus: opt.slots?.[0]?.focus || "full_body", step: step + 1 });
+  };
+  const pickFocus = (focus) => update({ todayFocus: focus, step: step + 1 });
+
+  // Daily focus options: the plan's slots (App passes the suggested next focus).
+  const focusSlots = (weeklyPlan?.slots || []);
 
   const handleRegenerate = () => {
     onRegenerate?.();
@@ -152,8 +189,73 @@ export function GenerateTodayModal({
     <Modal open={open} title={stepTitle} onClose={onClose} styles={styles}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
-        {/* Step 1: Duration */}
-        {step === 1 && (
+        {/* Days per week (weekly-plan setup) */}
+        {stepKey === "days" && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", paddingTop: 12 }}>
+            {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+              <button key={n} style={smallChipStyle(weeklyDays === n)} onClick={() => update({ weeklyDays: n })}>
+                {n}
+              </button>
+            ))}
+            <div style={{ width: "100%", textAlign: "center", fontSize: 12, opacity: 0.55, marginTop: 4 }}>
+              days you plan to train this week — a target, not a rule
+            </div>
+          </div>
+        )}
+
+        {/* Pick a split (weekly-plan setup) */}
+        {stepKey === "split" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 4 }}>
+            {splitOptions.map((opt) => (
+              <button
+                key={opt.id}
+                className="btn-press"
+                style={{ ...chipStyle(false), display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3 }}
+                onClick={() => pickSplit(opt)}
+              >
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{opt.label}</span>
+                <span style={{ fontSize: 12, opacity: 0.6, fontWeight: 500 }}>{opt.blurb}</span>
+              </button>
+            ))}
+            <div style={{ textAlign: "center", fontSize: 11, opacity: 0.45 }}>
+              You can pick any day from your split each session — or do something else entirely.
+            </div>
+          </div>
+        )}
+
+        {/* Today's focus (daily, active plan) */}
+        {stepKey === "focus" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 4 }}>
+            {weeklyPlan?.splitLabel && (
+              <div style={{ fontSize: 12, opacity: 0.55, textAlign: "center", marginBottom: 2 }}>
+                {weeklyPlan.splitLabel} — pick today
+              </div>
+            )}
+            {(() => {
+              let hl = false;
+              return focusSlots.map((slot) => {
+                const isSuggested = !hl && slot.focus === suggestedFocusKey;
+                if (isSuggested) hl = true;
+                return (
+                  <button
+                    key={slot.id}
+                    className="btn-press"
+                    style={chipStyle(isSuggested)}
+                    onClick={() => pickFocus(slot.focus)}
+                  >
+                    {slot.label}{isSuggested ? "  ·  suggested" : ""}
+                  </button>
+                );
+              });
+            })()}
+            <button className="btn-press" style={{ ...chipStyle(false), opacity: 0.85 }} onClick={() => pickFocus("full_body")}>
+              Something else — quick full body
+            </button>
+          </div>
+        )}
+
+        {/* Duration */}
+        {stepKey === "duration" && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", paddingTop: 12 }}>
             {DURATION_OPTIONS.map((opt) => (
               <button
@@ -167,8 +269,8 @@ export function GenerateTodayModal({
           </div>
         )}
 
-        {/* Step 2: Equipment */}
-        {step === 2 && (
+        {/* Equipment */}
+        {stepKey === "equipment" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
               {[{ key: "no_equipment", label: "No Equipment" }, ...Object.entries(EQUIPMENT_LABELS).map(([key, label]) => ({ key, label }))].map((opt) => {
@@ -205,8 +307,8 @@ export function GenerateTodayModal({
           </div>
         )}
 
-        {/* Step 3: Required check-in */}
-        {step === 3 && (
+        {/* Required check-in */}
+        {stepKey === "checkin" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 8 }}>
             <div style={{ fontSize: 13, opacity: 0.65, textAlign: "center", lineHeight: 1.5 }}>
               Today&apos;s workout uses how you feel right now, not just your history.
@@ -215,7 +317,7 @@ export function GenerateTodayModal({
               colors={colors}
               onSubmit={(checkinData) => {
                 onCheckinSubmit(checkinData);
-                update({ step: 4 });
+                update({ step: step + 1 });
               }}
               editValues={todayCheckin || null}
               showAll
@@ -223,9 +325,9 @@ export function GenerateTodayModal({
           </div>
         )}
 
-        {/* Step 4: Preview — loading. If streaming has started, build the
-            workout live (preamble + exercises appearing); else a spinner. */}
-        {step === 4 && loading && !preview && (
+        {/* Preview — loading. If streaming has started, build the workout live
+            (preamble + exercises appearing); else a spinner. */}
+        {stepKey === "preview" && loading && !preview && (
           (streamNote || streamExercises.length > 0) ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {streamNote && (
@@ -283,8 +385,8 @@ export function GenerateTodayModal({
           )
         )}
 
-        {/* Step 4: Preview — content */}
-        {step === 4 && preview && (
+        {/* Preview — content */}
+        {stepKey === "preview" && preview && (
           <>
             {error && (
               <div style={{
@@ -360,12 +462,14 @@ export function GenerateTodayModal({
             </button>
           )}
           <div style={{ flex: 1 }} />
-          {step < 3 && (
+          {/* Only the free-text steps need a manual Next; split/focus/check-in
+              auto-advance on selection, and preview has its own buttons. */}
+          {["days", "duration", "equipment"].includes(stepKey) && (
             <button className="btn-press" style={styles.primaryBtn} onClick={goNext}>
               Next
             </button>
           )}
-          {step === 4 && !loading && (
+          {stepKey === "preview" && !loading && (
             <>
               <button className="btn-press" style={styles.secondaryBtn} onClick={handleRegenerate}>
                 Regenerate

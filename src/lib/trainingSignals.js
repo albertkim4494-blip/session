@@ -639,3 +639,36 @@ export function buildGenerationPreferences(state, todayKey) {
 
   return { difficultyBias, sampleCount: recent.length };
 }
+
+// ---------------------------------------------------------------------------
+// Weekly plan context (the "this week" memory tier)
+// ---------------------------------------------------------------------------
+
+/**
+ * Summarize the active weekly plan + what's been done so far this week, so the
+ * daily generation reads as part of a coherent week instead of an island.
+ * Returns null when there's no active plan for `weekStart`.
+ * "Done this week" = daily workouts in [weekStart, todayKey] stamped with a focus.
+ * @returns {{ splitLabel, daysPerWeek, dayNumber, doneThisWeek: Array<{focus,date,name}> } | null}
+ */
+export function buildWeekContext(state, weekStart, todayKey) {
+  const plan = state?.weeklyPlan;
+  if (!plan || plan.weekStart !== weekStart) return null;
+
+  const daily = state?.dailyWorkouts || {};
+  const doneThisWeek = [];
+  for (const [date, workouts] of Object.entries(daily)) {
+    if (date < weekStart || date > todayKey) continue;
+    for (const w of (Array.isArray(workouts) ? workouts : [])) {
+      if (w?.focus) doneThisWeek.push({ focus: w.focus, date, name: w.name || null });
+    }
+  }
+  doneThisWeek.sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    splitLabel: plan.splitLabel || null,
+    daysPerWeek: plan.daysPerWeek || plan.slots?.length || null,
+    dayNumber: doneThisWeek.length + 1,
+    doneThisWeek,
+  };
+}

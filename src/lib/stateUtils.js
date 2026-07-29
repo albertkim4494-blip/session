@@ -149,6 +149,9 @@ export function makeDefaultState() {
     // Post-session difficulty feedback, keyed by date: { [YYYY-MM-DD]: { difficulty, ts } }.
     // Drives generation preferences (see trainingSignals.buildGenerationPreferences).
     sessionFeedback: {},
+    // Active weekly-plan scaffold for Generate Today (null = none). Shape:
+    // { weekStart, daysPerWeek, duration, splitId, splitLabel, slots:[{id,focus,label}] }.
+    weeklyPlan: null,
     preferences: {
       defaultRestSec: 90,
       timerSound: true,
@@ -207,6 +210,8 @@ export function normalizeState(st) {
     sessionAdditions: st.sessionAdditions && typeof st.sessionAdditions === "object" ? st.sessionAdditions : {},
     logsByDate: st.logsByDate && typeof st.logsByDate === "object" ? st.logsByDate : {},
     sessionFeedback: st.sessionFeedback && typeof st.sessionFeedback === "object" ? st.sessionFeedback : {},
+    // Valid weekly plan is an object with a weekStart; anything else → null.
+    weeklyPlan: st.weeklyPlan && typeof st.weeklyPlan === "object" && st.weeklyPlan.weekStart ? st.weeklyPlan : null,
     meta: {
       createdAt: st.meta?.createdAt ?? Date.now(),
       updatedAt: st.meta?.updatedAt ?? 0,

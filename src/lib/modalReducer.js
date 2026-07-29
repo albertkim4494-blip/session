@@ -153,6 +153,12 @@ export const initialModalState = {
     preview: null,
     loading: false,
     error: null,
+    // Weekly-plan flow: "setup" (no active plan → ask days/split) or "daily"
+    // (active plan → pick today's focus). weeklyDays = setup day-count choice;
+    // todayFocus = the chosen slot focus key driving today's generation.
+    planningMode: "daily",
+    weeklyDays: 4,
+    todayFocus: null,
   },
   customExercise: {
     isOpen: false,
@@ -674,6 +680,9 @@ export function modalReducer(state, action) {
           equipment: action.payload?.equipment || ["full_gym"],
           duration: action.payload?.duration || 60,
           preview: action.payload?.preview || null,
+          planningMode: action.payload?.planningMode || "daily",
+          weeklyDays: action.payload?.weeklyDays || 4,
+          todayFocus: action.payload?.todayFocus || null,
         },
       };
 
