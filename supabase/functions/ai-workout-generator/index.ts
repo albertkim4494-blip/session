@@ -435,6 +435,7 @@ ${(() => {
 })()}
 
 RULES:
+0. KEEP IT PROVEN AND FOCUSED. Default to well-known, effective movements — a great workout is mostly staples (compound lifts: squat, hinge/deadlift, press, row, pull, lunge) plus a few sensible accessories. It should look like a normal session a good trainer would actually program, NOT a showcase of unusual or highly-specific exercises. Reach for a less-common movement ONLY when there's a clear, concrete reason. Use the personalization signals to pick sensible emphasis and loading — do NOT over-optimize them into a scattered, exotic, or overly clever workout. When in doubt, choose the simpler, more familiar exercise.
 1. Prioritize muscles that haven't been trained recently (high days-ago or "never trained"). NEVER target muscles already trained today.
 2. Pick exercises ONLY from the catalog, using exact catalogId values. Do NOT pick exercises the user already did today.
 3. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.
@@ -726,6 +727,11 @@ Deno.serve(async (req) => {
     // Only "today" streams (the hero surface). Program stays a blocking JSON call.
     const wantsStream = body.stream === true && mode === "today";
 
+    // Lower temperature for "today" so it favors solid, standard workouts instead
+    // of exotic exercise picks (0.8 read as "a trainer doing too much"). Program
+    // keeps a bit more variety across a whole week.
+    const temperature = mode === "today" ? 0.4 : 0.8;
+
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -738,7 +744,7 @@ Deno.serve(async (req) => {
           { role: "system", content: system },
           { role: "user", content: user },
         ],
-        temperature: 0.8,
+        temperature,
         max_tokens: 2000,
         response_format: { type: "json_object" },
         ...(wantsStream ? { stream: true } : {}),
