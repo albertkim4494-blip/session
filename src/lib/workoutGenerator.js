@@ -76,7 +76,8 @@ export const SET_REP_SCHEMES = {
  */
 export function exerciseCountFromDuration(duration) {
   const mins = duration || 60;
-  if (mins <= 15) return 2;
+  if (mins <= 10) return 3;   // express — a few quick movements, ~1 set each
+  if (mins <= 15) return 3;
   if (mins <= 30) return Math.min(4, Math.max(3, Math.round(mins / 8)));
   return Math.max(4, Math.min(10, Math.round(mins / 7)));
 }

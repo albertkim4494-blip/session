@@ -5,12 +5,14 @@ import { CoachCheckin } from "./CoachCheckin";
 import { getSplitOptions, FOCUS_LABELS } from "../lib/splitTemplates";
 
 const DURATION_OPTIONS = [
+  { value: 5, label: "5 min" },
   { value: 10, label: "10 min" },
   { value: 15, label: "15 min" },
   { value: 30, label: "30 min" },
   { value: 45, label: "45 min" },
-  { value: 60, label: "60 min" },
-  { value: 90, label: "90+ min" },
+  { value: 60, label: "1 hr" },
+  { value: 90, label: "90 min" },
+  { value: 120, label: "2 hr" },
 ];
 
 // Status captions shown while waiting for the first streamed token. These mirror
@@ -53,7 +55,9 @@ export function GenerateTodayModal({
   weeklyPlan,
   suggestedFocusKey,
   maxWeeklyDays,
+  doneFocusesThisWeek,
   onCreateWeeklyPlan,
+  onChangePlan,
   styles,
   colors,
 }) {
@@ -63,7 +67,7 @@ export function GenerateTodayModal({
   // vs. "daily" (active plan → pick today's focus). Preview always generates.
   const stepFlow = planningMode === "setup"
     ? ["days", "duration", "equipment", "split", "checkin", "preview"]
-    : ["focus", "checkin", "preview"];
+    : ["focus", "duration", "checkin", "preview"];
   const stepKey = stepFlow[(step || 1) - 1] || "preview";
   const TOTAL_STEPS = stepFlow.length;
   const STEP_TITLES = {
@@ -150,6 +154,13 @@ export function GenerateTodayModal({
     return out;
   })();
   const showSomethingElse = !uniqueFocuses.includes("full_body");
+  // Progress within the week + which focuses are already fully covered.
+  const doneCounts = {};
+  for (const f of doneFocusesThisWeek || []) doneCounts[f] = (doneCounts[f] || 0) + 1;
+  const plannedCounts = {};
+  for (const slot of weeklyPlan?.slots || []) plannedCounts[slot.focus] = (plannedCounts[slot.focus] || 0) + 1;
+  const dayNumber = (doneFocusesThisWeek?.length || 0) + 1;
+  const totalDays = weeklyPlan?.daysPerWeek || weeklyPlan?.slots?.length || 0;
 
   const handleRegenerate = () => {
     onRegenerate?.();
@@ -225,9 +236,11 @@ export function GenerateTodayModal({
                 );
               })}
             </div>
-            <div style={{ textAlign: "center", fontSize: 12, opacity: 0.55 }}>
-              days you plan to train this week — a target, not a rule
-              {maxWeeklyDays != null && maxWeeklyDays < 7 ? ` · ${maxWeeklyDays} left this week` : ""}
+            <div style={{ textAlign: "center", fontSize: 12, opacity: 0.55, lineHeight: 1.5 }}>
+              <div>days you plan to train this week — a target, not a rule</div>
+              {maxWeeklyDays != null && maxWeeklyDays < 7 && (
+                <div style={{ opacity: 0.8 }}>{maxWeeklyDays} {maxWeeklyDays === 1 ? "day" : "days"} left this week</div>
+              )}
             </div>
           </div>
         )}
@@ -256,20 +269,24 @@ export function GenerateTodayModal({
         {stepKey === "focus" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 4 }}>
             {weeklyPlan?.splitLabel && (
-              <div style={{ fontSize: 12, opacity: 0.55, textAlign: "center", marginBottom: 2 }}>
-                {weeklyPlan.splitLabel} — pick today
+              <div style={{ fontSize: 12, opacity: 0.6, textAlign: "center", marginBottom: 2 }}>
+                {totalDays ? `Day ${Math.min(dayNumber, totalDays)} of ${totalDays} · ` : ""}{weeklyPlan.splitLabel}
               </div>
             )}
             {uniqueFocuses.map((focus) => {
               const isSuggested = focus === suggestedFocusKey;
+              const covered = (doneCounts[focus] || 0) >= (plannedCounts[focus] || 1);
               return (
                 <button
                   key={focus}
                   className="btn-press"
-                  style={chipStyle(isSuggested)}
+                  style={{ ...chipStyle(isSuggested), display: "flex", justifyContent: "space-between", alignItems: "center", opacity: covered && !isSuggested ? 0.6 : 1 }}
                   onClick={() => pickFocus(focus)}
                 >
-                  {FOCUS_LABELS[focus] || focus}{isSuggested ? "  ·  suggested" : ""}
+                  <span>{FOCUS_LABELS[focus] || focus}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.7 }}>
+                    {isSuggested ? "suggested" : covered ? "✓ done this week" : ""}
+                  </span>
                 </button>
               );
             })}
@@ -278,16 +295,23 @@ export function GenerateTodayModal({
                 Something else — quick full body
               </button>
             )}
+            <button
+              className="btn-press"
+              onClick={() => onChangePlan?.()}
+              style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.4, fontSize: 12, cursor: "pointer", padding: "6px 0", marginTop: 2 }}
+            >
+              Start a new plan
+            </button>
           </div>
         )}
 
-        {/* Duration */}
+        {/* Duration — 8 options, two rows of four */}
         {stepKey === "duration" && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", paddingTop: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, paddingTop: 12 }}>
             {DURATION_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
-                style={smallChipStyle(duration === opt.value)}
+                style={{ ...smallChipStyle(duration === opt.value), minWidth: 0, padding: "10px 0" }}
                 onClick={() => update({ duration: opt.value })}
               >
                 {opt.label}

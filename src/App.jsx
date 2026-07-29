@@ -3975,6 +3975,21 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
     });
   }, [dateKey, weekStartsOn]);
 
+  // "Start a new plan" mid-week → clear the plan and restart setup.
+  const restartWeeklyPlan = useCallback(() => {
+    updateState((s) => { s.weeklyPlan = null; return s; });
+    dispatchModal({
+      type: "OPEN_GENERATE_TODAY",
+      payload: {
+        planningMode: "setup",
+        equipment: equipment || ["full_gym"],
+        duration: 60,
+        weeklyDays: Math.min(4, maxWeeklyDays),
+        todayFocus: null,
+      },
+    });
+  }, [equipment, maxWeeklyDays]);
+
   async function handleGenerateToday(opts) {
     const eq = opts?.equipment || modals.generateToday.equipment || equipment;
     const dur = opts?.duration || modals.generateToday.duration || 60;
@@ -8215,7 +8230,9 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         weeklyPlan={activeWeeklyPlan}
         suggestedFocusKey={suggestedFocusKey}
         maxWeeklyDays={maxWeeklyDays}
+        doneFocusesThisWeek={doneFocusesThisWeek}
         onCreateWeeklyPlan={createWeeklyPlan}
+        onChangePlan={restartWeeklyPlan}
         styles={styles}
         colors={colors}
       />

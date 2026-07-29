@@ -368,7 +368,7 @@ TODAY'S FOCUS: ${todayFocus.label || todayFocus.key}. Build the session around $
     // A full-body day is SUPPOSED to revisit the main patterns — don't let the
     // "avoid repeating this week" rule starve it into an odd partial session.
     const complementLine = isFullBody
-      ? " Today is a full-body day, so a balanced session that revisits the main movement patterns is expected — just vary the specific exercises from earlier this week where you can."
+      ? " Today is a full-body day, so revisiting the main movement PATTERNS is expected — but pick DIFFERENT specific exercises than those in the recent training history above (e.g. if you already did barbell rows, choose pull-ups or a different row today). Do NOT hand back the same workout you gave earlier this week."
       : " Make today COMPLEMENT the week — build on it and avoid re-hammering what was already trained hard this week unless today's focus specifically calls for it.";
     weekSection = `
 THIS WEEK'S PLAN: ${weekContext.splitLabel}${weekContext.daysPerWeek ? `, ~${weekContext.daysPerWeek} days/week` : ""}. This is day ${weekContext.dayNumber || 1} of the week.${done ? ` Already trained this week: ${done}.` : ""}${complementLine}
@@ -474,11 +474,11 @@ RULES:
 0. KEEP IT PROVEN AND FOCUSED. Default to well-known, effective movements — a great workout is mostly staples (compound lifts: squat, hinge/deadlift, press, row, pull, lunge) plus a few sensible accessories. It should look like a normal session a good trainer would actually program, NOT a showcase of unusual or highly-specific exercises. Reach for a less-common movement ONLY when there's a clear, concrete reason. Use the personalization signals to pick sensible emphasis and loading — do NOT over-optimize them into a scattered, exotic, or overly clever workout. When in doubt, choose the simpler, more familiar exercise.
 1. Prioritize muscles that haven't been trained recently (high days-ago or "never trained"). NEVER target muscles already trained today.
 2. Pick exercises ONLY from the catalog, using exact catalogId values. Do NOT pick exercises the user already did today.
-3. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.
+3. Each exercise MUST have its own "scheme" field with sets x reps/duration tailored to that exercise.${dur <= 10 ? `\n   - EXPRESS OVERRIDE (~${dur} min): prescribe a SINGLE working set per exercise (e.g. "1x12", "1x15") — IGNORE the multi-set goal counts below. Speed over volume.` : ""}
    - For isometric/hold exercises (tagged "isometric", unit "sec") like planks: prescribe a SINGLE long hold, e.g. "1x60s", "1x45s", "1x90s". Do NOT prescribe multiple sets for holds.
    - For other exercises with unit "sec" (non-isometric): prescribe time-based schemes like "3x30s".
    - For exercises with unit "reps": prescribe rep-based schemes like "4x8-12", "3x10", "5x5".
-   - Tailor schemes to the user's goal:
+   - Tailor schemes to the user's goal${dur <= 10 ? " (EXCEPT express — one set each, see override above)" : ""}:
      * Build Muscle: 3-4 sets of 8-12 reps
      * Get Stronger: 4-5 sets of 3-5 reps
      * Lose Fat: 3 sets of 15-20 reps
@@ -487,7 +487,7 @@ RULES:
    - If the user has health conditions or is a beginner, lean toward fewer sets (2-3) with moderate intensity.
 4. No duplicate exercises.
 5. Order: compounds first, then isolation, then accessories.
-6. Pick ~${exerciseCount} exercises to fit within ~${dur} minutes (including warm-up and rest between sets).${dur <= 15 ? " This is a quick session — pick only compound movements, no isolation." : ""}
+6. Pick ~${exerciseCount} exercises to fit within ~${dur} minutes${dur <= 10 ? `. EXPRESS session (~${dur} min): 2-3 BIG compound movements only, a SINGLE quick working set each (e.g. "1x12", NOT multiple sets), minimal rest — a fast circuit. For full-body express, pick multi-joint lifts that each cover a lot (squat, hinge, push-up, row).` : dur <= 15 ? ". Quick session — compound movements only, no isolation." : " (including warm-up and rest between sets)."}
 7. Give the workout a descriptive name (e.g. "Pull", "Upper Body", "Chest & Shoulders").
 8. List the primary target muscle groups (use keys like CHEST, BACK, QUADS, etc.).
 
