@@ -642,7 +642,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "suspension"
     ],
     "aliases": [
       "trx row",
@@ -839,7 +839,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -2082,7 +2082,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -2393,7 +2393,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "suspension"
     ],
     "aliases": [],
     "tags": [
@@ -3125,7 +3125,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -4181,7 +4181,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -4419,7 +4419,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -5541,7 +5541,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [
       "banded hip thrust",
@@ -7275,7 +7275,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -7698,7 +7698,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [
       "band rear delt fly",
@@ -7995,7 +7995,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -8146,7 +8146,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -10209,7 +10209,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [
       "pallof press",
@@ -10608,7 +10608,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -10703,7 +10703,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -11109,7 +11109,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [
@@ -11804,7 +11804,7 @@ export const EXERCISE_CATALOG = [
       ]
     },
     "equipment": [
-      "bodyweight"
+      "band"
     ],
     "aliases": [],
     "tags": [

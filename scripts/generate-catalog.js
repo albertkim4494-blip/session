@@ -112,8 +112,8 @@ const EQUIPMENT_MAP = {
   "ez barbell": "barbell",
   "trap bar": "barbell",
   "olympic barbell": "barbell",
-  band: "bodyweight",
-  "resistance band": "bodyweight",
+  band: "band",
+  "resistance band": "band",
   "stability ball": "bodyweight",
   "bosu ball": "bodyweight",
   "wheel roller": "ab wheel",
@@ -128,6 +128,15 @@ const EQUIPMENT_MAP = {
   "upper body ergometer": "machine",
   assisted: "machine",
   "tire": "bodyweight",
+};
+
+// Per-exercise equipment overrides (by ExerciseDB id). ExerciseDB tags some
+// movements "body weight" when they actually need equipment (e.g. suspension
+// trainers / TRX) — correct them here so they don't slip into "no equipment".
+// (Band moves are fixed systemically via EQUIPMENT_MAP above.)
+const EQUIPMENT_OVERRIDES = {
+  "4OaumBr": ["suspension"], // Suspended Row
+  "IaGQCrC": ["suspension"], // Suspended Push-up
 };
 
 function mapEquipment(equipments) {
@@ -248,7 +257,7 @@ const CUSTOM_EXERCISES = [
   { id: "custom-sled-push", name: "Sled Push", defaultUnit: "sec", muscles: { primary: ["QUADS", "GLUTES", "CALVES"] }, equipment: ["machine"], aliases: ["prowler push", "sled drive"], tags: ["compound", "legs", "cardio"], movement: "legs" },
   { id: "custom-sled-pull", name: "Sled Pull", defaultUnit: "sec", muscles: { primary: ["BACK", "HAMSTRINGS", "GLUTES"] }, equipment: ["machine"], aliases: ["prowler pull", "sled drag"], tags: ["compound", "legs", "cardio"], movement: "legs" },
   { id: "custom-tire-flip", name: "Tire Flip", defaultUnit: "reps", muscles: { primary: ["BACK", "QUADS", "GLUTES"] }, equipment: ["bodyweight"], aliases: ["tire flips"], tags: ["compound"], movement: "legs" },
-  { id: "custom-battle-rope", name: "Battle Ropes", defaultUnit: "sec", muscles: { primary: ["ANTERIOR_DELT", "ABS"] }, equipment: ["bodyweight"], aliases: ["battle rope", "rope slams", "rope waves"], tags: ["cardio", "compound"], movement: "cardio" },
+  { id: "custom-battle-rope", name: "Battle Ropes", defaultUnit: "sec", muscles: { primary: ["ANTERIOR_DELT", "ABS"] }, equipment: ["machine"], aliases: ["battle rope", "rope slams", "rope waves"], tags: ["cardio", "compound"], movement: "cardio" },
   { id: "custom-cable-face-pull", name: "Cable Face Pull", defaultUnit: "reps", muscles: { primary: ["POSTERIOR_DELT"], secondary: ["BACK", "BICEPS"] }, equipment: ["cable"], aliases: ["face pull", "rope face pull", "cable rope face pull"], tags: ["compound", "pull"], movement: "pull", gifUrl: "https://static.exercisedb.dev/media/ZfyAGhK.gif" },
 
   // CARDIO
@@ -314,7 +323,7 @@ const CUSTOM_EXERCISES = [
   { id: "m-tai-chi", name: "Tai Chi", defaultUnit: "min", muscles: { primary: ["QUADS", "ABS", "CALVES"] }, equipment: [], aliases: ["tai chi class", "taichi"], tags: ["mobility", "flexibility"], movement: "mobility" },
   { id: "m-hip-90-90", name: "90/90 Hip Switch", defaultUnit: "reps", muscles: { primary: ["GLUTES"] }, equipment: ["bodyweight"], aliases: ["hip 90 90", "90 90 stretch", "hip switch"], tags: ["mobility", "bodyweight"], movement: "mobility" },
   { id: "m-worlds-greatest", name: "World's Greatest Stretch", defaultUnit: "reps", muscles: { primary: ["QUADS", "BACK", "GLUTES"] }, equipment: ["bodyweight"], aliases: ["greatest stretch", "wgs"], tags: ["mobility", "bodyweight"], movement: "mobility" },
-  { id: "m-shoulder-dislocate", name: "Shoulder Dislocates", defaultUnit: "reps", muscles: { primary: ["ANTERIOR_DELT", "POSTERIOR_DELT"] }, equipment: ["bodyweight"], aliases: ["band pass through", "dowel dislocate", "shoulder pass-through"], tags: ["mobility", "bodyweight"], movement: "mobility" },
+  { id: "m-shoulder-dislocate", name: "Shoulder Dislocates", defaultUnit: "reps", muscles: { primary: ["ANTERIOR_DELT", "POSTERIOR_DELT"] }, equipment: ["band"], aliases: ["band pass through", "dowel dislocate", "shoulder pass-through"], tags: ["mobility"], movement: "mobility" },
   { id: "m-ankle-mobility", name: "Ankle Mobility Drill", defaultUnit: "reps", muscles: { primary: ["CALVES"] }, equipment: ["bodyweight"], aliases: ["ankle circles", "ankle dorsiflexion", "wall ankle stretch"], tags: ["mobility", "bodyweight"], movement: "mobility" },
   { id: "m-hip-circles", name: "Hip Circles", defaultUnit: "reps", muscles: { primary: ["GLUTES"] }, equipment: ["bodyweight"], aliases: ["hip rotations", "standing hip circles"], tags: ["mobility", "bodyweight"], movement: "mobility" },
   { id: "m-thoracic-rotation", name: "Thoracic Rotation", defaultUnit: "reps", muscles: { primary: ["BACK"] }, equipment: ["bodyweight"], aliases: ["t-spine rotation", "open book stretch"], tags: ["mobility", "bodyweight"], movement: "mobility" },
@@ -374,7 +383,16 @@ const CUSTOM_EXERCISES = [
 function transformExercise(ex) {
   const name = toTitleCase(ex.name);
   const muscleData = mapMuscles(ex.targetMuscles, ex.secondaryMuscles, name);
-  const equipment = mapEquipment(ex.equipments);
+  let equipment = EQUIPMENT_OVERRIDES[ex.exerciseId] || mapEquipment(ex.equipments);
+  // Name-based safety net: ExerciseDB tags some equipment-based moves "body weight"
+  // (no TRX/battle-rope categories), which would wrongly slip into "no equipment".
+  if (equipment.length === 0 || (equipment.length === 1 && equipment[0] === "bodyweight")) {
+    const n = ex.name.toLowerCase();
+    if (/\bsuspend/.test(n)) equipment = ["suspension"];
+    else if (/battle rope/.test(n)) equipment = ["machine"];
+    else if (/cable machine|\bmachine\b/.test(n)) equipment = ["machine"];
+    else if (/dislocat/.test(n)) equipment = ["band"]; // shoulder dislocates (band/stick)
+  }
   const movement = mapMovement(ex.bodyParts);
   const tags = buildTags(ex, muscleData.primary, equipment, movement);
   const defaultUnit = getDefaultUnit(ex);
