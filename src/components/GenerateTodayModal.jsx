@@ -56,6 +56,7 @@ export function GenerateTodayModal({
   suggestedFocusKey,
   maxWeeklyDays,
   doneFocusesThisWeek,
+  alreadyTrainedToday,
   onCreateWeeklyPlan,
   onChangePlan,
   styles,
@@ -273,6 +274,30 @@ export function GenerateTodayModal({
                 {totalDays ? `Day ${Math.min(dayNumber, totalDays)} of ${totalDays} · ` : ""}{weeklyPlan.splitLabel}
               </div>
             )}
+
+            {/* Already trained today → don't let them advance the plan a second
+                time the same day; only a bonus quick session or a new plan. */}
+            {alreadyTrainedToday ? (
+              <>
+                <div style={{
+                  fontSize: 13, textAlign: "center", opacity: 0.7, lineHeight: 1.5,
+                  padding: "8px 4px",
+                }}>
+                  You&apos;ve already done today&apos;s session. The rest of your split is for the coming days — but you can squeeze in a quick bonus if you want.
+                </div>
+                <button className="btn-press" style={chipStyle(false)} onClick={() => pickFocus("full_body")}>
+                  Quick full body (bonus)
+                </button>
+                <button
+                  className="btn-press"
+                  onClick={() => onChangePlan?.()}
+                  style={{ background: "transparent", border: "none", color: colors.text, opacity: 0.4, fontSize: 12, cursor: "pointer", padding: "6px 0", marginTop: 2 }}
+                >
+                  Start a new plan
+                </button>
+              </>
+            ) : (
+            <>
             {uniqueFocuses.map((focus) => {
               const isSuggested = focus === suggestedFocusKey;
               const covered = (doneCounts[focus] || 0) >= (plannedCounts[focus] || 1);
@@ -302,6 +327,8 @@ export function GenerateTodayModal({
             >
               Start a new plan
             </button>
+            </>
+            )}
           </div>
         )}
 

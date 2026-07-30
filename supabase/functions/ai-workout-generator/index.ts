@@ -403,6 +403,7 @@ The user participates in: ${profile.sports}. Consider its muscular demands, avoi
 
   // Volume scaling — one authoritative guide so exercise/set counts match the
   // time budget (10-min sessions aren't 9 exercises; an hour isn't 1 set each).
+  const bodyweightOnly = Array.isArray(equipment) && equipment.length === 0;
   const isExpress = dur <= 10;
   const setsGuide = dur <= 10
     ? "1-2 quick sets per exercise (circuit style, short rest)"
@@ -415,7 +416,7 @@ The user participates in: ${profile.sports}. Consider its muscular demands, avoi
 USER PROFILE:
 ${profileLines.length > 0 ? profileLines.join("\n") : "No profile info."}
 
-Equipment: ${formatEquipmentLabelToday(equipment)}
+Equipment: ${formatEquipmentLabelToday(equipment)}${bodyweightOnly ? "\n⚠️ BODYWEIGHT ONLY: pick ONLY true bodyweight/calisthenic exercises. Do NOT use resistance bands, suspension trainers (TRX), machines, cables, dumbbells, or ANY equipment — even if a catalog entry doesn't list its equipment. If a movement plausibly needs equipment, skip it." : ""}
 Goal: ${goal}
 Session duration: ~${dur} minutes
 ${sportBioSection}${focusSection}${weekSection}

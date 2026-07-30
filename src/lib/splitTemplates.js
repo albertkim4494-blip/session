@@ -18,6 +18,11 @@ export const FOCUS_LABELS = {
   legs: "Legs",
   arms: "Arms",
   core: "Core",
+  chest: "Chest",
+  back: "Back",
+  shoulders: "Shoulders",
+  chest_tri: "Chest & Triceps",
+  back_bi: "Back & Biceps",
 };
 
 // Canonical focus → target-muscle guidance for the generation prompt.
@@ -30,6 +35,11 @@ export const FOCUS_MUSCLES = {
   legs: "the legs — quads, hamstrings, glutes, and calves",
   arms: "the arms — biceps, triceps, and forearms (with some shoulder work)",
   core: "the core and midsection — abs, obliques, and lower back",
+  chest: "the chest — plus supporting triceps and front delts",
+  back: "the back — lats and upper back, plus some biceps",
+  shoulders: "the shoulders — all three delt heads, plus some traps",
+  chest_tri: "chest and triceps — horizontal pressing and pushing",
+  back_bi: "back and biceps — pulling and rows",
 };
 
 /** One-line coaching guidance for a focus, for the prompt. Falls back gracefully. */
@@ -53,9 +63,11 @@ const TEMPLATES = {
   ],
   4: [
     { id: "ul_4", label: "Upper / Lower ×2", focuses: ["upper", "lower", "upper", "lower"], blurb: "Two upper and two lower days — balanced and popular." },
+    { id: "bodypart_4", label: "Chest & Tri · Back & Bi · Shoulders · Lower", focuses: ["chest_tri", "back_bi", "shoulders", "legs"], blurb: "A body-part split — push, pull, shoulders, and lower." },
     { id: "full_4", label: "Full Body ×4", focuses: ["full_body", "full_body", "full_body", "full_body"], blurb: "Four whole-body days — high frequency, low fuss." },
   ],
   5: [
+    { id: "bro_5", label: "Bro Split — Chest · Back · Shoulders · Arms · Legs", focuses: ["chest", "back", "shoulders", "arms", "legs"], blurb: "The classic bodybuilder split — one body part per day." },
     { id: "ppl_ul_5", label: "Push · Pull · Legs + Upper / Lower", focuses: ["push", "pull", "legs", "upper", "lower"], blurb: "PPL plus an extra upper and lower — solid volume." },
     { id: "full_5", label: "Full Body ×5", focuses: ["full_body", "full_body", "full_body", "full_body", "full_body"], blurb: "Five whole-body days — max frequency." },
   ],

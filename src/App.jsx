@@ -258,14 +258,23 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
   const currentWeekStart = startOfWeek(dateKey, weekStartsOn);
   const activeWeeklyPlan =
     state.weeklyPlan && state.weeklyPlan.weekStart === currentWeekStart ? state.weeklyPlan : null;
-  const doneFocusesThisWeek = useMemo(() => {
-    const out = [];
+  // The plan progresses by DISTINCT DAY (one slot per calendar day) — so two
+  // generations on the same day don't advance the week, and you can't start
+  // "day 2" the same day you did day 1.
+  const { doneFocusesThisWeek, alreadyTrainedToday } = useMemo(() => {
+    const byDate = {};
     const daily = state.dailyWorkouts || {};
     for (const [d, ws] of Object.entries(daily)) {
       if (d < currentWeekStart || d > dateKey) continue;
-      for (const w of Array.isArray(ws) ? ws : []) if (w?.focus) out.push(w.focus);
+      for (const w of Array.isArray(ws) ? ws : []) {
+        if (w?.focus && !byDate[d]) byDate[d] = w.focus; // that day's plan focus
+      }
     }
-    return out;
+    const dates = Object.keys(byDate).sort();
+    return {
+      doneFocusesThisWeek: dates.map((d) => byDate[d]),
+      alreadyTrainedToday: !!byDate[dateKey],
+    };
   }, [state.dailyWorkouts, currentWeekStart, dateKey]);
   const suggestedFocusKey = activeWeeklyPlan
     ? suggestNextSlot(activeWeeklyPlan, doneFocusesThisWeek)?.focus || null
@@ -8231,6 +8240,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
         suggestedFocusKey={suggestedFocusKey}
         maxWeeklyDays={maxWeeklyDays}
         doneFocusesThisWeek={doneFocusesThisWeek}
+        alreadyTrainedToday={alreadyTrainedToday}
         onCreateWeeklyPlan={createWeeklyPlan}
         onChangePlan={restartWeeklyPlan}
         styles={styles}
