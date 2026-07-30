@@ -4051,6 +4051,7 @@ export default function App({ session, onLogout, showGenerateWizard, onGenerateW
       checkinContext,
       // Weekly-plan continuity: today's chosen focus + this week's context.
       focus: opts?.focus || null,
+      focusMuscles: opts?.focusMuscles || null,
       weekContext: buildWeekContext(state, currentWeekStart, dateKey),
       // Stream the build so the modal can render the preamble + exercises live.
       onPreamble: opts?.onPreamble,

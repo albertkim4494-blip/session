@@ -47,6 +47,31 @@ export function focusGuidance(focus) {
   return FOCUS_MUSCLES[focus] || "a balanced session appropriate to the user's recent training";
 }
 
+// Muscle-group key → readable name, for the custom body-diagram focus.
+export const MUSCLE_READABLE = {
+  CHEST: "chest", BACK: "back", QUADS: "quads", HAMSTRINGS: "hamstrings",
+  GLUTES: "glutes", CALVES: "calves", TRICEPS: "triceps", BICEPS: "biceps",
+  FOREARMS: "forearms", ABS: "abs", OBLIQUES: "obliques",
+  ANTERIOR_DELT: "front delts", LATERAL_DELT: "side delts", POSTERIOR_DELT: "rear delts",
+};
+
+/**
+ * Build prompt guidance from a set of muscle-group keys the user tapped on the
+ * body diagram. Collapses the three delt heads to "shoulders" for readability.
+ */
+export function musclesToGuidance(keys) {
+  const set = new Set(keys || []);
+  const parts = [];
+  const delts = ["ANTERIOR_DELT", "LATERAL_DELT", "POSTERIOR_DELT"];
+  if (delts.some((d) => set.has(d)) && delts.every((d) => set.has(d))) {
+    parts.push("shoulders");
+    delts.forEach((d) => set.delete(d));
+  }
+  for (const k of set) if (MUSCLE_READABLE[k]) parts.push(MUSCLE_READABLE[k]);
+  if (parts.length === 0) return "a balanced session appropriate to the user's recent training";
+  return `specifically these muscles: ${parts.join(", ")}`;
+}
+
 // Curated split options per day-count (1–7). Each option is a POOL of focuses.
 // Kept intentionally simple and proven — the daily generation adds the exercises.
 const TEMPLATES = {

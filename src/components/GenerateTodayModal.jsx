@@ -3,6 +3,7 @@ import { Modal } from "./Modal";
 import { EQUIPMENT_LABELS } from "../lib/exerciseCatalog";
 import { CoachCheckin } from "./CoachCheckin";
 import { getSplitOptions, FOCUS_LABELS } from "../lib/splitTemplates";
+import { BodyDiagram, SLUG_TO_MUSCLES } from "./BodyDiagram";
 
 const DURATION_OPTIONS = [
   { value: 5, label: "5 min" },
@@ -62,7 +63,19 @@ export function GenerateTodayModal({
   styles,
   colors,
 }) {
-  const { step, duration, equipment, preview, loading, error, planningMode, weeklyDays, todayFocus } = todayState || {};
+  const { step, duration, equipment, preview, loading, error, planningMode, weeklyDays, todayFocus, todayFocusMuscles } = todayState || {};
+
+  // Body-diagram muscle picker (custom focus).
+  const [musclePicker, setMusclePicker] = useState(false);
+  const [pickedMuscles, setPickedMuscles] = useState([]);
+  const toggleMuscle = (part) => {
+    const ms = SLUG_TO_MUSCLES[part?.slug];
+    if (!ms?.length) return;
+    setPickedMuscles((prev) => {
+      const allPresent = ms.every((m) => prev.includes(m));
+      return allPresent ? prev.filter((m) => !ms.includes(m)) : [...new Set([...prev, ...ms])];
+    });
+  };
 
   // Dynamic step flow: "setup" (no active weekly plan → ask days + pick a split)
   // vs. "daily" (active plan → pick today's focus). Preview always generates.
@@ -109,6 +122,7 @@ export function GenerateTodayModal({
       equipment,
       duration,
       focus: todayFocus,
+      focusMuscles: todayFocusMuscles,
       checkinData: todayCheckin,
       onPreamble: (text) => setStreamNote(text),
       onExercise: (ex) => setStreamExercises((prev) => [...prev, ex]),
@@ -266,8 +280,32 @@ export function GenerateTodayModal({
           </div>
         )}
 
+        {/* Body-diagram muscle picker (custom focus) */}
+        {stepKey === "focus" && musclePicker && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 4 }}>
+            <div style={{ fontSize: 13, textAlign: "center", opacity: 0.7 }}>
+              Tap the muscles you want to train
+            </div>
+            <BodyDiagram highlightedMuscles={pickedMuscles} colors={colors} onBodyPartPress={toggleMuscle} />
+            <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+              <button className="btn-press" style={styles.secondaryBtn} onClick={() => setMusclePicker(false)}>
+                Back
+              </button>
+              <div style={{ flex: 1 }} />
+              <button
+                className="btn-press"
+                style={{ ...styles.primaryBtn, opacity: pickedMuscles.length ? 1 : 0.5 }}
+                disabled={!pickedMuscles.length}
+                onClick={() => update({ todayFocus: "custom", todayFocusMuscles: pickedMuscles, step: step + 1 })}
+              >
+                Use these ({pickedMuscles.length})
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Today's focus (daily, active plan) */}
-        {stepKey === "focus" && (
+        {stepKey === "focus" && !musclePicker && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 4 }}>
             {weeklyPlan?.splitLabel && (
               <div style={{ fontSize: 12, opacity: 0.6, textAlign: "center", marginBottom: 2 }}>
@@ -320,6 +358,13 @@ export function GenerateTodayModal({
                 Something else — quick full body
               </button>
             )}
+            <button
+              className="btn-press"
+              style={{ ...chipStyle(false), opacity: 0.85 }}
+              onClick={() => { setPickedMuscles([]); setMusclePicker(true); }}
+            >
+              🎯 Pick specific muscles
+            </button>
             <button
               className="btn-press"
               onClick={() => onChangePlan?.()}

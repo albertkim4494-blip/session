@@ -159,6 +159,7 @@ export const initialModalState = {
     planningMode: "daily",
     weeklyDays: 4,
     todayFocus: null,
+    todayFocusMuscles: null, // custom body-diagram muscle selection (array of keys)
   },
   customExercise: {
     isOpen: false,
